@@ -1,14 +1,14 @@
 /**
  * ThreeMatrixTab.jsx
  * 3 Matrix Tree tab:
- *  • 3-category type selector (Subscription 750 / Smart SSP / Self Rebirth)
+ *  • 3-category type selector (Join Prime / Smart SSP / Self Rebirth)
  *  • Account ID selector (filtered by chosen category)
- *  • KPI boxes: Total Team | Active Levels Open | Levels Completed | Total Earning
+ *  • KPI boxes: Total Team | Active Layers Open | Levels Completed | Total Earning
  *  • Interactive 3-matrix tree (NO level chart)
  */
 
 import React from "react";
-import InteractiveTree from "./InteractiveTree";
+import AccordionTree from "./AccordionTree";
 
 // ─── Design tokens ─────────────────────────────────────────────────────────
 const C = {
@@ -27,8 +27,6 @@ const C = {
 
 // ─── Account category definitions ──────────────────────────────────────────
 function looksLikeSmartSspSourceId(sourceId) {
-  // Smart SSP source_id usually: "{purchase_id}:{package_number}:{box_number}"
-  // Some legacy rows may be missing a clean source_type; this heuristic keeps them visible.
   try {
     const parts = String(sourceId || "").split(":");
     if (parts.length < 2) return false;
@@ -48,8 +46,8 @@ function looksLikeSmartSspSourceId(sourceId) {
 const ACCOUNT_CATEGORIES = [
   {
     id: "SUBSCRIPTION_750",
-    label: "Subscription Joining 1000",
-    hint: "3-matrix accounts from ₹1000 promo package",
+    label: "Join Prime",
+    hint: "3-matrix accounts from Prime package",
     match: (src) => {
       const s = (src || "").toUpperCase();
       return (
@@ -61,7 +59,12 @@ const ACCOUNT_CATEGORIES = [
         s.includes("PRIME750") ||
         s.includes("JOIN_SUBSCRIPTION") ||
         s.includes("SUBSCRIPTION_750") ||
-        s.includes("SUBSCRIPTION_1000")
+        s.includes("SUBSCRIPTION_1000") ||
+        s.includes("SENTINEL") ||
+        s.includes("ROOT") ||
+        s.includes("2K") ||
+        s.includes("PACKAGE") ||
+        s.includes("PROMO")
       );
     },
   },
@@ -101,12 +104,6 @@ const ACCOUNT_CATEGORIES = [
       );
     },
   },
-  {
-    id: "OTHER",
-    label: "Other / Legacy",
-    hint: "Fallback bucket for unknown/legacy source tags (should be rare)",
-    match: () => false,
-  },
 ];
 
 /** Classify a source_type string into one of the 3 category IDs */
@@ -116,7 +113,7 @@ function classifySource(sourceType, sourceId) {
   }
   // If tag is missing/unknown, infer Smart SSP by its source_id format.
   if (looksLikeSmartSspSourceId(sourceId)) return "SMART_SSP";
-  return "OTHER";
+  return "SUBSCRIPTION_750";
 }
 
 function categoryForRow(r) {
@@ -161,25 +158,27 @@ function KpiCard({ label, value, accent }) {
       <div
         style={{
           fontSize: 10,
+          fontWeight: 800,
           color: C.textSec,
-          fontWeight: 600,
-          letterSpacing: "0.03em",
-          lineHeight: 1.3,
-          marginBottom: 4,
           textTransform: "uppercase",
+          letterSpacing: "0.05em",
+          marginBottom: 4,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
         }}
       >
         {label}
       </div>
       <div
         style={{
-          fontSize: 22,
+          fontSize: 17,
           fontWeight: 900,
-          color: accent || C.primary,
-          lineHeight: 1,
+          color: accent || C.text,
+          lineHeight: 1.1,
         }}
       >
-        {value ?? "–"}
+        {value}
       </div>
     </div>
   );
@@ -187,43 +186,72 @@ function KpiCard({ label, value, accent }) {
 
 // ─── Legend ────────────────────────────────────────────────────────────────
 function Legend() {
+  const items = [
+    { label: "Active", bg: "#dcfce7", color: "#16a34a" },
+    { label: "Empty / Open", bg: "#f3f4f6", color: "#9ca3af" },
+  ];
   return (
-    <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 12, flexWrap: "wrap" }}>
-      {[
-        { color: "#059669", label: "Active" },
-        { color: "#9ca3af", label: "Inactive" },
-        { color: C.primary, label: "Expanded" },
-      ].map(({ color, label }) => (
-        <div key={label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.textSec, fontWeight: 600 }}>
-          <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, display: "inline-block", flexShrink: 0 }} />
-          {label}
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        marginTop: 12,
+        fontSize: 11,
+        color: C.textSec,
+        flexWrap: "wrap",
+      }}
+    >
+      {items.map((it) => (
+        <div key={it.label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: "50%",
+              background: it.bg,
+              border: `1.5px solid ${it.color}`,
+              display: "inline-block",
+            }}
+          />
+          <span>{it.label}</span>
         </div>
       ))}
     </div>
   );
 }
 
-// ─── Main component ─────────────────────────────────────────────────────────
+// ─── Main Component ────────────────────────────────────────────────────────
 export default function ThreeMatrixTab({
-  threeRootsList      = [],
-  selectedThreeRoot   = null,
-  setSelectedThreeRoot,
-  threeCategory       = null,
-  setThreeCategory,
-  threeLevelGrid      = [],
-  threeCounts         = null,
-  totalThreeTeam      = 0,
+  threeRootsList = [],
+  selectedThreeRoot = null,
+  setSelectedThreeRoot = () => {},
+  threeCounts = null,
+  threeLevelGrid = [],
+  totalThreeTeam = 0,
   activeLevelsReached = 0,
-  totalThreeEarning   = 0,
-  levels              = { three: 15 },
+  totalThreeEarning = 0,
+  levels = {},
+  threeCategory = null,
+  setThreeCategory = null,
 }) {
   const hasPools = threeRootsList.length > 0;
 
-  // ── Classify each position into a category ──
+  // ── Classify each position into a category (with Sentinel deduplication) ──
   const categorizedPools = React.useMemo(() => {
     const map = {};
     for (const cat of ACCOUNT_CATEGORIES) {
-      map[cat.id] = threeRootsList.filter((r) => categoryForRow(r) === cat.id);
+      let items = threeRootsList.filter((r) => categoryForRow(r) === cat.id);
+      if (cat.id === "SUBSCRIPTION_750" && items.length > 1) {
+        const hasRealPrime = items.some((r) =>
+          String(r.source_type || "").toUpperCase().includes("PRIME_750") ||
+          String(r.source_type || "").toUpperCase().includes("PROMO_PURCHASE")
+        );
+        if (hasRealPrime) {
+          items = items.filter((r) => String(r.source_type || "").toUpperCase() !== "SENTINEL" || Number(r.entry_amount || 0) > 0);
+        }
+      }
+      map[cat.id] = items;
     }
     return map;
   }, [threeRootsList]);
@@ -259,7 +287,7 @@ export default function ThreeMatrixTab({
     }).length;
 
   // Earning: prefer the value from the counts API (refreshes per account selection)
-  const earning = Number(threeCounts?.total_earned || totalThreeEarning || 0);
+  const earning = hasPools ? Number(threeCounts?.total_earned || totalThreeEarning || 0) : 0;
 
   // Build display name for each account position
   const getPositionLabel = (r, i) => {
@@ -267,7 +295,6 @@ export default function ThreeMatrixTab({
     const base = key.replace(/-\d+$/, "");
     const idx = r?.user_entry_index || (i + 1);
     const baseLabel = key || (idx === 1 ? base : `${base}-${idx}`) || `ID ${idx}`;
-    // For Smart SSP: append season number
     const earned = r?.total_earned;
     const earnedLabel =
       earned != null && earned !== ""
@@ -415,7 +442,7 @@ export default function ThreeMatrixTab({
 
       {/* ── KPI grid ── */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        <KpiCard label="Total Team" value={totalThreeTeam} accent={C.primary} />
+        <KpiCard label="Total Community" value={totalThreeTeam} accent={C.primary} />
         <KpiCard label="Active Layers Open" value={activeLevelsReached} accent={C.green} />
         <KpiCard label="Layers Completed" value={levelsCompleted > 0 ? `L${levelsCompleted}` : "–"} accent={C.amber} />
         <KpiCard label="3 Blocks Earning" value={`\u20b9${earning.toFixed(0)}`} accent="#7c3aed" />
@@ -424,7 +451,7 @@ export default function ThreeMatrixTab({
       {/* ── Tree section ── */}
       <div
         style={{
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: 800,
           color: C.text,
           letterSpacing: "-0.2px",
@@ -441,14 +468,14 @@ export default function ThreeMatrixTab({
           borderRadius: 10,
           fontSize: 11,
           fontWeight: 600,
-          marginBottom: 10,
+          marginBottom: 14,
         }}
       >
-        💡 <strong>Tap</strong> a member to view their downline · tap root to expand/collapse
+        💡 <strong>Tap</strong> a member to drill down into their layer downline · tap root in trail to reset
       </div>
 
       {hasPools ? (
-        <InteractiveTree
+        <AccordionTree
           key={`THREE_150-${String(selectedThreeRoot)}`}
           entryRootId={selectedThreeRoot}
           useEntriesTree={!!selectedThreeRoot}

@@ -296,7 +296,7 @@ export default function AdminWalletDebugger() {
                     <MenuItem value="INTERNAL_WALLET_CREDIT">INTERNAL_WALLET_CREDIT (Admin Upload)</MenuItem>
                     <MenuItem value="INTERNAL_WALLET_DEBIT">INTERNAL_WALLET_DEBIT (Upgrade Deduction)</MenuItem>
                     <MenuItem value="AUTO_PURCHASE_DEBIT">AUTO_PURCHASE_DEBIT (Prime 150 Auto-Debit)</MenuItem>
-                    <MenuItem value="SELF_ACCOUNT_DEBIT">SELF_ACCOUNT_DEBIT (Matrix Auto-Debit)</MenuItem>
+                    <MenuItem value="SELF_ACCOUNT_DEBIT">SELF_ACCOUNT_DEBIT (Block Auto-Debit)</MenuItem>
                   </Select>
                 </FormControl>
 

@@ -153,7 +153,10 @@ export default function AdminWalletLedger() {
         headerName: "Transaction Type",
         minWidth: 170,
         flex: 1,
-        renderCell: (params) => params?.row?.category || params?.row?.type || "",
+        renderCell: (params) => {
+          const cat = params?.row?.category || params?.row?.type || "";
+          return cat === "MLM_INCOME" ? "INCOME" : cat.replace(/MLM/g, "COMMISSION");
+        },
       },
       {
         field: "source_module",
@@ -249,7 +252,7 @@ export default function AdminWalletLedger() {
       </TextField>
       <TextField select size="small" label="Category" value={txType} onChange={(e) => setTxType(e.target.value)} sx={{ minWidth: 190 }}>
         <MenuItem value="">All</MenuItem>
-        {["ADD_MONEY", "WITHDRAWAL", "WALLET_TRANSFER", "VOUCHER_CREATE", "VOUCHER_REDEEM", "PACKAGE_PURCHASE", "MLM_INCOME", "SPONSOR_INCOME", "MATRIX_INCOME", "REWARD_DISTRIBUTION", "GST_INVOICE", "ADMIN_ADJUSTMENT", "REFUND", "SETTLEMENT"].map((v) => (
+        {["ADD_MONEY", "WITHDRAWAL", "WALLET_TRANSFER", "VOUCHER_CREATE", "VOUCHER_REDEEM", "PACKAGE_PURCHASE", "INCOME", "SPONSOR_INCOME", "BLOCK_INCOME", "REWARD_DISTRIBUTION", "GST_INVOICE", "ADMIN_ADJUSTMENT", "REFUND", "SETTLEMENT"].map((v) => (
           <MenuItem key={v} value={v}>{v}</MenuItem>
         ))}
       </TextField>
@@ -306,7 +309,7 @@ export default function AdminWalletLedger() {
         <DetailRow label="Transaction ID" value={selectedTx?.transaction_ref || selectedTx?.id} />
         <DetailRow label="User" value={selectedTx?.username} />
         <DetailRow label="Wallet Type" value={selectedTx?.wallet_type} />
-        <DetailRow label="Transaction Type" value={selectedTx?.category || selectedTx?.type} />
+        <DetailRow label="Transaction Type" value={((selectedTx?.category || selectedTx?.type) === "MLM_INCOME" ? "INCOME" : String(selectedTx?.category || selectedTx?.type || "").replace(/MLM/g, "Commission"))} />
         <DetailRow label="Source Module" value={selectedTx?.source_module || selectedTx?.source_type} />
         <DetailRow label="Source / Destination" value={selectedTx?.source_destination || selectedTx?.destination_module} />
         <DetailRow label="Gross Amount" value={`Rs. ${money(selectedTx?.gross_amount ?? selectedTx?.amount)}`} />

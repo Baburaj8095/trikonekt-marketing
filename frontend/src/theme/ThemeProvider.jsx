@@ -46,7 +46,7 @@ const theme = createTheme({
     divider: C.border,
   },
   shape: {
-    borderRadius: R.md,
+    borderRadius: R.button,
   },
   typography: {
     fontFamily: T.fontFamily,
@@ -54,14 +54,14 @@ const theme = createTheme({
     allVariants: {
       letterSpacing: 0,
     },
-    h1: { fontSize: "32px", fontWeight: 700, color: C.text },
-    h2: { fontSize: "24px", fontWeight: 600, color: C.text },
-    h3: { fontSize: "20px", fontWeight: 600, color: C.text },
-    h4: { fontSize: "18px", fontWeight: 600, color: C.text },
-    h5: { fontSize: "16px", fontWeight: 600, color: C.text },
-    h6: { fontSize: "15px", fontWeight: 600, color: C.text },
-    body1: { fontSize: "15px", fontWeight: 400, color: C.text },
-    body2: { fontSize: "13.5px", fontWeight: 400, color: C.textSec },
+    h1: { fontSize: "24px", fontWeight: 700, color: C.text, letterSpacing: "-0.02em" },
+    h2: { fontSize: "20px", fontWeight: 700, color: C.text, letterSpacing: "-0.015em" },
+    h3: { fontSize: "17px", fontWeight: 600, color: C.text, letterSpacing: "-0.01em" },
+    h4: { fontSize: "15px", fontWeight: 600, color: C.text },
+    h5: { fontSize: "14px", fontWeight: 600, color: C.text },
+    h6: { fontSize: "13px", fontWeight: 600, color: C.text },
+    body1: { fontSize: "14px", fontWeight: 400, color: C.text, lineHeight: 1.5 },
+    body2: { fontSize: "13px", fontWeight: 400, color: C.textSec, lineHeight: 1.45 },
     button: {
       textTransform: "none",
       fontWeight: 600,

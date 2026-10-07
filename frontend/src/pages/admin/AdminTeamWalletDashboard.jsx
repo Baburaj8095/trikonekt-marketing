@@ -89,7 +89,7 @@ export default function AdminTeamWalletDashboard() {
     <Box sx={{ p: { xs: 1, md: 2 }, maxWidth: 1440, mx: "auto" }}>
       <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={1.5} sx={{ mb: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 950, color: "#0f172a" }}>Team Wallet Dashboard</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 950, color: "#0f172a" }}>Community Wallet Dashboard</Typography>
           <Typography sx={{ color: "#64748b", fontSize: 13 }}>
             Admin visibility for sponsor income, matrix income, shopping rewards, reward income, wallet trends, and rebirth exposure.
           </Typography>
@@ -109,7 +109,7 @@ export default function AdminTeamWalletDashboard() {
         <Stat label="Monthly Earnings" value={`Rs. ${money(analytics.totals.main)}`} hint="Current wallet exposure sample" />
         <Stat label="Yearly Earnings" value="Reports" hint="Use settlement reports for fiscal view" />
         <Stat label="Sponsor Income" value={`Rs. ${money(analytics.totals.directBenefit)}`} hint="Direct Benefit Wallet exposure" />
-        <Stat label="Matrix Income" value={`Rs. ${money(analytics.totals.levelBenefit)}`} hint="Level Benefit Wallet exposure" />
+        <Stat label="Blocks Income" value={`Rs. ${money(analytics.totals.levelBenefit)}`} hint="Layer Benefit Wallet exposure" />
         <Stat label="Shopping Income" value={`Rs. ${money(analytics.totals.shopping)}`} hint="Shopping Self Re-birth exposure" />
         <Stat label="Reward Income" value={`Rs. ${money(analytics.totals.packageCoupon)}`} hint="Package Purchase Coupon wallet" />
         <Stat label="Pending Settlements" value={analytics.activeVouchers.length} hint="Active vouchers awaiting redeem/expiry" />

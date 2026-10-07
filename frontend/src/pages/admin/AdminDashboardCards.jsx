@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import { getAdminMeta } from "../../admin-panel/api/adminMeta";
 import ModelListSimple from "../../admin-panel/dynamic/ModelListSimple";
@@ -122,7 +122,7 @@ export default function AdminDashboardCards() {
               boxShadow: "0 6px 12px rgba(22,163,74,0.12)"
             }}
           >
-            Level Commission Master
+            Layer Commission Master
             <div style={{ fontSize: 12, color: "#166534", fontWeight: 600 }}>Direct + L1”“L5 settings</div>
           </div>
           <div
@@ -141,8 +141,8 @@ export default function AdminDashboardCards() {
               boxShadow: "0 6px 12px rgba(59,130,246,0.12)"
             }}
           >
-            Matrix Commission Master
-            <div style={{ fontSize: 12, color: "#1d4ed8", fontWeight: 600 }}>5‑Matrix & 3‑Matrix settings</div>
+            Block Commission Master
+            <div style={{ fontSize: 12, color: "#1d4ed8", fontWeight: 600 }}>5‑Block & 3‑Block settings</div>
           </div>
         </div>
       </Section>

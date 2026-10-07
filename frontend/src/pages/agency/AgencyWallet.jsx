@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Paper,
@@ -28,12 +28,15 @@ function fmtAmount(value) {
 }
 
 function computeWindowLocal(cfg) {
-  // cfg: { enabled, weekday(0=Mon..6=Sun), start_time:'HH:MM', end_time:'HH:MM' }
+  // cfg: { enabled, weekday(0=Mon..6=Sun, -1=All Days), start_time:'HH:MM', end_time:'HH:MM' }
   // Uses the browser's local timezone; backend enforcement is done in IST.
   const now = new Date();
   const enabled = Boolean(cfg?.enabled ?? true);
-  // JS weekday: 0=Sun..6=Sat. Python weekday: 0=Mon..6=Sun.
   const pyWeekday = Number(cfg?.weekday ?? 2);
+  if (pyWeekday === -1) {
+    return { isOpen: enabled, enabled, nextWindowAt: now, currentStart: now, currentEnd: now };
+  }
+  // JS weekday: 0=Sun..6=Sat. Python weekday: 0=Mon..6=Sun.
   const jsTargetDay = (pyWeekday + 1) % 7;
 
   const parseHHMM = (s, fallback) => {
@@ -78,6 +81,7 @@ function computeWindowLocal(cfg) {
 
 function weekdayLabel(pyWeekday) {
   const w = Number(pyWeekday ?? 2);
+  if (w === -1) return "24x7 / All Days";
   const map = [
     "Monday",
     "Tuesday",
@@ -124,6 +128,13 @@ export default function AgencyWallet() {
   });
   const [kyc, setKyc] = useState({ verified: false });
   const [withdrawalsWindowCfg, setWithdrawalsWindowCfg] = useState({ enabled: true, weekday: 2, start_time: "00:00", end_time: "23:59" });
+  const [withdrawalLimits, setWithdrawalLimits] = useState(() => {
+    try {
+      const stored = localStorage.getItem("tri_withdrawal_limits");
+      if (stored) return JSON.parse(stored);
+    } catch (_) {}
+    return { min_withdrawal: 500, max_withdrawal: 25000, daily_max_withdrawal: 50000 };
+  });
   const [windowInfo, setWindowInfo] = useState(computeWindowLocal(withdrawalsWindowCfg));
   const [primeInfo, setPrimeInfo] = useState({
     has150: false,
@@ -233,19 +244,25 @@ export default function AgencyWallet() {
     }
   }, [myWithdrawals, windowInfo]);
 
+  const minWd = Number(withdrawalLimits?.min_withdrawal || 500);
+  const maxWd = Number(withdrawalLimits?.max_withdrawal || 25000);
+
   const disableReason = useMemo(() => {
     if (!kyc?.verified) return "KYC verification required";
-    if (Number(displayWithdrawWallet) < 500)
-      return "Minimum withdrawable balance ₹500 required";
+    if (Number(displayWithdrawWallet) < minWd)
+      return `Minimum withdrawable balance ₹${minWd} required`;
     if (!windowInfo?.enabled) return "Withdrawals are currently disabled.";
     if (!windowInfo?.isOpen) {
+      if (withdrawalsWindowCfg?.weekday === -1) {
+        return "Withdrawals window is currently closed.";
+      }
       const day = weekdayLabel(withdrawalsWindowCfg?.weekday);
       const st = hhmm(withdrawalsWindowCfg?.start_time, "00:00");
       const et = hhmm(withdrawalsWindowCfg?.end_time, "23:59");
       return `Withdrawals are allowed only on ${day} between ${st} and ${et} (IST).`;
     }
     return "";
-  }, [kyc, displayWithdrawWallet, windowInfo, withdrawalsWindowCfg]);
+  }, [kyc, displayWithdrawWallet, windowInfo, withdrawalsWindowCfg, minWd]);
 
   useEffect(() => {
     const id = setInterval(() => setWindowInfo(computeWindowLocal(withdrawalsWindowCfg)), 30000);
@@ -368,10 +385,20 @@ export default function AgencyWallet() {
         setMyWithdrawals(wlist || []);
         setKyc(kycRes?.data || { verified: false });
 
-        // Load withdrawals window from admin master config
+        // Load withdrawals window and limits from admin master config
         try {
           const cfgRes = await API.get("/admin/commission/master/", { cacheTTL: 10_000, dedupe: "cancelPrevious" });
           const wwin = cfgRes?.data?.withdrawals_window;
+          const wlim = cfgRes?.data?.withdrawal_limits;
+          if (wlim) {
+            const limMerged = {
+              min_withdrawal: Number(wlim.min_withdrawal ?? 500),
+              max_withdrawal: Number(wlim.max_withdrawal ?? 25000),
+              daily_max_withdrawal: Number(wlim.daily_max_withdrawal ?? 50000),
+            };
+            setWithdrawalLimits(limMerged);
+            try { localStorage.setItem("tri_withdrawal_limits", JSON.stringify(limMerged)); } catch (_) {}
+          }
           if (wwin) {
             const cfg = {
               enabled: Boolean(wwin?.enabled ?? true),
@@ -496,7 +523,14 @@ export default function AgencyWallet() {
       setWdrErr("Enter a valid amount.");
       return;
     }
-    // No fixed per-request cap. Allow withdrawing up to available withdrawable wallet balance.
+    if (amtNum < minWd) {
+      setWdrErr(`Minimum withdrawal amount is ₹${minWd}.`);
+      return;
+    }
+    if (amtNum > maxWd) {
+      setWdrErr(`Maximum withdrawal amount per request is ₹${maxWd}.`);
+      return;
+    }
     const availableToWithdraw = Number(displayWithdrawWallet || 0);
     if (amtNum > availableToWithdraw) {
       setWdrErr(
@@ -786,11 +820,11 @@ export default function AgencyWallet() {
                 complete KYC in the KYC section.
               </Alert>
             ) : null}
-            {Number(displayWithdrawWallet) < 500 ? (
+            {Number(displayWithdrawWallet) < minWd ? (
               <Alert severity="warning" sx={{ mb: 1 }}>
-                Minimum withdrawable balance ₹500 required to enable
+                Minimum withdrawable balance ₹{minWd} required to enable
                 withdrawals. Short by ₹
-                {Math.max(0, 500 - Number(displayWithdrawWallet)).toFixed(2)}
+                {Math.max(0, minWd - Number(displayWithdrawWallet)).toFixed(2)}
               </Alert>
             ) : null}
             {!windowInfo?.enabled ? (
@@ -810,18 +844,20 @@ export default function AgencyWallet() {
                   fullWidth
                   size="small"
                   label="Amount (₹)"
+                  placeholder={`Enter amount (₹${minWd} - ₹${maxWd})`}
                   name="amount"
                   value={wdrForm.amount}
                   onChange={onWdrChange}
                   type="number"
                   inputProps={{
                     inputMode: "decimal",
-                    max: Number(displayWithdrawWallet || 0),
+                    min: minWd,
+                    max: Math.min(Number(displayWithdrawWallet || 0), maxWd),
                     step: "0.01",
                   }}
-                  helperText={`Available to withdraw: ₹ ${fmtAmount(
+                  helperText={`Limit per request: Min ₹${minWd} | Max ₹${maxWd} (Available: ₹${fmtAmount(
                     Number(displayWithdrawWallet || 0)
-                  )}`}
+                  )})`}
                   required
                 />
                 <TextField

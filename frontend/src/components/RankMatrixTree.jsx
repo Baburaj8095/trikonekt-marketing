@@ -56,7 +56,7 @@ const AvatarIcon = ({ size = 56 }) => (
 
 /**
  * RankMatrixTree
- * MLM-style tree UI for Rank‑1 matrix placements.
+ * Commission-style tree UI for Rank‑1 block placements.
  * - Uses /rank-matrix/tree to resolve the root_user_id context
  * - Uses /rank-matrix/subtree to load immediate children (up to 5) for any parent inside this root
  * - Breadcrumb navigation and Back similar to GenealogyTree5

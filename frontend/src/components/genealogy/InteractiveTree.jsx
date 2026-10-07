@@ -53,7 +53,13 @@ const NODE_TOTAL_H = ND + 90; // total vertical bounding box per node
   document.head.appendChild(s);
 })();
 
-// ─── Slot count by pool ───────────────────────────────────────────────────────
+// ─── Slot count and pool normalization ─────────────────────────────────────────
+function normalizePool(pool) {
+  const p = String(pool || "").toUpperCase();
+  if (p.includes("THREE") || p.includes("3")) return "THREE_150";
+  return "FIVE_150";
+}
+
 function maxSlots(pool) {
   const p = String(pool || "").toUpperCase();
   return p.includes("THREE") || p.includes("3") ? 3 : 5;
@@ -182,14 +188,15 @@ async function apiFetchRoot({
   adminRootUserId = null,
   useEntries = false,
   entryRootId = null,
-  pool = "FIVE_750",
+  pool = "FIVE_150",
   useRankMatrix = false,
   rankStartUserId = null,
   rankRootUserId = null,
 }) {
   try {
+    const activePoolType = normalizePool(pool);
     if (isAdmin) {
-      const params = { pool: pool || "FIVE_750", max_depth: 8, source: "auto" };
+      const params = { pool: activePoolType, max_depth: 8, source: "auto" };
       if (entryRootId) params.start_entry_id = entryRootId;
       else if (adminRootUserId) params.root_user_id = adminRootUserId;
       else if (adminIdentifier) params.identifier = adminIdentifier;

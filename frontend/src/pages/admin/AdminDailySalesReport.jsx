@@ -549,7 +549,7 @@ export default function AdminDailySalesReport() {
               scrollButtons="auto"
               sx={{ borderBottom: 1, borderColor: "divider", px: 1.5 }}
             >
-              <Tab label="1. Daily Sales Matrix" sx={{ fontWeight: 700, textTransform: "none" }} />
+              <Tab label="1. Daily Sales Blocks Summary" sx={{ fontWeight: 700, textTransform: "none" }} />
               <Tab label="2. Solvency & Wallet Liabilities" sx={{ fontWeight: 700, textTransform: "none" }} />
               <Tab label="3. Growth Funnel & Conversions" sx={{ fontWeight: 700, textTransform: "none" }} />
               <Tab label="4. Daily 11:59 PM & Monthly Pools" sx={{ fontWeight: 700, textTransform: "none" }} />
@@ -557,7 +557,7 @@ export default function AdminDailySalesReport() {
               <Tab label="6. Risk & Fraud Sentinel" sx={{ fontWeight: 700, textTransform: "none" }} />
               <Tab label="7. Tax & Profit Intelligence (GST/TDS)" sx={{ fontWeight: 700, textTransform: "none" }} />
               <Tab label="8. Geographic Leaderboard" sx={{ fontWeight: 700, textTransform: "none" }} />
-              <Tab label="9. SPP Retention & Cadence Matrix" sx={{ fontWeight: 700, textTransform: "none" }} />
+              <Tab label="9. SPP Retention & Cadence Report" sx={{ fontWeight: 700, textTransform: "none" }} />
             </Tabs>
           </Paper>
 
@@ -1643,7 +1643,7 @@ export default function AdminDailySalesReport() {
                 </FormControl>
               </Stack>
 
-              {/* Cadence Matrix Table */}
+              {/* Cadence Report Table */}
               <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, overflowX: "auto" }}>
                 <Table size="small" sx={{ minWidth: 900 }}>
                   <TableHead sx={{ backgroundColor: "#f8fafc" }}>

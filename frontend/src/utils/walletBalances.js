@@ -77,3 +77,14 @@ export function getAddMoneyPocketBalance(wallet, history = null) {
   if (summaryBalance > 0) return summaryBalance;
   return Math.max(0, addMoneyHistoryBalance(history));
 }
+
+export function getMainWalletBalance(wallet) {
+  return firstPositiveNumber(
+    wallet?.main_balance,
+    wallet?.balance,
+    wallet?.pockets?.main,
+    pickTransferWallet(wallet, ["main", "mainWallet", "main_wallet"])
+  );
+}
+
+

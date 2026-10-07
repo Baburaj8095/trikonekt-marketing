@@ -53,6 +53,24 @@ function Select({ label, value, onChange, options, style }) {
   );
 }
 
+function formatDateTime(value) {
+  if (!value) return "—";
+  try {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return String(value);
+    return d.toLocaleString("en-IN", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch (_) {
+    return String(value);
+  }
+}
+
 const CONSUMER_COLUMN_FIELDS = {
   basic: [
     "__slno",
@@ -60,19 +78,16 @@ const CONSUMER_COLUMN_FIELDS = {
     "__login",
     "is_active",
     "system_serial_number",
+    "full_name",
+    "phone",
+    "sponsor_id",
     "account_active",
     "date_joined",
-    "user_code",
-    "full_name",
-    "sponsor_id",
-    "pincode",
-    "address",
-    "commission_level",
     "payment_mode",
-    "direct_count",
     "total_earning",
     "wallet_balance",
-    "__kyc_profile",
+    "pincode",
+    "address",
   ],
   package: [
     "__slno",
@@ -165,14 +180,6 @@ function moneyValue(value) {
   return Number.isFinite(n) ? n.toFixed(2) : String(value);
 }
 
-function formatDateTime(value) {
-  if (!value) return "";
-  try {
-    return new Date(value).toLocaleString();
-  } catch (_) {
-    return String(value);
-  }
-}
 
 function SourceBadge({ children = NEEDS_SOURCE_LABEL, title }) {
   return (
@@ -309,7 +316,7 @@ function UplinePathViewer({ user }) {
     <div style={{ marginTop: 8, border: "1px solid #e2e8f0", borderRadius: 8, background: "#f8fafc", padding: 12 }}>
       {uplineChain.map((u, idx) => (
         <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: idx < uplineChain.length - 1 ? "1px solid #e2e8f0" : "none" }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b", minWidth: 60 }}>Level {u.level}:</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b", minWidth: 60 }}>Layer {u.level}:</span>
           <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{u.username}</span>
           <span style={{ fontSize: 13, color: "#475569" }}>({u.full_name})</span>
           <span style={{ fontSize: 12, color: "#94a3b8", marginLeft: "auto" }}>ID: {u.id}</span>
@@ -486,6 +493,8 @@ function UserProfileDrawer({ open, loading, user, onClose, onEdit }) {
 }
 
 export default function AdminUsers() {
+  const location = useLocation();
+
   // Filters applied to server fetch
   const [filters, setFilters] = useState(() => {
     // Admin Users is now the Team Consumer admin table. Franchise/agency flows
@@ -494,7 +503,7 @@ export default function AdminUsers() {
     let account_active = "";
     let is_active = "";
     try {
-      const qs = typeof window !== "undefined" ? (window.location.search || "") : "";
+      const qs = location?.search || (typeof window !== "undefined" ? (window.location.search || "") : "");
       const params = new URLSearchParams(qs);
       const rawActivated = (params.get("activated") || "").toLowerCase();
       activated = ["1", "true", "yes", "activated"].includes(rawActivated)
@@ -720,7 +729,6 @@ export default function AdminUsers() {
   }, []);
 
   // Sync filters from URL, but keep this page consumer-only regardless of query.
-  const location = useLocation();
   useEffect(() => {
     const params = new URLSearchParams(location.search || "");
     const rawActivated = (params.get("activated") || "").toLowerCase();
@@ -1235,7 +1243,7 @@ export default function AdminUsers() {
       { field: "country_name", headerName: "Country", minWidth: 150 },
       {
         field: "commission_level",
-        headerName: isMobile ? "Level" : "Commission Level",
+        headerName: isMobile ? "Layer" : "Commission Layer",
         minWidth: isMobile ? 110 : 150,
         renderCell: (params) => {
           const lvl = Number(params?.row?.commission_level || 0);
@@ -1258,7 +1266,7 @@ export default function AdminUsers() {
                   border: "1px solid #cbd5e1", // slate-300
                   color: "#0f172a",
                 }}
-                title="No level"
+                title="No layer"
               >
                 
               </div>
@@ -1272,7 +1280,7 @@ export default function AdminUsers() {
                 border: "1px solid #6d28d9", // violet-700
                 color: "#ffffff",
               }}
-              title={`Level L${lvl}`}
+              title={`Layer L${lvl}`}
             >
               L{lvl}
             </div>
@@ -1527,141 +1535,432 @@ export default function AdminUsers() {
 
   const consumerSummaryColumns = useMemo(
     () => [
-      { field: "__slno", headerName: "SI No", minWidth: 80, width: 80 },
+      {
+        field: "__slno",
+        headerName: "SI No",
+        minWidth: 60,
+        width: 60,
+        align: "center",
+        headerAlign: "center",
+        sortable: false,
+        filterable: false,
+        renderCell: (params) => {
+          let num = null;
+          try {
+            const api = params?.api;
+            if (api) {
+              const state = api.state || {};
+              const pagination = state.pagination?.paginationModel || { page: 0, pageSize: 25 };
+              const page = pagination.page || 0;
+              const pageSize = pagination.pageSize || 25;
+              const rowIndex = api.getRowIndexRelativeToVisibleRows ? api.getRowIndexRelativeToVisibleRows(params.row.id) : 0;
+              if (rowIndex !== null && rowIndex !== undefined && rowIndex >= 0) {
+                num = page * pageSize + rowIndex + 1;
+              }
+            }
+          } catch (_) {}
+          return (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontWeight: 700, color: "#64748b", fontSize: 12 }}>
+                {num ?? params?.row?.__slno ?? "—"}
+              </span>
+            </div>
+          );
+        },
+      },
       {
         field: "__edit_view",
         headerName: "View",
-        minWidth: 110,
+        minWidth: 75,
+        width: 75,
+        align: "center",
+        headerAlign: "center",
         sortable: false,
         filterable: false,
         renderCell: (params) => {
           const row = params?.row || {};
           return (
-            <button
-              type="button"
-              onClick={(e) => {
-                e?.stopPropagation?.();
-                openUserProfile(row);
-              }}
-              title="View full user profile"
-              style={{
-                borderRadius: 8,
-                padding: "6px 10px",
-                background: "#0f172a",
-                color: "#fff",
-                border: "1px solid #0f172a",
-                cursor: "pointer",
-                fontSize: 12,
-                fontWeight: 700,
-              }}
-            >
-              View
-            </button>
-          );
-        },
-      },
-      {
-        field: "__account_joining",
-        headerName: "Active / Joined",
-        minWidth: 210,
-        align: "center",
-        headerAlign: "center",
-        renderCell: (params) => {
-          const row = params?.row || {};
-          const active = !!row.account_active;
-          return (
-            <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 4 }}>
-              <span
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e?.stopPropagation?.();
+                  openUserProfile(row);
+                }}
+                title="View full user profile"
                 style={{
+                  width: 58,
+                  height: 28,
+                  borderRadius: 6,
+                  background: "#0f172a",
+                  color: "#fff",
+                  border: "1px solid #0f172a",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: 700,
                   display: "inline-flex",
-                  width: "fit-content",
-                  padding: "3px 8px",
-                  borderRadius: 8,
-                  fontSize: 11,
-                  fontWeight: 800,
-                  background: active ? "#dcfce7" : "#fee2e2",
-                  color: active ? "#166534" : "#991b1b",
-                  border: `1px solid ${active ? "#86efac" : "#fecaca"}`,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                  transition: "all 150ms ease",
                 }}
               >
-                {active ? "Active" : "Inactive"}
-              </span>
-              <span style={{ color: "#475569", fontSize: 12 }}>{formatDateTime(row.date_joined)}</span>
+                View
+              </button>
             </div>
           );
         },
       },
-      { field: "system_serial_number", headerName: "System Serial No", minWidth: 160 },
+      {
+        field: "__login",
+        headerName: "Login",
+        minWidth: 75,
+        width: 75,
+        align: "center",
+        headerAlign: "center",
+        sortable: false,
+        filterable: false,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const canLogin = row.is_active !== false;
+          const onLogin = async (e) => {
+            e?.stopPropagation?.();
+            try {
+              if (!row?.id || !canLogin) return;
+              const res = await API.post(`/admin/users/${row.id}/impersonate/`);
+              const { access, refresh, role } = res?.data || {};
+              if (!access || !refresh) return;
+              const r = String(role || row?.role || "").toLowerCase();
+              const c = String(row?.category || "").toLowerCase();
+              const pickNs = (s) => (s.startsWith("agency") ? "agency" : s.startsWith("employee") ? "employee" : "");
+              let ns = pickNs(r) || pickNs(c) || (r === "agency" ? "agency" : r === "employee" ? "employee" : "user");
+              const base = ns === "user" ? "" : `/${ns}`;
+              const query = new URLSearchParams({
+                access,
+                refresh,
+                ns,
+              });
+              if (ns === "user") {
+                query.set("next", "/user/team-dashboard");
+                query.set("login_context", "team");
+              }
+              const url = `${base}/impersonate?${query.toString()}`;
+              window.location.assign(url);
+            } catch (_) {}
+          };
+          return (
+            <div style={{ width: "100%", height: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+              <button
+                type="button"
+                onClick={onLogin}
+                disabled={!canLogin}
+                title={canLogin ? "Login as this user" : "User is blocked. Unblock before login."}
+                style={{
+                  width: 58,
+                  height: 28,
+                  borderRadius: 6,
+                  background: canLogin ? "#2563eb" : "#94a3b8",
+                  color: "#fff",
+                  border: `1px solid ${canLogin ? "#1d4ed8" : "#64748b"}`,
+                  cursor: canLogin ? "pointer" : "not-allowed",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  whiteSpace: "nowrap",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  opacity: canLogin ? 1 : 0.78,
+                }}
+              >
+                Login
+              </button>
+            </div>
+          );
+        },
+      },
+      {
+        field: "is_active",
+        headerName: "Block User",
+        minWidth: 85,
+        width: 85,
+        align: "center",
+        headerAlign: "center",
+        sortable: false,
+        filterable: false,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const canLogin = row.is_active !== false;
+          const onToggleAccess = async (e) => {
+            e?.stopPropagation?.();
+            if (!row?.id) return;
+            const action = canLogin ? "block" : "unblock";
+            const ok = window.confirm(
+              canLogin
+                ? `Block ${row.username || row.full_name || "this user"}? They will not be able to access consumer, team, franchise, or other user apps.`
+                : `Unblock ${row.username || row.full_name || "this user"} and allow login again?`
+            );
+            if (!ok) return;
+            try {
+              await API.post(`/admin/users/${row.id}/${canLogin ? "deactivate" : "activate"}/`, {});
+              setReloadKey((k) => k + 1);
+            } catch (e2) {
+              const msg = e2?.response?.data?.detail || e2?.message || `Failed to ${action} user`;
+              window.alert(String(msg));
+            }
+          };
+
+          return (
+            <div style={{ width: "100%", height: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+              <button
+                type="button"
+                onClick={onToggleAccess}
+                title={canLogin ? "Block this consumer" : "Unblock this consumer"}
+                style={{
+                  width: 68,
+                  height: 28,
+                  borderRadius: 6,
+                  background: canLogin ? "#dc2626" : "#16a34a",
+                  color: "#fff",
+                  border: `1px solid ${canLogin ? "#b91c1c" : "#15803d"}`,
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  whiteSpace: "nowrap",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {canLogin ? "Block" : "Unblock"}
+              </button>
+            </div>
+          );
+        },
+      },
+      {
+        field: "system_serial_number",
+        headerName: "DB Unique ID",
+        minWidth: 140,
+        width: 140,
+        align: "center",
+        headerAlign: "center",
+        renderCell: (p) => {
+          const row = p?.row || {};
+          const dbId = row?.id ?? row?.system_serial_number ?? "—";
+          const displaySerial = dbId !== "—" ? `#${dbId}` : "—";
+          return (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span
+                title={`Database Primary Key Unique ID: ${dbId}`}
+                style={{
+                  minWidth: 54,
+                  padding: "4px 8px",
+                  height: 28,
+                  boxSizing: "border-box",
+                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                  fontWeight: 800,
+                  fontSize: 12,
+                  color: "#0f172a",
+                  background: "#f1f5f9",
+                  borderRadius: 6,
+                  border: "1px solid #cbd5e1",
+                  letterSpacing: "0.5px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {displaySerial}
+              </span>
+            </div>
+          );
+        },
+        valueGetter: (v, row) => row?.id ?? row?.system_serial_number ?? "",
+      },
+      {
+        field: "user_code",
+        headerName: "Consumer ID",
+        minWidth: 140,
+        align: "center",
+        headerAlign: "center",
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const code = (row.prefixed_id || row.unique_id || row.user_code || `TR${String(row.id).padStart(4, "0")}`).trim();
+          return (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span
+                style={{
+                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                  fontWeight: 700,
+                  fontSize: 12,
+                  color: "#0284c7",
+                  background: "#f0f9ff",
+                  padding: "3px 8px",
+                  borderRadius: 6,
+                  border: "1px solid #bae6fd",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {code}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        field: "full_name",
+        headerName: "Consumer Name",
+        minWidth: 160,
+        renderCell: (p) => (
+          <span style={{ fontWeight: 700, color: "#1e293b" }}>
+            {p?.row?.full_name || p?.row?.username || "—"}
+          </span>
+        ),
+      },
+      {
+        field: "phone",
+        headerName: "Mobile",
+        minWidth: 125,
+        align: "center",
+        headerAlign: "center",
+        renderCell: (params) => {
+          const row = params?.row || {};
+          return (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontWeight: 600, color: "#334155", fontSize: 12, fontFamily: "ui-monospace, monospace" }}>
+                {row.phone || row.username || "—"}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        field: "sponsor_id",
+        headerName: "Sponsor Code",
+        minWidth: 135,
+        align: "center",
+        headerAlign: "center",
+        renderCell: (p) => {
+          const row = p?.row || {};
+          const s = (row?.sponsor_id || row?.sponsor_name || "").trim();
+          const u = (row?.username || row?.phone || "").trim();
+          if (!s || s === "None" || s === "null" || s === u || row?.id === 1 || u === "9999999999") {
+            return (
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ color: "#94a3b8", fontSize: 12, fontStyle: "italic" }}>None</span>
+              </div>
+            );
+          }
+          return (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span
+                style={{
+                  minWidth: 88,
+                  padding: "4px 8px",
+                  height: 28,
+                  boxSizing: "border-box",
+                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                  fontWeight: 700,
+                  fontSize: 12,
+                  color: "#475569",
+                  background: "#f8fafc",
+                  borderRadius: 6,
+                  border: "1px solid #cbd5e1",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {s}
+              </span>
+            </div>
+          );
+        },
+      },
       {
         field: "account_active",
         headerName: "Status",
-        minWidth: 100,
+        minWidth: 85,
+        width: 85,
         align: "center",
         headerAlign: "center",
         renderCell: (params) => {
           const active = !!params?.row?.account_active;
           return (
-            <span
-              style={{
-                display: "inline-flex",
-                padding: "3px 8px",
-                borderRadius: 8,
-                fontSize: 11,
-                fontWeight: 800,
-                background: active ? "#dcfce7" : "#fee2e2",
-                color: active ? "#166534" : "#991b1b",
-                border: `1px solid ${active ? "#86efac" : "#fecaca"}`,
-              }}
-            >
-              {active ? "Active" : "Inactive"}
-            </span>
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span
+                style={{
+                  width: 68,
+                  height: 28,
+                  boxSizing: "border-box",
+                  borderRadius: 6,
+                  background: active ? "#16a34a" : "#dc2626",
+                  color: "#fff",
+                  border: `1px solid ${active ? "#15803d" : "#b91c1c"}`,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  whiteSpace: "nowrap",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {active ? "Active" : "Inactive"}
+              </span>
+            </div>
           );
         },
       },
       {
         field: "date_joined",
-        headerName: "Time / Date",
+        headerName: "Joined Date",
         minWidth: 160,
-        renderCell: (p) => formatDateTime(p?.row?.date_joined),
+        align: "center",
+        headerAlign: "center",
+        renderCell: (p) => (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ color: "#334155", fontSize: 12 }}>{formatDateTime(p?.row?.date_joined)}</span>
+          </div>
+        ),
       },
-      {
-        field: "user_code",
-        headerName: "Users Code",
-        minWidth: 140,
-        renderCell: (params) => {
-          const row = params?.row || {};
-          return row.phone || row.username || row.user_code || "";
-        },
-      },
-      {
-        field: "full_name",
-        headerName: "Users Name",
-        minWidth: 160,
-        renderCell: (p) => p?.row?.full_name || p?.row?.username || "—",
-      },
-      {
-        field: "sponsor_id",
-        headerName: "Sponsor Code",
-        minWidth: 140,
-        renderCell: (p) => p?.row?.sponsor_id || p?.row?.sponsor_name || "—",
-      },
-      { field: "pincode", headerName: "Pincode", minWidth: 110, renderCell: (p) => p?.row?.pincode || "—" },
+      { field: "pincode", headerName: "Pincode", minWidth: 100, renderCell: (p) => p?.row?.pincode || "—" },
       {
         field: "address",
         headerName: "Address",
-        minWidth: 240,
+        minWidth: 220,
         renderCell: (p) => p?.row?.address || p?.row?.address_pincode || "—",
       },
       {
         field: "payment_mode",
-        headerName: "Mode of Payment Activation",
-        minWidth: 180,
+        headerName: "Activation Mode",
+        minWidth: 100,
+        width: 100,
+        align: "center",
+        headerAlign: "center",
         renderCell: (p) => {
           const m = p?.row?.payment_mode || p?.row?.mode_of_payment || "Wallet";
           return (
-            <span style={{ fontWeight: 700, color: "#0369a1", background: "#f0f9ff", padding: "2px 8px", borderRadius: 6, border: "1px solid #bae6fd" }}>
-              {m}
-            </span>
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span
+                style={{
+                  width: 68,
+                  height: 28,
+                  boxSizing: "border-box",
+                  borderRadius: 6,
+                  background: "#0284c7",
+                  color: "#fff",
+                  border: "1px solid #0369a1",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  whiteSpace: "nowrap",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {m}
+              </span>
+            </div>
           );
         },
       },
@@ -1713,7 +2012,7 @@ export default function AdminUsers() {
       { field: "package_buy_date", headerName: "Package Buy Date", minWidth: 180, valueFormatter: (v) => formatDateTime(v) },
       { field: "join_prime_750", headerName: "Join Prime 750", minWidth: 140, renderCell: (p) => <ValueOrSource value={p?.row?.join_prime_750} empty="No" /> },
       { field: "spp_months_boxes", headerName: "SPP (Months / Boxes)", minWidth: 160, renderCell: (p) => <ValueOrSource value={p?.row?.spp_months_boxes} empty="0" /> },
-      { field: "rank_upgrade_levels", headerName: "Rank Upgrade Levels", minWidth: 220, renderCell: (p) => <ValueOrSource value={p?.row?.rank_upgrade_levels} empty="0" /> },
+      { field: "rank_upgrade_levels", headerName: "Rank Upgrade Layers", minWidth: 220, renderCell: (p) => <ValueOrSource value={p?.row?.rank_upgrade_levels} empty="0" /> },
       { field: "current_rank", headerName: "Current Rank", minWidth: 160, renderCell: (p) => <ValueOrSource value={p?.row?.current_rank} empty="None" /> },
       { field: "subscription_1", headerName: "Subscription 1", minWidth: 150, renderCell: (p) => <ValueOrSource value={p?.row?.subscription_1} empty={NEEDS_RULE_LABEL} /> },
       { field: "subscription_2", headerName: "Subscription 2", minWidth: 150, renderCell: (p) => <ValueOrSource value={p?.row?.subscription_2} empty={NEEDS_RULE_LABEL} /> },
@@ -1769,26 +2068,23 @@ export default function AdminUsers() {
       { field: "self_package_pocket_details", headerName: "Self Package Pocket Details", minWidth: 230, renderCell: (p) => <ValueOrSource value={p?.row?.self_package_pocket_details} /> },
       { field: "__coupon_admin_charges", headerName: "Coupon Admin Charges", minWidth: 190, renderCell: () => <SourceBadge>Needs charge rule</SourceBadge> },
       { field: "__withdrawal_admin_charges", headerName: "Withdrawal Admin Charges", minWidth: 210, renderCell: () => <SourceBadge>Needs charge rule</SourceBadge> },
-      { field: "__package_admin_charges", headerName: "Package Admin Charges", minWidth: 200, renderCell: () => <SourceBadge>Needs charge rule</SourceBadge> },
-      { field: "__franchisee_reference_reward", headerName: "Franchisee Reference Reward", minWidth: 230, renderCell: () => <SourceBadge>Needs aggregation</SourceBadge> },
-      { field: "__zonal_reward", headerName: "Zonal Reward", minWidth: 150, renderCell: () => <SourceBadge>Needs aggregation</SourceBadge> },
       { field: "__direct_sponsor_benefit", headerName: "Direct Sponsor Benefit", minWidth: 210, renderCell: () => <SourceBadge>Needs aggregation</SourceBadge> },
-      { field: "__level_income_benefit", headerName: "Level Income Benefit", minWidth: 190, renderCell: () => <SourceBadge>Needs aggregation</SourceBadge> },
+      { field: "__level_income_benefit", headerName: "Layer Income Benefit", minWidth: 190, renderCell: () => <SourceBadge>Needs aggregation</SourceBadge> },
       { field: "__smart_product_pocket", headerName: "Smart Product Pocket", minWidth: 190, renderCell: () => <SourceBadge>Needs aggregation</SourceBadge> },
       { field: "__spp_spin_win", headerName: "SPP Spin & Win", minWidth: 170, renderCell: () => <SourceBadge /> },
       { field: "__digital_education_spin_win", headerName: "Digital Education Prime Package Spin & Win", minWidth: 310, renderCell: () => <SourceBadge /> },
       { field: "__shopping_rebirth_count", headerName: "Shopping Self Re-birth ID Count", minWidth: 250, renderCell: () => <SourceBadge>Needs rule</SourceBadge> },
-      { field: "__franchisee_rebirth_count", headerName: "Franchisee Self Rebirth ID Count", minWidth: 250, renderCell: () => <SourceBadge>Needs rule</SourceBadge> },
       { field: "__caption_coupon_rebirth_count", headerName: "Caption/Coupon Self Re-birth ID Count", minWidth: 280, renderCell: () => <SourceBadge>Needs rule</SourceBadge> },
-      { field: "__team_self_package_count", headerName: "Team Consumer Self Package ID Count", minWidth: 270, renderCell: () => <SourceBadge>Needs rule</SourceBadge> },
-      { field: "__team_block_id", headerName: "Team Consumer Block ID", minWidth: 200, renderCell: () => <SourceBadge>Needs rule</SourceBadge> },
+      { field: "__team_self_package_count", headerName: "Community Consumer Self Package ID Count", minWidth: 270, renderCell: () => <SourceBadge>Needs rule</SourceBadge> },
+      { field: "__team_block_id", headerName: "Community Consumer Block ID", minWidth: 200, renderCell: () => <SourceBadge>Needs rule</SourceBadge> },
     ],
     [openEdit, openUserProfile, setReloadKey]
   );
 
   const tableColumns = useMemo(() => {
     const byField = new Map();
-    [...columns, ...consumerSummaryColumns].forEach((col) => {
+    // Prioritize consumerSummaryColumns so custom overrides take precedence
+    [...consumerSummaryColumns, ...columns].forEach((col) => {
       if (!col?.field || byField.has(col.field)) return;
       byField.set(col.field, col);
     });
@@ -1808,7 +2104,7 @@ export default function AdminUsers() {
   // Server-side fetcher for DataTable
   const fetcher = useCallback(
     async ({ page, pageSize, search, ordering }) => {
-      const params = { page, page_size: pageSize, fast: 1 };
+      const params = { page, page_size: pageSize, fast: 0 };
       // merge active filters
       Object.entries(filters).forEach(([k, v]) => {
         if (v !== null && v !== undefined && String(v).trim() !== "") {
@@ -1816,7 +2112,61 @@ export default function AdminUsers() {
         }
       });
       if (search && String(search).trim()) params.search = String(search).trim();
-      if (ordering) params.ordering = ordering;
+      
+      const USER_SORT_FIELD_MAP = {
+        system_serial_number: "id",
+        __slno: "id",
+        user_code: "username",
+        username: "username",
+        phone: "phone",
+        full_name: "full_name",
+        sponsor_id: "sponsor_id",
+        sponsor_name: "sponsor_id",
+        sponsor_number: "sponsor_id",
+        sponsor_display: "sponsor_id",
+        date_joined: "date_joined",
+        account_active: "account_active",
+        is_active: "is_active",
+        pincode: "pincode",
+        address: "address",
+        address_pincode: "address",
+        package_buy_date: "first_purchase_activated_at",
+        email: "email",
+        id: "id",
+        prefixed_id: "prefixed_id",
+        unique_id: "unique_id",
+        role: "role",
+        category: "category",
+      };
+
+      const ALLOWED_DJANGO_ORDER_FIELDS = new Set([
+        "id",
+        "username",
+        "phone",
+        "email",
+        "full_name",
+        "sponsor_id",
+        "date_joined",
+        "account_active",
+        "is_active",
+        "pincode",
+        "address",
+        "first_purchase_activated_at",
+        "prefixed_id",
+        "unique_id",
+        "role",
+        "category",
+      ]);
+
+      let cleanOrdering = "id";
+      if (ordering && typeof ordering === "string") {
+        const isDesc = ordering.startsWith("-");
+        const rawField = isDesc ? ordering.substring(1) : ordering;
+        const mappedField = USER_SORT_FIELD_MAP[rawField] || (ALLOWED_DJANGO_ORDER_FIELDS.has(rawField) ? rawField : "id");
+        cleanOrdering = isDesc ? `-${mappedField}` : mappedField;
+      }
+
+      params.ordering = cleanOrdering;
       params.role = CONSUMER_ONLY_ROLE;
       params.category = CONSUMER_ONLY_CATEGORY;
       params.consumer_columns = consumerColumnView === "all" ? "all" : consumerColumnView;
@@ -1961,7 +2311,7 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
           ["Join Prime 750", (r) => r.join_prime_750 ?? (r.prime750_count > 0 ? `Yes (${r.prime750_count})` : "No")],
           ["Join Prime 750 Count", (r) => r.prime750_count ?? 0],
           ["SPP Months / Boxes", (r) => r.spp_months_boxes ?? r.monthly_759_count ?? 0],
-          ["Rank Upgrade Levels Purchased", (r) => r.rank_upgrade_levels ?? "0"],
+          ["Rank Upgrade Layers Purchased", (r) => r.rank_upgrade_levels ?? "0"],
           ["Rank Upgrade Count", (r) => r.rank_upgrade_count ?? 0],
           ["Current Rank", (r) => r.current_rank ?? ""],
           ["KYC Status", (r) => (r.kyc_verified ? "Verified" : (r.kyc_status || "Pending"))],
@@ -2294,9 +2644,9 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: "#0f172a" }}>Team Consumers</h2>
+        <h2 style={{ margin: 0, color: "#0f172a" }}>Community Consumers</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Consumer-only admin table. Agency and franchise users will be managed in the separate franchise admin flow.
+          Community consumers administration table and profiles.
         </div>
       </div>
 
@@ -2392,7 +2742,7 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
         onRowEdit={openUserProfile}
         columnVisibilityModel={colVis}
         onColumnVisibilityModelChange={setColVis}
-        instanceKey="admin-users"
+        instanceKey={location.search || "admin-users"}
       />
       <ModelFormDialog
         open={editOpen}

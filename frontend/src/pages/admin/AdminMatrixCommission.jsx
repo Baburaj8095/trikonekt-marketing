@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { adminGetMatrixCommissionConfig, adminUpdateMatrixCommissionConfig } from "../../api/api";
 
 function Section({ title, children, extraRight }) {
@@ -105,11 +105,11 @@ export default function AdminMatrixCommission() {
   const [cfg, setCfg] = useState(null);
 
   // Form state
-  const [fiveLevels, setFiveLevels] = useState("6");
+  const [fiveLayers, setFiveLayers] = useState("6");
   const [fiveAmounts, setFiveAmounts] = useState("");
   const [fivePercents, setFivePercents] = useState("");
 
-  const [threeLevels, setThreeLevels] = useState("15");
+  const [threeLayers, setThreeLayers] = useState("15");
   const [threeAmounts, setThreeAmounts] = useState("");
   const [threePercents, setThreePercents] = useState("");
 
@@ -120,8 +120,8 @@ export default function AdminMatrixCommission() {
     try {
       const data = await adminGetMatrixCommissionConfig();
       setCfg(data || {});
-      setFiveLevels(String(data?.five_matrix_levels ?? 6));
-      setThreeLevels(String(data?.three_matrix_levels ?? 15));
+      setFiveLayers(String(data?.five_matrix_levels ?? 6));
+      setThreeLayers(String(data?.three_matrix_levels ?? 15));
       setFiveAmounts(toCSV(data?.five_matrix_amounts_json || []));
       setFivePercents(toCSV(data?.five_matrix_percents_json || []));
       setThreeAmounts(toCSV(data?.three_matrix_amounts_json || []));
@@ -153,8 +153,8 @@ export default function AdminMatrixCommission() {
       const payload = {};
 
       // Coerce levels
-      const fL = parseInt(String(fiveLevels || "").trim() || "0", 10);
-      const tL = parseInt(String(threeLevels || "").trim() || "0", 10);
+      const fL = parseInt(String(fiveLayers || "").trim() || "0", 10);
+      const tL = parseInt(String(threeLayers || "").trim() || "0", 10);
       if (!Number.isNaN(fL) && fL > 0) payload.five_matrix_levels = fL;
       if (!Number.isNaN(tL) && tL > 0) payload.three_matrix_levels = tL;
 
@@ -173,8 +173,8 @@ export default function AdminMatrixCommission() {
       setCfg(data || {});
       setOk("Configuration updated");
       // Refresh form from server response
-      setFiveLevels(String((data?.five_matrix_levels ?? fL) || ""));
-      setThreeLevels(String((data?.three_matrix_levels ?? tL) || ""));
+      setFiveLayers(String((data?.five_matrix_levels ?? fL) || ""));
+      setThreeLayers(String((data?.three_matrix_levels ?? tL) || ""));
       setFiveAmounts(toCSV(data?.five_matrix_amounts_json || fAmt));
       setFivePercents(toCSV(data?.five_matrix_percents_json || fPct));
       setThreeAmounts(toCSV(data?.three_matrix_amounts_json || tAmt));
@@ -193,9 +193,9 @@ export default function AdminMatrixCommission() {
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: "#0f172a" }}>Matrix Commission</h2>
+        <h2 style={{ margin: 0, color: "#0f172a" }}>Block Commission</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Configure 5‑Matrix (FIVE_150) and 3‑Matrix (THREE_50/THREE_150) level-wise payouts. Amount arrays override percents when present.
+          Configure 5‑Block (FIVE_150) and 3‑Block (THREE_50/THREE_150) layer-wise payouts. Amount arrays override percents when present.
         </div>
       </div>
 
@@ -233,29 +233,29 @@ export default function AdminMatrixCommission() {
       </div>
 
       <Section
-        title="5‑Matrix (FIVE_150)"
+        title="5‑Block (FIVE_150)"
         extraRight={
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <Pill>Levels: {fiveLevels || "-"}</Pill>
+            <Pill>Layers: {fiveLayers || "-"}</Pill>
           </div>
         }
       >
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
           <TextInput
-            label="Levels"
-            value={fiveLevels}
-            onChange={setFiveLevels}
+            label="Layers"
+            value={fiveLayers}
+            onChange={setFiveLayers}
             placeholder="e.g. 6"
             type="number"
           />
           <TextInput
-            label="Fixed Amounts per level (₹) [overrides percents]"
+            label="Fixed Amounts per layer (₹) [overrides percents]"
             value={fiveAmounts}
             onChange={setFiveAmounts}
             placeholder={`e.g. ${examples.fiveAmounts}`}
           />
           <TextInput
-            label="Percents per level (%) [used when amounts empty]"
+            label="Percents per layer (%) [used when amounts empty]"
             value={fivePercents}
             onChange={setFivePercents}
             placeholder="e.g. 10, 5, 3, 2, 1, 1"
@@ -267,29 +267,29 @@ export default function AdminMatrixCommission() {
       </Section>
 
       <Section
-        title="3‑Matrix (THREE_50 / THREE_150)"
+        title="3‑Block (THREE_50 / THREE_150)"
         extraRight={
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <Pill>Levels: {threeLevels || "-"}</Pill>
+            <Pill>Layers: {threeLayers || "-"}</Pill>
           </div>
         }
       >
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
           <TextInput
-            label="Levels"
-            value={threeLevels}
-            onChange={setThreeLevels}
+            label="Layers"
+            value={threeLayers}
+            onChange={setThreeLayers}
             placeholder="e.g. 15"
             type="number"
           />
           <TextInput
-            label="Fixed Amounts per level (₹) [overrides percents]"
+            label="Fixed Amounts per layer (₹) [overrides percents]"
             value={threeAmounts}
             onChange={setThreeAmounts}
             placeholder="e.g. 5, 3, 2, 2, 1, 1, 1, 0.5, ..."
           />
           <TextInput
-            label="Percents per level (%) [used when amounts empty]"
+            label="Percents per layer (%) [used when amounts empty]"
             value={threePercents}
             onChange={setThreePercents}
             placeholder={`e.g. ${examples.threePercents}`}

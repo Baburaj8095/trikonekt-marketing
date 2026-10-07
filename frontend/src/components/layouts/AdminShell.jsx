@@ -214,6 +214,7 @@ export default function AdminShell({ children }) {
     if (to.startsWith("/admin/kyc")) return "kyc";
     if (to.startsWith("/admin/withdrawals")) return "withdrawals";
     if (
+      to.startsWith("/admin/overhead-income") ||
       to.startsWith("/admin/wallet-command-center") ||
       to.startsWith("/admin/wallet-ledger") ||
       to.startsWith("/admin/team-wallet-dashboard") ||
@@ -225,6 +226,7 @@ export default function AdminShell({ children }) {
       to.startsWith("/admin/wallets") ||
       to.startsWith("/admin/wallet-vouchers") ||
       to.startsWith("/admin/wallet-reconcile") ||
+      to.startsWith("/admin/user-audit") ||
       to.startsWith("/admin/ledger-statement") ||
       to.startsWith("/admin/reports/daily-report") ||
       to.startsWith("/admin/analytics")
@@ -266,15 +268,13 @@ export default function AdminShell({ children }) {
     return null;
   }
 
-  const groups = useMemo(
+  const isFranchise =
+    loc.pathname.startsWith("/admin/franchise") ||
+    loc.pathname.startsWith("/admin/workflows/franchise") ||
+    loc.pathname.startsWith("/admin/workflows/zonal");
+
+  const communityGroups = useMemo(
     () => [
-      {
-        key: "user",
-        label: "User Management",
-        items: [
-          { to: "/admin/user-tree", label: "Layer Blocks", icon: "tree" },
-        ],
-      },
       {
         key: "administration",
         label: "Administration",
@@ -290,85 +290,42 @@ export default function AdminShell({ children }) {
           },
         ],
       },
-      // {
-      //   key: "catalog",
-      //   label: "Catalog",
-      //   items: [
-      //     { to: "/admin/ecommerce-categories", label: "Categories", icon: "box" },
-      //     { to: "/admin/products", label: "Products", icon: "box" },
-      //     { to: "/admin/seed-demo", label: "Seed Demo Data", icon: "upload" },
-      //   ],
-      // },
       {
-        key: "ops",
-        label: "Payment Config",
+        key: "community",
+        label: "Community Consumers",
         items: [
-          // { to: "/admin/packages", label: "Packages", icon: "box" },
-          { to: "/admin/payments", label: "Payments", icon: "wallet" },
-          // { to: "/admin/payments?view=gateway", label: "Gateway", icon: "wallet" },
-          // { to: "/admin/payments?view=scanner", label: "Payment Scanner", icon: "upload" },
-          // { to: "/admin/agency-prime-requests", label: "Agency Prime Requests", icon: "wallet" },
-        ],
-      },
-      {
-        key: "package_management_requested",
-        label: "All Packages",
-        items: [
-          { to: "/admin/packages", label: "All Packages (Edit)", icon: "box" },
-          // { to: "/admin/package-management", label: "Package Management", icon: "box" },
-          { to: "/admin/dashboard/models/business/promopackage", label: "Promo Package Setup", icon: "box" },
-          // { to: "/admin/packages/join-subscription", label: "Join Subscription", icon: "ticket" },
-          // { to: "/admin/packages/spp", label: "Smart Product Package", icon: "ticket" },
-          // { to: "/admin/packages/spp-seasons", label: "SPP Seasons", icon: "box" },
-          // { to: "/admin/packages/digital-education-prime", label: "Digital Education Prime Approval", icon: "ticket" },
-          // { to: "/admin/tri/tri-holidays", label: "Tri Tour Setup", icon: "box" },
-          // { to: "/admin/packages/tri-tour", label: "Tri Tour", icon: "ticket" },
-        ],
-      },
-      {
-        key: "rewards_requested",
-        label: "Rewards",
-        items: [
-         
-          { to: "/admin/workflows/franchise-reference-reward", label: "Franchise Reference Reward", icon: "wallet" },
-          { to: "/admin/workflows/zonal-reward", label: "Zonal Reward", icon: "wallet" },
-        ],
-      },
-      {
-        key: "configuration_requested",
-        label: "Configuration",
-        items: [
-          { to: "/admin/workflows/social-media-links", label: "Social Media Links", icon: "file" },
-          { to: "/admin/workflows/tree-toggle", label: "Tree On / Off", icon: "tree" },
-          { to: "/admin/ui-config", label: "UI Configuration", icon: "box" },
+          { to: "/admin/users", label: "Community Consumers (996)", icon: "users" },
+          { to: "/admin/workflows/team-admin-board", label: "Community Admin Board", icon: "dashboard" },
+          { to: "/admin/team-consumer/block-users", label: "Block Community Consumers", icon: "users" },
+          { to: "/admin/team-consumer/top-achievers", label: "Top Achievers", icon: "users" },
         ],
       },
       {
         key: "finance_wallet_ops",
-        label: "Finance & Approvals",
+        label: "Finance & Treasury",
         items: [
+          { to: "/admin/payments", label: "Payment Gateways", icon: "wallet" },
+          { to: "/admin/overhead-income", label: "Daily 24h Overhead Incomes", icon: "wallet" },
           { to: "/admin/total-admin-charges", label: "Total Admin Charges", icon: "wallet" },
           { to: "/admin/wallet-upload-approvals", label: "Add Money Requests", icon: "upload" },
           { to: "/admin/withdrawals", label: "Withdrawal Requests", icon: "wallet" },
-          { to: "/admin/packages/join-subscription", label: "Package Approvals", icon: "ticket" },
-          { to: "/admin/rank-upgrades", label: "Rank Upgrade Approvals", icon: "wallet" },
           { to: "/admin/wallet-ledger", label: "Central Ledger", icon: "wallet" },
-          { to: "/admin/wallets", label: "Wallet Overview", icon: "wallet" },
+          { to: "/admin/wallets", label: "Consumer Wallets", icon: "wallet" },
           { to: "/admin/wallet-reconcile", label: "Wallet Reconcile", icon: "chart" },
+          { to: "/admin/user-audit", label: "User Earnings Audit", icon: "chart" },
         ],
       },
       {
-        key: "package_management_requested",
-        label: "Package Configuration",
+        key: "commissions",
+        label: "Commissions & Royalties",
         items: [
-          { to: "/admin/packages", label: "All Packages (Edit)", icon: "box" },
-          { to: "/admin/packages/spp-seasons", label: "Manage SPP Seasons", icon: "box" },
-          { to: "/admin/tri/tri-holidays", label: "Tri Tour Packages", icon: "box" },
+          { to: "/admin/commissions/distribute", label: "Commission & Layer Royalty Rules", icon: "wallet" },
+          { to: "/admin/autopool", label: "Auto Commission Pool Monitor", icon: "pool" },
         ],
       },
       {
         key: "reports_consolidated",
-        label: "Reports & Business Intelligence",
+        label: "Reports & Analytics",
         items: [
           { to: "/admin/analytics/sales", label: "Daily Sales & Cash Flow", icon: "chart" },
           { to: "/admin/reports/users-today", label: "Users Today Report", icon: "users" },
@@ -377,57 +334,21 @@ export default function AdminShell({ children }) {
         ],
       },
       {
-        key: "commissions",
-        label: "Commissions & Royalties",
-        items: [
-          { to: "/admin/commissions/distribute", label: "Commission & Royalty Rules", icon: "wallet" },
-          { to: "/admin/commissions/history", label: "Commission History", icon: "wallet" },
-          { to: "/admin/autopool", label: "Auto Commission Pool Monitor", icon: "pool" },
-        ],
-      },
-      {
         key: "coupon_requested",
         label: "Coupons & Rewards",
         items: [
           { to: "/admin/workflows/generate-coupon", label: "Generate Coupon", icon: "ticket" },
           { to: "/admin/wallet-vouchers", label: "Coupon / Voucher Maintenance", icon: "ticket" },
-          { to: "/admin/workflows/franchise-reference-reward", label: "Franchise Reference Reward", icon: "wallet" },
-          { to: "/admin/workflows/zonal-reward", label: "Zonal Reward", icon: "wallet" },
           { to: "/admin/lucky-draw", label: "Lucky Draw", icon: "ticket" },
         ],
       },
       {
-        key: "team_consumer",
-        label: "Team Consumer",
-        items: [
-          { to: "/admin/users", label: "Team Consumers", icon: "users" },
-          { to: "/admin/user-tree", label: "Layer Blocks / Tree", icon: "tree" },
-          { to: "/admin/workflows/team-admin-board", label: "Team Admin Board", icon: "dashboard" },
-          { to: "/admin/team-consumer/block-users", label: "Block Team Consumers", icon: "users" },
-          { to: "/admin/team-consumer/top-achievers", label: "Top Achievers", icon: "users" },
-        ],
-      },
-      {
         key: "media_content",
-        label: "Media & Content Management",
+        label: "Education & Certificates",
         items: [
-          { to: "/admin/team-consumer/educational-videos", label: "Educational Videos", icon: "file" },
-          { to: "/admin/team-consumer/pdf-uploads", label: "Trikonekt PDF Uploads", icon: "file" },
-          { to: "/admin/team-consumer/pdf-uploads?view=business", label: "Trikonekt Business PDF", icon: "file" },
-          { to: "/admin/team-consumer/certificate-uploads", label: "Certificate Uploads", icon: "file" },
+          { to: "/admin/team-consumer/pdf-uploads", label: "Education PDFs", icon: "file" },
+          { to: "/admin/team-consumer/certificate-uploads", label: "Certified Training Certificates", icon: "file" },
           { to: "/admin/team-consumer/wishing-banners", label: "Wishing Banners", icon: "box" },
-          { to: "/admin/workflows/crm-connect", label: "CRM Connect", icon: "briefcase" },
-          { to: "/admin/ui-config", label: "UI Configuration", icon: "box" },
-          { to: "/admin/workflows/tree-toggle", label: "Tree On / Off", icon: "tree" },
-        ],
-      },
-      {
-        key: "franchise",
-        label: "Franchise",
-        items: [
-          { to: "/admin/franchise/dashboard", label: "Franchise Dashboard", icon: "dashboard" },
-          { to: "/admin/franchise/achievers", label: "Achievers", icon: "users" },
-          { to: "/admin/franchise/wishing-banners", label: "Wishing Banners", icon: "box" },
         ],
       },
       {
@@ -440,21 +361,73 @@ export default function AdminShell({ children }) {
           { to: "/admin/analytics/debugger", label: "Wallet Debugger", icon: "shield" },
         ],
       },
-
-      // {
-      //   key: "dev",
-      //   label: "Developer Tools",
-      //   requiresSuperuser: true,
-      //   items: [{ to: "/admin/dashboard/models", label: "Developer Service", icon: "box" }],
-      // },
     ],
     []
   );
 
+  const franchiseGroups = useMemo(
+    () => [
+      {
+        key: "franchise_hierarchy",
+        label: "Franchise Hierarchy & Users",
+        items: [
+          { to: "/admin/franchise/users", label: "All Franchise Users", icon: "users" },
+          { to: "/admin/franchise/category/agency_state_coordinator", label: "State Coordinators", icon: "users" },
+          { to: "/admin/franchise/category/agency_state", label: "State Franchises", icon: "users" },
+          { to: "/admin/franchise/category/agency_district_coordinator", label: "District Coordinators", icon: "users" },
+          { to: "/admin/franchise/category/agency_district", label: "District Franchises", icon: "users" },
+          { to: "/admin/franchise/category/agency_pincode_coordinator", label: "Pincode Coordinators", icon: "users" },
+          { to: "/admin/franchise/category/agency_pincode", label: "Pincode Franchises", icon: "users" },
+          { to: "/admin/franchise/category/agency_sub_franchise", label: "Sub Franchises", icon: "users" },
+          { to: "/admin/franchise/category/merchant", label: "B2B Merchants", icon: "briefcase" },
+        ],
+      },
+      {
+        key: "franchise_wallets",
+        label: "Franchise Wallets & Controls",
+        items: [
+          { to: "/admin/franchise/wallets", label: "Franchise Wallets", icon: "wallet" },
+          { to: "/admin/franchise/wallet-controls", label: "Wallet Settings & Approvals", icon: "shield" },
+          { to: "/admin/withdrawals", label: "Franchise Withdrawals", icon: "wallet" },
+        ],
+      },
+      {
+        key: "franchise_pools",
+        label: "Zonal & Referral Pools",
+        items: [
+          { to: "/admin/workflows/franchise-reference-reward", label: "Franchise Reference Rewards", icon: "wallet" },
+          { to: "/admin/workflows/zonal-reward", label: "Zonal Royalty Pool", icon: "wallet" },
+        ],
+      },
+      {
+        key: "franchise_media",
+        label: "Documents & Recognition",
+        items: [
+          { to: "/admin/franchise/achievers", label: "Franchise Achievers", icon: "users" },
+          { to: "/admin/franchise/wishing-banners", label: "Wishing Banners", icon: "box" },
+          { to: "/admin/franchise/documents", label: "Agreements & Templates", icon: "file" },
+          { to: "/admin/franchise/pdfs", label: "Franchise PDFs", icon: "file" },
+          { to: "/admin/franchise/id-card", label: "Generate ID Card", icon: "shield" },
+        ],
+      },
+      {
+        key: "franchise_compliance",
+        label: "Compliance & Security",
+        items: [
+          { to: "/admin/kyc?workspace=franchise", label: "Franchise KYC Verification", icon: "shield" },
+          { to: "/admin/support", label: "Support Tickets", icon: "ticket" },
+        ],
+      },
+    ],
+    []
+  );
+
+  const activeGroups = isFranchise ? franchiseGroups : communityGroups;
+
   const visibleGroups = useMemo(() => {
-    if (!adminInfo) return groups.filter((g) => !g.requiresSuperuser);
-    return groups.filter((g) => (g.requiresSuperuser ? !!adminInfo.is_superuser : true));
-  }, [adminInfo, groups]);
+    if (!adminInfo) return activeGroups.filter((g) => !g.requiresSuperuser);
+    return activeGroups.filter((g) => (g.requiresSuperuser ? !!adminInfo.is_superuser : true));
+  }, [adminInfo, activeGroups]);
 
   const menu = useMemo(() => {
     const mods = adminInfo?.modules || null;
@@ -476,16 +449,11 @@ export default function AdminShell({ children }) {
 
     const out = [];
 
-    out.push({ to: "/admin/dashboard", label: "Dashboard", icon: "dashboard" });
-    // out.push({ to: "/admin/users?category=merchant", label: "Business / Merchant", icon: "briefcase" });
-    // out.push({ to: "/admin/users?category=employee", label: "Sarathi / Employee", icon: "users" });
-    // out.push({ to: "/admin/users?category=agency_state_coordinator", label: "Agency: State Coordinator", icon: "users" });
-    // out.push({ to: "/admin/users?category=agency_state", label: "Agency: State", icon: "users" });
-    // out.push({ to: "/admin/users?category=agency_district_coordinator", label: "Agency: District Coordinator", icon: "users" });
-    // out.push({ to: "/admin/users?category=agency_district", label: "Agency: District", icon: "users" });
-    // out.push({ to: "/admin/users?category=agency_pincode_coordinator", label: "Agency: Pincode Coordinator", icon: "users" });
-    // out.push({ to: "/admin/users?category=agency_pincode", label: "Agency: Pincode", icon: "users" });
-    // out.push({ to: "/admin/users?category=agency_sub_franchise", label: "Agency: Sub Franchise", icon: "users" });
+    if (isFranchise) {
+      out.push({ to: "/admin/franchise/dashboard", label: "Franchise Dashboard", icon: "dashboard" });
+    } else {
+      out.push({ to: "/admin/dashboard", label: "Community Dashboard", icon: "dashboard" });
+    }
 
     visibleGroups.forEach((g) => {
       const items = (g.items || []).filter(filterItem);
@@ -507,7 +475,7 @@ export default function AdminShell({ children }) {
     }
 
     return out;
-  }, [adminInfo, rbacPerms, visibleGroups, modelsErr, metrics]);
+  }, [adminInfo, rbacPerms, visibleGroups, modelsErr, metrics, isFranchise]);
 
   function getBadgeFor(to) {
     try {
@@ -546,20 +514,12 @@ export default function AdminShell({ children }) {
       return true;
     };
 
-    // If the menu item includes query params, treat it as a *filter selector*.
-    // In that case, mark active when:
-    //  - pathname matches, AND
-    //  - all query params in `to` match the current URL (allowing extra params like page=2)
     if (toStr.includes("?")) {
       return queryMatches(toStr);
     }
 
-    // Special-case: keep "All Users" un-highlighted when any quick-filter query is present.
     if (toPath === "/admin/users" && (location.search || "")) return false;
 
-    // When an alias item with query params points at the same screen, only that
-    // alias should highlight. This prevents "Payments", "Gateway", and
-    // "Payment Scanner" all lighting up together on the same component.
     if (location.search) {
       const hasMatchingQueryAlias = (menu || []).some((item) => {
         const itemTo = String(item?.to || "");
@@ -574,37 +534,66 @@ export default function AdminShell({ children }) {
   const rightPill = useMemo(() => {
     const who = adminInfo?.username ? String(adminInfo.username) : "Admin";
     return (
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "4px 10px",
-          borderRadius: 999,
-          border: "1px solid #e2e8f0",
-          background: "#f8fafc",
-          color: "#0f172a",
-          fontSize: 12,
-          fontWeight: 800,
-          whiteSpace: "nowrap",
-        }}
-        title={who}
-      >
-        {who}
-      </span>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button
+          type="button"
+          onClick={() => navigate(isFranchise ? "/admin/dashboard" : "/admin/franchise/dashboard")}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "5px 12px",
+            borderRadius: 8,
+            border: isFranchise ? "1px solid #7c3aed" : "1px solid #2563eb",
+            background: isFranchise ? "#f5f3ff" : "#eff6ff",
+            color: isFranchise ? "#6d28d9" : "#1d4ed8",
+            fontSize: 12,
+            fontWeight: 800,
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+            boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+            transition: "all 120ms ease",
+          }}
+          title={`Switch to ${isFranchise ? "Community Admin" : "Franchise Admin"}`}
+        >
+          <span>{isFranchise ? "🏢 Franchise Workspace" : "👤 Community Workspace"}</span>
+          <span style={{ fontSize: 10, textDecoration: "underline", opacity: 0.85 }}>
+            (Switch to {isFranchise ? "Community" : "Franchise"})
+          </span>
+        </button>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "5px 10px",
+            borderRadius: 999,
+            border: "1px solid #e2e8f0",
+            background: "#f8fafc",
+            color: "#0f172a",
+            fontSize: 12,
+            fontWeight: 800,
+            whiteSpace: "nowrap",
+          }}
+          title={who}
+        >
+          {who}
+        </span>
+      </div>
     );
-  }, [adminInfo]);
+  }, [adminInfo, isFranchise, navigate]);
 
   return (
     <div className="admin-scope">
       <ShellBase
-        title="Admin"
+        title={isFranchise ? "Franchise Admin" : "Community Admin"}
         menu={menu}
         isActive={isActive}
-        footerText={`© ${new Date().getFullYear()} Admin Console`}
+        footerText={`© ${new Date().getFullYear()} asiyapp Admin Console`}
         rightHeaderContent={rightPill}
-        rootPaths={["/admin/dashboard", "/admin/users"]}
-        onBackFallbackPath="/admin/dashboard"
+        rootPaths={isFranchise ? ["/admin/franchise/dashboard", "/admin/franchise/users"] : ["/admin/dashboard", "/admin/users"]}
+        onBackFallbackPath={isFranchise ? "/admin/franchise/dashboard" : "/admin/dashboard"}
+        showBottomNav={false}
       >
         {authErr ? (
           <div

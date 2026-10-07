@@ -15,19 +15,19 @@ import API from "../../api/api";
 
 const copyByKind = {
   PDF: {
-    title: "Trikonekt PDF",
-    empty: "Trikonekt PDF is not uploaded yet.",
-    filename: "trikonekt-pdf.pdf",
+    title: "asiyapp PDF",
+    empty: "asiyapp PDF is not uploaded yet.",
+    filename: "asiyapp-pdf.pdf",
   },
   BUSINESS_PDF: {
-    title: "Trikonekt Business PDF",
-    empty: "Trikonekt Business PDF is not uploaded yet.",
-    filename: "trikonekt-business-pdf.pdf",
+    title: "asiyapp Business PDF",
+    empty: "asiyapp Business PDF is not uploaded yet.",
+    filename: "asiyapp-business-pdf.pdf",
   },
   CERTIFICATE: {
     title: "Certificate Download",
     empty: "Certificate is not uploaded yet.",
-    filename: "trikonekt-certificate.pdf",
+    filename: "asiyapp-certificate.pdf",
   },
 };
 

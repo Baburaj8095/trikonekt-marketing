@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -1518,8 +1518,8 @@ const RegisterV2 = () => {
           sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "pointer" }}
           onClick={() => navigate("/")}
         >
-          <img src={LOGO} alt="Trikonekt" style={{ height: 28 }} />
-          <Typography sx={{ fontWeight: 900, letterSpacing: 0.3 }}>TRIKONEKT</Typography>
+          <img src={LOGO} alt="asiyapp" style={{ height: 28, borderRadius: 6 }} />
+          <Typography sx={{ fontWeight: 900, letterSpacing: 0.3 }}>asiyapp</Typography>
         </Box>
 
         <Box sx={{ flexGrow: 1 }} />
@@ -1719,8 +1719,8 @@ const RegisterV2 = () => {
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Avatar
             src={LOGO}
-            alt="Trikonekt"
-            sx={{ width: 40, height: 40, bgcolor: "transparent" }}
+            alt="asiyapp"
+            sx={{ width: 40, height: 40, bgcolor: "transparent", borderRadius: 1.5 }}
           />
           <Box>
             <Typography sx={{ fontSize: 20, fontWeight: 900, color: "#0f172a" }}>

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import API from "../../api/api";
 
 function TextInput({ label, value, onChange, placeholder, type = "text", style }) {
@@ -197,8 +197,8 @@ export default function AdminMatrixThree() {
 
   const poolOptions = useMemo(
     () => [
-      { value: "THREE_150", label: "3-Matrix (THREE_150)" },
-      { value: "THREE_50", label: "3-Matrix (THREE_50)" },
+      { value: "THREE_150", label: "3-Block (THREE_150)" },
+      { value: "THREE_50", label: "3-Block (THREE_50)" },
     ],
     []
   );
@@ -209,8 +209,8 @@ export default function AdminMatrixThree() {
       { value: "updated_at", label: "Oldest updated" },
       { value: "-total_earned", label: "Earned desc" },
       { value: "total_earned", label: "Earned asc" },
-      { value: "-level_reached", label: "Level desc" },
-      { value: "level_reached", label: "Level asc" },
+      { value: "-level_reached", label: "Layer desc" },
+      { value: "level_reached", label: "Layer asc" },
     ],
     []
   );
@@ -218,9 +218,9 @@ export default function AdminMatrixThree() {
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: "#0f172a" }}>3-Matrix</h2>
+        <h2 style={{ margin: 0, color: "#0f172a" }}>3-Block</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Browse progress and view sponsor hierarchy for 3-matrix pools.
+          Browse progress and view sponsor hierarchy for 3-block pools.
         </div>
       </div>
 
@@ -334,9 +334,9 @@ export default function AdminMatrixThree() {
           <div>Username</div>
           <div>Full Name</div>
           <div>Pool</div>
-          <div>Level</div>
-          <div>Per-Level Counts</div>
-          <div>Per-Level Earned</div>
+          <div>Layer</div>
+          <div>Per-Layer Counts</div>
+          <div>Per-Layer Earned</div>
           <div>Total Earned</div>
         </div>
         <div>
@@ -372,9 +372,9 @@ export default function AdminMatrixThree() {
         </div>
       </div>
 
-      {/* 3‑Matrix Transactions */}
+      {/* 3‑Block Transactions */}
       <div style={{ marginTop: 24 }}>
-        <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>3‑Matrix Transactions</h3>
+        <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>3‑Block Transactions</h3>
         <div
           style={{
             border: "1px solid #e2e8f0",
@@ -475,7 +475,7 @@ export default function AdminMatrixThree() {
         >
           {!tree ? (
             <div style={{ padding: 12, color: "#64748b" }}>
-              Enter an identifier and load to view the 3-matrix sponsor hierarchy.
+              Enter an identifier and load to view the 3-block sponsor hierarchy.
             </div>
           ) : (
             <div>
@@ -496,7 +496,7 @@ export default function AdminMatrixThree() {
         </div>
       </div>
 
-      {/* Matrix Accounts ({pool}) */}
+      {/* 3-Block Accounts ({pool}) */}
       <div style={{ marginTop: 24 }}>
         <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>{pool} Accounts</h3>
 
@@ -597,7 +597,7 @@ export default function AdminMatrixThree() {
             <div>ID</div>
             <div>Owner</div>
             <div>Parent Owner</div>
-            <div>Level</div>
+            <div>Layer</div>
             <div>Pos</div>
             <div>Source</div>
             <div>Source ID</div>
@@ -637,9 +637,9 @@ export default function AdminMatrixThree() {
         </div>
       </div>
 
-      {/* Level-wise Commission Stats (by Coupon ID) */}
+      {/* Layer-wise Commission Stats (by Coupon ID) */}
       <div style={{ marginTop: 24 }}>
-        <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>Level-wise Commission Stats</h3>
+        <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>Layer-wise Commission Stats</h3>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
           <input
             value={statsSourceId}
@@ -702,7 +702,7 @@ export default function AdminMatrixThree() {
         >
           {!stats ? (
             <div style={{ padding: 12, color: "#64748b" }}>
-              Enter a coupon id and load to view level-wise and total commission credited from {pool}.
+              Enter a coupon id and load to view layer-wise and total commission credited from {pool}.
             </div>
           ) : (
             <div style={{ padding: 12 }}>

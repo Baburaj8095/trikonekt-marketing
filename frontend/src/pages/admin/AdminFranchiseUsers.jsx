@@ -193,7 +193,7 @@ export default function AdminFranchiseUsers() {
       },
       {
         field: "category",
-        headerName: "Franchise Level",
+        headerName: "Franchise Layer",
         minWidth: 210,
         renderCell: (params) => <Chip size="small" label={labelFor(params?.row?.category)} />,
       },
@@ -324,7 +324,7 @@ export default function AdminFranchiseUsers() {
               ["Phone", selected?.phone],
               ["Email", selected?.email],
               ["Code", selected?.user_code || selected?.prefixed_id],
-              ["Franchise Level", labelFor(selected?.category)],
+              ["Franchise Layer", labelFor(selected?.category)],
               ["State", selected?.state_name || selected?.state],
               ["Pincode", selected?.pincode],
               ["Account", selected?.account_active ? "Active" : "Inactive"],

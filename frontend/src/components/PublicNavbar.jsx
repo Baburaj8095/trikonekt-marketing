@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -58,7 +58,7 @@ export default function PublicNavbar() {
             sx={{ display: "flex", alignItems: "center", cursor: "pointer" }}
             onClick={() => navigate("/")}
           >
-            <img src={LOGO} alt="Trikonekt" style={{ height: 34 }} />
+            <img src={LOGO} alt="asiyapp" style={{ height: 34, borderRadius: 8 }} />
           </Box>
 
           {/* DESKTOP NAV */}
@@ -136,7 +136,7 @@ export default function PublicNavbar() {
               p: 2,
             }}
           >
-            <img src={LOGO} alt="Trikonekt" style={{ height: 30 }} />
+            <img src={LOGO} alt="asiyapp" style={{ height: 30, borderRadius: 6 }} />
             <IconButton onClick={() => setOpen(false)}>
               <CloseIcon />
             </IconButton>

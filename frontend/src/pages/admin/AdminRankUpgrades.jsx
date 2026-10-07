@@ -490,7 +490,7 @@ export default function AdminRankUpgrades({
             <Box sx={{ textAlign: "right" }}>GST</Box>
             <Box sx={{ textAlign: "right" }}>Net</Box>
             <Box sx={{ textAlign: "right" }}>Sponsor</Box>
-            <Box sx={{ textAlign: "right" }}>Level Owner</Box>
+            <Box sx={{ textAlign: "right" }}>Layer Owner</Box>
             <Box sx={{ textAlign: "right" }}>Payment</Box>
             <Box sx={{ textAlign: "right" }}>Status</Box>
           </Box>
@@ -612,7 +612,7 @@ export default function AdminRankUpgrades({
                 value={`TR ${selectedUpgrade?.sponsor_username || "-"} • Rel ₹${Number(selectedUpgrade?.sponsor_released || 0).toFixed(2)} • Hold ₹${Number(selectedUpgrade?.sponsor_held || 0).toFixed(2)}`}
               />
               <ValueRow
-                label={`Level Owner${selectedUpgrade?.level_index ? ` (L${selectedUpgrade.level_index})` : ""}`}
+                label={`Layer Owner${selectedUpgrade?.level_index ? ` (L${selectedUpgrade.level_index})` : ""}`}
                 value={`TR ${selectedUpgrade?.level_owner_username || "-"} • Rel ₹${Number(selectedUpgrade?.level_released || 0).toFixed(2)} • Hold ₹${Number(selectedUpgrade?.level_held || 0).toFixed(2)}`}
               />
             </Paper>

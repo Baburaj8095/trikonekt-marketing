@@ -35,18 +35,18 @@ function resolveMedia(raw) {
 
 const labels = {
   PDF: {
-    title: "Team/Consumer - Trikonekt PDF Uploads",
-    helper: "Upload the PDF opened from the Team Dashboard Trikonekt PDF action.",
+    title: "Community - asiyapp PDF Uploads",
+    helper: "Upload the PDF opened from the Community Dashboard asiyapp PDF action.",
     button: "Upload PDF",
   },
   BUSINESS_PDF: {
-    title: "Team/Consumer - Trikonekt Business PDF",
-    helper: "Upload the business PDF used by Trikonekt Business front-page/content actions.",
+    title: "Community - Business PDF",
+    helper: "Upload the business PDF used by community business actions.",
     button: "Upload Business PDF",
   },
   CERTIFICATE: {
-    title: "Team/Consumer - Certificate Uploads",
-    helper: "Upload the certificate PDF downloaded from the Team Dashboard certificate action.",
+    title: "Community - Certificate Uploads",
+    helper: "Upload the certificate PDF downloaded from the Community Dashboard certificate action.",
     button: "Upload Certificate",
   },
 };

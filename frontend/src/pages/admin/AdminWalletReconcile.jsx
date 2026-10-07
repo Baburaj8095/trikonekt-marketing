@@ -74,7 +74,7 @@ export default function AdminWalletReconcile() {
           </Paper>
         ))}
       </Stack>
-      <Typography sx={{ fontWeight: 900, mb: 1 }}>Pocket-Level Ledger Reconciliation</Typography>
+      <Typography sx={{ fontWeight: 900, mb: 1 }}>Pocket-Layer Ledger Reconciliation</Typography>
       <Stack spacing={1}>
         {financeRows.map((r) => (
           <Paper key={r.wallet_account_id} variant="outlined" sx={{ p: 1.25, borderRadius: 2, borderColor: r.status === "OK" ? "#e2e8f0" : "#fca5a5" }}>

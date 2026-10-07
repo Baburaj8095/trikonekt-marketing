@@ -1,17 +1,16 @@
 /* Trikonekt Modern UI/UX Global CSS & Design Tokens */
 :root {
   color-scheme: light;
-  --color-primary: #2563EB;
-  --color-primary-dark: #1D4ED8;
+  --color-primary: #1E40AF;
+  --color-primary-dark: #1E3A8A;
   --color-primary-light: #EFF6FF;
-  --color-secondary: #7C3AED;
-  --color-accent: #06B6D4;
-  --color-success: #16A34A;
-  --color-success-bg: #DCFCE7;
-  --color-warning: #F59E0B;
-  --color-warning-bg: #FEF3C7;
-  --color-error: #EF4444;
-  --color-error-bg: #FEE2E2;
+  --color-secondary: #4338CA;
+  --color-success: #059669;
+  --color-success-bg: #ECFDF5;
+  --color-warning: #D97706;
+  --color-warning-bg: #FFFBEB;
+  --color-error: #DC2626;
+  --color-error-bg: #FEF2F2;
 
   --color-bg-app: #F8FAFC;
   --color-surface: #FFFFFF;
@@ -20,21 +19,21 @@
   --color-border-subtle: #F1F5F9;
 
   --color-text-primary: #0F172A;
-  --color-text-secondary: #64748B;
+  --color-text-secondary: #475569;
   --color-text-muted: #94A3B8;
 
   --radius-sm: 8px;
-  --radius-md: 12px;
+  --radius-md: 10px;
   --radius-card: 16px;
   --radius-modal: 20px;
   --radius-pill: 999px;
 
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-card: 0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+  --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
   --shadow-floating: 0 12px 32px -4px rgba(15, 23, 42, 0.12);
-  --shadow-dock: 0 -4px 20px 0 rgba(15, 23, 42, 0.08);
+  --shadow-dock: 0 -2px 16px 0 rgba(15, 23, 42, 0.06);
 
-  --font-family: 'Inter', 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 html, body {

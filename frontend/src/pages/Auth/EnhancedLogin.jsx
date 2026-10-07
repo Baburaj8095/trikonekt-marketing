@@ -1,4 +1,4 @@
-﻿// Login.jsx  Final polished wireframe UI (single-file).
+// Login.jsx  Final polished wireframe UI (single-file).
 // NOTE: This file PRESERVES your original logic (API calls, geolocation, registration, dialogs).
 // Styling is done via MUI sx props. Requires @mui/material and @mui/icons-material v7.
 
@@ -1993,7 +1993,7 @@ const Login = () => {
       <AppBar position="sticky" sx={{ backgroundColor: "transparent", color: "#fff", boxShadow: "none" }}>
         <Toolbar sx={{ gap: 2 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "pointer" }} onClick={() => navigate("/")}>
-            <img src={LOGO} alt="Trikonekt" style={{ height: 38 }} />
+            <img src={LOGO} alt="asiyapp" style={{ height: 38, borderRadius: 8 }} />
           </Box>
           <Box sx={{ flexGrow: 1 }} />
           <Button color="inherit" sx={{ textTransform: "none", fontWeight: 500 }} onClick={() => navigate("/")}>
@@ -2020,7 +2020,7 @@ const Login = () => {
           }}
         >
           <Box sx={{ textAlign: "center", mb: 1 }}>
-            <Avatar src={LOGO} alt="Trikonekt" className="trikonekt-logo" sx={{ width: 64, height: 64, mx: "auto", mb: 1, bgcolor: "transparent" }} />
+            <Avatar src={LOGO} alt="asiyapp" className="trikonekt-logo" sx={{ width: 64, height: 64, mx: "auto", mb: 1, bgcolor: "transparent", borderRadius: 2 }} />
           </Box>
 
           <Divider sx={{ my: 2 }} />

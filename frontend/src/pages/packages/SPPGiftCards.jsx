@@ -35,10 +35,13 @@ import {
   Verified as VerifiedIcon,
   Stars as StarsIcon,
   ArrowForward as ArrowForwardIcon,
+  ChevronRight as ChevronRightIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import API from "../../api/api";
+import PremiumScreenHeader from "../../components/common/PremiumScreenHeader";
+import BottomNav from "../../components/common/BottomNav";
 
 // Simple QR code renderer using standard SVG/canvas or QR code API
 function QRCodeView({ value, size = 180 }) {
@@ -181,67 +184,110 @@ export default function SPPGiftCards() {
   ];
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2.5, md: 4 }, maxWidth: 1280, mx: "auto" }}>
-      {/* Header Banner */}
+    <Box
+      sx={{
+        bgcolor: "#F4F7FC",
+        minHeight: "100dvh",
+        position: "relative",
+        pb: { xs: 12, sm: 14 },
+      }}
+    >
+      <PremiumScreenHeader
+        title="SPP Gift Cards & Maturity Vault"
+        onBack={() => navigate(-1)}
+        onNotifications={() => {
+          try {
+            window.dispatchEvent(new CustomEvent("trikonekt:open-consumer-sidebar"));
+          } catch (_) {}
+        }}
+        onSecondary={() => navigate("/user/coupon-pocket")}
+        hasBackdrop={true}
+      />
+
       <Box
         sx={{
-          display: "flex",
-          flexDirection: { xs: "column", sm: "row" },
-          justifyContent: "space-between",
-          alignItems: { xs: "flex-start", sm: "center" },
-          mb: 2.5,
-          gap: 1.5,
+          maxWidth: 600,
+          mx: "auto",
+          px: { xs: 2, sm: 2.5 },
+          pt: 1,
+          position: "relative",
+          zIndex: 1,
         }}
       >
-        <Box>
-          <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 0.5 }}>
-            <GiftIcon sx={{ fontSize: { xs: 26, sm: 30 }, color: "#10b981" }} />
-            <Typography variant="h5" sx={{ fontWeight: 900, color: "#0f172a", fontSize: { xs: "1.25rem", sm: "1.5rem" }, letterSpacing: -0.5 }}>
-              SPP Gift Cards & Maturity Vault
-            </Typography>
+        {/* HERO CARD - Deep Navy/Cobalt with Gold/Gift theme */}
+        <Card
+          elevation={0}
+          sx={{
+            p: { xs: 2.2, sm: 2.5 },
+            borderRadius: "22px",
+            mb: 2,
+            position: "relative",
+            overflow: "hidden",
+            background: "linear-gradient(135deg, #07152E 0%, #091E3A 40%, #0256B4 100%)",
+            color: "#FFFFFF",
+            boxShadow: "0 14px 34px -8px rgba(2, 86, 180, 0.4)",
+            border: "1px solid rgba(255, 255, 255, 0.14)",
+          }}
+        >
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: "14px",
+                  bgcolor: "rgba(245, 158, 11, 0.16)",
+                  border: "1px solid rgba(245, 158, 11, 0.35)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backdropFilter: "blur(8px)",
+                }}
+              >
+                <StarsIcon sx={{ fontSize: 24, color: "#FBBF24" }} />
+              </Box>
+              <Box>
+                <Typography
+                  sx={{
+                    fontSize: "10.5px",
+                    fontWeight: 700,
+                    letterSpacing: "0.8px",
+                    color: "#94A3B8",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  SPP GIFT CARDS & MATURITY VAULT
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    color: "rgba(255,255,255,0.75)",
+                    mt: 0.2,
+                  }}
+                >
+                  Universal vouchers & ₹14,000 maturity savings
+                </Typography>
+              </Box>
+            </Stack>
+
+            {/* 3D Gold Accent */}
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: "50%",
+                background: "radial-gradient(circle at 35% 35%, #F59E0B, #B45309)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 6px 16px rgba(245, 158, 11, 0.4)",
+              }}
+            >
+              <GiftIcon sx={{ fontSize: 26, color: "#FFFFFF" }} />
+            </Box>
           </Stack>
-          <Typography variant="body2" sx={{ color: "#64748b", fontWeight: 500, fontSize: { xs: "0.8rem", sm: "0.875rem" } }}>
-            QR-enabled ₹1,000 Universal Vouchers redeemable across <b>Tri Holidays, Products, Packages</b> or <b>₹14,000 Year-End Maturity</b>
-          </Typography>
-        </Box>
-
-        <Stack direction="row" spacing={1} sx={{ width: { xs: "100%", sm: "auto" } }}>
-          <IconButton
-            onClick={() => fetchGiftCards(true)}
-            disabled={refreshing}
-            size="small"
-            sx={{
-              bgcolor: "#f1f5f9",
-              border: "1px solid #e2e8f0",
-              p: 1,
-              "&:hover": { bgcolor: "#e2e8f0" },
-            }}
-          >
-            <RefreshIcon sx={{ color: "#475569", fontSize: 20, animation: refreshing ? "spin 1s linear infinite" : "none" }} />
-          </IconButton>
-
-          <Button
-            variant="contained"
-            fullWidth
-            startIcon={<ShoppingBagIcon />}
-            onClick={() => navigate("/user/packages/spp")}
-            sx={{
-              background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
-              color: "#fff",
-              fontWeight: 700,
-              fontSize: { xs: "13px", sm: "14px" },
-              px: 2.5,
-              py: 0.9,
-              borderRadius: 2.5,
-              textTransform: "none",
-              boxShadow: "0 4px 14px rgba(37,99,235,0.3)",
-              whiteSpace: "nowrap",
-            }}
-          >
-            Buy SPP Box (₹1,000)
-          </Button>
-        </Stack>
-      </Box>
+        </Card>
 
       {/* Financial Overview Metrics (2x2 Grid on Mobile, 4-col on Desktop) */}
       <Grid container spacing={{ xs: 1.5, sm: 2, md: 2.5 }} sx={{ mb: 2.5 }}>
@@ -251,35 +297,39 @@ export default function SPPGiftCards() {
             elevation={0}
             sx={{
               p: { xs: 1.75, sm: 2.25 },
-              borderRadius: 3,
-              background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+              borderRadius: "18px",
+              background: "linear-gradient(135deg, #0c1a2e 0%, #162540 100%)",
               color: "#ffffff",
-              boxShadow: "0 6px 18px rgba(15,23,42,0.12)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              boxShadow: "0 8px 24px rgba(12, 26, 46, 0.35)",
+              border: "1px solid rgba(56, 189, 248, 0.25)",
               height: "100%",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
+              position: "relative",
             }}
           >
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
               <Typography sx={{ fontSize: { xs: 10, sm: 11.5 }, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" }}>
                 Total Boxes
               </Typography>
-              <Box sx={{ p: 0.75, borderRadius: 1.5, bgcolor: "rgba(255,255,255,0.1)" }}>
+              <Box sx={{ p: 0.75, borderRadius: 1.5, bgcolor: "rgba(56, 189, 248, 0.15)" }}>
                 <ShoppingBagIcon sx={{ color: "#38bdf8", fontSize: { xs: 16, sm: 18 } }} />
               </Box>
             </Stack>
-            <Box>
-              <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.25rem", sm: "1.6rem" }, color: "#ffffff", lineHeight: 1.2 }}>
-                {summary?.total_purchased || 0}{" "}
-                <Typography component="span" sx={{ fontSize: { xs: 11, sm: 13 }, color: "#94a3b8", fontWeight: 600 }}>
-                  / 13
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+              <Box>
+                <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.3rem", sm: "1.6rem" }, color: "#ffffff", lineHeight: 1.2 }}>
+                  {summary?.total_purchased || 0}{" "}
+                  <Typography component="span" sx={{ fontSize: { xs: 11, sm: 13 }, color: "#94a3b8", fontWeight: 600 }}>
+                    / 13
+                  </Typography>
                 </Typography>
-              </Typography>
-              <Typography sx={{ fontSize: { xs: 10.5, sm: 11.5 }, color: "#38bdf8", fontWeight: 600, mt: 0.25 }}>
-                ₹{(summary?.total_invested || 0).toLocaleString("en-IN")} Value
-              </Typography>
+                <Typography sx={{ fontSize: { xs: 10.5, sm: 11.5 }, color: "#38bdf8", fontWeight: 700, mt: 0.25 }}>
+                  ₹{(summary?.total_invested || 0).toLocaleString("en-IN")} Value
+                </Typography>
+              </Box>
+              <ChevronRightIcon sx={{ color: "rgba(255,255,255,0.4)", fontSize: 18, mb: 0.2 }} />
             </Box>
           </Card>
         </Grid>
@@ -290,35 +340,39 @@ export default function SPPGiftCards() {
             elevation={0}
             sx={{
               p: { xs: 1.75, sm: 2.25 },
-              borderRadius: 3,
+              borderRadius: "18px",
               background: "linear-gradient(135deg, #064e3b 0%, #047857 100%)",
               color: "#ffffff",
-              boxShadow: "0 6px 18px rgba(4,120,87,0.15)",
-              border: "1px solid rgba(255,255,255,0.1)",
+              boxShadow: "0 8px 24px rgba(4, 120, 87, 0.35)",
+              border: "1px solid rgba(52, 211, 153, 0.3)",
               height: "100%",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
+              position: "relative",
             }}
           >
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
               <Typography sx={{ fontSize: { xs: 10, sm: 11.5 }, fontWeight: 700, color: "#a7f3d0", textTransform: "uppercase" }}>
                 Active Vouchers
               </Typography>
-              <Box sx={{ p: 0.75, borderRadius: 1.5, bgcolor: "rgba(255,255,255,0.15)" }}>
+              <Box sx={{ p: 0.75, borderRadius: 1.5, bgcolor: "rgba(255,255,255,0.18)" }}>
                 <GiftIcon sx={{ color: "#6ee7b7", fontSize: { xs: 16, sm: 18 } }} />
               </Box>
             </Stack>
-            <Box>
-              <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.25rem", sm: "1.6rem" }, color: "#ffffff", lineHeight: 1.2 }}>
-                {summary?.active_count || 0}{" "}
-                <Typography component="span" sx={{ fontSize: { xs: 11, sm: 13 }, color: "#a7f3d0", fontWeight: 600 }}>
-                  Active
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+              <Box>
+                <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.3rem", sm: "1.6rem" }, color: "#ffffff", lineHeight: 1.2 }}>
+                  {summary?.active_count || 0}{" "}
+                  <Typography component="span" sx={{ fontSize: { xs: 11, sm: 13 }, color: "#a7f3d0", fontWeight: 600 }}>
+                    Active
+                  </Typography>
                 </Typography>
-              </Typography>
-              <Typography sx={{ fontSize: { xs: 10.5, sm: 11.5 }, color: "#a7f3d0", fontWeight: 600, mt: 0.25 }}>
-                ₹{((summary?.active_count || 0) * 1000).toLocaleString("en-IN")} Balance
-              </Typography>
+                <Typography sx={{ fontSize: { xs: 10.5, sm: 11.5 }, color: "#a7f3d0", fontWeight: 700, mt: 0.25 }}>
+                  ₹{((summary?.active_count || 0) * 1000).toLocaleString("en-IN")} Balance
+                </Typography>
+              </Box>
+              <ChevronRightIcon sx={{ color: "rgba(255,255,255,0.5)", fontSize: 18, mb: 0.2 }} />
             </Box>
           </Card>
         </Grid>
@@ -329,35 +383,39 @@ export default function SPPGiftCards() {
             elevation={0}
             sx={{
               p: { xs: 1.75, sm: 2.25 },
-              borderRadius: 3,
-              background: "linear-gradient(135deg, #78350f 0%, #b45309 100%)",
+              borderRadius: "18px",
+              background: "linear-gradient(135deg, #78350f 0%, #92400e 100%)",
               color: "#ffffff",
-              boxShadow: "0 6px 18px rgba(180,83,9,0.15)",
-              border: "1px solid rgba(255,255,255,0.1)",
+              boxShadow: "0 8px 24px rgba(120, 53, 15, 0.35)",
+              border: "1px solid rgba(251, 191, 36, 0.3)",
               height: "100%",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
+              position: "relative",
             }}
           >
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
               <Typography sx={{ fontSize: { xs: 10, sm: 11.5 }, fontWeight: 700, color: "#fde68a", textTransform: "uppercase" }}>
                 60-Day Lock
               </Typography>
-              <Box sx={{ p: 0.75, borderRadius: 1.5, bgcolor: "rgba(255,255,255,0.15)" }}>
+              <Box sx={{ p: 0.75, borderRadius: 1.5, bgcolor: "rgba(255,255,255,0.18)" }}>
                 <LockIcon sx={{ color: "#fde68a", fontSize: { xs: 16, sm: 18 } }} />
               </Box>
             </Stack>
-            <Box>
-              <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.25rem", sm: "1.6rem" }, color: "#ffffff", lineHeight: 1.2 }}>
-                {summary?.locked_count || 0}{" "}
-                <Typography component="span" sx={{ fontSize: { xs: 11, sm: 13 }, color: "#fde68a", fontWeight: 600 }}>
-                  Locked
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+              <Box>
+                <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.3rem", sm: "1.6rem" }, color: "#ffffff", lineHeight: 1.2 }}>
+                  {summary?.locked_count || 0}{" "}
+                  <Typography component="span" sx={{ fontSize: { xs: 11, sm: 13 }, color: "#fde68a", fontWeight: 600 }}>
+                    Locked
+                  </Typography>
                 </Typography>
-              </Typography>
-              <Typography sx={{ fontSize: { xs: 10.5, sm: 11.5 }, color: "#fde68a", fontWeight: 600, mt: 0.25 }}>
-                Unlocks in 60d
-              </Typography>
+                <Typography sx={{ fontSize: { xs: 10.5, sm: 11.5 }, color: "#fde68a", fontWeight: 700, mt: 0.25 }}>
+                  Unlocks in 60d
+                </Typography>
+              </Box>
+              <ChevronRightIcon sx={{ color: "rgba(255,255,255,0.5)", fontSize: 18, mb: 0.2 }} />
             </Box>
           </Card>
         </Grid>
@@ -368,32 +426,36 @@ export default function SPPGiftCards() {
             elevation={0}
             sx={{
               p: { xs: 1.75, sm: 2.25 },
-              borderRadius: 3,
-              background: "linear-gradient(135deg, #311042 0%, #581c87 100%)",
+              borderRadius: "18px",
+              background: "linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%)",
               color: "#ffffff",
-              boxShadow: "0 6px 18px rgba(88,28,135,0.15)",
-              border: "1px solid rgba(255,255,255,0.1)",
+              boxShadow: "0 8px 24px rgba(76, 29, 149, 0.35)",
+              border: "1px solid rgba(192, 132, 252, 0.35)",
               height: "100%",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
+              position: "relative",
             }}
           >
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
               <Typography sx={{ fontSize: { xs: 10, sm: 11.5 }, fontWeight: 700, color: "#e9d5ff", textTransform: "uppercase" }}>
                 Annual Maturity
               </Typography>
-              <Box sx={{ p: 0.75, borderRadius: 1.5, bgcolor: "rgba(255,255,255,0.15)" }}>
+              <Box sx={{ p: 0.75, borderRadius: 1.5, bgcolor: "rgba(255,255,255,0.18)" }}>
                 <StarsIcon sx={{ color: "#f0abfc", fontSize: { xs: 16, sm: 18 } }} />
               </Box>
             </Stack>
-            <Box>
-              <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.25rem", sm: "1.6rem" }, color: "#f0abfc", lineHeight: 1.2 }}>
-                ₹14,000
-              </Typography>
-              <Typography sx={{ fontSize: { xs: 10.5, sm: 11.5 }, color: "#e9d5ff", fontWeight: 600, mt: 0.25 }}>
-                ₹12k + ₹2k Bonus
-              </Typography>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+              <Box>
+                <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.3rem", sm: "1.6rem" }, color: "#ffffff", lineHeight: 1.2 }}>
+                  ₹14,000
+                </Typography>
+                <Typography sx={{ fontSize: { xs: 10.5, sm: 11.5 }, color: "#e9d5ff", fontWeight: 700, mt: 0.25 }}>
+                  ₹12k + ₹2k Bonus
+                </Typography>
+              </Box>
+              <ChevronRightIcon sx={{ color: "rgba(255,255,255,0.5)", fontSize: 18, mb: 0.2 }} />
             </Box>
           </Card>
         </Grid>
@@ -473,36 +535,6 @@ export default function SPPGiftCards() {
                 </Typography>
               )}
             </Box>
-
-            {summary.renewal_cadence.cadence_status !== "COMPLETED" && (
-              <Button
-                variant="contained"
-                fullWidth
-                onClick={() => navigate("/user/packages/spp")}
-                sx={{
-                  bgcolor:
-                    summary.renewal_cadence.cadence_status === "OVERDUE" || summary.renewal_cadence.cadence_status === "DUE_TODAY"
-                      ? "#ea580c"
-                      : "#2563eb",
-                  "&:hover": {
-                    bgcolor:
-                      summary.renewal_cadence.cadence_status === "OVERDUE" || summary.renewal_cadence.cadence_status === "DUE_TODAY"
-                        ? "#c2410c"
-                        : "#1d4ed8",
-                  },
-                  fontWeight: 800,
-                  fontSize: "13px",
-                  borderRadius: 2.5,
-                  px: 3,
-                  py: 1,
-                  textTransform: "none",
-                  whiteSpace: "nowrap",
-                  maxWidth: { sm: 260 },
-                }}
-              >
-                Purchase Monthly Box (₹1,000)
-              </Button>
-            )}
           </Stack>
         </Card>
       )}
@@ -694,21 +726,21 @@ export default function SPPGiftCards() {
             No SPP Gift Cards in this category
           </Typography>
           <Typography variant="body2" sx={{ color: "#64748b", mb: 2.5, maxWidth: 440, mx: "auto", fontSize: "13px" }}>
-            Purchase SPP Monthly Boxes to generate luxury ₹1,000 QR Gift Cards and start your 12-month savings journey.
+            SPP monthly subscriptions and package purchases are managed directly on TriAcademy.
           </Typography>
           <Button
-            variant="contained"
-            onClick={() => navigate("/user/packages/spp")}
+            variant="outlined"
+            onClick={() => window.open("https://triacademy.trikonekt.com/spp", "_blank")}
             sx={{
-              bgcolor: "#2563eb",
-              "&:hover": { bgcolor: "#1d4ed8" },
+              borderColor: "#2563eb",
+              color: "#2563eb",
               fontWeight: 700,
               borderRadius: 2.5,
               textTransform: "none",
               px: 3,
             }}
           >
-            Go to SPP Store
+            Visit TriAcademy Store ↗
           </Button>
         </Card>
       ) : (
@@ -784,7 +816,7 @@ export default function SPPGiftCards() {
                             textTransform: "uppercase",
                           }}
                         >
-                          TRIKONEKT SPP VOUCHER
+                          ASIYAPP SPP VOUCHER
                         </Typography>
                         <Typography variant="h5" sx={{ fontWeight: 900, color: "#ffffff", letterSpacing: -0.5, fontSize: "1.4rem" }}>
                           ₹{Number(card.amount || 1000).toLocaleString("en-IN")}
@@ -1110,6 +1142,7 @@ export default function SPPGiftCards() {
 
       {/* Mobile Bottom Clearance Spacer */}
       <Box sx={{ height: { xs: 80, sm: 40 } }} />
+      </Box>
     </Box>
   );
 }

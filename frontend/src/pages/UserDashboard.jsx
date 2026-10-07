@@ -43,6 +43,7 @@ import EmojiEventsOutlinedIcon from "@mui/icons-material/EmojiEventsOutlined";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import TravelExploreOutlinedIcon from "@mui/icons-material/TravelExploreOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
+import CardGiftcardIcon from "@mui/icons-material/CardGiftcard";
 
 import { BottomNavigation, BottomNavigationAction } from "@mui/material";
 import { useLocation } from "react-router-dom";
@@ -630,23 +631,23 @@ export default function UserDashboard({ embedded = false }) {
             <Button
               size="small"
               variant="contained"
-              onClick={() => navigate("/user/promo-packages")}
+              onClick={() => window.open("https://triacademy.trikonekt.com", "_blank")}
               sx={{
                 textTransform: "none",
                 borderRadius: 999,
-                fontWeight: 900,
+                fontWeight: 800,
                 fontSize: 11,
-                px: 1.25,
+                px: 1.5,
                 py: 0.5,
                 minWidth: "auto",
                 whiteSpace: "nowrap",
                 flexShrink: 0,
-                background: "linear-gradient(90deg,#f59e0b,#ef4444)",
-                boxShadow: "0 8px 18px rgba(239,68,68,0.20)",
-                "&:hover": { background: "linear-gradient(90deg,#d97706,#dc2626)" },
+                background: "linear-gradient(90deg,#2563eb,#1d4ed8)",
+                boxShadow: "0 4px 12px rgba(37,99,235,0.25)",
+                "&:hover": { background: "linear-gradient(90deg,#1d4ed8,#1e40af)" },
               }}
             >
-              Agent Subscription
+              TriAcademy ↗
             </Button>
           )}
           <IconButton size="small" sx={{ p: 0.5 }}>
@@ -772,7 +773,7 @@ export default function UserDashboard({ embedded = false }) {
           <Grid container spacing={1} justifyContent="space-around">
             {[
               { label: "Add Money", icon: "＋", bg: "#2563eb", route: "/user/upload-wallet" },
-              { label: "Buy Package", icon: "🛍️", bg: "#7c3aed", route: "/user/promo-packages" },
+              { label: "SPP Vault", icon: "🎁", bg: "#7c3aed", route: "/user/spp-gift-cards" },
               { label: "Withdraw", icon: "↑", bg: "#ea580c", route: "/user/wallet" },
               { label: "History", icon: "🕒", bg: "#0d9488", route: "/user/history" },
             ].map((act) => (
@@ -1286,7 +1287,7 @@ export default function UserDashboard({ embedded = false }) {
       setTab(newValue);
 
       if (newValue === 0) navigate("/user/home");
-      if (newValue === 1) navigate("/user/promo-packages");
+      if (newValue === 1) navigate("/user/spp-gift-cards");
       if (newValue === 2) navigate("/user/cart");
       if (newValue === 3) navigate("/user/history");
       if (newValue === 4) navigate("/user/profile");
@@ -1297,7 +1298,7 @@ export default function UserDashboard({ embedded = false }) {
     }}
   >
     <BottomNavigationAction label="Home" icon={<HomeOutlinedIcon />} />
-    <BottomNavigationAction label="Prime" icon={<TravelExploreOutlinedIcon />} />
+    <BottomNavigationAction label="SPP Vault" icon={<CardGiftcardIcon />} />
     <BottomNavigationAction
       label="Cart"
       icon={

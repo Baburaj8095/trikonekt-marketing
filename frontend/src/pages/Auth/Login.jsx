@@ -1,4 +1,4 @@
-﻿// Login.jsx  Final polished wireframe UI (single-file).
+// Login.jsx  Final polished wireframe UI (single-file).
 // NOTE: This file PRESERVES your original logic (API calls, geolocation, registration, dialogs).
 // Styling is done via MUI sx props. Requires @mui/material and @mui/icons-material v7.
 
@@ -2260,7 +2260,7 @@ const Login = () => {
       <AppBar position="sticky" color="default" elevation={0} sx={{ backgroundColor: "#ffffff", color: "#0f172a", borderBottom: "1px solid #e2e8f0" }}>
         <Toolbar sx={{ gap: 2 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "pointer" }} onClick={() => navigate("/")}>
-            <img src={LOGO} alt="Trikonekt" style={{ height: 38 }} />
+            <img src={LOGO} alt="asiyapp" style={{ height: 38, borderRadius: 8 }} />
           </Box>
           <Box sx={{ flexGrow: 1 }} />
           <Button
@@ -2268,7 +2268,7 @@ const Login = () => {
             sx={{ textTransform: "none", fontWeight: 600, mr: 1 }}
             onClick={() => setDrawerOpen(true)}
           >
-            {loginMode === "franchise" ? "Franchise Login" : "Team Login"}
+            {loginMode === "franchise" ? "Franchise Login" : "Community Login"}
           </Button>
           <IconButton color="inherit" onClick={() => setDrawerOpen(true)} aria-label="open menu">
             <MenuIcon />
@@ -2294,7 +2294,7 @@ const Login = () => {
           }}
         >
           <Box sx={{ textAlign: "center", mb: 1 }}>
-            <Avatar src={LOGO} alt="Trikonekt" sx={{ width: 64, height: 64, mx: "auto", mb: 1, bgcolor: "transparent" }} />
+            <Avatar src={LOGO} alt="asiyapp" sx={{ width: 64, height: 64, mx: "auto", mb: 1, bgcolor: "transparent", borderRadius: 2 }} />
           </Box>
 
           <Divider sx={{ my: 2 }} />

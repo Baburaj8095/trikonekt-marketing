@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Typography,
   Box,
@@ -616,7 +616,7 @@ const [activeTab, setActiveTab] = useState(TABS.EMPLOYEES);
                 Prime Packages
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Join Trikonekt Prime packages to unlock exclusive benefits.
+                Join Asiyapp Prime packages to unlock exclusive benefits.
               </Typography>
               <Box sx={{ mt: 1.5 }}>
                 <Button variant="contained" component={RouterLink} to="/agency/join-prime">

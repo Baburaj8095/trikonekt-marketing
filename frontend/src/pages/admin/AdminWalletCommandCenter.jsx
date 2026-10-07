@@ -124,7 +124,7 @@ export default function AdminWalletCommandCenter() {
       activeVouchers: (voucherData?.results || []).filter((row) => row.status === "ACTIVE").length,
       voucherCount: countFrom(voucherData),
       transactionVolume: financeOverview?.transaction_volume,
-      mlmPayoutVolume: financeOverview?.mlm_payout_volume,
+      mlmPayoutVolume: financeOverview?.commission_payout_volume || financeOverview?.mlm_payout_volume,
       taxCollected: financeOverview?.tax_collected,
       companyRevenue: financeOverview?.company_revenue,
       riskAlerts: financeOverview?.suspicious_activity_alerts,
@@ -155,7 +155,7 @@ export default function AdminWalletCommandCenter() {
         <MetricCard label="Pending Withdrawals" value={`Rs. ${money(totals.pendingWithdrawalAmount)}`} hint={`${withdrawalRows.length} requests awaiting action`} tone={withdrawalRows.length ? "warning" : "success"} />
         <MetricCard label="Pending Add Money" value={`Rs. ${money(totals.pendingUploadAmount)}`} hint={`${uploadRows.length} upload approvals`} tone={uploadRows.length ? "warning" : "success"} />
         <MetricCard label="Reconciliation Mismatches" value={Number(reconcile?.mismatches || 0)} hint="Stored balance vs ledger checks" tone={reconcile?.mismatches ? "danger" : "success"} />
-        <MetricCard label="MLM Payout Volume" value={`Rs. ${money(totals.mlmPayoutVolume)}`} hint="Sponsor, level, matrix, and reward finance ledger" />
+        <MetricCard label="Commission Payout Volume" value={`Rs. ${money(totals.mlmPayoutVolume)}`} hint="Sponsor, layer, block, and reward finance ledger" />
         <MetricCard label="GST / Tax Collected" value={`Rs. ${money(totals.taxCollected)}`} hint="Structured GST finance fields" />
         <MetricCard label="Company Revenue" value={`Rs. ${money(totals.companyRevenue)}`} hint="Service charge and fee summary" />
         <MetricCard label="Risk Alerts" value={Number(totals.riskAlerts || 0)} hint="Duplicate and velocity monitoring" tone={totals.riskAlerts ? "warning" : "success"} />
@@ -169,7 +169,7 @@ export default function AdminWalletCommandCenter() {
         <WorkflowCard title="Withdrawal Requests" body="Review KYC-backed bank/UPI withdrawals, tax preview, payout reference, and approval outcome." to="/admin/withdrawals" badge={withdrawalRows.length} tone="warning" />
         <WorkflowCard title="Coupon Management" body="Manage active, redeemed, expired, cancelled, and refundable wallet vouchers." to="/admin/wallet-vouchers" badge={totals.activeVouchers} />
         <WorkflowCard title="Package Management" body="Verify Join Subscription, SPP, Prime Education, and Tour purchase approval queues." to="/admin/package-management" />
-        <WorkflowCard title="Reward Distribution" body="Monitor commission distribution, matrix earnings, auto commission, and reward processing." to="/admin/reward-distribution" />
+        <WorkflowCard title="Reward Distribution" body="Monitor commission distribution, block earnings, auto commission, and reward processing." to="/admin/reward-distribution" />
         <WorkflowCard title="Settlement & Reconcile" body="Run wallet reconciliation, inspect mismatch queues, and prepare settlement reporting." to="/admin/wallet-settlements" badge={reconcile?.mismatches || ""} tone={reconcile?.mismatches ? "danger" : "default"} />
       </Box>
     </Box>

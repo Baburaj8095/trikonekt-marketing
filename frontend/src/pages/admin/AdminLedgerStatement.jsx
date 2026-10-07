@@ -251,7 +251,7 @@ export default function AdminLedgerStatement() {
                       <TableCell align="right" sx={{ fontWeight: 900, backgroundColor: "#f8fafc" }}>Main Bal</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 900, backgroundColor: "#f8fafc" }}>Self Bal</TableCell>
                       <TableCell sx={{ fontWeight: 900, backgroundColor: "#f8fafc" }}>From User</TableCell>
-                      <TableCell sx={{ fontWeight: 900, backgroundColor: "#f8fafc" }}>Level/Trigger</TableCell>
+                      <TableCell sx={{ fontWeight: 900, backgroundColor: "#f8fafc" }}>Layer/Trigger</TableCell>
                       <TableCell sx={{ fontWeight: 900, backgroundColor: "#f8fafc" }}>Remarks</TableCell>
                     </TableRow>
                   </TableHead>

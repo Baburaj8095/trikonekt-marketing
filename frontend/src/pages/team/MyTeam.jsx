@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import API from "../../api/api";
 import TreeReferralGalaxy from "../../components/TreeReferralGalaxy";
 import { adminGetMatrixCommissionConfig } from "../../api/api";
@@ -138,7 +138,7 @@ export default function MyTeam() {
           Genealogy
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          View 5 Matrix accounts and 3 Matrix tree (includes self).
+          View 5 Block accounts and 3 Block tree (includes self).
         </Typography>
         {role ? <Chip size="small" label={`Role: ${role}`} sx={{ mt: 1 }} /> : null}
       </Box>
@@ -149,7 +149,7 @@ export default function MyTeam() {
         </Typography>
       ) : null}
 
-      {/* Top tabs (restricted to 5-matrix accounts and 3-matrix tree) */}
+      {/* Top tabs (restricted to 5-block accounts and 3-block tree) */}
       <Box
         sx={{
           border: "1px solid #e2e8f0",
@@ -166,12 +166,12 @@ export default function MyTeam() {
           textColor="primary"
           indicatorColor="primary"
         >
-          <Tab label="5 Matrix Accounts" />
-          <Tab label="3 Matrix Tree" />
+          <Tab label="5 Block Accounts" />
+          <Tab label="3 Block Tree" />
         </Tabs>
       </Box>
 
-      {/* 5 Matrix Accounts (summary only) */}
+      {/* 5 Block Accounts (summary only) */}
       {tab === 0 ? (
         <Box>
           <Grid container spacing={2} sx={{ mb: 1 }}>
@@ -179,18 +179,18 @@ export default function MyTeam() {
               <StatCard
                 title="Direct Referrals"
                 value={String(directCount)}
-                subtitle="Total direct team members"
+                subtitle="Total direct community members"
               />
             </Grid>
             <Grid item xs={6} md={4}>
               <StatCard
-                title="5 Matrix Level Reached"
+                title="5 Block Layer Reached"
                 value={String(fiveProgress?.level_reached ?? 0)}
               />
             </Grid>
             <Grid item xs={6} md={4}>
               <StatCard
-                title="5 Matrix Total Earned"
+                title="5 Block Total Earned"
                 value={String(fiveProgress?.total_earned ?? "0")}
               />
             </Grid>
@@ -199,19 +199,19 @@ export default function MyTeam() {
           <Card variant="outlined">
             <CardContent>
               <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                5 Matrix Level-wise Accounts
+                5 Block Layer-wise Accounts
               </Typography>
               <Divider sx={{ mb: 1 }} />
               {!fiveProgress ? (
                 <Typography variant="body2" color="text.secondary">
-                  No 5 Matrix progress available yet.
+                  No 5 Block progress available yet.
                 </Typography>
               ) : (
                 <Box sx={{ width: "100%", overflowX: "auto" }}>
                   <Table size="small" sx={{ minWidth: 480 }}>
                     <TableHead>
                       <TableRow>
-                        <TableCell>Level</TableCell>
+                        <TableCell>Layer</TableCell>
                         <TableCell align="right">Count</TableCell>
                       </TableRow>
                     </TableHead>

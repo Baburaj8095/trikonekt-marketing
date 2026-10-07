@@ -260,7 +260,7 @@ export default function AdminCommissionConfig() {
               <Grid item xs={4}>
                 <TextField
                   size="small"
-                  label="5-Matrix (₹)"
+                  label="5-Block (₹)"
                   type="number"
                   value={config.rebirth_5matrix_share}
                   onChange={handleChange("rebirth_5matrix_share")}
@@ -270,7 +270,7 @@ export default function AdminCommissionConfig() {
               <Grid item xs={4}>
                 <TextField
                   size="small"
-                  label="3-Matrix (₹)"
+                  label="3-Block (₹)"
                   type="number"
                   value={config.rebirth_3matrix_share}
                   onChange={handleChange("rebirth_3matrix_share")}
@@ -364,19 +364,19 @@ export default function AdminCommissionConfig() {
             <Stack direction="row" spacing={1.2} alignItems="center" sx={{ mb: 2 }}>
               <SchoolRoundedIcon color="success" />
               <Typography variant="h6" sx={{ fontWeight: 900, color: "#0f172a" }}>
-                Digital Education Net Level Share
+                Digital Education Net Layer Share
               </Typography>
             </Stack>
             <Divider sx={{ mb: 2 }} />
 
             <TextField
               size="small"
-              label="Consumer Level Payout Share (%)"
+              label="Consumer Layer Payout Share (%)"
               type="number"
               value={config.de_net_consumer_share}
               onChange={handleChange("de_net_consumer_share")}
               fullWidth
-              helperText="Percentage of Net Pool (after GST) allocated to upline Level Income"
+              helperText="Percentage of Net Pool (after GST) allocated to upline Layer Income"
             />
           </Paper>
         </Grid>

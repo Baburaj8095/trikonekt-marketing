@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import AppShell from "../common/AppShell";
 
-export default function ConsumerShell({ children }) {
+export default function ConsumerShell({ children, hideHeader, edgeToEdge }) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -40,7 +40,7 @@ export default function ConsumerShell({ children }) {
 
   const title = useMemo(() => {
     const path = location.pathname;
-    if (path.includes("/team-dashboard") || path.includes("/user/dashboard")) return "Team Consumer";
+    if (path.includes("/team-dashboard") || path.includes("/user/dashboard")) return "Community Consumer";
     if (path.includes("/wallet") || path.includes("/withdrawal")) return "Wallet";
     if (path.includes("/spp")) return "Smart Product Purchase";
     if (path.includes("/coupon-pocket")) return "Coupon Pocket";
@@ -51,7 +51,7 @@ export default function ConsumerShell({ children }) {
     if (path.includes("/profile")) return "Profile";
     if (path.includes("/kyc")) return "KYC Verification";
     if (path.includes("/history")) return "Transaction History";
-    return isTeamLogin ? "Team Consumer" : "Consumer";
+    return isTeamLogin ? "Community Consumer" : "Consumer";
   }, [location.pathname, isTeamLogin]);
 
   return (
@@ -62,6 +62,8 @@ export default function ConsumerShell({ children }) {
       isTeam={isTeamLogin}
       rootPaths={["/user/team-dashboard", "/user/dashboard", "/v4/home"]}
       onBackFallbackPath={isTeamLogin ? "/user/team-dashboard" : "/user/dashboard"}
+      hideHeader={hideHeader}
+      edgeToEdge={edgeToEdge}
     >
       {children}
     </AppShell>

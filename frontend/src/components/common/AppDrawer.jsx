@@ -63,7 +63,7 @@ export default function AppDrawer({
       items: [
         { label: "E-edu Agent Academy", to: "https://triacademy.trikonekt.com/", external: true, icon: SchoolOutlinedIcon },
         { label: "E-edu Purchase History", to: "/user/prime-invoices", icon: ReceiptLongOutlinedIcon },
-        { label: "SPP (13 Boxes & History)", to: "/user/spp-gift-cards", icon: CardGiftcardOutlinedIcon },
+        { label: "Smart Shopping Voucher", to: "/user/spp-gift-cards", icon: CardGiftcardOutlinedIcon },
         { label: "Tri Holiday Packages", to: "/user/tri/tri-holidays", icon: FlightTakeoffOutlinedIcon },
         { label: "P2P Coupon Pocket", to: "/user/coupon-pocket", icon: ConfirmationNumberOutlinedIcon },
       ],
@@ -78,7 +78,7 @@ export default function AppDrawer({
     {
       title: "ACCOUNT & SUPPORT",
       items: [
-        { label: "Growth / Trikonekt PDF", to: "/user/trikonekt-pdf", icon: ReceiptLongOutlinedIcon },
+        { label: "Asiyapp Documents & PDF", to: "/user/trikonekt-pdf", icon: ReceiptLongOutlinedIcon },
         { label: "Profile & KYC", to: "/user/profile", icon: PersonOutlineRoundedIcon },
         { label: "Help & Support", to: "/user/support", icon: HelpOutlineOutlinedIcon },
       ],
@@ -101,10 +101,11 @@ export default function AppDrawer({
       }}
       PaperProps={{
         sx: {
-          width: { xs: 290, sm: 320 },
-          bgcolor: C.surface,
-          borderRight: `1px solid ${C.border}`,
-          boxShadow: S.floatingShadow,
+          width: { xs: 295, sm: 320 },
+          bgcolor: "#0B132B",
+          color: "#ffffff",
+          borderRight: "1px solid rgba(255,255,255,0.08)",
+          boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
           display: "flex",
           flexDirection: "column",
           p: 0,
@@ -114,12 +115,13 @@ export default function AppDrawer({
       {/* 1. Header with Avatar, User info, Status chip and Close button */}
       <Box
         sx={{
-          p: 2,
-          pb: 1.5,
-          borderBottom: `1px solid ${C.border}`,
+          p: 2.25,
+          pb: 2,
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
           display: "flex",
           flexDirection: "column",
           gap: 1.5,
+          background: "linear-gradient(180deg, rgba(30,64,175,0.15) 0%, rgba(11,19,43,0) 100%)",
         }}
       >
         <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
@@ -130,10 +132,10 @@ export default function AppDrawer({
             sx={{
               width: 32,
               height: 32,
-              borderRadius: `${R.sm}px`,
-              border: `1px solid ${C.border}`,
-              color: C.textSec,
-              "&:hover": { bgcolor: C.surfaceSubtle },
+              borderRadius: "10px",
+              border: "1px solid rgba(255,255,255,0.15)",
+              color: "#94a3b8",
+              "&:hover": { bgcolor: "rgba(255,255,255,0.08)", color: "#ffffff" },
             }}
           >
             <CloseRoundedIcon sx={{ fontSize: 18 }} />
@@ -144,22 +146,23 @@ export default function AppDrawer({
           <Avatar
             src={user?.avatar_url || user?.avatar || undefined}
             sx={{
-              width: 48,
-              height: 48,
-              bgcolor: C.primary,
+              width: 52,
+              height: 52,
+              bgcolor: "#1E40AF",
               color: "#ffffff",
-              fontSize: 18,
-              fontWeight: 700,
-              boxShadow: "0 4px 12px rgba(37, 99, 235, 0.25)",
+              fontSize: 20,
+              fontWeight: 800,
+              border: "2px solid #38bdf8",
+              boxShadow: "0 0 16px rgba(56, 189, 248, 0.35)",
             }}
           >
             {initials}
           </Avatar>
           <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography sx={{ fontSize: 15, fontWeight: 700, color: C.text }} noWrap>
+            <Typography sx={{ fontSize: 16, fontWeight: 800, color: "#ffffff" }} noWrap>
               {fullName}
             </Typography>
-            <Typography sx={{ fontSize: 12, color: C.textSec, fontWeight: 500 }} noWrap>
+            <Typography sx={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }} noWrap>
               ID: {userPhone}
             </Typography>
             <Chip
@@ -169,9 +172,10 @@ export default function AppDrawer({
                 mt: 0.5,
                 height: 20,
                 fontSize: 10.5,
-                fontWeight: 600,
-                bgcolor: C.successBg,
-                color: C.success,
+                fontWeight: 700,
+                bgcolor: "rgba(16, 185, 129, 0.15)",
+                color: "#34d399",
+                border: "1px solid rgba(52, 211, 153, 0.3)",
               }}
             />
           </Box>
@@ -179,15 +183,15 @@ export default function AppDrawer({
       </Box>
 
       {/* 2. Categorized Menu Items */}
-      <Box sx={{ flex: 1, overflowY: "auto", py: 1, px: 1.25 }}>
+      <Box sx={{ flex: 1, overflowY: "auto", py: 1.5, px: 1.5 }}>
         {menuSections.map((section, idx) => (
-          <Box key={section.title} sx={{ mb: 1.5 }}>
+          <Box key={section.title} sx={{ mb: 2 }}>
             <Typography
               sx={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: C.textMuted,
-                letterSpacing: "0.06em",
+                fontSize: 10.5,
+                fontWeight: 800,
+                color: "#64748b",
+                letterSpacing: "0.08em",
                 px: 1.5,
                 py: 0.75,
                 textTransform: "uppercase",
@@ -196,7 +200,7 @@ export default function AppDrawer({
               {section.title}
             </Typography>
 
-            <Stack spacing={0.5}>
+            <Stack spacing={0.75}>
               {section.items.map((item) => {
                 const IconComp = item.icon;
                 const isActive = currentPath === item.to || location.pathname === item.to;
@@ -216,14 +220,19 @@ export default function AppDrawer({
                       alignItems: "center",
                       justifyContent: "space-between",
                       px: 1.5,
-                      py: 1,
-                      borderRadius: `${R.sm}px`,
-                      bgcolor: isActive ? C.primaryLight : "transparent",
-                      color: isActive ? C.primary : C.text,
+                      py: 1.1,
+                      borderRadius: "14px",
+                      background: isActive
+                        ? "linear-gradient(90deg, rgba(30,64,175,0.85) 0%, rgba(124,58,237,0.7) 100%)"
+                        : "transparent",
+                      color: isActive ? "#ffffff" : "#cbd5e1",
                       textDecoration: "none",
+                      border: isActive ? "1px solid rgba(255,255,255,0.2)" : "1px solid transparent",
+                      boxShadow: isActive ? "0 4px 14px rgba(30, 64, 175, 0.35)" : "none",
                       transition: "all 140ms ease",
                       "&:hover": {
-                        bgcolor: isActive ? C.primaryLight : C.surfaceSubtle,
+                        bgcolor: isActive ? undefined : "rgba(255,255,255,0.06)",
+                        color: "#ffffff",
                       },
                       "&:active": {
                         transform: "scale(0.985)",
@@ -235,13 +244,12 @@ export default function AppDrawer({
                         sx={{
                           width: 32,
                           height: 32,
-                          borderRadius: `${R.sm}px`,
-                          bgcolor: isActive ? "#ffffff" : C.surfaceSubtle,
+                          borderRadius: "10px",
+                          bgcolor: isActive ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.06)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          color: isActive ? C.primary : C.textSec,
-                          boxShadow: isActive ? "0 1px 3px rgba(0,0,0,0.06)" : "none",
+                          color: isActive ? "#ffffff" : "#94a3b8",
                         }}
                       >
                         <IconComp sx={{ fontSize: 18 }} />
@@ -250,26 +258,26 @@ export default function AppDrawer({
                         sx={{
                           fontSize: 13.5,
                           fontWeight: isActive ? 700 : 500,
-                          color: isActive ? C.primary : C.text,
+                          color: isActive ? "#ffffff" : "#e2e8f0",
                         }}
                       >
                         {item.label}
                       </Typography>
                     </Stack>
-                    <ChevronRightRoundedIcon sx={{ fontSize: 18, color: C.textMuted }} />
+                    <ChevronRightRoundedIcon sx={{ fontSize: 18, color: isActive ? "#ffffff" : "#64748b" }} />
                   </Box>
                 );
               })}
             </Stack>
 
-            {idx < menuSections.length - 1 && <Divider sx={{ mt: 1.5, borderColor: C.borderSubtle }} />}
+            {idx < menuSections.length - 1 && <Divider sx={{ mt: 2, borderColor: "rgba(255,255,255,0.06)" }} />}
           </Box>
         ))}
       </Box>
 
-      {/* 3. Footer Logout Button */}
+      {/* 3. Footer Logout Button (Mockup Screen 4) */}
       {onLogout && (
-        <Box sx={{ p: 1.5, borderTop: `1px solid ${C.border}` }}>
+        <Box sx={{ p: 2, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
           <Box
             component="button"
             onClick={() => {
@@ -283,14 +291,19 @@ export default function AppDrawer({
               justifyContent: "center",
               gap: 1,
               py: 1.25,
-              borderRadius: `${R.button}px`,
-              border: `1px solid ${C.dangerBg}`,
-              bgcolor: C.dangerBg,
-              color: C.danger,
-              fontSize: 13.5,
-              fontWeight: 600,
+              borderRadius: "14px",
+              border: "none",
+              background: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
+              color: "#ffffff",
+              fontSize: 14,
+              fontWeight: 800,
               cursor: "pointer",
-              transition: "transform 140ms ease",
+              boxShadow: "0 4px 14px rgba(225, 29, 72, 0.35)",
+              transition: "transform 140ms ease, box-shadow 140ms ease",
+              "&:hover": {
+                boxShadow: "0 6px 18px rgba(225, 29, 72, 0.45)",
+                transform: "translateY(-1px)",
+              },
               "&:active": { transform: "scale(0.985)" },
             }}
           >

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import API from "../../api/api";
 
 function Card({ title, value, subtitle, onClick, color = "#0f172a" }) {
@@ -101,7 +101,7 @@ export default function AdminAutopool() {
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ margin: 0, color: "#0f172a" }}>Auto Commission Pool</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Overview of matrix progress and autopool accounts status across pools.
+          Overview of block progress and autopool accounts status across pools.
         </div>
       </div>
 
@@ -123,7 +123,7 @@ export default function AdminAutopool() {
             <Card
               title="Total Users in Pools"
               value={totals.users}
-              subtitle="Users with any matrix progress"
+              subtitle="Users with any block progress"
               color="#2563eb"
             />
             <Card
@@ -172,14 +172,14 @@ export default function AdminAutopool() {
                         href="/admin/matrix/five"
                         style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}
                       >
-                        Open 5-Matrix
+                        Open 5-Block
                       </a>
                     ) : (
                       <a
                         href="/admin/matrix/three"
                         style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}
                       >
-                        Open 3-Matrix
+                        Open 3-Block
                       </a>
                     )}
                   </div>

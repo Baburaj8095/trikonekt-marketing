@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -28,15 +29,23 @@ import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 import LanguageRoundedIcon from "@mui/icons-material/LanguageRounded";
 import ShoppingBagRoundedIcon from "@mui/icons-material/ShoppingBagRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import CardGiftcardRoundedIcon from "@mui/icons-material/CardGiftcardRounded";
+import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
+import PercentRoundedIcon from "@mui/icons-material/PercentRounded";
+import LocalOfferRoundedIcon from "@mui/icons-material/LocalOfferRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import API from "../api/api";
 import { S } from "../theme/tokens";
 import StatusBadge from "../components/common/StatusBadge";
+import GiftCardModal from "../components/vouchers/GiftCardModal";
+import PremiumScreenHeader from "../components/common/PremiumScreenHeader";
+import BottomNav from "../components/common/BottomNav";
 
 const COUPON_BUCKETS = [
   {
     id: "P2P_INTERNAL",
     name: "P2P Package Coupon",
-    description: "Instant peer-to-peer package coupon transfer to any Trikonekt user",
+    description: "Instant peer-to-peer package coupon transfer to any Asiayapp user",
     isOpen: true,
     badgeText: "ACTIVE",
     badgeColor: "success",
@@ -114,6 +123,7 @@ export default function CouponPocket() {
   const [voucherData, setVoucherData] = useState({ results: [] });
   const [selectedBucket, setSelectedBucket] = useState(COUPON_BUCKETS[0]);
   const [p2pModalOpen, setP2pModalOpen] = useState(false);
+  const [selectedGiftCard, setSelectedGiftCard] = useState(null);
 
   const [p2pForm, setP2pForm] = useState({
     recipient_phone: "",
@@ -335,259 +345,413 @@ export default function CouponPocket() {
     }
   };
 
+  const navigate = useNavigate();
+
   return (
-    <Box sx={{ maxWidth: 1200, mx: "auto", p: { xs: 1.5, sm: 2.5, md: 3 } }}>
-      {/* Header Banner */}
-      <Paper
-        elevation={0}
+    <Box
+      sx={{
+        bgcolor: "#F4F7FC",
+        minHeight: "100dvh",
+        position: "relative",
+        pb: { xs: 12, sm: 14 },
+      }}
+    >
+      <PremiumScreenHeader
+        title="Coupon Pocket"
+        onBack={() => navigate(-1)}
+        onNotifications={() => {
+          try {
+            window.dispatchEvent(new CustomEvent("trikonekt:open-consumer-sidebar"));
+          } catch (_) {}
+        }}
+        onSecondary={() => navigate("/user/history")}
+        hasBackdrop={true}
+      />
+
+      <Box
         sx={{
-          p: { xs: 2.5, sm: 3 },
-          borderRadius: 3.5,
-          background: "linear-gradient(135deg, #0F172A 0%, #1E293B 100%)",
-          color: "#fff",
-          mb: 3,
-          boxShadow: S.card,
+          maxWidth: 600,
+          mx: "auto",
+          px: { xs: 2, sm: 2.5 },
+          pt: 1,
+          position: "relative",
+          zIndex: 1,
         }}
       >
-        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={2}>
-          <Box>
-            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 0.5 }}>
-              <ConfirmationNumberRoundedIcon sx={{ fontSize: 32, color: "#38BDF8" }} />
-              <Typography variant="h5" sx={{ fontWeight: 900, color: "#fff", letterSpacing: -0.5 }}>
-                P2P Internal & Coupon Pocket
-              </Typography>
+        {/* HERO CARD - Deep Navy/Cobalt with Gift/Ticket theme */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: { xs: 2.2, sm: 2.5 },
+            borderRadius: "22px",
+            mb: 2,
+            position: "relative",
+            overflow: "hidden",
+            background: "linear-gradient(135deg, #07152E 0%, #091E3A 40%, #0256B4 100%)",
+            color: "#FFFFFF",
+            boxShadow: "0 14px 34px -8px rgba(2, 86, 180, 0.4)",
+            border: "1px solid rgba(255, 255, 255, 0.14)",
+          }}
+        >
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: "14px",
+                  bgcolor: "rgba(56, 189, 248, 0.16)",
+                  border: "1px solid rgba(56, 189, 248, 0.35)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backdropFilter: "blur(8px)",
+                }}
+              >
+                <ConfirmationNumberRoundedIcon sx={{ fontSize: 24, color: "#38BDF8" }} />
+              </Box>
+              <Box>
+                <Typography
+                  sx={{
+                    fontSize: "10.5px",
+                    fontWeight: 700,
+                    letterSpacing: "0.8px",
+                    color: "#94A3B8",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  P2P INTERNAL & COUPON POCKET
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    color: "rgba(255,255,255,0.75)",
+                    mt: 0.2,
+                  }}
+                >
+                  Peer-to-peer vouchers & package points
+                </Typography>
+              </Box>
             </Stack>
-            <Typography variant="body2" sx={{ color: "#94A3B8", fontWeight: 500, fontSize: "13.5px" }}>
-              Peer-to-Peer coupon routing, package vouchers, and ledger history
-            </Typography>
-          </Box>
 
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ width: { xs: "100%", sm: "auto" } }}>
-            <IconButton
-              onClick={load}
-              disabled={loading}
-              sx={{ bgcolor: "rgba(255,255,255,0.08)", color: "#fff", "&:hover": { bgcolor: "rgba(255,255,255,0.18)" } }}
+            {/* 3D-Style Gift Accent */}
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: "50%",
+                background: "radial-gradient(circle at 35% 35%, #F59E0B, #B45309)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 6px 16px rgba(245, 158, 11, 0.4)",
+              }}
             >
-              <RefreshRoundedIcon sx={{ animation: loading ? "spin 1s linear infinite" : "none" }} />
-            </IconButton>
+              <CardGiftcardRoundedIcon sx={{ fontSize: 26, color: "#FFFFFF" }} />
+            </Box>
+          </Stack>
 
+          {/* Action CTAs */}
+          <Stack direction="row" spacing={1.5} sx={{ mt: 2.2 }}>
             <Button
-              variant="contained"
               fullWidth
-              startIcon={<SendRoundedIcon />}
+              variant="contained"
               onClick={() => {
                 setP2pModalError("");
                 setP2pModalSuccess("");
                 setP2pModalOpen(true);
               }}
               sx={{
-                background: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
-                color: "#fff",
-                fontWeight: 800,
-                px: 2.5,
-                py: 1,
-                borderRadius: 2.5,
+                py: 1.1,
+                borderRadius: "14px",
                 textTransform: "none",
-                whiteSpace: "nowrap",
-                boxShadow: "0 4px 14px rgba(37,99,235,0.4)",
+                fontWeight: 800,
+                fontSize: "13px",
+                color: "#FFFFFF",
+                background: "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)",
+                boxShadow: "0 8px 18px -4px rgba(37, 99, 235, 0.5)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 0.5,
+                "&:hover": {
+                  background: "linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%)",
+                },
               }}
             >
-              P2P Send (7% Fee)
+              P2P Send (7% Fee) &gt;
             </Button>
 
             <Button
-              variant="contained"
               fullWidth
-              startIcon={<ShoppingBagRoundedIcon />}
+              variant="contained"
               onClick={() => {
                 setRedeemModalError("");
                 setRedeemModalSuccess("");
                 setRedeemModalOpen(true);
               }}
               sx={{
-                background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
-                color: "#fff",
-                fontWeight: 800,
-                px: 2.5,
-                py: 1,
-                borderRadius: 2.5,
+                py: 1.1,
+                borderRadius: "14px",
                 textTransform: "none",
-                whiteSpace: "nowrap",
-                boxShadow: "0 4px 14px rgba(5,150,105,0.4)",
+                fontWeight: 800,
+                fontSize: "13px",
+                color: "#FFFFFF",
+                background: "linear-gradient(135deg, #059669 0%, #10B981 100%)",
+                boxShadow: "0 8px 18px -4px rgba(16, 185, 129, 0.4)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 0.5,
+                "&:hover": {
+                  background: "linear-gradient(135deg, #047857 0%, #059669 100%)",
+                },
               }}
             >
               Redeem Coupon
             </Button>
           </Stack>
-        </Stack>
+        </Paper>
 
-        {/* Balance Badges */}
-        <Grid container spacing={2} sx={{ mt: 2 }}>
-          <Grid item xs={6} sm={3}>
-            <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" }}>Coupon Balance</Typography>
-              <Typography sx={{ fontSize: "18px", fontWeight: 900, color: "#38BDF8" }}>₹{fmtAmount(couponBalance)}</Typography>
-            </Box>
+        {/* 2X2 METRIC TILES */}
+        <Grid container spacing={1.5} sx={{ mb: 2 }}>
+          {/* Coupon Balance */}
+          <Grid item xs={6}>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.8,
+                borderRadius: "18px",
+                background: "linear-gradient(145deg, #0c1a30 0%, #071224 100%)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                boxShadow: "0 8px 24px rgba(2, 6, 23, 0.25)",
+              }}
+            >
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.8 }}>
+                <Box
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "8px",
+                    bgcolor: "rgba(14, 165, 233, 0.2)",
+                    border: "1px solid rgba(14, 165, 233, 0.35)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <ConfirmationNumberRoundedIcon sx={{ fontSize: 16, color: "#38BDF8" }} />
+                </Box>
+                <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" }}>
+                  Coupon Balance
+                </Typography>
+              </Stack>
+              <Typography sx={{ fontSize: "19px", fontWeight: 900, color: "#FFFFFF", letterSpacing: -0.5 }}>
+                ₹{fmtAmount(couponBalance)}
+              </Typography>
+            </Paper>
           </Grid>
-          <Grid item xs={6} sm={3}>
-            <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" }}>Withdrawable Wallet</Typography>
-              <Typography sx={{ fontSize: "18px", fontWeight: 900, color: "#4ADE80" }}>₹{fmtAmount(withdrawableBalance)}</Typography>
-            </Box>
+
+          {/* Withdrawable Wallet */}
+          <Grid item xs={6}>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.8,
+                borderRadius: "18px",
+                background: "linear-gradient(145deg, #0c1a30 0%, #071224 100%)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                boxShadow: "0 8px 24px rgba(2, 6, 23, 0.25)",
+              }}
+            >
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.8 }}>
+                <Box
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "8px",
+                    bgcolor: "rgba(16, 185, 129, 0.2)",
+                    border: "1px solid rgba(16, 185, 129, 0.35)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <AccountBalanceWalletRoundedIcon sx={{ fontSize: 16, color: "#34D399" }} />
+                </Box>
+                <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" }}>
+                  Withdrawable Wallet
+                </Typography>
+              </Stack>
+              <Typography sx={{ fontSize: "19px", fontWeight: 900, color: "#FFFFFF", letterSpacing: -0.5 }}>
+                ₹{fmtAmount(withdrawableBalance)}
+              </Typography>
+            </Paper>
           </Grid>
-          <Grid item xs={6} sm={3}>
-            <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" }}>P2P Transfer Fee</Typography>
-              <Typography sx={{ fontSize: "18px", fontWeight: 900, color: "#FBBF24" }}>7.00%</Typography>
-            </Box>
+
+          {/* P2P Transfer Fee */}
+          <Grid item xs={6}>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.8,
+                borderRadius: "18px",
+                background: "linear-gradient(145deg, #0c1a30 0%, #071224 100%)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                boxShadow: "0 8px 24px rgba(2, 6, 23, 0.25)",
+              }}
+            >
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.8 }}>
+                <Box
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "8px",
+                    bgcolor: "rgba(245, 158, 11, 0.2)",
+                    border: "1px solid rgba(245, 158, 11, 0.35)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <PercentRoundedIcon sx={{ fontSize: 16, color: "#FBBF24" }} />
+                </Box>
+                <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" }}>
+                  P2P Transfer Fee
+                </Typography>
+              </Stack>
+              <Typography sx={{ fontSize: "19px", fontWeight: 900, color: "#FBBF24", letterSpacing: -0.5 }}>
+                7.00%
+              </Typography>
+            </Paper>
           </Grid>
-          <Grid item xs={6} sm={3}>
-            <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" }}>Active Category</Typography>
-              <Typography sx={{ fontSize: "18px", fontWeight: 900, color: "#C084FC" }}>Package Coupon</Typography>
-            </Box>
+
+          {/* Active Category */}
+          <Grid item xs={6}>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.8,
+                borderRadius: "18px",
+                background: "linear-gradient(145deg, #0c1a30 0%, #071224 100%)",
+                border: "1px solid rgba(255, 255, 255, 0.12)",
+                boxShadow: "0 8px 24px rgba(2, 6, 23, 0.25)",
+              }}
+            >
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.8 }}>
+                <Box
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "8px",
+                    bgcolor: "rgba(168, 85, 247, 0.2)",
+                    border: "1px solid rgba(168, 85, 247, 0.35)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <LocalOfferRoundedIcon sx={{ fontSize: 16, color: "#C084FC" }} />
+                </Box>
+                <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" }}>
+                  Active Category
+                </Typography>
+              </Stack>
+              <Typography sx={{ fontSize: "16px", fontWeight: 900, color: "#C084FC", letterSpacing: -0.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                Package Coupon
+              </Typography>
+            </Paper>
           </Grid>
         </Grid>
-      </Paper>
 
-      {error && <Alert severity="error" sx={{ mb: 2.5, borderRadius: 2.5, fontWeight: 600 }}>{error}</Alert>}
-      {success && <Alert severity="success" sx={{ mb: 2.5, borderRadius: 2.5, fontWeight: 600 }}>{success}</Alert>}
-
-      {/* Bucket Selector Grid */}
-      <Typography variant="h6" sx={{ fontWeight: 800, color: "#0F172A", mb: 1.5, fontSize: "16px" }}>
-        Coupon Buckets & Access Controls
-      </Typography>
-
-      <Grid container spacing={2} sx={{ mb: 3.5 }}>
-        {COUPON_BUCKETS.map((bucket) => {
-          const Icon = bucket.icon;
-          const isSelected = selectedBucket?.id === bucket.id;
-          return (
-            <Grid item xs={12} sm={6} md={2.4} key={bucket.id}>
-              <Paper
-                elevation={0}
-                onClick={() => setSelectedBucket(bucket)}
-                sx={{
-                  p: 2,
-                  borderRadius: 3,
-                  cursor: "pointer",
-                  border: isSelected ? `2px solid ${bucket.accent}` : "1.5px solid #E2E8F0",
-                  bgcolor: isSelected ? "#F8FAFC" : "#FFFFFF",
-                  boxShadow: isSelected ? "0 8px 24px rgba(15,23,42,0.08)" : S.card,
-                  transition: "all 0.2s ease",
-                  height: "100%",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "space-between",
-                  opacity: bucket.isOpen ? 1 : 0.7,
-                  "&:hover": {
-                    borderColor: bucket.accent,
-                    transform: "translateY(-2px)",
-                  },
-                }}
-              >
-                <Box>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.25 }}>
-                    <Box sx={{ p: 1, borderRadius: 2, bgcolor: bucket.isOpen ? `${bucket.accent}15` : "#F1F5F9" }}>
-                      <Icon sx={{ color: bucket.isOpen ? bucket.accent : "#94A3B8", fontSize: 22 }} />
-                    </Box>
-                    <StatusBadge
-                      label={bucket.badgeText}
-                      color={bucket.isOpen ? "success" : "default"}
-                    />
-                  </Stack>
-
-                  <Typography sx={{ fontWeight: 800, color: "#0F172A", fontSize: "14px", mb: 0.5 }}>
-                    {bucket.name}
-                  </Typography>
-                  <Typography sx={{ fontSize: "11.5px", color: "#64748B", lineHeight: 1.4 }}>
-                    {bucket.description}
-                  </Typography>
-                </Box>
-
-                <Box sx={{ mt: 1.5, pt: 1, borderTop: "1px dashed #E2E8F0" }}>
-                  <Typography sx={{ fontSize: "10.5px", fontWeight: 700, color: bucket.isOpen ? "#059669" : "#64748B" }}>
-                    {bucket.feeNote}
-                  </Typography>
-                </Box>
-              </Paper>
-            </Grid>
-          );
-        })}
-      </Grid>
-
-      {/* Selected Bucket Detail & Action Card */}
-      <Paper
-        elevation={0}
-        sx={{
-          p: { xs: 2, sm: 3 },
-          borderRadius: 3.5,
-          border: "1.5px solid #E2E8F0",
-          bgcolor: "#FFFFFF",
-          boxShadow: S.card,
-          mb: 4,
-        }}
-      >
-        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={2} sx={{ mb: 2 }}>
-          <Box>
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-              <Typography variant="h6" sx={{ fontWeight: 900, color: "#0F172A" }}>
-                {selectedBucket.name} Ledger
+        {/* PROMOTIONAL MINI-BANNER */}
+        <Paper
+          elevation={0}
+          onClick={() => navigate("/user/packages")}
+          sx={{
+            p: 2,
+            borderRadius: "20px",
+            mb: 2.2,
+            cursor: "pointer",
+            background: "linear-gradient(135deg, #1E1B4B 0%, #312E81 100%)",
+            color: "#FFFFFF",
+            boxShadow: "0 8px 20px -4px rgba(49, 46, 129, 0.3)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            transition: "transform 150ms ease",
+            "&:hover": { transform: "translateY(-2px)" },
+          }}
+        >
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Box
+              sx={{
+                width: 42,
+                height: 42,
+                borderRadius: "12px",
+                bgcolor: "rgba(255,255,255,0.12)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <FlightTakeoffRoundedIcon sx={{ color: "#38BDF8", fontSize: 24 }} />
+            </Box>
+            <Box>
+              <Typography sx={{ fontSize: "13.5px", fontWeight: 800, color: "#FFFFFF" }}>
+                Use Your Coupons for Packages
               </Typography>
-              <StatusBadge label={selectedBucket.badgeText} color={selectedBucket.isOpen ? "success" : "default"} />
-            </Stack>
-            <Typography variant="body2" sx={{ color: "#64748B", fontSize: "13px" }}>
-              {selectedBucket.description} • {selectedBucket.feeNote}
-            </Typography>
-          </Box>
+              <Typography sx={{ fontSize: "11.5px", color: "#C7D2FE", fontWeight: 500 }}>
+                Redeem across holidays, products and more
+              </Typography>
+            </Box>
+          </Stack>
+          <ChevronRightRoundedIcon sx={{ color: "#C7D2FE" }} />
+        </Paper>
 
-          {selectedBucket.isOpen ? (
-            <Button
-              variant="contained"
-              startIcon={<SendRoundedIcon />}
-              onClick={() => {
-                setP2pModalError("");
-                setP2pModalSuccess("");
-                setP2pModalOpen(true);
-              }}
-              sx={{
-                bgcolor: selectedBucket.accent,
-                "&:hover": { bgcolor: selectedBucket.accent, opacity: 0.9 },
-                fontWeight: 800,
-                borderRadius: 2.5,
-                px: 3,
-                textTransform: "none",
-              }}
-            >
-              Send {selectedBucket.name}
-            </Button>
-          ) : (
-            <Button
-              variant="outlined"
-              disabled
-              startIcon={<LockRoundedIcon />}
-              sx={{
-                borderRadius: 2.5,
-                fontWeight: 700,
-                textTransform: "none",
-                borderColor: "#CBD5E1",
-                color: "#94A3B8",
-              }}
-            >
-              Locked by Admin
-            </Button>
-          )}
-        </Stack>
+        {error && <Alert severity="error" sx={{ mb: 2, borderRadius: "14px", fontWeight: 600 }}>{error}</Alert>}
+        {success && <Alert severity="success" sx={{ mb: 2, borderRadius: "14px", fontWeight: 600 }}>{success}</Alert>}
+
+        {/* RECENT COUPON ACTIVITY SECTION */}
+        <Box sx={{ mb: 1.5, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Typography sx={{ fontSize: "15px", fontWeight: 900, color: "#0F172A", letterSpacing: -0.3 }}>
+            Recent Coupon Activity
+          </Typography>
+          <Typography
+            onClick={load}
+            sx={{
+              fontSize: "12px",
+              fontWeight: 800,
+              color: "#2563EB",
+              cursor: "pointer",
+              "&:hover": { textDecoration: "underline" },
+            }}
+          >
+            Refresh
+          </Typography>
+        </Box>
 
         {/* Voucher List */}
         {voucherData?.results?.length === 0 ? (
-          <Box sx={{ p: 4, textAlign: "center", bgcolor: "#F8FAFC", borderRadius: 3, border: "1.5px dashed #CBD5E1" }}>
-            <ConfirmationNumberRoundedIcon sx={{ fontSize: 40, color: "#94A3B8", mb: 1 }} />
-            <Typography sx={{ fontWeight: 800, color: "#334155" }}>No vouchers found in your ledger</Typography>
-            <Typography sx={{ fontSize: "12.5px", color: "#64748B", mt: 0.5 }}>
-              Use P2P Internal Send or purchase package coupons to populate your pocket.
+          <Paper
+            elevation={0}
+            sx={{
+              p: 4,
+              textAlign: "center",
+              bgcolor: "#FFFFFF",
+              borderRadius: "20px",
+              border: "1px dashed #CBD5E1",
+            }}
+          >
+            <ConfirmationNumberRoundedIcon sx={{ fontSize: 36, color: "#94A3B8", mb: 1 }} />
+            <Typography sx={{ fontWeight: 800, color: "#334155", fontSize: "14px" }}>
+              No coupons in pocket yet
             </Typography>
-          </Box>
+            <Typography sx={{ fontSize: "12px", color: "#64748B", mt: 0.5 }}>
+              Use P2P Send or receive coupons from others to populate your pocket.
+            </Typography>
+          </Paper>
         ) : (
           <Grid container spacing={2}>
             {(voucherData?.results || []).map((voucher) => {
@@ -601,22 +765,63 @@ export default function CouponPocket() {
                 <Grid item xs={12} sm={6} md={4} key={voucher.id || voucher.code}>
                   <Paper
                     elevation={0}
+                    onClick={() => {
+                      if (!isSender) setSelectedGiftCard(voucher);
+                    }}
                     sx={{
-                      p: 2,
-                      borderRadius: 3,
-                      border: isSender ? "1.5px solid #BFDBFE" : "1.5px solid #E2E8F0",
-                      bgcolor: isSender ? "#F8FAFC" : "#FFFFFF",
+                      p: 2.25,
+                      borderRadius: "18px",
+                      border: isSender
+                        ? "1.5px solid #BFDBFE"
+                        : isActive
+                        ? "1.5px solid #fecdd3"
+                        : "1.5px solid #E2E8F0",
+                      bgcolor: isSender
+                        ? "#F8FAFC"
+                        : isActive
+                        ? "#fff1f2"
+                        : "#FFFFFF",
                       display: "flex",
                       flexDirection: "column",
                       justifyContent: "space-between",
                       position: "relative",
+                      cursor: !isSender ? "pointer" : "default",
+                      transition: "transform 180ms ease, box-shadow 180ms ease",
+                      "&:hover": {
+                        transform: !isSender ? "translateY(-3px)" : "none",
+                        boxShadow: !isSender ? "0 10px 24px rgba(225, 29, 72, 0.12)" : "none",
+                      },
                     }}
                   >
                     <Box>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.25 }}>
                         <Stack direction="row" spacing={0.75} alignItems="center">
-                          <Typography sx={{ fontSize: "11px", fontWeight: 800, color: isSender ? "#2563EB" : "#059669", textTransform: "uppercase" }}>
-                            {voucher.voucher_type || "PACKAGE_COUPON"}
+                          {!isSender ? (
+                            <Box
+                              sx={{
+                                width: 26,
+                                height: 26,
+                                borderRadius: "8px",
+                                bgcolor: isActive ? "#f43f5e" : "#64748b",
+                                color: "#fff",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              <CardGiftcardRoundedIcon sx={{ fontSize: 16 }} />
+                            </Box>
+                          ) : null}
+                          <Typography
+                            sx={{
+                              fontSize: "11.5px",
+                              fontWeight: 800,
+                              color: isSender ? "#2563EB" : isActive ? "#e11d48" : "#475569",
+                              textTransform: "uppercase",
+                              letterSpacing: "0.4px",
+                            }}
+                          >
+                            {!isSender ? "Asiayapp Gift Card" : (voucher.voucher_type || "PACKAGE_COUPON")}
                           </Typography>
                           {isSender && (
                             <Chip
@@ -639,15 +844,39 @@ export default function CouponPocket() {
                         />
                       </Stack>
 
-                      <Typography sx={{ fontSize: "18px", fontWeight: 900, color: "#0F172A", mb: 1 }}>
-                        ₹{fmtAmount(voucher.amount || voucher.value)}
-                      </Typography>
-
-                      <Box sx={{ p: 1, bgcolor: "#F8FAFC", borderRadius: 2, border: "1px dashed #CBD5E1", display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-                        <Typography sx={{ fontFamily: "monospace", fontWeight: 800, fontSize: "13px", color: "#0F172A" }}>
-                          {voucher.code}
+                      <Stack direction="row" alignItems="baseline" spacing={0.75} sx={{ mb: 1 }}>
+                        <Typography sx={{ fontSize: "24px", fontWeight: 900, color: "#0F172A", letterSpacing: "-0.5px" }}>
+                          ₹{fmtAmount(voucher.amount || voucher.value)}
                         </Typography>
-                        <Tooltip title="Copy Code">
+                        {!isSender && (
+                          <Typography sx={{ fontSize: "12px", fontWeight: 700, color: "#e11d48" }}>
+                            Gift Coupon
+                          </Typography>
+                        )}
+                      </Stack>
+
+                      <Box
+                        onClick={(e) => e.stopPropagation()}
+                        sx={{
+                          p: 1,
+                          bgcolor: "#FFFFFF",
+                          borderRadius: "10px",
+                          border: "1px dashed #CBD5E1",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          mb: 1.25,
+                        }}
+                      >
+                        <Box>
+                          <Typography sx={{ fontSize: "9.5px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" }}>
+                            Coupon Code
+                          </Typography>
+                          <Typography sx={{ fontFamily: "monospace", fontWeight: 800, fontSize: "13px", color: "#0F172A" }}>
+                            {voucher.code}
+                          </Typography>
+                        </Box>
+                        <Tooltip title={copiedId === voucher.id ? "Copied!" : "Copy Code"}>
                           <IconButton size="small" onClick={() => handleCopy(voucher.code, voucher.id)}>
                             {copiedId === voucher.id ? <CheckRoundedIcon fontSize="small" sx={{ color: "#16A34A" }} /> : <ContentCopyRoundedIcon fontSize="small" />}
                           </IconButton>
@@ -658,24 +887,34 @@ export default function CouponPocket() {
                       <Box sx={{ mb: 1 }}>
                         {isSender ? (
                           <Typography sx={{ fontSize: "11.5px", color: "#2563EB", fontWeight: 700 }}>
-                            Sent to: {assigned || "Assigned User"}
+                            Sent to: <b>{assigned || "Assigned User"}</b>
                           </Typography>
                         ) : assigned ? (
                           <Typography sx={{ fontSize: "11.5px", color: "#64748B", fontWeight: 600 }}>
-                            From: {creator || "Admin"}
+                            Gift from: <b>{creator || "Admin"}</b>
                           </Typography>
                         ) : null}
                       </Box>
                     </Box>
 
-                    <Box sx={{ mt: 1.5, pt: 1, borderTop: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Box
+                      sx={{
+                        mt: 1.5,
+                        pt: 1.25,
+                        borderTop: "1px solid #E2E8F0",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: 1,
+                      }}
+                    >
                       <Typography sx={{ fontSize: "11px", color: "#64748B" }}>
                         {isRedeemed && voucher.redeemed_at
                           ? `Redeemed: ${fmtDate(voucher.redeemed_at)}`
                           : `Created: ${fmtDate(voucher.created_at)}`}
                       </Typography>
 
-                      {/* Action Button: Senders only view history; only Recipients can Redeem active vouchers */}
+                      {/* Action Button: Senders only view history; Recipients can Redeem active vouchers */}
                       {isSender ? (
                         <Chip
                           label={isRedeemed ? "Redeemed by Recipient" : "P2P Sent"}
@@ -692,36 +931,46 @@ export default function CouponPocket() {
                         <Button
                           size="small"
                           variant="contained"
-                          startIcon={<ShoppingBagRoundedIcon sx={{ fontSize: 14 }} />}
-                          onClick={() => {
-                            setRedeemModalError("");
-                            setRedeemModalSuccess("");
-                            setRedeemForm({ coupon_code: voucher.code, category: "ECOMMERCE_SHOPPING", pin: "" });
-                            setRedeemModalOpen(true);
+                          startIcon={<CardGiftcardRoundedIcon sx={{ fontSize: 15 }} />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedGiftCard(voucher);
                           }}
                           sx={{
-                            fontSize: "11px",
+                            fontSize: "11.5px",
                             fontWeight: 800,
                             textTransform: "none",
-                            borderRadius: 1.5,
-                            bgcolor: "#059669",
+                            borderRadius: "10px",
+                            background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
                             color: "#fff",
-                            "&:hover": { bgcolor: "#047857" },
+                            boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
+                            px: 1.5,
+                            "&:hover": {
+                              background: "linear-gradient(135deg, #047857 0%, #059669 100%)",
+                            },
                           }}
                         >
-                          Redeem
+                          Redeem Gift Card
                         </Button>
                       ) : isRedeemed ? (
-                        <Chip
-                          label="Redeemed"
+                        <Button
                           size="small"
+                          variant="outlined"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedGiftCard(voucher);
+                          }}
                           sx={{
                             fontSize: "11px",
                             fontWeight: 700,
-                            bgcolor: "#F1F5F9",
-                            color: "#64748B",
+                            textTransform: "none",
+                            borderRadius: "8px",
+                            color: "#64748b",
+                            borderColor: "#cbd5e1",
                           }}
-                        />
+                        >
+                          View Card
+                        </Button>
                       ) : (
                         <Chip
                           label="Expired"
@@ -741,7 +990,16 @@ export default function CouponPocket() {
             })}
           </Grid>
         )}
-      </Paper>
+
+      {/* Celebratory Gift Card Modal */}
+      <GiftCardModal
+        open={Boolean(selectedGiftCard)}
+        voucher={selectedGiftCard}
+        onClose={() => setSelectedGiftCard(null)}
+        onRedeemSuccess={() => {
+          load();
+        }}
+      />
 
       {/* P2P Transfer Modal */}
       <Dialog
@@ -953,6 +1211,7 @@ export default function CouponPocket() {
           </Button>
         </DialogActions>
       </Dialog>
+      </Box>
     </Box>
   );
 }

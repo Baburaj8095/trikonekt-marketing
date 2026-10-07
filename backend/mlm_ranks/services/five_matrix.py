@@ -102,6 +102,10 @@ class FiveMatrixService:
         if not child_user or not getattr(child_user, "id", None):
             return None
 
+        # Prevent root user from ever being placed as a child node under themselves
+        if int(child_user.id) == int(root.root_user_id):
+            return None
+
         # Prevent duplicate placements
         existing = RankMatrixNode.objects.filter(root_user_id=root.root_user_id, placed_user_id=child_user.id).first()
         if existing:
@@ -123,14 +127,21 @@ class FiveMatrixService:
 
             rid = int(root_l.root_user_id)
 
-            # Helper: count children for a parent in this root
+            # Helper: count children and get first free position (1..5) for a parent in this root
             def sibling_count(parent_uid: int) -> int:
                 return int(RankMatrixNode.objects.filter(root_user_id=rid, parent_user_id=int(parent_uid)).count())
+
+            def first_free_pos(parent_uid: int) -> int:
+                used = set(RankMatrixNode.objects.filter(root_user_id=rid, parent_user_id=int(parent_uid)).values_list("position", flat=True))
+                for p in range(1, 6):
+                    if p not in used:
+                        return p
+                return len(used) + 1
 
             # Case 1: first row under root (fill 1..5)
             total_so_far = int(RankMatrixNode.objects.filter(root_user_id=rid).count())
             if total_so_far < 5:
-                pos = sibling_count(rid) + 1
+                pos = first_free_pos(rid)
                 try:
                     node = RankMatrixNode.objects.create(
                         root_user_id=rid,
@@ -142,7 +153,7 @@ class FiveMatrixService:
                     )
                 except IntegrityError:
                     # recompute once
-                    pos = sibling_count(rid) + 1
+                    pos = first_free_pos(rid)
                     node = RankMatrixNode.objects.create(
                         root_user_id=rid,
                         placed_user_id=child_user.id,
@@ -187,7 +198,7 @@ class FiveMatrixService:
                     for pid in parent_ids:
                         used = sibling_count(pid)
                         if used < 5:
-                            found_parent = (pid, used + 1, lvl + 1)
+                            found_parent = (pid, first_free_pos(pid), lvl + 1)
                             break
                     if found_parent:
                         p_uid, pos, child_level = found_parent
@@ -202,13 +213,13 @@ class FiveMatrixService:
                             )
                         except IntegrityError:
                             # Rare sibling-position clash; recompute once
-                            new_used = sibling_count(int(p_uid))
+                            new_pos = first_free_pos(int(p_uid))
                             node = RankMatrixNode.objects.create(
                                 root_user_id=rid,
                                 placed_user_id=child_user.id,
                                 parent_user_id=int(p_uid),
                                 level_depth=int(child_level),
-                                position=int(new_used + 1),
+                                position=int(new_pos),
                                 approved_at=approved_at,
                             )
                         placed = node
@@ -216,7 +227,7 @@ class FiveMatrixService:
 
                 if not placed:
                     # As a safety net, place under root in next available slot (shouldn't happen in normal BFS growth)
-                    pos = sibling_count(rid) + 1
+                    pos = first_free_pos(rid)
                     node = RankMatrixNode.objects.create(
                         root_user_id=rid,
                         placed_user_id=child_user.id,
@@ -338,6 +349,21 @@ class FiveMatrixService:
 
         direct_amt = q2(net * Decimal("0.50"))
         level_pool = q2(net * Decimal("0.50"))
+
+        # Retained Platform Tax Credit to Company Root/Tax Account
+        gst_amt = q2(getattr(upgrade, "gst_amount", Decimal("0.00")) or Decimal("0.00"))
+        if gst_amt > 0:
+            try:
+                from business.models import CommissionConfig
+                cfg = CommissionConfig.get_solo()
+                cu = cfg.get_company_user()
+                if not cu:
+                    from accounts.models import CustomUser
+                    cu = CustomUser.objects.filter(id=1).first() or CustomUser.objects.filter(is_superuser=True).first()
+                if cu:
+                    WalletPoster.credit_company_gst(cu, gst_amt, upgrade_id=upgrade.id)
+            except Exception:
+                pass
 
         # 1) DIRECT 50% -> sponsor (released)
         if direct_amt > 0:
@@ -552,7 +578,7 @@ class FiveMatrixService:
                     sid = int(getattr(sponsor, "id", 0) or 0)
                 except Exception:
                     sid = 0
-                if sid and sid == int(root_user_id):
+                if sid and sid == int(root_user_id) and int(payer.id) != int(root_user_id):
                     try:
                         # Ensure root + place node; then distribute if this upgrade has no rows yet
                         cls.on_rank1_approval(upg)
@@ -568,7 +594,7 @@ class FiveMatrixService:
         try:
             has_any2 = False
             if RankMatrixNode is not None:
-                has_any2 = RankMatrixNode.objects.filter(root_user_id=int(root_user_id), level_depth=1).exists()
+                has_any2 = RankMatrixNode.objects.filter(root_user_id=int(root_user_id), level_depth=1).exclude(placed_user_id=int(root_user_id)).exists()
             if not has_any2:
                 from django.contrib.auth import get_user_model
                 User = get_user_model()
@@ -586,11 +612,12 @@ class FiveMatrixService:
                             level=0,
                             upgrade__to_rank__level_number=1,
                         )
+                        .exclude(from_user_id=int(root_user_id))
                         .order_by("upgrade__upgraded_at", "id")[:int(max_scan)]
                     )
                     for c in cs:
                         payer = getattr(c, "from_user", None)
-                        if not payer or not getattr(payer, "id", None):
+                        if not payer or not getattr(payer, "id", None) or int(getattr(payer, "id", 0)) == int(root_user_id):
                             continue
                         approved_at = (
                             getattr(getattr(c, "upgrade", None), "upgraded_at", None)
@@ -609,7 +636,7 @@ class FiveMatrixService:
         try:
             has_any3 = False
             if RankMatrixNode is not None:
-                has_any3 = RankMatrixNode.objects.filter(root_user_id=int(root_user_id), level_depth=1).exists()
+                has_any3 = RankMatrixNode.objects.filter(root_user_id=int(root_user_id), level_depth=1).exclude(placed_user_id=int(root_user_id)).exists()
             if not has_any3:
                 from django.contrib.auth import get_user_model
                 from django.db.models import Q
@@ -651,8 +678,8 @@ class FiveMatrixService:
                         pass
                     idents = [v for v in vals if v]
 
-                    # Directs: registered_by=root OR legacy sponsor_id points to root's identifiers
-                    directs_q = Q(registered_by_id=int(root_user_id)) | (Q(registered_by__isnull=True) & Q(sponsor_id__in=idents))
+                    # Directs: registered_by=root OR legacy sponsor_id points to root's identifiers (excluding self)
+                    directs_q = (Q(registered_by_id=int(root_user_id)) | (Q(registered_by__isnull=True) & Q(sponsor_id__in=idents))) & ~Q(id=int(root_user_id))
                     direct_ids = list(
                         User.objects
                         .filter(directs_q)
@@ -742,6 +769,7 @@ class FiveMatrixService:
             nodes = (
                 RankMatrixNode.objects
                 .filter(root_user_id=root_user_id, level_depth=1)
+                .exclude(placed_user_id=root_user_id)
                 .select_related("placed_user")
                 .order_by("approved_at", "position", "id")
             )

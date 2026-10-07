@@ -61,14 +61,14 @@ export default function AdminWalletDetail() {
               <Chip label={`Reward Rs. ${money(wallet.pockets?.rewards || wallet.pockets?.reward)}`} />
               <Chip label={`Package Coupon Rs. ${money(wallet.pockets?.package_purchase_coupon)}`} />
               <Chip label={`Direct Rs. ${money(wallet.pockets?.direct_benefit)}`} />
-              <Chip label={`Level Rs. ${money(wallet.pockets?.level_benefit)}`} />
+              <Chip label={`Layer Rs. ${money(wallet.pockets?.level_benefit)}`} />
               <Chip label={`Charges Rs. ${money(wallet.pockets?.admin_service_charges)}`} />
             </Stack>
           </Paper>
 
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1.2fr 0.8fr" }, gap: 1.5, mb: 2 }}>
             <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
-              <Typography sx={{ fontWeight: 900, mb: 1 }}>Pocket-Level Finance Accounts</Typography>
+              <Typography sx={{ fontWeight: 900, mb: 1 }}>Pocket-Layer Finance Accounts</Typography>
               <Stack spacing={1}>
                 {(wallet.finance_accounts || []).map((account) => (
                   <Paper key={account.id} variant="outlined" sx={{ p: 1, borderRadius: 1, bgcolor: "#f8fafc" }}>

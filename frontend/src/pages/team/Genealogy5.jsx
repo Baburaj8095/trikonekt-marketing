@@ -223,7 +223,21 @@ const AppTabBar = React.memo(function AppTabBar({ active, onChange }) {
 });
 
 // ─── AppHeader ───────────────────────────────────────────────────────────────
-const AppHeader = React.memo(function AppHeader({ role, err }) {
+const AppHeader = React.memo(function AppHeader({ role, err, userIdentifier: propIdent }) {
+  const userIdentifier = useMemo(() => {
+    if (propIdent) return propIdent;
+    try {
+      const raw = localStorage.getItem("user_user") || sessionStorage.getItem("user_user");
+      const u = raw ? JSON.parse(raw) : {};
+      const username = String(u?.username || "").trim();
+      const phone = String(u?.phone || u?.phone_number || u?.mobile || "").trim();
+      if (username && phone && username !== phone) return `${username} (${phone})`;
+      return username || phone || "";
+    } catch {
+      return "";
+    }
+  }, [propIdent]);
+
   return (
     <div
       style={{
@@ -240,18 +254,36 @@ const AppHeader = React.memo(function AppHeader({ role, err }) {
         }}
       >
         <div>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 22,
-              fontWeight: 900,
-              color: C.text,
-              letterSpacing: "-0.5px",
-              lineHeight: 1.1,
-            }}
-          >
-            Layer Blocks
-          </h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: 22,
+                fontWeight: 900,
+                color: C.text,
+                letterSpacing: "-0.5px",
+                lineHeight: 1.1,
+              }}
+            >
+              Layer Blocks
+            </h1>
+            {userIdentifier ? (
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: "#4338CA",
+                  background: "#EEF2FF",
+                  border: "1px solid #C7D2FE",
+                  borderRadius: 8,
+                  padding: "2px 8px",
+                  letterSpacing: "0.2px",
+                }}
+              >
+                ● {userIdentifier}
+              </span>
+            ) : null}
+          </div>
           <p
             style={{
               margin: "3px 0 0",
@@ -260,7 +292,7 @@ const AppHeader = React.memo(function AppHeader({ role, err }) {
               lineHeight: 1.4,
             }}
           >
-            Your network &amp; team overview
+            Your network &amp; community overview
           </p>
         </div>
         {role ? (
@@ -343,7 +375,25 @@ export default function Genealogy5() {
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
 
-  // ── Role ──
+  // ── Role & User ──
+  const storedUser = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("user_user") || sessionStorage.getItem("user_user");
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+
+  const userIdentifier = useMemo(() => {
+    const username = String(storedUser?.username || "").trim();
+    const phone = String(storedUser?.phone || storedUser?.phone_number || storedUser?.mobile || "").trim();
+    if (username && phone && username !== phone) {
+      return `${username} (${phone})`;
+    }
+    return username || phone || "";
+  }, [storedUser]);
+
   const role = useMemo(() => {
     try {
       return (
@@ -453,7 +503,7 @@ export default function Genealogy5() {
         setErr("");
       } catch (_) {
         if (!mounted) return;
-        setErr("Failed to load team data.");
+        setErr("Failed to load community data.");
       }
     })();
     return () => {
@@ -692,7 +742,8 @@ export default function Genealogy5() {
       const extra = idx.get(key);
       const earned = extra?.total_earned ?? undefined;
       // Prefer API category (it is derived from stable rules), else inferred_category/source_type.
-      const category = extra?.category || p?.inferred_category || "";
+      const rawCat = extra?.category || p?.inferred_category || "";
+      const category = rawCat === "OTHER" ? "SUBSCRIPTION_750" : rawCat;
       return {
         ...p,
         total_earned: earned,
@@ -903,12 +954,12 @@ export default function Genealogy5() {
           boxShadow: "0 1px 10px rgba(0,0,0,0.08)",
         }}
       >
-        <AppHeader role={role} err={err} />
+        <AppHeader role={role} err={err} userIdentifier={userIdentifier} />
         <AppTabBar active={tab} onChange={switchTab} />
       </div>
 
-      {/* ── Scrollable + swipeable content ── */}
-      <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      {/* ── Scrollable content ── */}
+      <div>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={tab}
@@ -969,7 +1020,7 @@ export default function Genealogy5() {
 
               {/* ── e - Edu Tab (Digital Education / Rank Upgrade) ── */}
               {tab === "earnings" && (
-                <RankUpgrade embedded />
+                <RankUpgrade embedded teamSummary={data} />
               )}
 
               {/* ── Progress Tab ── */}

@@ -72,13 +72,13 @@ const WORKFLOWS = {
     ],
   },
   "team-admin-board": {
-    title: "Team Admin Board",
-    description: "Board view/edit entry for team consumer details. Existing users and team wallet analytics remain the source screens.",
+    title: "Community Admin Board",
+    description: "Board view/edit entry for community consumer details. Existing users and community wallet analytics remain the source screens.",
     status: "Linked workflow",
     links: [
-      { to: "/admin/users?category=consumer", label: "Team Consumers" },
-      { to: "/admin/team-wallet-dashboard", label: "Team Wallet Dashboard" },
-      { to: "/admin/team-consumer/top-achievers", label: "Team Achievers" },
+      { to: "/admin/users?category=consumer", label: "Community Consumers" },
+      { to: "/admin/team-wallet-dashboard", label: "Community Wallet Dashboard" },
+      { to: "/admin/team-consumer/top-achievers", label: "Community Achievers" },
     ],
   },
   "generate-coupon": {

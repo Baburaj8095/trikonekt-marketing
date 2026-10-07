@@ -10,7 +10,7 @@ const TITLES = {
   "/admin/franchise/agreement": "Generate Agreement",
   "/admin/franchise/id-card": "Generate ID Card",
   "/admin/franchise/banners": "Franchise Banners",
-  "/admin/franchise/pdfs": "Trikonekt PDF",
+  "/admin/franchise/pdfs": "asiyapp PDF",
   "/admin/franchise/customer-care": "Customer Care Chat",
 };
 

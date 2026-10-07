@@ -1,8 +1,9 @@
-﻿import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { DataGrid } from "@mui/x-data-grid";
+import { Box, Pagination, PaginationItem, MenuItem, Select as MuiSelect, Typography } from "@mui/material";
 
 /**
- * Reusable server-side DataGrid wrapper.
+ * Reusable server-side DataGrid wrapper with full sorting and numbered pagination.
  * Props:
  *  - columns: MUI DataGrid columns
  *  - fetcher: ({ page, pageSize, search, ordering }) => Promise<{ results, count }>
@@ -26,8 +27,8 @@ export default function DataTable({
 }) {
   const [rows, setRows] = useState([]);
   const [rowCount, setRowCount] = useState(0);
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 50 });
-  const [sortModel, setSortModel] = useState([]);
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 25 });
+  const [sortModel, setSortModel] = useState([{ field: "id", sort: "asc" }]);
   const [searchText, setSearchText] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,22 +45,10 @@ export default function DataTable({
   }, [searchText]);
 
   const load = useCallback(async () => {
-    // Avoid overlapping requests entirely; wait for current one to finish before starting another.
-    if (loading) return;
     const mySeq = (reqSeq.current += 1);
     const ordering = sortModel[0]
       ? `${sortModel[0].sort === "desc" ? "-" : ""}${sortModel[0].field}`
-      : undefined;
-    const key = JSON.stringify({
-      p: paginationModel.page,
-      ps: paginationModel.pageSize,
-      s: searchRef.current || "",
-      o: ordering || "",
-      x: extraKey || "",
-    });
-    // Prevent starting a duplicate identical in-flight request (avoid axios cancel noise)
-    if (inflightKeyRef.current === key) return;
-    inflightKeyRef.current = key;
+      : "id";
     setLoading(true);
     try {
       const { results, count } = await fetcher({
@@ -73,8 +62,6 @@ export default function DataTable({
         const fallbackId = r.id ?? r.pk ?? r.uuid ?? r._id ?? r.key ?? `${Math.random()}`;
         const fieldsObj = r && typeof r === "object" && r.fields && typeof r.fields === "object" ? r.fields : {};
         const dataObj = r && typeof r === "object" && r.data && typeof r.data === "object" ? r.data : {};
-        // Flatten common container shapes (fields/data) so column field names map directly
-        // Preserve explicit row keys over containers by spreading containers first.
         return { ...fieldsObj, ...dataObj, ...r, id: fallbackId };
       });
       if (mySeq === reqSeq.current) {
@@ -88,25 +75,20 @@ export default function DataTable({
         setRowCount(count || 0);
       }
     } catch (e) {
-      // no-op; caller should handle toasts/snacks
+      // no-op
     } finally {
       if (mySeq === reqSeq.current) {
         setLoading(false);
-        if (inflightKeyRef.current === key) {
-          inflightKeyRef.current = null;
-        }
       }
     }
   }, [fetcher, paginationModel, sortModel, search, extraKey]);
 
   useEffect(() => {
-    // On search/filter change: reset to first page; the load effect will run when 'load' changes
+    // On search change: reset to first page
     setPaginationModel((m) => (m.page !== 0 ? { ...m, page: 0 } : m));
-  }, [search, fetcher]);
+  }, [search]);
 
   useEffect(() => {
-    // Always perform the initial load. Our inflight de-duplication and cancel handling
-    // already suppress duplicate/canceled noise in dev StrictMode.
     load();
   }, [load, instanceKey]);
 
@@ -122,7 +104,7 @@ export default function DataTable({
     return cur;
   };
 
-  // Field resolver with nested path support and special cases; returns a primitive/string
+  // Field resolver with nested path support and special cases
   const getFieldValue = (row, field) => {
     if (!row) return "";
     if (field === "__str__") return row.repr ?? row.__str__ ?? row.name ?? "";
@@ -145,26 +127,22 @@ export default function DataTable({
             .replace(/_/g, " ")
             .replace(/\b\w/g, (c) => c.toUpperCase());
         }
-        // Default valueGetter robust to MUI X signatures (v8: (value,row,...), v5-v7: (params))
+        // Default valueGetter robust to MUI X signatures
         if (!base.valueGetter) {
           const f = String(base.field || "");
           if (f.startsWith("__")) {
-            // for synthetic columns like "__actions" just return empty value
             base.valueGetter = () => "";
           } else {
             base.valueGetter = (...args) => {
               try {
-                // v8+ signature: (value, row, ...rest)
                 if (args.length >= 2 && args[1] && typeof args[1] === "object" && !("row" in (args[0] || {}))) {
                   const [, row] = args;
                   return getFieldValue(row, base.field);
                 }
-                // v5-v7 signature: (params)
                 const params = args[0] || {};
                 const row = params?.row || {};
                 return getFieldValue(row, base.field);
               } catch {
-                // Fallback to raw value when anything goes wrong
                 return args && args.length ? args[0] : "";
               }
             };
@@ -179,7 +157,7 @@ export default function DataTable({
             return String(v);
           };
         }
-        // Default valueFormatter tolerant of both v7 (params) and v8 (value, ctx) shapes
+        // Default valueFormatter
         if (!base.valueFormatter) {
           base.valueFormatter = (...args) => {
             try {
@@ -209,25 +187,24 @@ export default function DataTable({
   }, []);
 
   const handleSortChange = useCallback((m) => {
-    setSortModel((prev) => {
-      const a = Array.isArray(prev) ? prev : [];
-      const b = Array.isArray(m) ? m : [];
-      const same =
-        a.length === b.length &&
-        ((a[0] && b[0] && a[0].field === b[0].field && a[0].sort === b[0].sort) || (!a[0] && !b[0]));
-      return same ? prev : m;
-    });
+    setSortModel(Array.isArray(m) ? m : []);
+    setPaginationModel((prev) => ({ ...prev, page: 0 }));
   }, []);
+
+  const totalPages = Math.max(1, Math.ceil(rowCount / paginationModel.pageSize));
+  const currentPage = Math.min(paginationModel.page + 1, totalPages);
+  const startEntry = rowCount === 0 ? 0 : paginationModel.page * paginationModel.pageSize + 1;
+  const endEntry = Math.min((paginationModel.page + 1) * paginationModel.pageSize, rowCount);
 
   return (
     <div className="tk-card tk-grid" style={{ width: "100%", background: "#ffffff", borderRadius: 12, border: "1px solid #e5e7eb", overflowX: "auto", overflowY: "hidden", position: "relative", isolation: "isolate" }}>
-      <div style={{ padding: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      <div style={{ padding: 10, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         {toolbar}
         <input
-          placeholder="Search”¦"
+          placeholder="Search records..."
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          style={{ padding: 8, width: "min(280px, 100%)", borderRadius: 8, border: "1px solid #e5e7eb", backgroundColor: "#ffffff" }}
+          style={{ padding: "8px 12px", width: "min(280px, 100%)", borderRadius: 8, border: "1px solid #e5e7eb", backgroundColor: "#ffffff", fontSize: 13, outline: "none" }}
         />
       </div>
       <DataGrid
@@ -238,16 +215,15 @@ export default function DataTable({
         loading={loading}
         paginationMode="server"
         sortingMode="server"
-        initialState={{ pagination: { paginationModel: { page: 0, pageSize: 10 } } }}
-        pagination
-        pageSizeOptions={[100, 50, 25, 10]}
+        sortModel={sortModel}
+        onSortModelChange={handleSortChange}
         paginationModel={paginationModel}
         onPaginationModelChange={handlePaginationChange}
-        onSortModelChange={handleSortChange}
         onRowDoubleClick={(p) => onRowEdit?.(p.row)}
         disableRowSelectionOnClick
         density={density}
         checkboxSelection={checkboxSelection}
+        hideFooterPagination={true}
         onRowSelectionModelChange={(m) => {
           setSelection(m);
           onSelectionChange?.(m);
@@ -256,7 +232,6 @@ export default function DataTable({
         getRowId={(row) => row.id ?? row.pk ?? row.uuid ?? row._id ?? row.key}
         rowHeight={52}
         columnHeaderHeight={44}
-        // Workaround for virtualization measurement issues causing "invisible" rows in some layouts
         disableVirtualization
         columnVisibilityModel={columnVisibilityModel}
         onColumnVisibilityModelChange={onColumnVisibilityModelChange}
@@ -272,35 +247,110 @@ export default function DataTable({
           },
           "& .MuiDataGrid-cell--textCenter": { justifyContent: "center" },
           "& .MuiDataGrid-cellContent": { color: "#0f172a !important" },
-          "& .MuiDataGrid-columnHeaderTitle": { color: "#0f172a !important", fontWeight: 600 },
+          "& .MuiDataGrid-columnHeaderTitle": { color: "#0f172a !important", fontWeight: 700 },
           "& .MuiDataGrid-columnHeaderTitleContainerContent": { color: "#0f172a !important" },
 
-          // Force white backgrounds for all grid surfaces to avoid partial/transparent cells
-          "&.MuiDataGrid-root": { backgroundColor: "#ffffff" },
+          // Force solid backgrounds for all grid surfaces
+          "&.MuiDataGrid-root": { backgroundColor: "#ffffff", border: "none" },
           "& .MuiDataGrid-main": { backgroundColor: "#ffffff" },
-          "& .MuiDataGrid-columnHeaders": { backgroundColor: "#eef2ff", borderBottom: "1px solid #e5e7eb" },
+          "& .MuiDataGrid-columnHeaders": { backgroundColor: "#f8fafc", borderBottom: "1.5px solid #cbd5e1" },
           "& .MuiDataGrid-virtualScroller": { backgroundColor: "#ffffff" },
           "& .MuiDataGrid-virtualScrollerContent": { backgroundColor: "#ffffff" },
           "& .MuiDataGrid-virtualScrollerRenderZone": { backgroundColor: "#ffffff" },
           "& .MuiDataGrid-row": { backgroundColor: "#ffffff" },
-          "& .MuiDataGrid-footerContainer": { backgroundColor: "#ffffff" },
+          "& .MuiDataGrid-footerContainer": { display: "none" },
 
-          // Remove hover/selection tinting so rows remain solid white
-          "& .MuiDataGrid-row:hover": { backgroundColor: "rgba(99, 102, 241, 0.06) !important" },
-          "& .MuiDataGrid-row.Mui-hover": { backgroundColor: "rgba(99, 102, 241, 0.06) !important" },
-          "& .MuiDataGrid-row.Mui-selected": { backgroundColor: "rgba(99, 102, 241, 0.12) !important" },
-          "& .MuiDataGrid-row.Mui-selected:hover": { backgroundColor: "rgba(99, 102, 241, 0.16) !important" },
+          // Rows hover/striped styling
+          "& .MuiDataGrid-row:hover": { backgroundColor: "rgba(79, 70, 229, 0.04) !important" },
+          "& .MuiDataGrid-row.Mui-selected": { backgroundColor: "rgba(79, 70, 229, 0.08) !important" },
           "& .MuiDataGrid-overlay": { backgroundColor: "#ffffff" },
           "& .MuiDataGrid-filler": { backgroundColor: "#ffffff" },
-          // Add table-like borders
           "& .MuiDataGrid-row:nth-of-type(odd)": { backgroundColor: "#ffffff" },
           "& .MuiDataGrid-row:nth-of-type(even)": { backgroundColor: "#f8fafc" },
-          "& .MuiDataGrid-row": { borderBottom: "1px solid #e5e7eb" },
-          "& .MuiDataGrid-columnHeader": { borderRight: "1px solid #e5e7eb" },
+          "& .MuiDataGrid-row": { borderBottom: "1px solid #e2e8f0" },
+          "& .MuiDataGrid-columnHeader": { borderRight: "1px solid #e2e8f0" },
           "& .MuiDataGrid-columnHeader:last-of-type": { borderRight: "none" },
           "& .MuiDataGrid-cell:last-of-type": { borderRight: "none" }
         }}
       />
+
+      {/* ── NUMBERED PAGINATION BAR (Enterprise Standard with Page Buttons) ── */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 1.5,
+          px: 2,
+          py: 1.5,
+          borderTop: "1px solid #e2e8f0",
+          bgcolor: "#ffffff",
+        }}
+      >
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
+          <Typography sx={{ fontSize: 12.5, color: "#64748b", fontWeight: 700 }}>
+            Rows per page:
+          </Typography>
+          <MuiSelect
+            size="small"
+            value={paginationModel.pageSize}
+            onChange={(e) => {
+              const newSize = Number(e.target.value);
+              setPaginationModel({ page: 0, pageSize: newSize });
+            }}
+            sx={{
+              height: 32,
+              fontSize: 12.5,
+              fontWeight: 800,
+              borderRadius: "8px",
+              bgcolor: "#f8fafc",
+              "& .MuiSelect-select": { py: 0.5, px: 1.25 },
+            }}
+          >
+            {[10, 25, 50, 100].map((size) => (
+              <MenuItem key={size} value={size} sx={{ fontSize: 12.5, fontWeight: 700 }}>
+                {size}
+              </MenuItem>
+            ))}
+          </MuiSelect>
+          <Typography sx={{ fontSize: 12.5, color: "#475569", fontWeight: 700, ml: 1 }}>
+            Showing {startEntry}–{endEntry} of {rowCount.toLocaleString("en-IN")} records
+          </Typography>
+        </Box>
+
+        <Pagination
+          color="primary"
+          shape="rounded"
+          variant="outlined"
+          page={currentPage}
+          count={totalPages}
+          onChange={(_, val) => {
+            setPaginationModel((prev) => ({ ...prev, page: val - 1 }));
+          }}
+          showFirstButton
+          showLastButton
+          siblingCount={1}
+          boundaryCount={1}
+          renderItem={(item) => (
+            <PaginationItem
+              {...item}
+              sx={{
+                fontWeight: 800,
+                fontSize: 12.5,
+                minWidth: 32,
+                height: 32,
+                borderRadius: "8px",
+                "&.Mui-selected": {
+                  bgcolor: "#4F46E5 !important",
+                  color: "#ffffff",
+                  borderColor: "#4F46E5",
+                },
+              }}
+            />
+          )}
+        />
+      </Box>
     </div>
   );
 }

@@ -692,7 +692,7 @@ export default function ConsumerCoupon() {
             referral_id: String(form.referral_id).trim(),
           },
         });
-        alert(t === "150" ? "Activated: 5-matrix + 3-matrix opened." : "Activated: 3-matrix opened.");
+        alert(t === "150" ? "Activated: 5-block + 3-block opened." : "Activated: 3-block opened.");
       } else {
         await API.post("/v1/coupon/redeem/", {
           type: "150",

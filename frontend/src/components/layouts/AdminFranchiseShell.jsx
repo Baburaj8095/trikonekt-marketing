@@ -67,7 +67,7 @@ const FRANCHISE_MENU = [
       { to: "/admin/franchise/achievers", label: "Achievers", icon: "star" },
       { to: "/admin/franchise/wishing-banners", label: "Wishing Banners", icon: "image" },
       { to: "/admin/franchise/banners", label: "Banners", icon: "image" },
-      { to: "/admin/franchise/pdfs", label: "Trikonekt PDF", icon: "file" },
+      { to: "/admin/franchise/pdfs", label: "Asiyapp PDF", icon: "file" },
       { to: "/admin/franchise/customer-care", label: "Customer Care Chat", icon: "ticket" },
     ],
   },
@@ -177,6 +177,7 @@ export default function AdminFranchiseShell({ children }) {
         rightHeaderContent={rightPill}
         rootPaths={["/admin/franchise/dashboard"]}
         onBackFallbackPath="/admin/franchise/dashboard"
+        showBottomNav={false}
       >
         <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
           <Link to="/admin/dashboard" style={{ color: "#2563eb", fontWeight: 800, fontSize: 13, textDecoration: "none" }}>

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -295,7 +295,7 @@ export default function EmployeeLuckyCoupons() {
           </IconButton>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Box component="img" src={LOGO} alt="Trikonekt" sx={{ height: 36 }} />
+            <Box component="img" src={LOGO} alt="asiyapp" sx={{ height: 36, borderRadius: 1 }} />
             <Typography variant="h6" sx={{ fontWeight: 700 }}></Typography>
           </Box>
 

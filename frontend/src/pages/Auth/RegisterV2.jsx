@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -2477,7 +2477,7 @@ const mapUIRoleToCategory = () => {
             <ArrowBackIcon />
           </IconButton>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, cursor: "pointer" }} onClick={() => navigate("/")}>
-            <img src={LOGO} alt="Trikonekt" style={{ height: 32 }} />
+            <img src={LOGO} alt="asiyapp" style={{ height: 32, borderRadius: 6 }} />
           </Box>
           <Box sx={{ flexGrow: 1 }} />
           <Button color="inherit" sx={{ textTransform: "none", fontWeight: 600, mr: 1 }} onClick={() => setDrawerOpen(true)}>
@@ -2506,7 +2506,7 @@ const mapUIRoleToCategory = () => {
           }}
         >
           <Box sx={{ textAlign: "center", mb: 1 }}>
-            <Avatar src={LOGO} alt="Trikonekt" sx={{ width: 64, height: 64, mx: "auto", mb: 1, bgcolor: "transparent" }} />
+            <Avatar src={LOGO} alt="asiyapp" sx={{ width: 64, height: 64, mx: "auto", mb: 1, bgcolor: "transparent", borderRadius: 2 }} />
             <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: 0.2 }}>
               Register
             </Typography>

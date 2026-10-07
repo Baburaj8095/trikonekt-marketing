@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Box, Container, Typography, Card, CardContent, Grid } from "@mui/material";
 import PublicNavbar from "../components/PublicNavbar";
 import Footer from "../components/Footer";
@@ -49,11 +49,11 @@ export default function PrimePage() {
 
       <Container sx={{ py: { xs: 5, md: 8 }, flex: 1 }}>
         <Typography fontSize={{ xs: 28, md: 36 }} fontWeight={800} color="#0C2D48" mb={2}>
-          Trikonekt Prime
+          Asiyapp Prime
         </Typography>
 
         <Typography color="text.secondary" maxWidth={800} mb={3}>
-          Unlock premium benefits with Trikonekt Prime  enhanced rewards, exclusive offers, and tools
+          Unlock premium benefits with Asiyapp Prime — enhanced rewards, exclusive offers, and tools
           designed to help you earn and grow faster.
         </Typography>
 

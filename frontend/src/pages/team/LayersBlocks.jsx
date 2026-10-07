@@ -50,7 +50,7 @@ export default function LayersBlocks() {
       const mapped = rawMembers.map((m, idx) => ({
         id: m.id || idx + 1,
         username: m.username || "-",
-        full_name: m.full_name || m.name || m.username || "Team Member",
+        full_name: m.full_name || m.name || m.username || "Community Member",
         phone: m.phone || m.mobile || "-",
         sponsor: m.sponsor_id || m.sponsor_phone || "Direct",
         layer: m.depth || m.level || ((idx % 5) + 1),
@@ -114,7 +114,7 @@ export default function LayersBlocks() {
               </Typography>
             </Stack>
             <Typography variant="body2" sx={{ color: "#94A3B8", fontWeight: 500, fontSize: "13.5px" }}>
-              Streamlined tabular layer tracking across your direct sponsors, sub-accounts, and team nodes
+              Streamlined tabular layer tracking across your direct sponsors, sub-accounts, and community nodes
             </Typography>
           </Box>
 
@@ -153,7 +153,7 @@ export default function LayersBlocks() {
         <Grid container spacing={2} sx={{ mt: 2 }}>
           <Grid item xs={6} sm={3}>
             <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" }}>Total Team</Typography>
+              <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8", textTransform: "uppercase" }}>Total Community</Typography>
               <Typography sx={{ fontSize: "18px", fontWeight: 900, color: "#38BDF8" }}>{stats.total_team} Members</Typography>
             </Box>
           </Grid>

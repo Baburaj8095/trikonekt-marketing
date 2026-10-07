@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import {
   Box,
   Container,
@@ -60,7 +60,7 @@ export default function LandingPage() {
               color="text.secondary"
               maxWidth={480}
             >
-              Trikonekt connects shopping, services, and earning opportunities
+              Asiyapp connects shopping, services, and earning opportunities
               into one powerful digital ecosystem.
             </Typography>
 
@@ -104,7 +104,7 @@ export default function LandingPage() {
           viewport={viewportOnce}
         >
           <Typography fontSize={24} fontWeight={800} mb={4}>
-            What You Can Do with Trikonekt
+            What You Can Do with Asiyapp
           </Typography>
 
           <Grid container spacing={3}>
@@ -147,17 +147,17 @@ export default function LandingPage() {
             viewport={viewportOnce}
           >
             <Typography fontSize={24} fontWeight={800} mb={2}>
-              About Trikonekt
+              About Asiyapp
             </Typography>
 
             <Typography color="text.secondary" maxWidth={700}>
-              <strong>TRIKONEKT</strong> is a smart digital platform built to
+              <strong>ASIYAPP</strong> is a smart digital platform built to
               connect people, businesses, and opportunities into one powerful
               network.
             </Typography>
 
             <Typography mt={2} color="text.secondary" maxWidth={700}>
-              Through our <strong>Connect â†’ Earn â†’ Grow</strong> model, everyday
+              Through our <strong>Connect → Earn → Grow</strong> model, everyday
               spending and interactions are transformed into meaningful income
               and long-term growth.
             </Typography>
@@ -165,7 +165,7 @@ export default function LandingPage() {
         </Container>
       </Box>
 
-      {/* ================= WHY TRIKONEKT ================= */}
+      {/* ================= WHY ASIYAPP ================= */}
       <Container sx={{ py: { xs: 5, md: 7 } }}>
         <motion.div
           variants={fadeUp}
@@ -174,7 +174,7 @@ export default function LandingPage() {
           viewport={viewportOnce}
         >
           <Typography fontSize={24} fontWeight={800} mb={3}>
-            Why Trikonekt
+            Why Asiyapp
           </Typography>
 
           <Grid container spacing={2}>
@@ -211,7 +211,7 @@ export default function LandingPage() {
               maxWidth={520}
               mx="auto"
             >
-              Join Trikonekt and turn your everyday spending into opportunities
+              Join Asiyapp and turn your everyday spending into opportunities
               for growth.
             </Typography>
 

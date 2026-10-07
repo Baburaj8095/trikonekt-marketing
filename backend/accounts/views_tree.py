@@ -960,14 +960,31 @@ def _infer_root_category(source_type: str, source_id: str) -> str:
     except Exception:
         s = ""
 
-    if any(x in s for x in ("PRIME_750", "SUBSCRIPTION_750", "PROMO_PURCHASE")):
-        return "SUBSCRIPTION_750"
-
     if any(x in s for x in ("MONTHLY_759", "MONTHLY_1000", "SMART_SSP", "MONTHLY_FIRST_SEASON")):
         return "SMART_SSP"
 
     if any(x in s for x in ("SELF_ACCOUNT", "SELF_250", "SELF_250_PACK", "ECOUPON", "COUPON_150", "PRIME_150", "PRIME150", "SELF_REBIRTH")):
         return "SELF_REBIRTH"
+
+    if any(x in s for x in ("PRIME_750", "SUBSCRIPTION_750")):
+        return "SUBSCRIPTION_750"
+
+    if "PROMO_PURCHASE" in s:
+        sid = str(source_id or "").strip()
+        if sid.isdigit():
+            try:
+                from business.models import PromoPurchase
+                pp = PromoPurchase.objects.filter(id=int(sid)).select_related("package").first()
+                if pp and pp.package:
+                    ptype = str(getattr(pp.package, "type", "")).upper()
+                    pcode = str(getattr(pp.package, "code", "")).upper()
+                    if ptype == "MONTHLY" or "MONTHLY" in pcode or "SPP" in pcode:
+                        return "SMART_SSP"
+                    if ptype == "PRIME" or "PRIME" in pcode or "750" in pcode:
+                        return "SUBSCRIPTION_750"
+            except Exception:
+                pass
+        return "SUBSCRIPTION_750"
 
     # Fallback: infer Smart SSP by its source_id format: "{purchase_id}:{season}:{box}"
     try:

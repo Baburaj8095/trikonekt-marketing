@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import API from "../../api/api";
 
@@ -12,515 +12,174 @@ import {
   CardContent,
   Chip,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  Drawer,
   FormControl,
   Grid,
+  IconButton,
+  InputAdornment,
   InputLabel,
+  LinearProgress,
   MenuItem,
   Paper,
   Select,
   Skeleton,
   Stack,
+  Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Tabs,
+  TextField,
+  Tooltip,
   Typography,
-  IconButton,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 
-import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
-import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
-import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
-import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
+// Icons
+import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
+import AddCircleOutlineRoundedIcon from "@mui/icons-material/AddCircleOutlineRounded";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import AgricultureRoundedIcon from "@mui/icons-material/AgricultureRounded";
 import ApartmentOutlinedIcon from "@mui/icons-material/ApartmentOutlined";
-import StoreOutlinedIcon from "@mui/icons-material/StoreOutlined";
-import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
-import WorkOutlineOutlinedIcon from "@mui/icons-material/WorkOutlineOutlined";
-import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
-import CurrencyRupeeRoundedIcon from "@mui/icons-material/AccountBalanceWallet";
-import PublicRoundedIcon from "@mui/icons-material/MyLocation";
-import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
-import BusinessCenterRoundedIcon from "@mui/icons-material/BusinessCenterRounded";
-import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
+import ArrowUpwardRoundedIcon from "@mui/icons-material/ArrowUpwardRounded";
 import AssessmentRoundedIcon from "@mui/icons-material/AssessmentRounded";
+import AutoGraphRoundedIcon from "@mui/icons-material/AutoGraphRounded";
+import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
+import BlockRoundedIcon from "@mui/icons-material/BlockRounded";
+import BuildRoundedIcon from "@mui/icons-material/BuildRounded";
+import BusinessCenterRoundedIcon from "@mui/icons-material/BusinessCenterRounded";
+import CallRoundedIcon from "@mui/icons-material/CallRounded";
+import CampaignRoundedIcon from "@mui/icons-material/CampaignRounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import CleaningServicesRoundedIcon from "@mui/icons-material/CleaningServicesRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import ComputerRoundedIcon from "@mui/icons-material/ComputerRounded";
+import ConfirmationNumberRoundedIcon from "@mui/icons-material/ConfirmationNumberRounded";
+import CurrencyRupeeRoundedIcon from "@mui/icons-material/CurrencyRupeeRounded";
+import DirectionsBusRoundedIcon from "@mui/icons-material/DirectionsBusRounded";
+import DirectionsCarRoundedIcon from "@mui/icons-material/DirectionsCarRounded";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import ExploreRoundedIcon from "@mui/icons-material/ExploreRounded";
+import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
+import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
+import FlightTakeoffRoundedIcon from "@mui/icons-material/FlightTakeoffRounded";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
+import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
+import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
+import HomeWorkRoundedIcon from "@mui/icons-material/HomeWorkRounded";
+import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
+import LocalGroceryStoreRoundedIcon from "@mui/icons-material/LocalGroceryStoreRounded";
+import LocalHospitalRoundedIcon from "@mui/icons-material/LocalHospitalRounded";
+import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
+import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
+import MilitaryTechRoundedIcon from "@mui/icons-material/MilitaryTechRounded";
+import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
+import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
+import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
+import PhoneAndroidRoundedIcon from "@mui/icons-material/PhoneAndroidRounded";
+import PolicyRoundedIcon from "@mui/icons-material/PolicyRounded";
+import QrCode2RoundedIcon from "@mui/icons-material/QrCode2Rounded";
+import QrCodeScannerRoundedIcon from "@mui/icons-material/QrCodeScannerRounded";
+import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
+import RestaurantRoundedIcon from "@mui/icons-material/RestaurantRounded";
+import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import SendRoundedIcon from "@mui/icons-material/SendRounded";
+import SetMealRoundedIcon from "@mui/icons-material/SetMealRounded";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
+import ShoppingBagOutlinedIcon from "@mui/icons-material/ShoppingBagOutlined";
+import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
+import ShoppingCartRoundedIcon from "@mui/icons-material/ShoppingCartRounded";
+import SouthEastRoundedIcon from "@mui/icons-material/SouthEastRounded";
+import SpaRoundedIcon from "@mui/icons-material/SpaRounded";
+import StoreOutlinedIcon from "@mui/icons-material/StoreOutlined";
+import StoreRoundedIcon from "@mui/icons-material/StoreRounded";
+import SupportAgentRoundedIcon from "@mui/icons-material/SupportAgentRounded";
+import SwapHorizRoundedIcon from "@mui/icons-material/SwapHorizRounded";
+import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
+import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
+import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
+import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
+import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
+import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
+import WorkOutlineOutlinedIcon from "@mui/icons-material/WorkOutlineOutlined";
+import WorkspacePremiumRoundedIcon from "@mui/icons-material/WorkspacePremiumRounded";
 
 const COLORS = {
-  primary: "#0ea5e9",
-  primaryDark: "#0284c7",
-  success: "#22c55e",
-  secondary: "#a855f7",
-  background: "#f6f8fb",
-  surface: "#ffffff",
-  text: "#0f172a",
-  textSecondary: "#64748b",
-  border: "#e5e7eb",
-  shadow: "0 16px 42px rgba(15, 23, 42, 0.08), 0 1px 0 rgba(15, 23, 42, 0.03)",
+  primary: "#4F46E5",
+  primaryDark: "#4338CA",
+  primaryLight: "#EEF2FF",
+  secondary: "#0284C7",
+  success: "#10B981",
+  successLight: "#ECFDF5",
+  warning: "#F59E0B",
+  warningLight: "#FEF3C7",
+  danger: "#EF4444",
+  dangerLight: "#FEF2F2",
+  textPrimary: "#0F172A",
+  textSecondary: "#64748B",
+  background: "#F8FAFC",
+  surface: "#FFFFFF",
+  border: "#E2E8F0",
 };
 
-const sectionCardSx = {
-  borderRadius: { xs: 2, sm: 4 },
-  boxShadow: {
-    xs: "0 10px 24px rgba(15, 23, 42, 0.07), 0 1px 0 rgba(15, 23, 42, 0.04)",
-    md: COLORS.shadow,
-  },
-  border: `1px solid ${COLORS.border}`,
-  background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
-  overflow: "hidden",
-};
+// 18 Master TriZone Categories
+const TRIZONE_CATEGORIES = [
+  { id: "all", name: "All Categories", icon: <StoreRoundedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_basket", name: "Grocery (Tri Basket)", icon: <LocalGroceryStoreRoundedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_eat", name: "Food & Dining (Tri Eat)", icon: <RestaurantRoundedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_rides", name: "Rides (Tri Rides)", icon: <DirectionsCarRoundedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_bills", name: "Bills & Recharge", icon: <PhoneAndroidRoundedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_hotels", name: "Hotels & Stays", icon: <ApartmentOutlinedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_travel", name: "Travel & Tours", icon: <FlightTakeoffRoundedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_entertainment", name: "Entertainment", icon: <ConfirmationNumberRoundedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_health", name: "Health & Pharma", icon: <LocalHospitalRoundedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_electronics", name: "Electronics & Gadgets", icon: <ComputerRoundedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_fashion", name: "Fashion & Lifestyle", icon: <ShoppingBagOutlinedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_beauty", name: "Beauty & Spa", icon: <SpaRoundedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_home", name: "Home & Kitchen", icon: <HomeWorkRoundedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_meat", name: "Meat & Fish", icon: <SetMealRoundedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_services", name: "Home Services", icon: <CleaningServicesRoundedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_education", name: "e-Edu & Courses", icon: <SchoolRoundedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_realestate", name: "Real Estate", icon: <HomeRoundedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_automobile", name: "Automobiles", icon: <DirectionsBusRoundedIcon sx={{ fontSize: 18 }} /> },
+  { id: "tri_agriculture", name: "Agriculture", icon: <AgricultureRoundedIcon sx={{ fontSize: 18 }} /> },
+];
 
-const scrollRowSx = {
-  display: "flex",
-  gap: { xs: 1.25, sm: 2, md: 2.5 },
-  overflowX: "auto",
-  overflowY: "hidden",
-  pb: { xs: 0.75, md: 1 },
-  px: { xs: 0.25, md: 0 },
-  scrollSnapType: "x mandatory",
-  WebkitOverflowScrolling: "touch",
-  scrollbarWidth: "none",
-  "&::-webkit-scrollbar": { display: "none" },
-};
-
-function SectionTitle({ title }) {
-  return (
-    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.5, mb: { xs: 1.75, md: 2.5 } }}>
-      <Typography
-        variant="h5"
-        sx={{
-          fontWeight: 900,
-          color: COLORS.text,
-          fontSize: { xs: "1rem", sm: "1.15rem", md: "1.5rem" },
-          lineHeight: 1.18,
-        }}
-      >
-        {title}
-      </Typography>
-      <Box sx={{ width: 36, height: 4, borderRadius: 999, bgcolor: "rgba(14,165,233,0.22)", flexShrink: 0 }} />
-    </Box>
-  );
-}
-
-function MobileBottomNav({ activePath, onNavigate }) {
-  const items = [
-    { label: "Home", icon: <HomeRoundedIcon />, path: "/agency/franchise-dashboard" },
-    // { label: "Business Connect", icon: <BusinessCenterRoundedIcon />, path: "/agency/franchise-dashboard" },
-    { label: "Wallet", icon: <CurrencyRupeeRoundedIcon />, path: "/agency/franchise-wallet" },
-    { label: "History", icon: <HistoryRoundedIcon />, path: "/agency/transactions" },
-    { label: "Report", icon: <AssessmentRoundedIcon />, path: "/agency/daily-report" },
-  ];
-
-  return (
-    <Paper
-      elevation={0}
-      sx={{
-        position: "fixed",
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 1200,
-        display: { xs: "block", md: "none" },
-        px: 1,
-        pt: 0.75,
-        pb: "calc(0.75rem + env(safe-area-inset-bottom))",
-        bgcolor: "rgba(255,255,255,0.94)",
-        borderTop: "1px solid rgba(226,232,240,0.9)",
-        boxShadow: "0 -12px 32px rgba(15,23,42,0.12)",
-        backdropFilter: "blur(16px)",
-      }}
-    >
-      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 0.35 }}>
-        {items.map((item) => {
-          const active = activePath === item.path || (item.label === "Home" && activePath === "/franchise/dashboard");
-          return (
-            <Box
-              key={item.label}
-              component="button"
-              type="button"
-              onClick={() => onNavigate(item.path)}
-              aria-current={active ? "page" : undefined}
-              sx={{
-                minWidth: 0,
-                border: 0,
-                borderRadius: 2,
-                px: 0.25,
-                py: 0.55,
-                bgcolor: active ? "rgba(14,165,233,0.12)" : "transparent",
-                color: active ? COLORS.primaryDark : COLORS.textSecondary,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 0.25,
-                cursor: "pointer",
-                transition: "background-color 160ms ease, color 160ms ease, transform 160ms ease",
-                "&:active": { transform: "scale(0.96)" },
-                "& svg": { fontSize: 20 },
-              }}
-            >
-              {item.icon}
-              <Typography
-                component="span"
-                sx={{
-                  fontSize: item.label === "Business Connect" ? 9.5 : 10.5,
-                  lineHeight: 1.1,
-                  fontWeight: active ? 900 : 800,
-                  whiteSpace: "nowrap",
-                  maxWidth: "100%",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {item.label}
-              </Typography>
-            </Box>
-          );
-        })}
-      </Box>
-    </Paper>
-  );
-}
-
-function AchieverCard({ name, subtitle, achieved, photoUrl }) {
-  const initials = useMemo(() => {
-    const t = String(name || "").trim();
-    if (!t) return "A";
-    return t.split(/\s+/).slice(0, 2).map((x) => x[0]).join("").toUpperCase();
-  }, [name]);
-
-  return (
-    <motion.div whileHover={{ y: -3 }} whileTap={{ scale: 0.985 }} transition={{ duration: 0.18 }}>
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          width: "100%",
-          p: { xs: 1.5, md: 2 },
-          minWidth: { xs: 156, sm: 190 },
-          maxWidth: { xs: 156, sm: 190 },
-          minHeight: { xs: 158, sm: 184 },
-          borderRadius: { xs: 2, sm: 3 },
-          bgcolor: COLORS.surface,
-          border: `1px solid ${COLORS.border}`,
-          boxShadow: "0 10px 24px rgba(15,23,42,0.07)",
-          transition: "box-shadow 180ms ease, border-color 180ms ease",
-          "&:hover": { boxShadow: "0 14px 34px rgba(15,23,42,0.11)", borderColor: "rgba(14,165,233,0.22)" },
-        }}
-      >
-        <Avatar
-          src={photoUrl || undefined}
-          alt={name}
-          sx={{ width: { xs: 56, sm: 72 }, height: { xs: 56, sm: 72 }, mb: 1, bgcolor: COLORS.primary, fontWeight: 900 }}
-        >
-          {initials}
-        </Avatar>
-
-        <Typography variant="subtitle2" sx={{ fontWeight: 900, textAlign: "center", fontSize: { xs: 12.5, sm: 14 }, lineHeight: 1.2 }}>
-          {name || "Achiever"}
-        </Typography>
-        <Typography variant="caption" sx={{ color: COLORS.textSecondary, textAlign: "center", mb: 0.75, fontWeight: 700, lineHeight: 1.2 }}>
-          {subtitle || ""}
-        </Typography>
-
-        <Typography variant="body2" sx={{ fontWeight: 800, color: COLORS.success, textAlign: "center", fontSize: { xs: 12, sm: 14 }, lineHeight: 1.2 }}>
-          {achieved || ""}
-        </Typography>
-      </Box>
-    </motion.div>
-  );
-}
-
-function OverviewMetricCard({ title, value, icon, accent }) {
-  return (
-    <motion.div whileHover={{ y: -5, scale: 1.01 }} whileTap={{ scale: 0.985 }} transition={{ duration: 0.2 }}>
-      <Box
-        sx={{
-          height: "100%",
-          minHeight: { xs: 132, sm: 150, md: 180 },
-          p: { xs: 2, sm: 2.5, md: 3 },
-          borderRadius: { xs: 3, sm: 4 },
-          bgcolor: COLORS.surface,
-          border: `1px solid ${COLORS.border}`,
-          borderTop: `4px solid ${accent}`,
-          boxShadow: { xs: "0 10px 24px rgba(15,23,42,0.06)", md: "0 16px 36px rgba(15,23,42,0.08)" },
-          transition: "all 200ms ease",
-          position: "relative",
-          overflow: "hidden",
-          "&:hover": { borderColor: `${accent}44`, boxShadow: `0 20px 44px ${accent}18` },
-        }}
-      >
-        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2, mb: { xs: 1.5, md: 2 } }}>
-          <Box
-            sx={{
-              width: { xs: 40, md: 52 },
-              height: { xs: 40, md: 52 },
-              borderRadius: { xs: 2.5, md: 3 },
-              display: "grid",
-              placeItems: "center",
-              bgcolor: `${accent}12`,
-              color: accent,
-              border: `1px solid ${accent}24`,
-              boxShadow: `0 8px 20px ${accent}18`,
-              "& svg": { fontSize: { xs: 22, md: 28 } },
-            }}
-          >
-            {icon}
-          </Box>
-        </Box>
-
-        <Typography variant="body1" sx={{ fontWeight: 800, color: COLORS.textSecondary, mb: 0.75, fontSize: { xs: 12.5, md: 15 }, lineHeight: 1.25 }}>
-          {title}
-        </Typography>
-
-        <Typography
-          sx={{
-            fontWeight: 900,
-            color: COLORS.text,
-            fontSize: { xs: "1.3rem", sm: "1.5rem", md: "1.75rem" },
-            lineHeight: 1.1,
-            wordBreak: "break-word",
-          }}
-        >
-          {value}
-        </Typography>
-      </Box>
-    </motion.div>
-  );
-}
-
-function OverviewSection({ title, metrics, horizontalSwipe = false }) {
-  return (
-    <Card sx={sectionCardSx}>
-      <CardContent sx={{ p: { xs: 2, md: 4 } }}>
-        <SectionTitle title={title} />
-
-        {horizontalSwipe ? (
-          <Box sx={scrollRowSx}>
-            {metrics.map((metric) => (
-              <Box
-                key={metric.title}
-                sx={{
-                  flex: "0 0 auto",
-                  width: { xs: "78vw", sm: 300, md: 360, lg: 380 },
-                  maxWidth: { xs: 290, sm: 340, md: 380 },
-                  scrollSnapAlign: "start",
-                }}
-              >
-                <OverviewMetricCard {...metric} />
-              </Box>
-            ))}
-          </Box>
-        ) : (
-          <Grid
-            container
-            spacing={{ xs: 0, md: 2.5 }}
-            sx={{
-              display: "flex",
-              flexWrap: { xs: "nowrap", md: "wrap" },
-              gap: { xs: 1.25, md: 0 },
-              overflowX: { xs: "auto", md: "visible" },
-              scrollSnapType: { xs: "x mandatory", md: "none" },
-              WebkitOverflowScrolling: "touch",
-              pb: { xs: 0.75, md: 0 },
-              scrollbarWidth: "none",
-              "&::-webkit-scrollbar": { display: "none" },
-            }}
-          >
-            {metrics.map((metric) => (
-              <Grid
-                item
-                xs={12}
-                sm={6}
-                lg={4}
-                xl={3}
-                key={metric.title}
-                sx={{
-                  flex: { xs: "0 0 78vw", sm: "0 0 310px", md: "unset" },
-                  maxWidth: { xs: 290, sm: 330, md: "none" },
-                  scrollSnapAlign: "start",
-                }}
-              >
-                <OverviewMetricCard {...metric} />
-              </Grid>
-            ))}
-          </Grid>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function PincodeWiseScroller({ title, icon, rows }) {
-  return (
-    <Card sx={sectionCardSx}>
-      <CardContent sx={{ p: { xs: 2, md: 4 } }}>
-        <SectionTitle title={title} />
-        <Box sx={scrollRowSx}>
-          <Stack direction="row" spacing={{ xs: 1.25, md: 2 }} sx={{ minWidth: "max-content" }}>
-            {(rows || []).map((r) => (
-              <Card key={r.pincode} sx={{ minWidth: { xs: 184, sm: 220 }, borderRadius: { xs: 2, sm: 3 }, border: `1px solid ${COLORS.border}`, boxShadow: "0 8px 20px rgba(15,23,42,0.06)", scrollSnapAlign: "start" }}>
-                <CardContent sx={{ p: { xs: 1.5, md: 2.5 } }}>
-                  <Stack direction="row" spacing={1.5} alignItems="center">
-                    <Box
-                      sx={{
-                        width: { xs: 36, md: 40 },
-                        height: { xs: 36, md: 40 },
-                        borderRadius: 2,
-                        bgcolor: COLORS.background,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: COLORS.primary,
-                        "& svg": { fontSize: { xs: 20, md: 24 } },
-                      }}
-                    >
-                      {icon}
-                    </Box>
-                    <Box>
-                      <Typography variant="body2" sx={{ color: COLORS.textSecondary, fontWeight: 800, fontSize: { xs: 12, md: 14 } }}>
-                        Pincode {r.pincode}
-                      </Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 900, color: COLORS.text, lineHeight: 1.1, fontSize: { xs: "1.15rem", md: "1.25rem" } }}>
-                        {r.count}
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </CardContent>
-              </Card>
-            ))}
-          </Stack>
-        </Box>
-      </CardContent>
-    </Card>
-  );
-}
-
-function DistrictWiseScroller({ title, icon, rows }) {
-  if (!Array.isArray(rows) || !rows.length) return null;
-  return (
-    <Card sx={sectionCardSx}>
-      <CardContent sx={{ p: { xs: 2, md: 4 } }}>
-        <SectionTitle title={title} />
-        <Box sx={scrollRowSx}>
-          <Stack direction="row" spacing={{ xs: 1.25, md: 2 }} sx={{ minWidth: "max-content" }}>
-            {rows.map((r) => (
-              <Card key={r.district} sx={{ minWidth: { xs: 190, sm: 230 }, borderRadius: { xs: 2, sm: 3 }, border: `1px solid ${COLORS.border}`, boxShadow: "0 8px 20px rgba(15,23,42,0.06)", scrollSnapAlign: "start" }}>
-                <CardContent sx={{ p: { xs: 1.5, md: 2.5 } }}>
-                  <Stack direction="row" spacing={1.5} alignItems="center">
-                    <Box
-                      sx={{
-                        width: { xs: 36, md: 40 },
-                        height: { xs: 36, md: 40 },
-                        borderRadius: 2,
-                        bgcolor: "rgba(14,165,233,0.1)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: COLORS.primaryDark,
-                        "& svg": { fontSize: { xs: 20, md: 24 } },
-                      }}
-                    >
-                      {icon}
-                    </Box>
-                    <Box>
-                      <Typography variant="body2" sx={{ color: COLORS.textSecondary, fontWeight: 800, fontSize: { xs: 12, md: 14 } }}>
-                        {r.district}
-                      </Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 900, color: COLORS.text, lineHeight: 1.1, fontSize: { xs: "1.15rem", md: "1.25rem" } }}>
-                        {r.count}
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </CardContent>
-              </Card>
-            ))}
-          </Stack>
-        </Box>
-      </CardContent>
-    </Card>
-  );
-}
-
-const growthData = {
-  Daily: [
-    { name: "Mon", value: 420 },
-    { name: "Tue", value: 510 },
-    { name: "Wed", value: 470 },
-    { name: "Thu", value: 560 },
-    { name: "Fri", value: 620 },
-    { name: "Sat", value: 710 },
-    { name: "Sun", value: 760 },
-  ],
-  Weekly: [
-    { name: "W1", value: 3200 },
-    { name: "W2", value: 3600 },
-    { name: "W3", value: 3400 },
-    { name: "W4", value: 4100 },
-  ],
-  Monthly: [
-    { name: "Jan", value: 5.2 },
-    { name: "Feb", value: 6.1 },
-    { name: "Mar", value: 5.8 },
-    { name: "Apr", value: 6.3 },
-    { name: "May", value: 6.8 },
-  ],
-};
-
-function GrowthBar({ data, maxValue }) {
-  return (
-    <Stack
-      direction="row"
-      spacing={{ xs: 0.85, md: 1 }}
-      alignItems="flex-end"
-      justifyContent="space-around"
-      sx={{
-        minHeight: { xs: 158, md: 200 },
-        py: { xs: 1, md: 2 },
-        overflowX: "auto",
-        scrollSnapType: "x mandatory",
-        WebkitOverflowScrolling: "touch",
-        scrollbarWidth: "none",
-        "&::-webkit-scrollbar": { display: "none" },
-      }}
-    >
-      {data.map((item) => (
-        <Box
-          key={item.name}
-          sx={{
-            flex: 1,
-            minWidth: { xs: 34, md: 40 },
-            textAlign: "center",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            scrollSnapAlign: "start",
-          }}
-        >
-          <Box
-            sx={{
-              width: "100%",
-              height: { xs: `${Math.max(28, (item.value / maxValue) * 110)}px`, md: `${Math.max(30, (item.value / maxValue) * 150)}px` },
-              background: `linear-gradient(180deg, ${COLORS.primary} 0%, ${COLORS.primaryDark} 100%)`,
-              borderRadius: 1.5,
-              mb: 1,
-              boxShadow: "0 8px 18px rgba(14,165,233,0.2)",
-            }}
-          />
-          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700, fontSize: "0.7rem" }}>
-            {item.name}
-          </Typography>
-        </Box>
-      ))}
-    </Stack>
-  );
+function fmtCurrency(v) {
+  try {
+    const n = Number(v || 0);
+    return `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  } catch {
+    return `₹${v || 0}`;
+  }
 }
 
 export default function FranchiseDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [selectedTab, setSelectedTab] = useState("Daily");
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
-  // Region Filter States
-  const [selectedState, setSelectedState] = useState("");
-  const [selectedDistrict, setSelectedDistrict] = useState("");
-  const [selectedPincode, setSelectedPincode] = useState("");
+  // Navigation Sub-tab: 'dashboard' | 'merchants' | 'packages' | 'wallet' | 'ledger' | 'hierarchy'
+  const [activeTab, setActiveTab] = useState("dashboard");
 
+  // Read Agency Session
   const storedUser = useMemo(() => {
     try {
       const raw = localStorage.getItem("user_agency") || sessionStorage.getItem("user_agency");
@@ -530,673 +189,2114 @@ export default function FranchiseDashboard() {
     }
   }, []);
 
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
-  const [banners, setBanners] = useState([]);
-  const [achievers, setAchievers] = useState([]);
-  const [metrics, setMetrics] = useState(null);
+  const agencyCategory = (storedUser?.category || "agency_pincode").toLowerCase();
+  const userPincode = storedUser?.pincode || "586101";
+  const userName = storedUser?.full_name || storedUser?.name || "SAVITRI BIRADAR";
+  const userCode = storedUser?.username || "TRPN9611443183";
+  const userInitials = useMemo(() => {
+    const p = String(userName || "SB").trim().split(" ");
+    return `${p[0]?.[0] || "S"}${p[1]?.[0] || "B"}`.toUpperCase();
+  }, [userName]);
 
-  // Dynamic Districts map for selected State
-  const [stateDistrictsMap, setStateDistrictsMap] = useState({});
+  // Role Scope Flags
+  const isCoordinator = agencyCategory.includes("coordinator");
+  const isDistrictAgency = agencyCategory.includes("district");
+  const isStateAgency = agencyCategory.includes("state");
 
-  useEffect(() => {
-    if (!selectedState) return;
-    if (stateDistrictsMap[selectedState]) return;
-    let alive = true;
-    (async () => {
-      try {
-        const resp = await API.get("/location/cities/", { params: { state: selectedState, page_size: 500 }, _skipLoadingTrack: true, timeout: 10000 });
-        const results = Array.isArray(resp?.data?.results) ? resp.data.results : Array.isArray(resp?.data) ? resp.data : [];
-        const names = results.map((c) => c?.name || c?.city).filter(Boolean);
-        if (alive && names.length) {
-          setStateDistrictsMap((prev) => ({ ...prev, [selectedState]: names }));
-        }
-      } catch (_) {}
-    })();
-    return () => { alive = false; };
-  }, [selectedState, stateDistrictsMap]);
+  // Multi-Pincode Cluster for Coordinators / District Franchisees
+  const assignedPincodesList = useMemo(() => [
+    { pincode: userPincode, name: `${userPincode} (Primary Hub)`, merchants: 142, potential: 350, gtv: "₹34.8L", earnings: "₹69,600", activeCaptains: 12 },
+    { pincode: "560073", name: "560073 (Bangalore North)", merchants: 98, potential: 280, gtv: "₹24.2L", earnings: "₹48,400", activeCaptains: 8 },
+    { pincode: "560074", name: "560074 (Kumbalgodu Hub)", merchants: 76, potential: 210, gtv: "₹18.5L", earnings: "₹37,000", activeCaptains: 6 },
+    { pincode: "560057", name: "560057 (Peenya Industrial)", merchants: 114, potential: 400, gtv: "₹42.1L", earnings: "₹84,200", activeCaptains: 10 },
+  ], [userPincode]);
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      // Only set loading on initial mount if metrics is null
-      if (!metrics) {
-        setLoading(true);
-      }
-      setErr("");
+  // Territory Selection State (Drill-Down)
+  const [selectedState, setSelectedState] = useState("Karnataka");
+  const [selectedDistrict, setSelectedDistrict] = useState("Vijayapura");
+  const [selectedPincode, setSelectedPincode] = useState("all"); // 'all' or specific pincode
+  const [opportunityViewMode, setOpportunityViewMode] = useState("live"); // 'live' | 'pre_ownership'
 
-      const params = { _skipLoadingTrack: true };
-      if (selectedState) params.state = selectedState;
-      if (selectedDistrict) params.district = selectedDistrict;
-      if (selectedPincode) params.pincode = selectedPincode;
+  // Search & Filter state
+  const [merchantSearch, setMerchantSearch] = useState("");
+  const [merchantTypeFilter, setMerchantTypeFilter] = useState("all"); // 'all', 'b2c', 'b2b', 'trizone'
+  const [merchantStatusFilter, setMerchantStatusFilter] = useState("all"); // 'all', 'active', 'inactive'
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
 
-      try {
-        const [mRes, aRes, bRes] = await Promise.allSettled([
-          API.get("/business/franchise/dashboard-metrics/", { params, timeout: 15000 }),
-          API.get("/business/franchise/achievers/", { params, timeout: 15000 }),
-          API.get("/business/franchise/wishing-banners/", { params, timeout: 15000 }),
-        ]);
+  // Selected Merchant for Details
+  const [selectedMerchant, setSelectedMerchant] = useState(null);
+  const [merchantDetailTab, setMerchantDetailTab] = useState("overview");
 
-        if (!alive) return;
+  // Balance visibility toggle
+  const [showBalance, setShowBalance] = useState(true);
 
-        if (mRes.status === "fulfilled" && mRes.value?.data) {
-          setMetrics(mRes.value.data);
-        }
-        if (aRes.status === "fulfilled" && Array.isArray(aRes.value?.data?.results)) {
-          setAchievers(aRes.value.data.results);
-        }
-        if (bRes.status === "fulfilled" && Array.isArray(bRes.value?.data?.results)) {
-          setBanners(bRes.value.data.results);
-        }
-      } catch (e) {
-        if (!alive) return;
-        setErr(e?.response?.data?.detail || "Failed to load franchise dashboard data.");
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [selectedState, selectedDistrict, selectedPincode]);
+  // Add Merchant & Register Captain Modals
+  const [openAddMerchantModal, setOpenAddMerchantModal] = useState(false);
+  const [merchantStep, setMerchantStep] = useState(1);
+  const [newMerchantData, setNewMerchantData] = useState({
+    storeName: "",
+    ownerName: "",
+    mobile: "",
+    address: "",
+    category: "tri_basket",
+    type: "B2C",
+    pincode: userPincode,
+  });
 
-  const fmtMoney = (v) => {
-    try {
-      const n = Number(v || 0);
-      return `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
-    } catch {
-      return `₹${v || 0}`;
-    }
-  };
+  const [openAddCaptainModal, setOpenAddCaptainModal] = useState(false);
+  const [captainStep, setCaptainStep] = useState(1);
+  const [newCaptainData, setNewCaptainData] = useState({
+    name: "",
+    mobile: "",
+    gender: "Male",
+    pincode: userPincode,
+    locality: "",
+  });
 
-  const scope = metrics?.scope || {};
-  const category = (storedUser?.category || "").toLowerCase();
-  const level = (scope?.level || "").toLowerCase();
+  // Wallet and Metrics
+  const [metrics, setMetrics] = useState({
+    total_pincodes: assignedPincodesList.length,
+    total_captains: 36,
+    active_captains: 31,
+    inactive_captains: 5,
+    total_merchants: 430,
+    total_addressable_merchants: 1240,
+    trizone_stores: 14,
+    b2c_merchants: 348,
+    b2b_merchants: 68,
+    market_penetration_pct: 34.6,
+    monthly_gtv: "₹1,19,60,000",
+    monthly_earnings: "₹2,39,200",
+    new_leads_pipeline: 84,
+  });
 
-  const isStateRole = level === "state" || category.includes("state");
-  const isDistrictRole = level === "district" || category.includes("district");
-  const isPincodeOnlyRole = (level === "pincode" || category.includes("pincode")) && !isStateRole && !isDistrictRole;
+  const [wallet, setWallet] = useState({
+    balance: "14850.75",
+    main_wallet: "11138.06", // 75%
+    self_account_pocket: "3712.69", // 25% for Rebirth
+    rebirth_nodes_spawned: 14,
+    total_received: "125430.00",
+    total_spent: "102979.00",
+    today: "3450.00",
+  });
 
-  const showDistrictCards = !isPincodeOnlyRole;
+  // Digital Education Packages (`tri-academy` / trieducation.in)
+  const [eduPackageStats, setEduPackageStats] = useState({
+    totalStarterSold: 248, // Track 1 (₹2,000)
+    totalSuperAgentSold: 42, // Track 2 (₹8,000)
+    totalPromotersSold: 12, // Track 3 (₹40,000)
+    royaltyPromotersCount: 14, // ≥ ₹50k Volume Qualifiers
+    midnightRoyaltyPool: "₹48,250.00",
+    rebirthPoolVelocity: "28 Rebirths/Day",
+    layerBreakdown: [
+      { layer: "Layer 1 (Rank 1)", count: 248, track: "Track 1 Foundation (₹2k)", pct: 100, color: "#4F46E5" },
+      { layer: "Layer 2 (Rank 2)", count: 184, track: "Part 1 Leadership (₹4.75k)", pct: 74, color: "#6366F1" },
+      { layer: "Layer 3 (Rank 3)", count: 122, track: "Part 1 Leadership (₹4.75k)", pct: 49, color: "#818CF8" },
+      { layer: "Layer 4 (Rank 4)", count: 86, track: "Part 1 Leadership (₹4.75k)", pct: 34, color: "#0284C7" },
+      { layer: "Layer 5 (Rank 5)", count: 54, track: "Part 1 Leadership (₹4.75k)", pct: 21, color: "#0EA5E9" },
+      { layer: "Layer 6 (Rank 6)", count: 32, track: "Part 2 Leadership (₹3.25k)", pct: 13, color: "#059669" },
+      { layer: "Layer 7 (Rank 7)", count: 21, track: "Part 2 Leadership (₹3.25k)", pct: 8.5, color: "#10B981" },
+      { layer: "Layer 8 (Rank 8)", count: 14, track: "Tranche 1 DAP (₹5k)", pct: 5.6, color: "#D97706" },
+      { layer: "Layer 9 (Rank 9)", count: 8, track: "Tranche 2 DAP (₹10k)", pct: 3.2, color: "#F59E0B" },
+      { layer: "Layer 10 (Rank 10)", count: 4, track: "Tranche 3 DAP (₹25k)", pct: 1.6, color: "#EA580C" },
+    ],
+    promoterQualifiers: [
+      { id: "U-9901", name: "Ramesh Patil", mobile: "9845012345", pincode: "560073", rank: "Rank 10 DAP", volume: "₹50,000", dailyRoyalty: "₹1,450.00" },
+      { id: "U-9902", name: "Anand Biradar", mobile: "9880098765", pincode: "586101", rank: "Rank 9 Promoter", volume: "₹50,000", dailyRoyalty: "₹1,450.00" },
+      { id: "U-9903", name: "Suresh Hegde", mobile: "9448123456", pincode: "560057", rank: "Rank 8 Promoter", volume: "₹50,000", dailyRoyalty: "₹1,450.00" },
+      { id: "U-9904", name: "Vijay Kumar", mobile: "9900112233", pincode: "560074", rank: "Rank 8 Promoter", volume: "₹50,000", dailyRoyalty: "₹1,450.00" },
+    ],
+  });
 
-  const scopeLabel = scope?.label || "Franchise";
-  const scopeEntityLabel = selectedPincode
-    ? "Pincode"
-    : selectedDistrict
-      ? "District"
-      : selectedState
-        ? "State"
-        : scope?.level === "state"
-          ? "State"
-          : scope?.level === "district"
-            ? "District"
-            : "Pincode";
+  // Category Distribution & Market Opportunities
+  const categoryMarketData = useMemo(() => [
+    { id: "tri_basket", name: "Grocery (Tri Basket)", count: 146, addressable: 420, pct: 34.7, gtv: "₹48.5L", color: "#10B981", icon: "🛒" },
+    { id: "tri_eat", name: "Food & Dining (Tri Eat)", count: 98, addressable: 260, pct: 37.6, gtv: "₹28.4L", color: "#F97316", icon: "🍔" },
+    { id: "tri_electronics", name: "Electronics & Gadgets", count: 42, addressable: 110, pct: 38.1, gtv: "₹19.2L", color: "#3B82F6", icon: "💻" },
+    { id: "tri_fashion", name: "Fashion & Lifestyle", count: 56, addressable: 180, pct: 31.1, gtv: "₹14.8L", color: "#EC4899", icon: "👗" },
+    { id: "tri_health", name: "Health & Pharma", count: 32, addressable: 95, pct: 33.6, gtv: "₹8.9L", color: "#059669", icon: "💊" },
+    { id: "tri_automobile", name: "Automobile & Services", count: 28, addressable: 85, pct: 32.9, gtv: "₹5.6L", color: "#8B5CF6", icon: "🚗" },
+    { id: "tri_services", name: "Home & Local Services", count: 28, addressable: 90, pct: 31.1, gtv: "₹4.2L", color: "#64748B", icon: "🔧" },
+  ], []);
 
-  const stateFallback = storedUser?.state?.name || (typeof storedUser?.state === "string" ? storedUser.state : "");
-  const districtFallback = storedUser?.city?.name || (typeof storedUser?.city === "string" ? storedUser.city : "");
+  // Merchants Data
+  const [merchantsList, setMerchantsList] = useState([
+    {
+      id: "M-101",
+      name: "Blink Quick Store",
+      owner: "Suresh Kumar",
+      mobile: "9876543210",
+      category: "tri_basket",
+      categoryName: "Grocery (Tri Basket)",
+      type: "B2C",
+      pincode: "560073",
+      status: "Active",
+      totalTransactions: 1248,
+      totalSpend: "₹4,28,950",
+      joinedOn: "12 May 2026",
+      address: "Shop 14, Main Cross, Peenya North, 560073",
+      image: "https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=200&auto=format&fit=crop&q=80",
+      lastTx: { date: "Today, 10:24 AM", amount: "₹840.00" },
+    },
+    {
+      id: "M-102",
+      name: "Fresh Veggies Express",
+      owner: "Rajesh Patil",
+      mobile: "9845012345",
+      category: "tri_basket",
+      categoryName: "Grocery (Tri Basket)",
+      type: "B2C",
+      pincode: userPincode,
+      status: "Active",
+      totalTransactions: 890,
+      totalSpend: "₹2,10,400",
+      joinedOn: "01 Jun 2026",
+      address: "Station Road, Near Bus Stand, Vijayapura, 586101",
+      image: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&auto=format&fit=crop&q=80",
+      lastTx: { date: "Today, 09:15 AM", amount: "₹320.00" },
+    },
+    {
+      id: "M-103",
+      name: "Royal Kitchen Restaurant",
+      owner: "Mohammed Irfan",
+      mobile: "9741234567",
+      category: "tri_eat",
+      categoryName: "Food & Dining (Tri Eat)",
+      type: "B2C",
+      pincode: "560073",
+      status: "Active",
+      totalTransactions: 1560,
+      totalSpend: "₹6,80,000",
+      joinedOn: "18 Apr 2026",
+      address: "Opp. City Central Mall, 560073",
+      image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=200&auto=format&fit=crop&q=80",
+      lastTx: { date: "Yesterday, 08:30 PM", amount: "₹1,450.00" },
+    },
+    {
+      id: "M-104",
+      name: "Sri Lakshmi Wholesale Traders",
+      owner: "Basavaraj Gowda",
+      mobile: "9880011223",
+      category: "tri_basket",
+      categoryName: "B2B Wholesaler (FMCG)",
+      type: "B2B",
+      pincode: "560057",
+      status: "Active",
+      totalTransactions: 340,
+      totalSpend: "₹18,40,000",
+      joinedOn: "10 Feb 2026",
+      address: "APMC Yard, Warehouse Block B, 560057",
+      image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=200&auto=format&fit=crop&q=80",
+      lastTx: { date: "06 Oct 2026, 04:12 PM", amount: "₹45,000.00" },
+    },
+    {
+      id: "M-105",
+      name: "TriZone Experience Center Hub",
+      owner: "Trikonekt Flagship Partner",
+      mobile: "9611443183",
+      category: "tri_electronics",
+      categoryName: "TriZone Store (Electronics)",
+      type: "TriZone",
+      pincode: userPincode,
+      status: "Active",
+      totalTransactions: 2100,
+      totalSpend: "₹12,65,000",
+      joinedOn: "15 Jan 2026",
+      address: "Ground Floor, Commercial Plaza, Vijayapura, 586101",
+      image: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=200&auto=format&fit=crop&q=80",
+      lastTx: { date: "Today, 11:05 AM", amount: "₹3,999.00" },
+    },
+  ]);
 
-  const assignedStates = useMemo(() => {
-    if (Array.isArray(scope?.states) && scope.states.length) {
-      return scope.states.map((s) => (typeof s === "string" ? s : s?.name)).filter(Boolean);
-    }
-    if (stateFallback) return [stateFallback];
-    return [];
-  }, [scope?.states, stateFallback]);
+  // Transactions Ledger Data
+  const [transactionsList, setTransactionsList] = useState([
+    {
+      id: "tx-101",
+      amount: 420.0,
+      type: "Credit",
+      category: "Geo-Pool Share",
+      title: "Pincode 560073 Prime Joining Pool Share",
+      date: "07 Oct 2026 • 10:28 AM",
+      badgeColor: "#10B981",
+      badgeBg: "#ECFDF5",
+      icon: <ShoppingCartRoundedIcon sx={{ fontSize: 18, color: "#10B981" }} />,
+    },
+    {
+      id: "tx-102",
+      amount: 1200.0,
+      type: "Credit",
+      category: "e-Edu Track",
+      title: "Track 1 Starter Bundle Sales Commission (LMS)",
+      date: "07 Oct 2026 • 09:15 AM",
+      badgeColor: "#4F46E5",
+      badgeBg: "#EEF2FF",
+      icon: <SchoolRoundedIcon sx={{ fontSize: 18, color: "#4F46E5" }} />,
+    },
+    {
+      id: "tx-103",
+      amount: 850.0,
+      type: "Credit",
+      category: "Merchant QR",
+      title: "Blink Quick Store QR Scan Override",
+      date: "06 Oct 2026 • 07:42 PM",
+      badgeColor: "#10B981",
+      badgeBg: "#ECFDF5",
+      icon: <QrCode2RoundedIcon sx={{ fontSize: 18, color: "#10B981" }} />,
+    },
+    {
+      id: "tx-104",
+      amount: 2500.0,
+      type: "Credit",
+      category: "B2B Spread",
+      title: "Sri Lakshmi Wholesale FMCG Order #TR8832",
+      date: "05 Oct 2026 • 06:10 PM",
+      badgeColor: "#0284C7",
+      badgeBg: "#F0F9FF",
+      icon: <BusinessCenterRoundedIcon sx={{ fontSize: 18, color: "#0284C7" }} />,
+    },
+    {
+      id: "tx-105",
+      amount: -5000.0,
+      type: "Debit",
+      category: "Withdrawal",
+      title: "Instant Bank Payout to HDFC A/C ••4102",
+      date: "04 Oct 2026 • 11:22 AM",
+      badgeColor: "#EF4444",
+      badgeBg: "#FEF2F2",
+      icon: <SouthEastRoundedIcon sx={{ fontSize: 18, color: "#EF4444" }} />,
+    },
+  ]);
 
-  const assignedDistricts = useMemo(() => {
-    if (selectedState && stateDistrictsMap[selectedState]?.length) {
-      return stateDistrictsMap[selectedState];
-    }
-    if (Array.isArray(scope?.districts) && scope.districts.length) {
-      return scope.districts.map((d) => (typeof d === "string" ? d : d?.district || d?.name)).filter(Boolean);
-    }
-    if (Array.isArray(metrics?.districts) && metrics.districts.length) {
-      return metrics.districts.map((d) => (typeof d === "string" ? d : d?.district || d?.name)).filter(Boolean);
-    }
-    const pDistricts = new Set();
-    const rawPin = metrics?.per_pincode || {};
-    Object.values(rawPin).forEach((arr) => {
-      if (Array.isArray(arr)) {
-        arr.forEach((item) => {
-          if (item?.district) pDistricts.add(item.district);
-        });
-      }
+  // Filtered Merchants
+  const filteredMerchants = useMemo(() => {
+    return merchantsList.filter((m) => {
+      const matchPincode = selectedPincode === "all" || m.pincode === selectedPincode;
+      const matchStatus =
+        merchantStatusFilter === "all" ||
+        m.status.toLowerCase() === merchantStatusFilter.toLowerCase();
+      const matchType =
+        merchantTypeFilter === "all" ||
+        m.type.toLowerCase().includes(merchantTypeFilter.toLowerCase());
+      const matchCat =
+        selectedCategory === "all" || m.category === selectedCategory;
+      const matchSearch =
+        !merchantSearch ||
+        m.name.toLowerCase().includes(merchantSearch.toLowerCase()) ||
+        m.owner.toLowerCase().includes(merchantSearch.toLowerCase()) ||
+        m.mobile.includes(merchantSearch) ||
+        m.id.toLowerCase().includes(merchantSearch.toLowerCase()) ||
+        m.pincode.includes(merchantSearch);
+      return matchPincode && matchStatus && matchType && matchCat && matchSearch;
     });
-    if (pDistricts.size > 0) return Array.from(pDistricts);
-    if (districtFallback) return [districtFallback];
-    return [];
-  }, [selectedState, stateDistrictsMap, scope?.districts, metrics, districtFallback]);
+  }, [merchantsList, selectedPincode, merchantStatusFilter, merchantTypeFilter, selectedCategory, merchantSearch]);
 
-  const assignedPincodes = useMemo(() => {
-    const raw = Array.isArray(scope?.assigned_pincodes) && scope.assigned_pincodes.length
-      ? scope.assigned_pincodes
-      : Array.isArray(scope?.pincodes)
-        ? scope.pincodes
-        : [];
-    if (raw.length) return raw.map(String);
-    if (storedUser?.pincode) return [String(storedUser.pincode)];
-    return [];
-  }, [scope?.assigned_pincodes, scope?.pincodes, storedUser?.pincode]);
-
-  const perDistrict = useMemo(() => {
-    if (metrics?.per_district) return metrics.per_district;
-    const rawPin = metrics?.per_pincode || {};
-    const aggregateByDistrict = (rows) => {
-      if (!Array.isArray(rows)) return [];
-      const distMap = {};
-      rows.forEach((r) => {
-        const dKey = r.district || r.city || "District Scope";
-        distMap[dKey] = (distMap[dKey] || 0) + (Number(r.count) || 0);
-      });
-      return Object.entries(distMap).map(([district, count]) => ({ district, count }));
-    };
-    return {
-      consumers: aggregateByDistrict(rawPin.consumers),
-      captain_office: aggregateByDistrict(rawPin.captain_office),
-      sarathi: aggregateByDistrict(rawPin.sarathi),
-      merchants: aggregateByDistrict(rawPin.merchants),
-      self_rebirth_ids: aggregateByDistrict(rawPin.self_rebirth_ids),
-    };
-  }, [metrics]);
-
-  const assignedScopeText = useMemo(() => {
-    if (selectedPincode) return `Pincode ${selectedPincode}`;
-    if (selectedDistrict) return `District ${selectedDistrict}`;
-    if (selectedState) return `State ${selectedState}`;
-    if (scope?.level === "state") {
-      const names = Array.isArray(scope?.states) ? scope.states.map((s) => s?.name).filter(Boolean) : [];
-      return names.length ? names.join(", ") : stateFallback || "-";
-    }
-    if (scope?.level === "district") {
-      const names = Array.isArray(scope?.districts)
-        ? scope.districts.map((d) => [d?.district, d?.state].filter(Boolean).join(", ")).filter(Boolean)
-        : [];
-      return names.length ? names.join(" | ") : districtFallback || "-";
-    }
-    const pins = Array.isArray(scope?.assigned_pincodes) && scope.assigned_pincodes.length
-      ? scope.assigned_pincodes
-      : Array.isArray(scope?.pincodes)
-        ? scope.pincodes
-        : [];
-    return pins.length ? pins.join(", ") : storedUser?.pincode || "-";
-  }, [selectedState, selectedDistrict, selectedPincode, scope, stateFallback, districtFallback, storedUser?.pincode]);
-
-  const activeCounts = useMemo(() => {
-    const defaultCounts = metrics?.overall?.counts || {};
-
-    if (selectedPincode) {
-      const perPin = metrics?.per_pincode || {};
-      const findPinCount = (arr) => {
-        if (!Array.isArray(arr)) return 0;
-        const match = arr.find((item) => String(item.pincode) === String(selectedPincode));
-        return match ? Number(match.count) || 0 : 0;
-      };
-      return {
-        consumers: findPinCount(perPin.consumers),
-        captain_office: findPinCount(perPin.captain_office),
-        sarathi: findPinCount(perPin.sarathi),
-        merchants: findPinCount(perPin.merchants),
-        self_rebirth_ids: findPinCount(perPin.self_rebirth_ids),
-      };
-    }
-
-    if (selectedDistrict) {
-      const perDist = metrics?.per_district;
-      if (perDist) {
-        const findDistCount = (arr) => {
-          if (!Array.isArray(arr)) return 0;
-          const match = arr.find((item) => String(item.district || item.city || item.name).toLowerCase() === String(selectedDistrict).toLowerCase());
-          return match ? Number(match.count) || 0 : 0;
-        };
-        const res = {
-          consumers: findDistCount(perDist.consumers),
-          captain_office: findDistCount(perDist.captain_office),
-          sarathi: findDistCount(perDist.sarathi),
-          merchants: findDistCount(perDist.merchants),
-          self_rebirth_ids: findDistCount(perDist.self_rebirth_ids),
-        };
-        if (Object.values(res).some((v) => v > 0)) return res;
-      }
-
-      // Fallback: aggregate per_pincode matching selected district
-      const perPin = metrics?.per_pincode || {};
-      const sumPinCount = (arr) => {
-        if (!Array.isArray(arr)) return 0;
-        return arr
-          .filter((item) => String(item.district || item.city).toLowerCase() === String(selectedDistrict).toLowerCase())
-          .reduce((sum, item) => sum + (Number(item.count) || 0), 0);
-      };
-      return {
-        consumers: sumPinCount(perPin.consumers),
-        captain_office: sumPinCount(perPin.captain_office),
-        sarathi: sumPinCount(perPin.sarathi),
-        merchants: sumPinCount(perPin.merchants),
-        self_rebirth_ids: sumPinCount(perPin.self_rebirth_ids),
-      };
-    }
-
-    return defaultCounts;
-  }, [metrics, selectedDistrict, selectedPincode]);
-
-  const pincodeOverviewMetrics = useMemo(() => {
-    return [
-      { title: `${scopeEntityLabel} Total Consumer Count`, value: String(activeCounts.consumers ?? 0), icon: <GroupsOutlinedIcon />, accent: COLORS.primary },
-      { title: `${scopeEntityLabel} Captain Office Count`, value: String(activeCounts.captain_office ?? 0), icon: <ApartmentOutlinedIcon />, accent: COLORS.success },
-      { title: `${scopeEntityLabel} Sarathi Count`, value: String(activeCounts.sarathi ?? 0), icon: <WorkOutlineOutlinedIcon />, accent: COLORS.secondary },
-      { title: `${scopeEntityLabel} Merchant Count`, value: String(activeCounts.merchants ?? 0), icon: <StoreOutlinedIcon />, accent: COLORS.primaryDark },
-      { title: `${scopeEntityLabel} Total Self Rebirth ID`, value: String(activeCounts.self_rebirth_ids ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.success },
-    ];
-  }, [activeCounts, scopeEntityLabel]);
-
-  const consumerStatsCards = useMemo(() => {
-    const cs = metrics?.consumer_stats || {};
-    return [
-      { title: "Consumer Active Overall", value: String(cs?.active?.overall ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.success },
-      { title: "Consumer Active Month", value: String(cs?.active?.month ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.success },
-      { title: "Consumer Inactive Overall", value: String(cs?.inactive?.overall ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.secondary },
-      { title: "Consumer Inactive Month", value: String(cs?.inactive?.month ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.secondary },
-      { title: "Consumer ID Self Rebirth Overall", value: String(cs?.self_rebirth_id?.overall ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.primary },
-      { title: "Consumer ID Self Rebirth Month", value: String(cs?.self_rebirth_id?.month ?? 0), icon: <TrendingUpOutlinedIcon />, accent: COLORS.primary },
-      { title: "Consumer Total Earning Overall", value: fmtMoney(cs?.total_earning?.overall ?? 0), icon: <CurrencyRupeeRoundedIcon />, accent: COLORS.primaryDark },
-      { title: "Consumer Total Earning Month", value: fmtMoney(cs?.total_earning?.month ?? 0), icon: <CurrencyRupeeRoundedIcon />, accent: COLORS.primaryDark },
-    ];
-  }, [metrics]);
-
-  const selectedData = growthData[selectedTab] || [];
-  const maxDataValue = useMemo(() => Math.max(...selectedData.map((item) => item.value), 1), [selectedData]);
-
-  const perPin = metrics?.per_pincode || {};
+  const activeFilterCount = useMemo(() => {
+    let cnt = 0;
+    if (merchantTypeFilter !== "all") cnt++;
+    if (merchantStatusFilter !== "all") cnt++;
+    if (selectedCategory !== "all") cnt++;
+    if (selectedPincode !== "all") cnt++;
+    return cnt;
+  }, [merchantTypeFilter, merchantStatusFilter, selectedCategory, selectedPincode]);
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        bgcolor: COLORS.background,
-        pt: { xs: 1.25, md: 4 },
-        pb: { xs: "calc(92px + env(safe-area-inset-bottom))", md: 4 },
-        WebkitOverflowScrolling: "touch",
-      }}
-    >
-      <Container maxWidth="xl" sx={{ px: { xs: 1.25, sm: 2, md: 3 } }}>
-        <Stack spacing={{ xs: 1.5, md: 4 }}>
-          {err ? <Alert severity="error">{err}</Alert> : null}
+    <Box sx={{ minHeight: "100vh", bgcolor: COLORS.background, pb: { xs: 11, md: 5 } }}>
+      {/* ── DESKTOP TABS (Enterprise 6-Module Hub) ── */}
+      <Box sx={{ display: { xs: "none", md: "block" }, bgcolor: "#FFFFFF", borderBottom: "1px solid #E2E8F0", px: 3, position: "sticky", top: 0, zIndex: 100 }}>
+        <Container maxWidth="xl" disableGutters>
+          <Tabs
+            value={activeTab}
+            onChange={(_, v) => {
+              setActiveTab(v);
+              setSelectedMerchant(null);
+            }}
+            textColor="primary"
+            indicatorColor="primary"
+            sx={{
+              "& .MuiTab-root": {
+                fontWeight: 800,
+                fontSize: 13.5,
+                textTransform: "none",
+                minHeight: 52,
+                px: 2.2,
+              },
+            }}
+          >
+            <Tab value="dashboard" label="Territory Intelligence" icon={<InsightsRoundedIcon sx={{ fontSize: 18 }} />} iconPosition="start" />
+            <Tab value="merchants" label="Merchants & Captains" icon={<StoreRoundedIcon sx={{ fontSize: 18 }} />} iconPosition="start" />
+            <Tab value="packages" label="e-Edu & Layer Engine" icon={<SchoolRoundedIcon sx={{ fontSize: 18 }} />} iconPosition="start" />
+            <Tab value="wallet" label="Master Wallet & Earnings" icon={<AccountBalanceWalletRoundedIcon sx={{ fontSize: 18 }} />} iconPosition="start" />
+            <Tab value="ledger" label="Transaction Ledger" icon={<HistoryRoundedIcon sx={{ fontSize: 18 }} />} iconPosition="start" />
+            <Tab value="hierarchy" label="Territory Command" icon={<LocationOnRoundedIcon sx={{ fontSize: 18 }} />} iconPosition="start" />
+          </Tabs>
+        </Container>
+      </Box>
 
-          {/* Wishing banner scroller */}
-          {loading ? (
-            <Skeleton variant="rounded" height={210} sx={{ borderRadius: { xs: 2, md: 4 } }} />
-          ) : banners?.length ? (
-            <Card sx={{ borderRadius: { xs: 2, md: 4 }, overflow: "hidden", border: `1px solid ${COLORS.border}`, boxShadow: { xs: "0 10px 24px rgba(15,23,42,0.08)", md: COLORS.shadow } }}>
-              <CardContent sx={{ p: 0 }}>
-                <Box sx={{ ...scrollRowSx, gap: 0, p: 0 }}>
-                  <Stack direction="row" spacing={0} sx={{ minWidth: "max-content" }}>
-                    {banners.map((b) => (
-                      <Box key={b.id} sx={{ width: { xs: "calc(100vw - 20px)", sm: 420, md: 520 }, height: { xs: 142, sm: 170, md: 220 }, flex: "0 0 auto", scrollSnapAlign: "start" }}>
-                        {b?.image_url ? (
-                          <img
-                            src={b.image_url}
-                            alt={b.title || "Banner"}
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                          />
-                        ) : (
-                          <Box sx={{ width: "100%", height: "100%", bgcolor: COLORS.background }} />
-                        )}
-                      </Box>
-                    ))}
-                  </Stack>
-                </Box>
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {/* Header */}
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <Card
-              sx={{
-                background: "linear-gradient(135deg, #0f172a 0%, #0369a1 52%, #0ea5e9 100%)",
-                borderRadius: { xs: 3, md: 5 },
-                boxShadow: "0 24px 56px rgba(15, 23, 42, 0.22), 0 4px 12px rgba(14, 165, 233, 0.15)",
-                border: "1px solid rgba(255,255,255,0.15)",
-                overflow: "hidden",
-                position: "relative",
-                "&::before": {
-                  content: '""',
-                  position: "absolute",
-                  top: -80,
-                  right: -80,
-                  width: 260,
-                  height: 260,
-                  borderRadius: "50%",
-                  background: "radial-gradient(circle, rgba(14,165,233,0.3) 0%, rgba(255,255,255,0) 70%)",
-                  pointerEvents: "none",
-                },
-              }}
-            >
-              <CardContent sx={{ p: { xs: 2.5, md: 4.5 }, color: "white", position: "relative", zIndex: 1 }}>
-                <Box sx={{ display: "flex", alignItems: { xs: "flex-start", sm: "center" }, justifyContent: "space-between", gap: { xs: 1.5, md: 2 } }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: { xs: 1.5, md: 2.5 }, minWidth: 0 }}>
-                    <Box
-                      sx={{
-                        width: { xs: 46, md: 56 },
-                        height: { xs: 46, md: 56 },
-                        borderRadius: { xs: 2.5, md: 3 },
-                        bgcolor: "rgba(255,255,255,0.18)",
-                        backdropFilter: "blur(12px)",
-                        border: "1px solid rgba(255,255,255,0.28)",
-                        boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <TrendingUpOutlinedIcon sx={{ fontSize: { xs: 26, md: 32 }, color: "white" }} />
-                    </Box>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="h4" sx={{ fontWeight: 900, fontSize: { xs: "1.35rem", sm: "1.65rem", md: "2.15rem" }, mb: 0.35, lineHeight: 1.1 }}>
-                        Franchise Dashboard
-                      </Typography>
-                      <Typography variant="subtitle1" sx={{ opacity: 0.9, fontSize: { xs: "0.85rem", md: "1.05rem" }, lineHeight: 1.2, fontWeight: 700 }}>
-                        {scopeLabel} Overview
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
-                    <IconButton sx={{ width: { xs: 40, md: 44 }, height: { xs: 40, md: 44 }, bgcolor: "rgba(255,255,255,0.16)", backdropFilter: "blur(10px)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "all 140ms ease", "&:hover": { bgcolor: "rgba(255,255,255,0.26)", transform: "translateY(-2px)" }, "&:active": { transform: "scale(0.94)" } }}>
-                      <NotificationsNoneRoundedIcon />
-                    </IconButton>
-                    <IconButton
-                      onClick={() => navigate("/agency/franchise-wallet")}
-                      sx={{ width: { xs: 40, md: 44 }, height: { xs: 40, md: 44 }, bgcolor: "rgba(255,255,255,0.16)", backdropFilter: "blur(10px)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "all 140ms ease", "&:hover": { bgcolor: "rgba(255,255,255,0.26)", transform: "translateY(-2px)" }, "&:active": { transform: "scale(0.94)" } }}
-                    >
-                      <CurrencyRupeeRoundedIcon />
-                    </IconButton>
-                    <IconButton sx={{ width: { xs: 40, md: 44 }, height: { xs: 40, md: 44 }, bgcolor: "rgba(255,255,255,0.16)", backdropFilter: "blur(10px)", color: "white", border: "1px solid rgba(255,255,255,0.22)", transition: "all 140ms ease", "&:hover": { bgcolor: "rgba(255,255,255,0.26)", transform: "translateY(-2px)" }, "&:active": { transform: "scale(0.94)" } }}>
-                      <PublicRoundedIcon />
-                    </IconButton>
-                  </Stack>
-                </Box>
-
-                <Box sx={{ mt: { xs: 2.5, md: 3.5 } }}>
-                  <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap" sx={{ mb: 1.5 }}>
-                    <Typography variant="h5" sx={{ fontWeight: 900, color: "white", fontSize: { xs: "1.15rem", md: "1.6rem" }, lineHeight: 1.15 }}>
-                      {storedUser?.full_name || storedUser?.username || "Franchise Partner"}
-                    </Typography>
-
-                    <Chip
-                      label={storedUser?.category ? String(storedUser.category).replaceAll("_", " ") : "Agency Partner"}
-                      sx={{
-                        bgcolor: "rgba(255,255,255,0.22)",
-                        backdropFilter: "blur(10px)",
-                        color: "white",
-                        fontWeight: 800,
-                        fontSize: { xs: 11, md: 12 },
-                        textTransform: "capitalize",
-                        height: 26,
-                        border: "1px solid rgba(255,255,255,0.3)",
-                      }}
-                    />
-                  </Stack>
-
-                  <Paper
+      <Container maxWidth="xl" sx={{ mt: { xs: 2, md: 3 }, px: { xs: 2, sm: 3 } }}>
+        {/* =========================================================================
+            TERRITORY JURISDICTION SELECTOR & DRILL-DOWN BAR (Global)
+        ========================================================================= */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: { xs: 1.75, sm: 2 },
+            borderRadius: "18px",
+            bgcolor: "#FFFFFF",
+            border: "1px solid #E2E8F0",
+            boxShadow: "0 2px 10px rgba(15,23,42,0.03)",
+            mb: 2.5,
+          }}
+        >
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            justifyContent="space-between"
+            alignItems={{ xs: "flex-start", sm: "center" }}
+            spacing={1.5}
+          >
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              <Box
+                sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: "12px",
+                  bgcolor: "#EEF2FF",
+                  color: "#4F46E5",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <ExploreRoundedIcon sx={{ fontSize: 22 }} />
+              </Box>
+              <Box>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Typography sx={{ fontSize: 15, fontWeight: 950, color: "#0F172A" }}>
+                    {isCoordinator ? "Multi-Pincode Zone Command" : "Assigned Pincode Hub"}
+                  </Typography>
+                  <Chip
+                    label={isCoordinator ? "Coordinator Scope" : `${userPincode}`}
+                    size="small"
                     sx={{
-                      p: { xs: 2, md: 3 },
-                      borderRadius: { xs: 2.5, md: 3.5 },
-                      bgcolor: "rgba(255,255,255,0.12)",
-                      backdropFilter: "blur(16px)",
-                      border: "1px solid rgba(255,255,255,0.22)",
-                      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.2)",
+                      height: 20,
+                      fontSize: 10.5,
+                      fontWeight: 900,
+                      bgcolor: "#EEF2FF",
+                      color: "#4F46E5",
+                    }}
+                  />
+                </Stack>
+                <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 700 }}>
+                  {selectedState} • {selectedDistrict} {selectedPincode !== "all" ? `• Pincode ${selectedPincode}` : "• Aggregated Zone"}
+                </Typography>
+              </Box>
+            </Stack>
+
+            {/* Pincode Drill-down Selector */}
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ width: { xs: "100%", sm: "auto" } }}>
+              <FormControl size="small" sx={{ minWidth: 190, width: { xs: "100%", sm: "auto" } }}>
+                <Select
+                  value={selectedPincode}
+                  onChange={(e) => setSelectedPincode(e.target.value)}
+                  sx={{
+                    borderRadius: "12px",
+                    fontWeight: 800,
+                    fontSize: 12.5,
+                    bgcolor: "#F8FAFC",
+                    "& .MuiSelect-select": { py: 0.8 },
+                  }}
+                >
+                  <MenuItem value="all" sx={{ fontWeight: 800, fontSize: 12.5 }}>
+                    🌐 All Assigned Pincodes ({assignedPincodesList.length})
+                  </MenuItem>
+                  {assignedPincodesList.map((pin) => (
+                    <MenuItem key={pin.pincode} value={pin.pincode} sx={{ fontWeight: 700, fontSize: 12.5 }}>
+                      📍 {pin.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Stack>
+          </Stack>
+        </Paper>
+
+        <AnimatePresence mode="wait">
+          {/* =========================================================================
+              SCREEN 3: MERCHANT DETAILS VIEW (Drill-Down Modal/View)
+          ========================================================================= */}
+          {selectedMerchant ? (
+            <motion.div
+              key="merchant-detail"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.18 }}
+            >
+              <Box sx={{ maxWidth: 640, mx: "auto" }}>
+                <Button
+                  startIcon={<ArrowBackRoundedIcon />}
+                  onClick={() => setSelectedMerchant(null)}
+                  sx={{ mb: 2, textTransform: "none", fontWeight: 800, color: "#4F46E5" }}
+                >
+                  Back to Merchants List
+                </Button>
+
+                <Paper elevation={0} sx={{ borderRadius: "24px", overflow: "hidden", border: "1px solid #E2E8F0", bgcolor: "#FFFFFF" }}>
+                  <Box
+                    sx={{
+                      height: 140,
+                      backgroundImage: `url(${selectedMerchant.image})`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                      position: "relative",
                     }}
                   >
-                    <Grid container spacing={{ xs: 2, md: 3 }}>
-                      <Grid item xs={12} sm={4}>
-                        <Stack direction="row" alignItems="center" spacing={1.5}>
-                          <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <BadgeOutlinedIcon sx={{ color: "white", fontSize: 20 }} />
-                          </Box>
-                          <Box sx={{ minWidth: 0 }}>
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", display: "block", fontWeight: 700, lineHeight: 1.15 }}>
-                              Username
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: "white", fontWeight: 900, overflowWrap: "anywhere", lineHeight: 1.2, fontSize: { xs: 13, md: 14 } }}>
-                              {storedUser?.username || "—"}
-                            </Typography>
-                          </Box>
-                        </Stack>
-                      </Grid>
-
-                      <Grid item xs={12} sm={4}>
-                        <Stack direction="row" alignItems="center" spacing={1.5}>
-                          <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <LocationOnOutlinedIcon sx={{ color: "white", fontSize: 20 }} />
-                          </Box>
-                          <Box sx={{ minWidth: 0 }}>
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", display: "block", fontWeight: 700, lineHeight: 1.15 }}>
-                              Assigned {scopeEntityLabel}
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: "white", fontWeight: 900, overflowWrap: "anywhere", lineHeight: 1.2, fontSize: { xs: 13, md: 14 } }}>
-                              {assignedScopeText}
-                            </Typography>
-                          </Box>
-                        </Stack>
-                      </Grid>
-
-                      <Grid item xs={12} sm={4}>
-                        <Stack direction="row" alignItems="center" spacing={1.5}>
-                          <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <TrendingUpOutlinedIcon sx={{ color: "white", fontSize: 20 }} />
-                          </Box>
-                          <Box sx={{ minWidth: 0 }}>
-                            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.8)", display: "block", fontWeight: 700, lineHeight: 1.15 }}>
-                              Resolved Pincodes
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: "white", fontWeight: 900, lineHeight: 1.2, fontSize: { xs: 13, md: 14 } }}>
-                              {Number(scope?.pincode_count ?? (Array.isArray(metrics?.overall?.pincodes) ? metrics.overall.pincodes.length : 0))}
-                            </Typography>
-                          </Box>
-                        </Stack>
-                      </Grid>
-                    </Grid>
-                  </Paper>
-                </Box>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Interactive Region Filter Bar */}
-          <Card sx={sectionCardSx}>
-            <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <FilterAltOutlinedIcon sx={{ color: COLORS.primary }} />
-                  <Typography variant="h6" sx={{ fontWeight: 900, color: COLORS.text, fontSize: { xs: "0.95rem", md: "1.15rem" } }}>
-                    Filter By Assigned Region
-                  </Typography>
-                </Box>
-
-                <Stack direction="row" spacing={1.5} flexWrap="wrap" alignItems="center">
-                  {/* State Filter (for State Coordinator / Multi-state level) */}
-                  {assignedStates.length > 0 && (
-                    <FormControl size="small" sx={{ minWidth: 160 }}>
-                      <InputLabel id="state-select-label">State</InputLabel>
-                      <Select
-                        labelId="state-select-label"
-                        value={selectedState}
-                        label="State"
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          React.startTransition(() => {
-                            setSelectedState(val);
-                            setSelectedDistrict("");
-                            setSelectedPincode("");
-                          });
-                        }}
-                      >
-                        <MenuItem value="">All Assigned States ({assignedStates.length})</MenuItem>
-                        {assignedStates.map((st) => (
-                          <MenuItem key={st} value={st}>{st}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  )}
-
-                  {/* District Filter (Disabled for State Coordinator / State Agency) */}
-                  {assignedDistricts.length > 0 && (
-                    <FormControl size="small" sx={{ minWidth: 170 }} disabled={isStateRole}>
-                      <InputLabel id="district-select-label">District</InputLabel>
-                      <Select
-                        labelId="district-select-label"
-                        value={selectedDistrict}
-                        label="District"
-                        disabled={isStateRole}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          React.startTransition(() => {
-                            setSelectedDistrict(val);
-                            setSelectedPincode("");
-                          });
-                        }}
-                      >
-                        <MenuItem value="">
-                          {isStateRole ? "District (State Scope)" : `All Assigned Districts (${assignedDistricts.length})`}
-                        </MenuItem>
-                        {assignedDistricts.map((dist) => (
-                          <MenuItem key={dist} value={dist}>{dist}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  )}
-
-                  {/* Pincode Filter (Disabled for State Coordinator / State Agency) */}
-                  {assignedPincodes.length > 0 && (
-                    <FormControl size="small" sx={{ minWidth: 160 }} disabled={isStateRole}>
-                      <InputLabel id="pincode-select-label">Pincode</InputLabel>
-                      <Select
-                        labelId="pincode-select-label"
-                        value={selectedPincode}
-                        label="Pincode"
-                        disabled={isStateRole}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          React.startTransition(() => {
-                            setSelectedPincode(val);
-                          });
-                        }}
-                      >
-                        <MenuItem value="">
-                          {isStateRole ? "Pincode (State Scope)" : `All Pincodes (${assignedPincodes.length})`}
-                        </MenuItem>
-                        {assignedPincodes.map((pin) => (
-                          <MenuItem key={pin} value={pin}>{pin}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  )}
-
-                  {(selectedState || selectedDistrict || selectedPincode) && (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => {
-                        setSelectedState("");
-                        setSelectedDistrict("");
-                        setSelectedPincode("");
-                      }}
-                      sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}
-                    >
-                      Reset Filter
-                    </Button>
-                  )}
-                </Stack>
-              </Box>
-            </CardContent>
-          </Card>
-
-          {/* Achievers */}
-          <Card sx={sectionCardSx}>
-            <CardContent sx={{ p: { xs: 2, md: 4 } }}>
-              <SectionTitle title="Top Achievers" />
-              <Box sx={scrollRowSx}>
-                <Stack direction="row" spacing={{ xs: 1.25, md: 2 }} sx={{ minWidth: "max-content" }}>
-                  {loading ? (
-                    Array.from({ length: 5 }).map((_, idx) => (
-                      <Skeleton key={idx} variant="rounded" width={156} height={158} sx={{ borderRadius: 2, scrollSnapAlign: "start" }} />
-                    ))
-                  ) : achievers.length ? (
-                    achievers.map((a) => (
-                      <Box key={a.id} sx={{ scrollSnapAlign: "start" }}>
-                        <AchieverCard
-                          name={a.name}
-                          subtitle={a.pincode ? `Pincode ${a.pincode}` : ""}
-                          achieved={a.achieved}
-                          photoUrl={a.photo_url}
-                        />
-                      </Box>
-                    ))
-                  ) : (
-                    <Typography variant="body2" sx={{ color: COLORS.textSecondary }}>
-                      No achievers configured for your assigned region.
-                    </Typography>
-                  )}
-                </Stack>
-              </Box>
-            </CardContent>
-          </Card>
-
-          {/* Overview counts */}
-          <Stack spacing={3}>
-            <OverviewSection title={`${scopeEntityLabel} Overview Counts`} metrics={pincodeOverviewMetrics} horizontalSwipe />
-            <OverviewSection title="Consumer Stats (Overall + Month)" metrics={consumerStatsCards} />
-          </Stack>
-
-          {/* District-wise scrollers (For State & District roles only) */}
-          {showDistrictCards && (
-            <>
-              <DistrictWiseScroller title="District Total Consumer (district-wise)" icon={<GroupsOutlinedIcon />} rows={perDistrict?.consumers} />
-              <DistrictWiseScroller title="District Captain Office (district-wise)" icon={<ApartmentOutlinedIcon />} rows={perDistrict?.captain_office} />
-              <DistrictWiseScroller title="District Sarathi (district-wise)" icon={<WorkOutlineOutlinedIcon />} rows={perDistrict?.sarathi} />
-              <DistrictWiseScroller title="District Merchant (district-wise)" icon={<StoreOutlinedIcon />} rows={perDistrict?.merchants} />
-              <DistrictWiseScroller title="District Self Rebirth ID (district-wise)" icon={<TrendingUpOutlinedIcon />} rows={perDistrict?.self_rebirth_ids} />
-            </>
-          )}
-
-          {/* Pincode-wise scrollers */}
-          <PincodeWiseScroller title="Pincode Total Consumer (pincode-wise)" icon={<GroupsOutlinedIcon />} rows={perPin?.consumers} />
-          <PincodeWiseScroller title="Pincode Captain Office (pincode-wise)" icon={<ApartmentOutlinedIcon />} rows={perPin?.captain_office} />
-          <PincodeWiseScroller title="Pincode Sarathi (pincode-wise)" icon={<WorkOutlineOutlinedIcon />} rows={perPin?.sarathi} />
-          <PincodeWiseScroller title="Pincode Merchant (pincode-wise)" icon={<StoreOutlinedIcon />} rows={perPin?.merchants} />
-          <PincodeWiseScroller title="Pincode Self Rebirth ID (pincode-wise)" icon={<TrendingUpOutlinedIcon />} rows={perPin?.self_rebirth_ids} />
-
-          {/* Growth analytics placeholder (existing UI) */}
-          <Card sx={sectionCardSx}>
-            <CardContent sx={{ p: { xs: 2, md: 4 } }}>
-              <Box sx={{ display: "flex", alignItems: { xs: "flex-start", sm: "center" }, justifyContent: "space-between", mb: { xs: 1.75, md: 3 }, flexWrap: "wrap", gap: 1.5 }}>
-                <SectionTitle title="Growth Analytics" />
-
-                <Stack direction="row" spacing={1}>
-                  {Object.keys(growthData).map((tab) => (
-                    <Chip
-                      key={tab}
-                      label={tab}
-                      onClick={() => setSelectedTab(tab)}
+                    <Box
                       sx={{
-                        fontWeight: 700,
-                        height: { xs: 30, md: 32 },
-                        borderRadius: 999,
-                        bgcolor: selectedTab === tab ? COLORS.primary : COLORS.background,
-                        color: selectedTab === tab ? COLORS.surface : COLORS.text,
-                        border: `1px solid ${selectedTab === tab ? COLORS.primary : COLORS.border}`,
+                        position: "absolute",
+                        inset: 0,
+                        background: "linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.6) 100%)",
                       }}
                     />
-                  ))}
-                </Stack>
-              </Box>
+                  </Box>
 
-              <GrowthBar data={selectedData} maxValue={maxDataValue} />
-            </CardContent>
-          </Card>
-        </Stack>
+                  <Box sx={{ p: { xs: 2.5, sm: 3 } }}>
+                    <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: -6, mb: 2, position: "relative" }}>
+                      <Avatar
+                        src={selectedMerchant.image}
+                        sx={{
+                          width: 72,
+                          height: 72,
+                          border: "3.5px solid #FFFFFF",
+                          boxShadow: "0 8px 20px rgba(0,0,0,0.15)",
+                        }}
+                      />
+                      <Box sx={{ pt: 3.5, flex: 1 }}>
+                        <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+                          <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#0F172A" }}>
+                            {selectedMerchant.name}
+                          </Typography>
+                          <Chip
+                            label={selectedMerchant.status}
+                            size="small"
+                            sx={{
+                              bgcolor: selectedMerchant.status === "Active" ? "#ECFDF5" : "#FEF2F2",
+                              color: selectedMerchant.status === "Active" ? "#059669" : "#DC2626",
+                              fontWeight: 900,
+                              fontSize: 10.5,
+                            }}
+                          />
+                        </Stack>
+                        <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 700 }}>
+                          {selectedMerchant.id} • {selectedMerchant.categoryName} • Pincode {selectedMerchant.pincode}
+                        </Typography>
+                      </Box>
+                    </Stack>
+
+                    <Tabs
+                      value={merchantDetailTab}
+                      onChange={(_, v) => setMerchantDetailTab(v)}
+                      sx={{
+                        borderBottom: "1px solid #E2E8F0",
+                        mb: 2.5,
+                        "& .MuiTab-root": { textTransform: "none", fontWeight: 800, fontSize: 13 },
+                      }}
+                    >
+                      <Tab value="overview" label="Overview" />
+                      <Tab value="transactions" label="Transactions" />
+                      <Tab value="documents" label="Documents" />
+                    </Tabs>
+
+                    {merchantDetailTab === "overview" && (
+                      <Stack spacing={2}>
+                        <Paper variant="outlined" sx={{ p: 2, borderRadius: "16px" }}>
+                          <Stack spacing={1.5}>
+                            <Stack direction="row" justifyContent="space-between">
+                              <Typography sx={{ fontSize: 12.5, color: "#64748B", fontWeight: 700 }}>
+                                👤 Owner Name
+                              </Typography>
+                              <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>
+                                {selectedMerchant.owner}
+                              </Typography>
+                            </Stack>
+                            <Divider />
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                              <Typography sx={{ fontSize: 12.5, color: "#64748B", fontWeight: 700 }}>
+                                📞 Phone Number
+                              </Typography>
+                              <Stack direction="row" alignItems="center" spacing={1}>
+                                <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>
+                                  {selectedMerchant.mobile}
+                                </Typography>
+                                <IconButton
+                                  size="small"
+                                  component="a"
+                                  href={`tel:${selectedMerchant.mobile}`}
+                                  sx={{ bgcolor: "#EEF2FF", color: "#4F46E5", p: 0.5 }}
+                                >
+                                  <CallRoundedIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              </Stack>
+                            </Stack>
+                            <Divider />
+                            <Stack direction="row" justifyContent="space-between">
+                              <Typography sx={{ fontSize: 12.5, color: "#64748B", fontWeight: 700 }}>
+                                🏷 Category & Type
+                              </Typography>
+                              <Chip
+                                label={`${selectedMerchant.categoryName} (${selectedMerchant.type})`}
+                                size="small"
+                                sx={{ bgcolor: "#EEF2FF", color: "#4F46E5", fontWeight: 800, fontSize: 11 }}
+                              />
+                            </Stack>
+                            <Divider />
+                            <Stack direction="row" justifyContent="space-between">
+                              <Typography sx={{ fontSize: 12.5, color: "#64748B", fontWeight: 700 }}>
+                                📍 Address
+                              </Typography>
+                              <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: "#0F172A", maxWidth: 260, textAlign: "right" }}>
+                                {selectedMerchant.address}
+                              </Typography>
+                            </Stack>
+                          </Stack>
+                        </Paper>
+
+                        <Grid container spacing={1.5}>
+                          <Grid item xs={6}>
+                            <Paper variant="outlined" sx={{ p: 2, borderRadius: "16px", bgcolor: "#F8FAFC" }}>
+                              <Typography sx={{ fontSize: 11.5, color: "#64748B", fontWeight: 700 }}>
+                                Total Transactions
+                              </Typography>
+                              <Typography sx={{ fontSize: 20, fontWeight: 900, color: "#0F172A", mt: 0.5 }}>
+                                {selectedMerchant.totalTransactions}
+                              </Typography>
+                              <Typography sx={{ fontSize: 11, color: "#10B981", fontWeight: 800 }}>
+                                ↑ 12% vs last month
+                              </Typography>
+                            </Paper>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Paper variant="outlined" sx={{ p: 2, borderRadius: "16px", bgcolor: "#F8FAFC" }}>
+                              <Typography sx={{ fontSize: 11.5, color: "#64748B", fontWeight: 700 }}>
+                                Total Spend
+                              </Typography>
+                              <Typography sx={{ fontSize: 20, fontWeight: 900, color: "#0F172A", mt: 0.5 }}>
+                                {selectedMerchant.totalSpend}
+                              </Typography>
+                              <Typography sx={{ fontSize: 11, color: "#10B981", fontWeight: 800 }}>
+                                ↑ 18% vs last month
+                              </Typography>
+                            </Paper>
+                          </Grid>
+                        </Grid>
+
+                        <Stack direction="row" spacing={1.5} sx={{ pt: 1 }}>
+                          <Button
+                            variant="outlined"
+                            fullWidth
+                            startIcon={<CallRoundedIcon />}
+                            component="a"
+                            href={`tel:${selectedMerchant.mobile}`}
+                            sx={{
+                              py: 1.2,
+                              borderRadius: "14px",
+                              fontWeight: 800,
+                              textTransform: "none",
+                              color: "#4F46E5",
+                              borderColor: "#C7D2FE",
+                            }}
+                          >
+                            Call Owner
+                          </Button>
+                          <Button
+                            variant="contained"
+                            fullWidth
+                            startIcon={<EditRoundedIcon />}
+                            onClick={() => alert(`Editing Merchant ${selectedMerchant.name}`)}
+                            sx={{
+                              py: 1.2,
+                              borderRadius: "14px",
+                              fontWeight: 800,
+                              textTransform: "none",
+                              bgcolor: "#4F46E5",
+                            }}
+                          >
+                            Edit Merchant
+                          </Button>
+                        </Stack>
+                      </Stack>
+                    )}
+                  </Box>
+                </Paper>
+              </Box>
+            </motion.div>
+          ) : (
+            <>
+              {/* =========================================================================
+                  TAB 1: TERRITORY BUSINESS INTELLIGENCE & COMMAND DASHBOARD
+              ========================================================================= */}
+              {activeTab === "dashboard" && (
+                <motion.div
+                  key="dashboard"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <Box sx={{ maxWidth: { xs: 680, md: "100%" }, mx: "auto" }}>
+                    {/* Master Wallet Card (75% Main / 25% Self Rebirth Split) */}
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: { xs: 2.5, sm: 3 },
+                        borderRadius: "24px",
+                        background: "linear-gradient(135deg, #312E81 0%, #4338CA 40%, #7C3AED 100%)",
+                        color: "#FFFFFF",
+                        boxShadow: "0 14px 34px -8px rgba(79, 70, 229, 0.45)",
+                        mb: 2.5,
+                        position: "relative",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                        <Box>
+                          <Typography sx={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.8)", letterSpacing: "0.4px", textTransform: "uppercase" }}>
+                            Franchise Master Wallet & Geo-Pool
+                          </Typography>
+                          <Typography sx={{ fontSize: { xs: 28, sm: 36 }, fontWeight: 950, my: 0.5, letterSpacing: "-0.5px" }}>
+                            {showBalance ? `₹${wallet.balance}` : "₹ ••••••••"}
+                          </Typography>
+                          <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+                            <Typography sx={{ fontSize: 11.5, color: "rgba(255,255,255,0.9)", fontWeight: 700 }}>
+                              💵 Main (75%): ₹{wallet.main_wallet}
+                            </Typography>
+                            <Typography sx={{ fontSize: 11.5, color: "#FDE68A", fontWeight: 800 }}>
+                              🔄 Self Rebirth (25%): ₹{wallet.self_account_pocket}
+                            </Typography>
+                          </Stack>
+                        </Box>
+                        <IconButton
+                          size="small"
+                          onClick={() => setShowBalance(!showBalance)}
+                          sx={{ color: "rgba(255,255,255,0.85)", bgcolor: "rgba(255,255,255,0.15)", backdropFilter: "blur(6px)" }}
+                        >
+                          {showBalance ? <VisibilityRoundedIcon sx={{ fontSize: 18 }} /> : <VisibilityOffRoundedIcon sx={{ fontSize: 18 }} />}
+                        </IconButton>
+                      </Stack>
+
+                      {/* Action Buttons */}
+                      <Stack direction="row" spacing={1.2} sx={{ mt: 2.5 }}>
+                        <Button
+                          variant="contained"
+                          startIcon={<AddRoundedIcon sx={{ fontSize: 16 }} />}
+                          onClick={() => navigate("/agency/franchise-wallet")}
+                          sx={{
+                            flex: 1,
+                            py: 0.8,
+                            borderRadius: "12px",
+                            fontWeight: 800,
+                            fontSize: 11.5,
+                            textTransform: "none",
+                            background: "linear-gradient(135deg, #EA580C 0%, #F97316 100%)",
+                            boxShadow: "0 4px 12px rgba(234, 88, 12, 0.35)",
+                            color: "#FFFFFF",
+                          }}
+                        >
+                          Add Money
+                        </Button>
+                        <Button
+                          variant="contained"
+                          startIcon={<SendRoundedIcon sx={{ fontSize: 15 }} />}
+                          onClick={() => navigate("/agency/franchise-wallet")}
+                          sx={{
+                            flex: 1,
+                            py: 0.8,
+                            borderRadius: "12px",
+                            fontWeight: 800,
+                            fontSize: 11.5,
+                            textTransform: "none",
+                            bgcolor: "rgba(255,255,255,0.2)",
+                            backdropFilter: "blur(8px)",
+                            border: "1px solid rgba(255,255,255,0.3)",
+                            color: "#FFFFFF",
+                          }}
+                        >
+                          Send
+                        </Button>
+                        <Button
+                          variant="contained"
+                          startIcon={<SouthEastRoundedIcon sx={{ fontSize: 15 }} />}
+                          onClick={() => navigate("/agency/withdrawals")}
+                          sx={{
+                            flex: 1,
+                            py: 0.8,
+                            borderRadius: "12px",
+                            fontWeight: 800,
+                            fontSize: 11.5,
+                            textTransform: "none",
+                            bgcolor: "rgba(255,255,255,0.2)",
+                            backdropFilter: "blur(8px)",
+                            border: "1px solid rgba(255,255,255,0.3)",
+                            color: "#FFFFFF",
+                          }}
+                        >
+                          Withdraw (0 Hold)
+                        </Button>
+                      </Stack>
+                    </Paper>
+
+                    {/* TERRITORY POTENTIAL & PENETRATION INDEX (Pre/Post Ownership) */}
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: { xs: 2, sm: 2.5 },
+                        borderRadius: "20px",
+                        bgcolor: "#FFFFFF",
+                        border: "1px solid #E2E8F0",
+                        mb: 2.5,
+                      }}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                        <Box>
+                          <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#0F172A" }}>
+                            Territory Market Strength & Penetration
+                          </Typography>
+                          <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 700 }}>
+                            {selectedPincode === "all" ? "Zone Aggregated Potential" : `Pincode ${selectedPincode} Potential`}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          label={`Market Capture: ${metrics.market_penetration_pct}%`}
+                          size="small"
+                          sx={{
+                            fontWeight: 900,
+                            fontSize: 11,
+                            bgcolor: "#ECFDF5",
+                            color: "#059669",
+                            border: "1px solid #A7F3D0",
+                          }}
+                        />
+                      </Stack>
+
+                      <Box sx={{ mb: 2 }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.75 }}>
+                          <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#475569" }}>
+                            Onboarded Merchants vs Total Addressable Shops ({metrics.total_merchants} / {metrics.total_addressable_merchants})
+                          </Typography>
+                          <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#4F46E5" }}>
+                            {metrics.new_leads_pipeline} Leads Ready in Pipeline
+                          </Typography>
+                        </Stack>
+                        <LinearProgress
+                          variant="determinate"
+                          value={metrics.market_penetration_pct}
+                          sx={{
+                            height: 8,
+                            borderRadius: 4,
+                            bgcolor: "#F1F5F9",
+                            "& .MuiLinearProgress-bar": {
+                              borderRadius: 4,
+                              background: "linear-gradient(90deg, #4F46E5 0%, #10B981 100%)",
+                            },
+                          }}
+                        />
+                      </Box>
+
+                      {/* 4 Micro KPI Pillars */}
+                      <Grid container spacing={1.5}>
+                        <Grid item xs={6} sm={3}>
+                          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#F8FAFC" }}>
+                            <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>
+                              🏪 B2C Retail Outlets
+                            </Typography>
+                            <Typography sx={{ fontSize: 17, fontWeight: 950, color: "#0F172A", mt: 0.25 }}>
+                              {metrics.b2c_merchants}
+                            </Typography>
+                            <Typography sx={{ fontSize: 10.5, color: "#10B981", fontWeight: 800 }}>
+                              Retail Kiranas & Dining
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#F8FAFC" }}>
+                            <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>
+                              📦 B2B Wholesalers
+                            </Typography>
+                            <Typography sx={{ fontSize: 17, fontWeight: 950, color: "#0F172A", mt: 0.25 }}>
+                              {metrics.b2b_merchants}
+                            </Typography>
+                            <Typography sx={{ fontSize: 10.5, color: "#0284C7", fontWeight: 800 }}>
+                              Master Distributors
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#F8FAFC" }}>
+                            <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>
+                              🛍 TriZone Flagships
+                            </Typography>
+                            <Typography sx={{ fontSize: 17, fontWeight: 950, color: "#0F172A", mt: 0.25 }}>
+                              {metrics.trizone_stores}
+                            </Typography>
+                            <Typography sx={{ fontSize: 10.5, color: "#D97706", fontWeight: 800 }}>
+                              Experience Hubs
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                        <Grid item xs={6} sm={3}>
+                          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#F8FAFC" }}>
+                            <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>
+                              👥 Field Captains
+                            </Typography>
+                            <Typography sx={{ fontSize: 17, fontWeight: 950, color: "#0F172A", mt: 0.25 }}>
+                              {metrics.active_captains} <span style={{ fontSize: 11, color: "#64748B" }}>/ {metrics.total_captains}</span>
+                            </Typography>
+                            <Typography sx={{ fontSize: 10.5, color: "#10B981", fontWeight: 800 }}>
+                              86% Active Force
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                      </Grid>
+                    </Paper>
+
+                    {/* CATEGORY DISTRIBUTION & VOLUME SHARES */}
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2.5,
+                        borderRadius: "20px",
+                        bgcolor: "#FFFFFF",
+                        border: "1px solid #E2E8F0",
+                        mb: 2.5,
+                      }}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                        <Box>
+                          <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#0F172A" }}>
+                            Category-Wise Market Distribution & Gross Volume
+                          </Typography>
+                          <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 700 }}>
+                            Monthly Turnover Run-Rate: {metrics.monthly_gtv}
+                          </Typography>
+                        </Box>
+                        <Button
+                          size="small"
+                          onClick={() => setActiveTab("merchants")}
+                          sx={{ textTransform: "none", fontWeight: 800, fontSize: 12, color: "#4F46E5" }}
+                        >
+                          View Merchants &gt;
+                        </Button>
+                      </Stack>
+
+                      <Stack spacing={1.75}>
+                        {categoryMarketData.map((cat, idx) => (
+                          <Box key={idx}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                              <Stack direction="row" alignItems="center" spacing={1}>
+                                <Typography sx={{ fontSize: 15 }}>{cat.icon}</Typography>
+                                <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>
+                                  {cat.name}
+                                </Typography>
+                                <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>
+                                  ({cat.count} shops)
+                                </Typography>
+                              </Stack>
+                              <Stack direction="row" alignItems="center" spacing={1.5}>
+                                <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: "#64748B" }}>
+                                  {cat.pct}% share
+                                </Typography>
+                                <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A" }}>
+                                  {cat.gtv}
+                                </Typography>
+                              </Stack>
+                            </Stack>
+                            <LinearProgress
+                              variant="determinate"
+                              value={cat.pct * 2.5}
+                              sx={{
+                                height: 6,
+                                borderRadius: 3,
+                                bgcolor: "#F1F5F9",
+                                "& .MuiLinearProgress-bar": { bgcolor: cat.color, borderRadius: 3 },
+                              }}
+                            />
+                          </Box>
+                        ))}
+                      </Stack>
+                    </Paper>
+
+                    {/* Quick Register Actions */}
+                    <Grid container spacing={1.5}>
+                      <Grid item xs={6}>
+                        <Button
+                          variant="outlined"
+                          fullWidth
+                          startIcon={<AddCircleOutlineRoundedIcon />}
+                          onClick={() => {
+                            setMerchantStep(1);
+                            setOpenAddMerchantModal(true);
+                          }}
+                          sx={{
+                            py: 1.2,
+                            borderRadius: "14px",
+                            fontWeight: 800,
+                            fontSize: 12,
+                            textTransform: "none",
+                            bgcolor: "#FFFFFF",
+                            borderColor: "#C7D2FE",
+                            color: "#4F46E5",
+                          }}
+                        >
+                          + Add New Merchant
+                        </Button>
+                      </Grid>
+                      <Grid item xs={6}>
+                        <Button
+                          variant="outlined"
+                          fullWidth
+                          startIcon={<PersonAddRoundedIcon />}
+                          onClick={() => {
+                            setCaptainStep(1);
+                            setOpenAddCaptainModal(true);
+                          }}
+                          sx={{
+                            py: 1.2,
+                            borderRadius: "14px",
+                            fontWeight: 800,
+                            fontSize: 12,
+                            textTransform: "none",
+                            bgcolor: "#FFFFFF",
+                            borderColor: "#BAE6FD",
+                            color: "#0284C7",
+                          }}
+                        >
+                          + Register Captain
+                        </Button>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                </motion.div>
+              )}
+
+              {/* =========================================================================
+                  TAB 2: MERCHANTS & CAPTAINS DIRECTORY (tri-business)
+              ========================================================================= */}
+              {activeTab === "merchants" && (
+                <motion.div
+                  key="merchants"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <Box sx={{ maxWidth: { xs: 680, md: "100%" }, mx: "auto" }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                      <Box>
+                        <Typography sx={{ fontSize: 18, fontWeight: 950, color: "#0F172A" }}>
+                          Merchants Directory
+                        </Typography>
+                        <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 700 }}>
+                          Showing {filteredMerchants.length} merchants in {selectedPincode === "all" ? "all assigned pincodes" : `Pincode ${selectedPincode}`}
+                        </Typography>
+                      </Box>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<AddRoundedIcon />}
+                        onClick={() => {
+                          setMerchantStep(1);
+                          setOpenAddMerchantModal(true);
+                        }}
+                        sx={{
+                          borderRadius: "12px",
+                          fontWeight: 800,
+                          textTransform: "none",
+                          background: "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)",
+                          color: "#FFFFFF",
+                        }}
+                      >
+                        Add Merchant
+                      </Button>
+                    </Stack>
+
+                    {/* Search Bar */}
+                    <TextField
+                      fullWidth
+                      size="small"
+                      placeholder="Search by store name, owner, phone, pincode..."
+                      value={merchantSearch}
+                      onChange={(e) => setMerchantSearch(e.target.value)}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <SearchRoundedIcon sx={{ color: "#94A3B8" }} />
+                          </InputAdornment>
+                        ),
+                      }}
+                      sx={{
+                        mb: 1.5,
+                        bgcolor: "#FFFFFF",
+                        borderRadius: "14px",
+                        "& .MuiOutlinedInput-root": { borderRadius: "14px" },
+                      }}
+                    />
+
+                    {/* Filter Pills Row */}
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5, overflowX: "auto", pb: 0.5 }}>
+                      <Chip
+                        label={`All Types: ${merchantTypeFilter.toUpperCase()} ▼`}
+                        onClick={() => setFilterDrawerOpen(true)}
+                        size="small"
+                        sx={{ fontWeight: 800, fontSize: 11.5, bgcolor: "#FFFFFF", border: "1px solid #E2E8F0" }}
+                      />
+                      <Chip
+                        label={`Status: ${merchantStatusFilter.toUpperCase()} ▼`}
+                        onClick={() => setFilterDrawerOpen(true)}
+                        size="small"
+                        sx={{ fontWeight: 800, fontSize: 11.5, bgcolor: "#FFFFFF", border: "1px solid #E2E8F0" }}
+                      />
+                      <IconButton
+                        size="small"
+                        onClick={() => setFilterDrawerOpen(true)}
+                        sx={{
+                          bgcolor: activeFilterCount > 0 ? "#EEF2FF" : "#FFFFFF",
+                          border: "1px solid #E2E8F0",
+                          color: activeFilterCount > 0 ? "#4F46E5" : "#64748B",
+                        }}
+                      >
+                        <TuneRoundedIcon sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    </Stack>
+
+                    {/* Category Horizontal Pills */}
+                    <Stack direction="row" spacing={1} sx={{ mb: 2, overflowX: "auto", pb: 0.5 }}>
+                      {TRIZONE_CATEGORIES.map((cat) => (
+                        <Chip
+                          key={cat.id}
+                          label={cat.name}
+                          onClick={() => setSelectedCategory(cat.id)}
+                          size="small"
+                          sx={{
+                            fontWeight: 800,
+                            fontSize: 11.5,
+                            bgcolor: selectedCategory === cat.id ? "#0F172A" : "#FFFFFF",
+                            color: selectedCategory === cat.id ? "#FFFFFF" : "#475569",
+                            border: "1px solid #E2E8F0",
+                            cursor: "pointer",
+                          }}
+                        />
+                      ))}
+                    </Stack>
+
+                    {/* Merchant Cards List */}
+                    <Stack spacing={1.5}>
+                      {filteredMerchants.map((m) => (
+                        <Paper
+                          key={m.id}
+                          elevation={0}
+                          onClick={() => setSelectedMerchant(m)}
+                          sx={{
+                            p: 1.5,
+                            borderRadius: "18px",
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid #E2E8F0",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            cursor: "pointer",
+                            transition: "all 140ms ease",
+                            "&:hover": {
+                              borderColor: "#4F46E5",
+                              transform: "translateY(-1px)",
+                              boxShadow: "0 6px 16px rgba(79,70,229,0.08)",
+                            },
+                          }}
+                        >
+                          <Stack direction="row" alignItems="center" spacing={1.5}>
+                            <Avatar
+                              src={m.image}
+                              variant="rounded"
+                              sx={{ width: 56, height: 56, borderRadius: "12px" }}
+                            />
+                            <Box>
+                              <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A" }}>
+                                {m.name}
+                              </Typography>
+                              <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>
+                                {m.id} • Owner: {m.owner} • Pincode: {m.pincode}
+                              </Typography>
+                              <Typography sx={{ fontSize: 11, color: "#94A3B8" }}>
+                                {m.mobile}
+                              </Typography>
+                            </Box>
+                          </Stack>
+
+                          <Stack alignItems="flex-end" spacing={0.5}>
+                            <Chip
+                              label={m.status}
+                              size="small"
+                              sx={{
+                                height: 20,
+                                fontSize: 10,
+                                fontWeight: 900,
+                                bgcolor: m.status === "Active" ? "#ECFDF5" : "#FEF2F2",
+                                color: m.status === "Active" ? "#059669" : "#DC2626",
+                              }}
+                            />
+                            <Chip
+                              label={m.type}
+                              size="small"
+                              sx={{
+                                height: 20,
+                                fontSize: 10,
+                                fontWeight: 800,
+                                bgcolor: m.type === "TriZone" ? "#FFFBEB" : "#EEF2FF",
+                                color: m.type === "TriZone" ? "#D97706" : "#4F46E5",
+                              }}
+                            />
+                          </Stack>
+                        </Paper>
+                      ))}
+                    </Stack>
+                  </Box>
+                </motion.div>
+              )}
+
+              {/* =========================================================================
+                  TAB 3: DIGITAL EDUCATION & LAYER PROGRESSION ENGINE (tri-academy)
+              ========================================================================= */}
+              {activeTab === "packages" && (
+                <motion.div
+                  key="packages"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <Box sx={{ maxWidth: { xs: 680, md: "100%" }, mx: "auto" }}>
+                    <Box sx={{ mb: 2.5 }}>
+                      <Typography sx={{ fontSize: 18, fontWeight: 950, color: "#0F172A" }}>
+                        Digital Education Packages & 10-Layer Engine
+                      </Typography>
+                      <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 700 }}>
+                        Live package sales, rank upgrades, and Midnight 11:59 PM Royalty Qualifiers on trieducation.in
+                      </Typography>
+                    </Box>
+
+                    {/* 3 Executive Programme Tracks */}
+                    <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
+                      <Grid item xs={12} sm={4}>
+                        <Paper
+                          elevation={0}
+                          sx={{
+                            p: 2,
+                            borderRadius: "18px",
+                            bgcolor: "#FFFFFF",
+                            border: "1.5px solid #C7D2FE",
+                          }}
+                        >
+                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Chip label="Track 1 • ₹2,000" size="small" sx={{ fontWeight: 900, bgcolor: "#EEF2FF", color: "#4F46E5" }} />
+                            <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#10B981" }}>
+                              0 Hold Payout
+                            </Typography>
+                          </Stack>
+                          <Typography sx={{ fontSize: 15, fontWeight: 900, color: "#0F172A", mt: 1.5 }}>
+                            Foundation: e-Edu Agent
+                          </Typography>
+                          <Typography sx={{ fontSize: 11.5, color: "#64748B", fontWeight: 700, mb: 1.5 }}>
+                            ₹750 Prime + ₹1,000 SPP Box + ₹250 LMS Rank 1
+                          </Typography>
+                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>
+                              Total Sold in Territory:
+                            </Typography>
+                            <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#4F46E5" }}>
+                              {eduPackageStats.totalStarterSold}
+                            </Typography>
+                          </Stack>
+                        </Paper>
+                      </Grid>
+
+                      <Grid item xs={12} sm={4}>
+                        <Paper
+                          elevation={0}
+                          sx={{
+                            p: 2,
+                            borderRadius: "18px",
+                            bgcolor: "#FFFFFF",
+                            border: "1.5px solid #BAE6FD",
+                          }}
+                        >
+                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Chip label="Track 2 • ₹8,000" size="small" sx={{ fontWeight: 900, bgcolor: "#F0F9FF", color: "#0284C7" }} />
+                            <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#10B981" }}>
+                              0 Hold Payout
+                            </Typography>
+                          </Stack>
+                          <Typography sx={{ fontSize: 15, fontWeight: 900, color: "#0F172A", mt: 1.5 }}>
+                            Super Agent Leadership
+                          </Typography>
+                          <Typography sx={{ fontSize: 11.5, color: "#64748B", fontWeight: 700, mb: 1.5 }}>
+                            Part 1 (₹4.75k: Ranks 2–5) + Part 2 (₹3.25k: Ranks 6–7)
+                          </Typography>
+                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>
+                              Total Sold in Territory:
+                            </Typography>
+                            <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#0284C7" }}>
+                              {eduPackageStats.totalSuperAgentSold}
+                            </Typography>
+                          </Stack>
+                        </Paper>
+                      </Grid>
+
+                      <Grid item xs={12} sm={4}>
+                        <Paper
+                          elevation={0}
+                          sx={{
+                            p: 2,
+                            borderRadius: "18px",
+                            bgcolor: "#FFFFFF",
+                            border: "1.5px solid #FED7AA",
+                          }}
+                        >
+                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Chip label="Track 3 • ₹40,000" size="small" sx={{ fontWeight: 900, bgcolor: "#FFF7ED", color: "#EA580C" }} />
+                            <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#D97706" }}>
+                              11:59 PM Royalty
+                            </Typography>
+                          </Stack>
+                          <Typography sx={{ fontSize: 15, fontWeight: 900, color: "#0F172A", mt: 1.5 }}>
+                            Promoter & DAP Leadership
+                          </Typography>
+                          <Typography sx={{ fontSize: 11.5, color: "#64748B", fontWeight: 700, mb: 1.5 }}>
+                            Tranche 1 (₹5k: L8) + Tranche 2 (₹10k: L9) + Tranche 3 (₹25k: L10)
+                          </Typography>
+                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>
+                              Total Sold in Territory:
+                            </Typography>
+                            <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#EA580C" }}>
+                              {eduPackageStats.totalPromotersSold}
+                            </Typography>
+                          </Stack>
+                        </Paper>
+                      </Grid>
+                    </Grid>
+
+                    {/* 10-LAYER PROGRESSION MATRIX */}
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2.5,
+                        borderRadius: "20px",
+                        bgcolor: "#FFFFFF",
+                        border: "1px solid #E2E8F0",
+                        mb: 2.5,
+                      }}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                        <Box>
+                          <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#0F172A" }}>
+                            10-Layer Network Progression Funnel
+                          </Typography>
+                          <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 700 }}>
+                            Active members upgraded and certified per layer
+                          </Typography>
+                        </Box>
+                        <Chip
+                          label="Dynamic Admin Distributed"
+                          size="small"
+                          sx={{ fontSize: 11, fontWeight: 900, bgcolor: "#EEF2FF", color: "#4F46E5" }}
+                        />
+                      </Stack>
+
+                      <Stack spacing={1.5}>
+                        {eduPackageStats.layerBreakdown.map((layer, idx) => (
+                          <Box key={idx}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                              <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A" }}>
+                                {layer.layer} • <span style={{ fontSize: 11.5, color: "#64748B", fontWeight: 700 }}>{layer.track}</span>
+                              </Typography>
+                              <Typography sx={{ fontSize: 13.5, fontWeight: 950, color: "#0F172A" }}>
+                                {layer.count} members
+                              </Typography>
+                            </Stack>
+                            <LinearProgress
+                              variant="determinate"
+                              value={layer.pct}
+                              sx={{
+                                height: 7,
+                                borderRadius: 3.5,
+                                bgcolor: "#F1F5F9",
+                                "& .MuiLinearProgress-bar": { bgcolor: layer.color, borderRadius: 3.5 },
+                              }}
+                            />
+                          </Box>
+                        ))}
+                      </Stack>
+                    </Paper>
+
+                    {/* MIDNIGHT 11:59 PM ROYALTY QUALIFIERS (≥₹50,000 Volume) */}
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2.5,
+                        borderRadius: "20px",
+                        bgcolor: "#FFFFFF",
+                        border: "1px solid #E2E8F0",
+                      }}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                        <Box>
+                          <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#0F172A" }}>
+                            District Royalty Qualifiers (≥₹50,000 Volume)
+                          </Typography>
+                          <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 700 }}>
+                            Receiving Daily 11:59 PM District Royalty Turnover Distributions
+                          </Typography>
+                        </Box>
+                        <Chip
+                          label={`${eduPackageStats.royaltyPromotersCount} Qualified Promoters`}
+                          size="small"
+                          sx={{ fontWeight: 900, bgcolor: "#FEF3C7", color: "#B45309" }}
+                        />
+                      </Stack>
+
+                      <TableContainer>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell sx={{ fontWeight: 800, color: "#64748B" }}>Promoter Name</TableCell>
+                              <TableCell sx={{ fontWeight: 800, color: "#64748B" }}>Pincode</TableCell>
+                              <TableCell sx={{ fontWeight: 800, color: "#64748B" }}>Rank Tier</TableCell>
+                              <TableCell sx={{ fontWeight: 800, color: "#64748B" }}>Package Volume</TableCell>
+                              <TableCell sx={{ fontWeight: 800, color: "#64748B" }} align="right">Daily Royalty</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {eduPackageStats.promoterQualifiers.map((p) => (
+                              <TableRow key={p.id}>
+                                <TableCell sx={{ fontWeight: 800, color: "#0F172A" }}>
+                                  {p.name} <Typography component="span" sx={{ fontSize: 11, color: "#94A3B8" }}>({p.mobile})</Typography>
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 700 }}>{p.pincode}</TableCell>
+                                <TableCell>
+                                  <Chip label={p.rank} size="small" sx={{ fontWeight: 900, fontSize: 10.5, bgcolor: "#EEF2FF", color: "#4F46E5" }} />
+                                </TableCell>
+                                <TableCell sx={{ fontWeight: 800, color: "#059669" }}>{p.volume}</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 950, color: "#D97706" }}>{p.dailyRoyalty}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </Paper>
+                  </Box>
+                </motion.div>
+              )}
+
+              {/* =========================================================================
+                  TAB 4: MASTER WALLET & EARNINGS
+              ========================================================================= */}
+              {activeTab === "wallet" && (
+                <motion.div
+                  key="wallet"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <Box sx={{ maxWidth: 680, mx: "auto" }}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: { xs: 2.5, sm: 3 },
+                        borderRadius: "24px",
+                        background: "linear-gradient(135deg, #312E81 0%, #4338CA 40%, #7C3AED 100%)",
+                        color: "#FFFFFF",
+                        boxShadow: "0 14px 34px -8px rgba(79, 70, 229, 0.45)",
+                        mb: 2,
+                      }}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                        <Box>
+                          <Typography sx={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.8)", letterSpacing: "0.4px" }}>
+                            AVAILABLE MASTER BALANCE
+                          </Typography>
+                          <Typography sx={{ fontSize: 34, fontWeight: 950, my: 0.5 }}>
+                            ₹{wallet.balance}
+                          </Typography>
+                          <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
+                            <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.9)", fontWeight: 700 }}>
+                              Main Wallet (75%): ₹{wallet.main_wallet}
+                            </Typography>
+                            <Typography sx={{ fontSize: 12, color: "#FDE68A", fontWeight: 800 }}>
+                              Self Account Pocket (25%): ₹{wallet.self_account_pocket}
+                            </Typography>
+                          </Stack>
+                        </Box>
+                        <VisibilityRoundedIcon sx={{ color: "rgba(255,255,255,0.8)" }} />
+                      </Stack>
+
+                      <Stack direction="row" spacing={1.2} sx={{ mt: 2.5 }}>
+                        <Button
+                          variant="contained"
+                          startIcon={<AddRoundedIcon sx={{ fontSize: 16 }} />}
+                          onClick={() => navigate("/agency/franchise-wallet")}
+                          sx={{
+                            flex: 1,
+                            py: 0.8,
+                            borderRadius: "12px",
+                            fontWeight: 800,
+                            fontSize: 11.5,
+                            textTransform: "none",
+                            background: "linear-gradient(135deg, #EA580C 0%, #F97316 100%)",
+                            color: "#FFFFFF",
+                          }}
+                        >
+                          Add Money
+                        </Button>
+                        <Button
+                          variant="contained"
+                          startIcon={<SendRoundedIcon sx={{ fontSize: 15 }} />}
+                          onClick={() => navigate("/agency/franchise-wallet")}
+                          sx={{
+                            flex: 1,
+                            py: 0.8,
+                            borderRadius: "12px",
+                            fontWeight: 800,
+                            fontSize: 11.5,
+                            textTransform: "none",
+                            bgcolor: "rgba(255,255,255,0.2)",
+                            backdropFilter: "blur(8px)",
+                            border: "1px solid rgba(255,255,255,0.3)",
+                            color: "#FFFFFF",
+                          }}
+                        >
+                          Send
+                        </Button>
+                        <Button
+                          variant="contained"
+                          startIcon={<SouthEastRoundedIcon sx={{ fontSize: 15 }} />}
+                          onClick={() => navigate("/agency/withdrawals")}
+                          sx={{
+                            flex: 1,
+                            py: 0.8,
+                            borderRadius: "12px",
+                            fontWeight: 800,
+                            fontSize: 11.5,
+                            textTransform: "none",
+                            bgcolor: "rgba(255,255,255,0.2)",
+                            backdropFilter: "blur(8px)",
+                            border: "1px solid rgba(255,255,255,0.3)",
+                            color: "#FFFFFF",
+                          }}
+                        >
+                          Withdraw (0 Hold)
+                        </Button>
+                      </Stack>
+                    </Paper>
+
+                    <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
+                      {[
+                        { title: "Total Received", val: `₹${wallet.total_received}` },
+                        { title: "Total Spent", val: `₹${wallet.total_spent}` },
+                        { title: "Today's Earnings", val: `₹${wallet.today}` },
+                      ].map((st, idx) => (
+                        <Grid item xs={4} key={idx}>
+                          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: "14px", textAlign: "center", bgcolor: "#FFFFFF" }}>
+                            <Typography sx={{ fontSize: 10.5, color: "#64748B", fontWeight: 700 }}>
+                              {st.title}
+                            </Typography>
+                            <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A", mt: 0.25 }}>
+                              {st.val}
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                      ))}
+                    </Grid>
+
+                    <Paper elevation={0} sx={{ borderRadius: "20px", border: "1px solid #E2E8F0", overflow: "hidden", bgcolor: "#FFFFFF" }}>
+                      {[
+                        { title: "Transaction History", icon: <ReceiptLongRoundedIcon sx={{ color: "#4F46E5" }} />, path: "/agency/transactions" },
+                        { title: "Bank Accounts & KYC", icon: <AccountBalanceWalletRoundedIcon sx={{ color: "#0284C7" }} />, path: "/agency/profile" },
+                        { title: "Wallet Statement", icon: <AssessmentRoundedIcon sx={{ color: "#10B981" }} />, path: "/agency/monthly-report" },
+                        { title: "Payout Settings", icon: <SettingsOutlinedIcon sx={{ color: "#8B5CF6" }} />, path: "/agency/profile" },
+                        { title: "Help & Support", icon: <HelpOutlineRoundedIcon sx={{ color: "#F59E0B" }} />, path: "/agency/support" },
+                      ].map((item, idx, arr) => (
+                        <React.Fragment key={idx}>
+                          <Stack
+                            direction="row"
+                            justifyContent="space-between"
+                            alignItems="center"
+                            onClick={() => navigate(item.path)}
+                            sx={{
+                              p: 2,
+                              cursor: "pointer",
+                              "&:hover": { bgcolor: "#F8FAFC" },
+                            }}
+                          >
+                            <Stack direction="row" alignItems="center" spacing={1.5}>
+                              <Box sx={{ width: 36, height: 36, borderRadius: "10px", bgcolor: "#F8FAFC", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                {item.icon}
+                              </Box>
+                              <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: "#0F172A" }}>
+                                {item.title}
+                              </Typography>
+                            </Stack>
+                            <ChevronRightRoundedIcon sx={{ color: "#94A3B8", fontSize: 20 }} />
+                          </Stack>
+                          {idx < arr.length - 1 && <Divider />}
+                        </React.Fragment>
+                      ))}
+                    </Paper>
+                  </Box>
+                </motion.div>
+              )}
+
+              {/* =========================================================================
+                  TAB 5: TRANSACTION LEDGER
+              ========================================================================= */}
+              {activeTab === "ledger" && (
+                <motion.div
+                  key="ledger"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <Box sx={{ maxWidth: 680, mx: "auto" }}>
+                    <Typography sx={{ fontSize: 18, fontWeight: 950, color: "#0F172A", mb: 2 }}>
+                      Live Territory Transaction Ledger
+                    </Typography>
+
+                    <Stack spacing={1.5}>
+                      {transactionsList.map((t) => (
+                        <Paper
+                          key={t.id}
+                          elevation={0}
+                          sx={{
+                            p: 2,
+                            borderRadius: "16px",
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid #E2E8F0",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <Stack direction="row" alignItems="center" spacing={1.5}>
+                            <Box
+                              sx={{
+                                width: 42,
+                                height: 42,
+                                borderRadius: "12px",
+                                bgcolor: t.badgeBg,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              {t.icon}
+                            </Box>
+                            <Box>
+                              <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: "#0F172A" }}>
+                                {t.title}
+                              </Typography>
+                              <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>
+                                {t.date} • {t.category}
+                              </Typography>
+                            </Box>
+                          </Stack>
+
+                          <Typography
+                            sx={{
+                              fontSize: 15,
+                              fontWeight: 950,
+                              color: t.amount > 0 ? "#059669" : "#DC2626",
+                            }}
+                          >
+                            {t.amount > 0 ? `+₹${t.amount.toFixed(2)}` : `-₹${Math.abs(t.amount).toFixed(2)}`}
+                          </Typography>
+                        </Paper>
+                      ))}
+                    </Stack>
+                  </Box>
+                </motion.div>
+              )}
+
+              {/* =========================================================================
+                  TAB 6: TERRITORY COMMAND & 7-TIER HIERARCHY
+              ========================================================================= */}
+              {activeTab === "hierarchy" && (
+                <motion.div
+                  key="hierarchy"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <Box sx={{ maxWidth: 680, mx: "auto" }}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2.5,
+                        borderRadius: "20px",
+                        bgcolor: "#FFFFFF",
+                        border: "1.5px solid #C7D2FE",
+                        boxShadow: "0 4px 16px rgba(79, 70, 229, 0.08)",
+                        mb: 2.5,
+                      }}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                        <Box>
+                          <Typography sx={{ fontSize: 17, fontWeight: 950, color: "#0F172A" }}>
+                            {isCoordinator ? "Multi-Pincode Coordinator Command" : "Pincode Agency Territory Hub"}
+                          </Typography>
+                          <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 700 }}>
+                            {userName} ({userCode})
+                          </Typography>
+                        </Box>
+                        <Chip
+                          label="ACTIVE JURISDICTION"
+                          size="small"
+                          sx={{
+                            bgcolor: "#4F46E5",
+                            color: "#FFFFFF",
+                            fontWeight: 900,
+                            fontSize: 10.5,
+                          }}
+                        />
+                      </Stack>
+
+                      <Divider sx={{ my: 1.5 }} />
+
+                      <Grid container spacing={1.5}>
+                        <Grid item xs={4}>
+                          <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>
+                            State
+                          </Typography>
+                          <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>
+                            {selectedState}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={4}>
+                          <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>
+                            District
+                          </Typography>
+                          <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>
+                            {selectedDistrict}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={4}>
+                          <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>
+                            Assigned Pincodes
+                          </Typography>
+                          <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#4F46E5" }}>
+                            {assignedPincodesList.length} Pincodes
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Paper>
+
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2.5,
+                        borderRadius: "20px",
+                        bgcolor: "#FFFFFF",
+                        border: "1px solid #E2E8F0",
+                      }}
+                    >
+                      <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#0F172A" }}>
+                        Agency Enterprise Hierarchy (7 Tiers)
+                      </Typography>
+                      <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600, mb: 2 }}>
+                        Standard operational territory allocation model
+                      </Typography>
+
+                      <Stack spacing={1.5}>
+                        {[
+                          { tier: "Tier 1", name: "State Coordinator", quota: "Multi-State Regional Zone", isMe: isStateAgency && isCoordinator },
+                          { tier: "Tier 2", name: "State Franchise", quota: "Full State (~31 Districts)", isMe: isStateAgency && !isCoordinator },
+                          { tier: "Tier 3", name: "District Coordinator", quota: "Multi-District Division", isMe: isDistrictAgency && isCoordinator },
+                          { tier: "Tier 4", name: "District Franchise", quota: "Single Full District (e.g. Bijapur)", isMe: isDistrictAgency && !isCoordinator },
+                          { tier: "Tier 5", name: "Pincode Coordinator", quota: "Cluster of 4–8 Pincodes", isMe: isCoordinator && !isDistrictAgency },
+                          { tier: "Tier 6", name: "Pincode Agency", quota: "Single Pincode (e.g. 560073)", isMe: !isCoordinator && !isDistrictAgency },
+                          { tier: "Tier 7", name: "Captain (Sub-Franchise)", quota: "Micro-Zone / Retail Cluster", isMe: false },
+                        ].map((item, idx) => (
+                          <Paper
+                            key={idx}
+                            variant="outlined"
+                            sx={{
+                              p: 1.5,
+                              borderRadius: "14px",
+                              bgcolor: item.isMe ? "#EEF2FF" : "#FFFFFF",
+                              borderColor: item.isMe ? "#818CF8" : "#E2E8F0",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                            }}
+                          >
+                            <Stack direction="row" alignItems="center" spacing={1.5}>
+                              <Chip
+                                label={item.tier}
+                                size="small"
+                                sx={{
+                                  bgcolor: item.isMe ? "#4F46E5" : "#F1F5F9",
+                                  color: item.isMe ? "#FFFFFF" : "#475569",
+                                  fontWeight: 900,
+                                  fontSize: 10.5,
+                                }}
+                              />
+                              <Box>
+                                <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A" }}>
+                                  {item.name}
+                                </Typography>
+                                <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>
+                                  Scope: {item.quota}
+                                </Typography>
+                              </Box>
+                            </Stack>
+                            {item.isMe && (
+                              <Chip label="YOU ARE HERE" size="small" sx={{ bgcolor: "#10B981", color: "#FFFFFF", fontWeight: 900, fontSize: 10 }} />
+                            )}
+                          </Paper>
+                        ))}
+                      </Stack>
+                    </Paper>
+                  </Box>
+                </motion.div>
+              )}
+            </>
+          )}
+        </AnimatePresence>
       </Container>
-      <MobileBottomNav activePath={location.pathname} onNavigate={navigate} />
+
+      {/* ── FILTER DRAWER (Screen 7 Mockup) ── */}
+      <Drawer
+        anchor="bottom"
+        open={filterDrawerOpen}
+        onClose={() => setFilterDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            borderTopLeftRadius: "24px",
+            borderTopRightRadius: "24px",
+            p: 3,
+            maxHeight: "85vh",
+            maxWidth: 600,
+            mx: "auto",
+          },
+        }}
+      >
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+          <Typography sx={{ fontSize: 18, fontWeight: 950, color: "#0F172A" }}>
+            Filter Territory Data
+          </Typography>
+          <IconButton size="small" onClick={() => setFilterDrawerOpen(false)}>
+            <CloseRoundedIcon />
+          </IconButton>
+        </Stack>
+
+        <Stack spacing={2.5}>
+          <Box>
+            <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A", mb: 1 }}>
+              Merchant Type
+            </Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap">
+              {["all", "b2c", "b2b", "trizone"].map((type) => (
+                <Chip
+                  key={type}
+                  label={type.toUpperCase()}
+                  onClick={() => setMerchantTypeFilter(type)}
+                  sx={{
+                    fontWeight: 800,
+                    bgcolor: merchantTypeFilter === type ? "#4F46E5" : "#F1F5F9",
+                    color: merchantTypeFilter === type ? "#FFFFFF" : "#475569",
+                  }}
+                />
+              ))}
+            </Stack>
+          </Box>
+
+          <Box>
+            <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A", mb: 1 }}>
+              Status
+            </Typography>
+            <Stack direction="row" spacing={1}>
+              {["all", "active", "inactive"].map((st) => (
+                <Chip
+                  key={st}
+                  label={st.toUpperCase()}
+                  onClick={() => setMerchantStatusFilter(st)}
+                  sx={{
+                    fontWeight: 800,
+                    bgcolor: merchantStatusFilter === st ? "#4F46E5" : "#F1F5F9",
+                    color: merchantStatusFilter === st ? "#FFFFFF" : "#475569",
+                  }}
+                />
+              ))}
+            </Stack>
+          </Box>
+
+          <Button
+            variant="contained"
+            fullWidth
+            onClick={() => setFilterDrawerOpen(false)}
+            sx={{
+              py: 1.25,
+              borderRadius: "14px",
+              fontWeight: 900,
+              bgcolor: "#4F46E5",
+              mt: 2,
+            }}
+          >
+            Apply Filters
+          </Button>
+        </Stack>
+      </Drawer>
+
+      {/* ── ADD MERCHANT WIZARD (Screen 8 Mockup) ── */}
+      <Dialog
+        open={openAddMerchantModal}
+        onClose={() => setOpenAddMerchantModal(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: "20px", p: 1 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 950, fontSize: 18 }}>
+          + Add New Merchant (Step {merchantStep}/2)
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            {merchantStep === 1 ? (
+              <>
+                <TextField
+                  fullWidth
+                  label="Store Name"
+                  size="small"
+                  value={newMerchantData.storeName}
+                  onChange={(e) => setNewMerchantData({ ...newMerchantData, storeName: e.target.value })}
+                />
+                <TextField
+                  fullWidth
+                  label="Owner Name"
+                  size="small"
+                  value={newMerchantData.ownerName}
+                  onChange={(e) => setNewMerchantData({ ...newMerchantData, ownerName: e.target.value })}
+                />
+                <TextField
+                  fullWidth
+                  label="Phone Number"
+                  size="small"
+                  value={newMerchantData.mobile}
+                  onChange={(e) => setNewMerchantData({ ...newMerchantData, mobile: e.target.value })}
+                />
+              </>
+            ) : (
+              <>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Category</InputLabel>
+                  <Select
+                    label="Category"
+                    value={newMerchantData.category}
+                    onChange={(e) => setNewMerchantData({ ...newMerchantData, category: e.target.value })}
+                  >
+                    {TRIZONE_CATEGORIES.filter((c) => c.id !== "all").map((c) => (
+                      <MenuItem key={c.id} value={c.id}>
+                        {c.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Store Type</InputLabel>
+                  <Select
+                    label="Store Type"
+                    value={newMerchantData.type}
+                    onChange={(e) => setNewMerchantData({ ...newMerchantData, type: e.target.value })}
+                  >
+                    <MenuItem value="B2C">B2C Retail Outlet</MenuItem>
+                    <MenuItem value="B2B">B2B Wholesaler / Distributor</MenuItem>
+                    <MenuItem value="TriZone">TriZone Experience Hub</MenuItem>
+                  </Select>
+                </FormControl>
+                <TextField
+                  fullWidth
+                  label="Pincode"
+                  size="small"
+                  value={newMerchantData.pincode}
+                  onChange={(e) => setNewMerchantData({ ...newMerchantData, pincode: e.target.value })}
+                />
+                <TextField
+                  fullWidth
+                  label="Full Address"
+                  size="small"
+                  multiline
+                  rows={2}
+                  value={newMerchantData.address}
+                  onChange={(e) => setNewMerchantData({ ...newMerchantData, address: e.target.value })}
+                />
+              </>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          {merchantStep === 2 && (
+            <Button onClick={() => setMerchantStep(1)} sx={{ fontWeight: 800 }}>
+              Back
+            </Button>
+          )}
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (merchantStep === 1) {
+                if (!newMerchantData.storeName || !newMerchantData.mobile) {
+                  alert("Please provide store name and phone number.");
+                  return;
+                }
+                setMerchantStep(2);
+              } else {
+                alert(`Merchant ${newMerchantData.storeName} onboarded under Pincode ${newMerchantData.pincode}!`);
+                setOpenAddMerchantModal(false);
+                setNewMerchantData({ storeName: "", ownerName: "", mobile: "", address: "", category: "tri_basket", type: "B2C", pincode: userPincode });
+              }
+            }}
+            sx={{ bgcolor: "#4F46E5" }}
+          >
+            {merchantStep === 1 ? "Next Step >" : "Onboard Merchant"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── REGISTER CAPTAIN WIZARD (Screen 9 Mockup) ── */}
+      <Dialog
+        open={openAddCaptainModal}
+        onClose={() => setOpenAddCaptainModal(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: "20px", p: 1 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 950, fontSize: 18 }}>
+          + Register Captain / Field Partner
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <TextField
+              fullWidth
+              label="Captain Name"
+              size="small"
+              value={newCaptainData.name}
+              onChange={(e) => setNewCaptainData({ ...newCaptainData, name: e.target.value })}
+            />
+            <TextField
+              fullWidth
+              label="Mobile Number"
+              size="small"
+              value={newCaptainData.mobile}
+              onChange={(e) => setNewCaptainData({ ...newCaptainData, mobile: e.target.value })}
+            />
+            <TextField
+              fullWidth
+              label="Assigned Pincode"
+              size="small"
+              value={newCaptainData.pincode}
+              onChange={(e) => setNewCaptainData({ ...newCaptainData, pincode: e.target.value })}
+            />
+            <TextField
+              fullWidth
+              label="Locality / Micro-Zone"
+              size="small"
+              value={newCaptainData.locality}
+              onChange={(e) => setNewCaptainData({ ...newCaptainData, locality: e.target.value })}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setOpenAddCaptainModal(false)} sx={{ fontWeight: 800 }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (!newCaptainData.name || !newCaptainData.mobile) {
+                alert("Please provide Captain Name and Phone Number.");
+                return;
+              }
+              alert(`Captain ${newCaptainData.name} registered under Pincode ${newCaptainData.pincode}!`);
+              setOpenAddCaptainModal(false);
+              setNewCaptainData({ name: "", mobile: "", gender: "Male", pincode: userPincode, locality: "" });
+            }}
+            sx={{ bgcolor: "#4F46E5" }}
+          >
+            Register Captain
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── MOBILE BOTTOM NAVIGATION BAR (Enterprise 6-Module Hub) ── */}
+      <Paper
+        elevation={0}
+        sx={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1200,
+          display: { xs: "block", md: "none" },
+          px: 0.5,
+          pt: 0.5,
+          pb: "calc(0.5rem + env(safe-area-inset-bottom))",
+          bgcolor: "rgba(255,255,255,0.96)",
+          borderTop: "1px solid #E2E8F0",
+          backdropFilter: "blur(16px)",
+          boxShadow: "0 -8px 24px rgba(15,23,42,0.08)",
+        }}
+      >
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 0.25 }}>
+          {[
+            { label: "Overview", tab: "dashboard", icon: <InsightsRoundedIcon sx={{ fontSize: 18 }} /> },
+            { label: "Merchants", tab: "merchants", icon: <StoreRoundedIcon sx={{ fontSize: 18 }} /> },
+            { label: "e-Edu", tab: "packages", icon: <SchoolRoundedIcon sx={{ fontSize: 18 }} /> },
+            { label: "Wallet", tab: "wallet", icon: <AccountBalanceWalletRoundedIcon sx={{ fontSize: 18 }} /> },
+            { label: "Ledger", tab: "ledger", icon: <HistoryRoundedIcon sx={{ fontSize: 18 }} /> },
+            { label: "Territory", tab: "hierarchy", icon: <LocationOnRoundedIcon sx={{ fontSize: 18 }} /> },
+          ].map((item) => {
+            const active = activeTab === item.tab && !selectedMerchant;
+            return (
+              <Box
+                key={item.label}
+                component="button"
+                type="button"
+                onClick={() => {
+                  setActiveTab(item.tab);
+                  setSelectedMerchant(null);
+                }}
+                sx={{
+                  border: 0,
+                  borderRadius: "10px",
+                  py: 0.6,
+                  bgcolor: active ? "#EEF2FF" : "transparent",
+                  color: active ? "#4F46E5" : "#64748B",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 0.2,
+                  cursor: "pointer",
+                }}
+              >
+                {item.icon}
+                <Typography sx={{ fontSize: 9.5, fontWeight: active ? 900 : 700, whiteSpace: "nowrap" }}>
+                  {item.label}
+                </Typography>
+              </Box>
+            );
+          })}
+        </Box>
+      </Paper>
     </Box>
   );
 }

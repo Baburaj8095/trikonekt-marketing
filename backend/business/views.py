@@ -1263,15 +1263,34 @@ class PromoPurchasePayFromWalletView(APIView):
         if total <= 0:
             return Response({"detail": "Invalid payable amount."}, status=status.HTTP_400_BAD_REQUEST)
 
-        wallet_source = str(request.data.get("wallet_source") or request.data.get("walletSource") or "internal").strip().lower()
-        if wallet_source not in {"internal", "package_coupon", "package_upload", "add_money"}:
+        wallet_source = str(request.data.get("wallet_source") or request.data.get("walletSource") or "main").strip().lower()
+        if wallet_source not in {"main", "main_wallet", "internal", "package_coupon", "package_upload", "add_money"}:
             return Response({"detail": "Invalid wallet_source."}, status=status.HTTP_400_BAD_REQUEST)
         if wallet_source == "add_money":
             wallet_source = "package_upload"
 
         with transaction.atomic():
             w = Wallet.get_or_create_for_user(request.user)
-            if wallet_source == "package_coupon":
+            if wallet_source in {"main", "main_wallet"}:
+                main_acc = WalletEngine.get_account(request.user, WalletTypes.MAIN, lock=True)
+                available = D(str(main_acc.available_balance or 0)).quantize(D("0.01"))
+                if available < total:
+                    available = D(str(getattr(w, "balance", 0) or 0)).quantize(D("0.01"))
+                if available < total:
+                    return Response({"detail": "Insufficient Main Wallet balance."}, status=status.HTTP_400_BAD_REQUEST)
+
+                try:
+                    w.debit(
+                        total,
+                        tx_type="MAIN_WALLET_DEBIT",
+                        meta={"reason": "PROMO_PURCHASE", "package_id": getattr(pkg, "id", None), "wallet_source": "main"},
+                        source_type="PROMO_PURCHASE",
+                        source_id="",
+                    )
+                except Exception:
+                    pass
+            elif wallet_source == "package_coupon":
+
                 coupon_acc = WalletEngine.get_account(request.user, WalletTypes.PACKAGE_PURCHASE_COUPON, lock=True)
                 available = D(str(coupon_acc.available_balance or 0)).quantize(D("0.01"))
                 if available < total:

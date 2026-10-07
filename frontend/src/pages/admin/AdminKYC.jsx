@@ -204,7 +204,7 @@ export default function AdminKYC({ audience = "consumer" }) {
         ? [
             {
               field: "category",
-              headerName: "Franchise Level",
+              headerName: "Franchise Layer",
               minWidth: 190,
               renderCell: (params) => categoryLabel(params?.row?.category),
               valueGetter: (_, row) => categoryLabel(row?.category),
@@ -559,7 +559,7 @@ export default function AdminKYC({ audience = "consumer" }) {
           />
           {isFranchise ? (
             <Select
-              label="Franchise Level"
+              label="Franchise Layer"
               value={kycFilters.category}
               onChange={(v) => setKycF("category", v)}
               options={FRANCHISE_CATEGORY_OPTIONS}

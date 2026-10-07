@@ -122,14 +122,29 @@ export default function AdminFranchiseDashboard() {
             Separate operating view for State Coordinator, State, District Coordinator, District, Pincode Coordinator, and Pincode flows.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-          <TextField select size="small" label="Wallet scope" value={scope} onChange={(e) => setScope(e.target.value)} sx={{ minWidth: 210 }}>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+          <Box sx={{ display: "inline-flex", bgcolor: "#f1f5f9", p: "4px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+            <Button
+              component={Link}
+              to="/admin/dashboard"
+              size="small"
+              sx={{ textTransform: "none", fontWeight: 800, color: "#64748b", px: 1.5, py: 0.5, borderRadius: "8px" }}
+            >
+              👥 Community Admin
+            </Button>
+            <Button
+              size="small"
+              sx={{ textTransform: "none", fontWeight: 900, color: "#2563eb", bgcolor: "#ffffff", boxShadow: "0 2px 8px rgba(15,23,42,0.08)", px: 1.5, py: 0.5, borderRadius: "8px" }}
+            >
+              🏢 Franchise Admin
+            </Button>
+          </Box>
+          <TextField select size="small" label="Wallet scope" value={scope} onChange={(e) => setScope(e.target.value)} sx={{ minWidth: 200 }}>
             {FRANCHISE_CATEGORIES.map((cat) => (
               <MenuItem key={cat.key} value={cat.key}>{cat.label}</MenuItem>
             ))}
           </TextField>
-          <Button onClick={load} variant="outlined">Refresh</Button>
-          <Button component={Link} to="/admin/dashboard" variant="contained">Team Consumer Admin</Button>
+          <Button onClick={load} variant="outlined" size="small" sx={{ fontWeight: 800 }}>Refresh</Button>
         </Stack>
       </Stack>
 

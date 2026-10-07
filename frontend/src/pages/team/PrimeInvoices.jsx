@@ -193,7 +193,7 @@ export default function PrimeInvoices() {
         throw new Error(parsed?.detail || "Failed to download invoice.");
       }
       const safeNo = String(row.invoice_number || row.id).replace(/[^\w.-]+/g, "_");
-      downloadBlob(blob, `Trikonekt_Invoice_${safeNo}.pdf`);
+      downloadBlob(blob, `asiyapp_Invoice_${safeNo}.pdf`);
     } catch (err) {
       const msg = await readBlobError(err);
       setError(msg || "Failed to download invoice.");

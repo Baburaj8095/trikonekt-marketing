@@ -1,4 +1,4 @@
-# Trikonekt MLM Ranks Module - Backend Views & Workflows
+# Asiyapp Commission Ranks Module - Backend Views & Workflows
 from __future__ import annotations
 
 from decimal import Decimal
@@ -138,9 +138,20 @@ class UpgradeInitiateView(APIView):
         if total_upgrade <= 0:
             return Response({"detail": "Invalid computed upgrade amount for target rank"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Calculate taxes
+        # Calculate taxes dynamically from CommissionConfig (custom_module_tax['tax_rank']) or tax_percent fallback
         upgrade_amount = total_upgrade
-        gst_amount = q2(upgrade_amount * GST_RATE)
+        try:
+            from business.models import CommissionConfig
+            cfg = CommissionConfig.get_solo()
+            master_json = getattr(cfg, "master_commission_json", {}) or {}
+            custom_tax = master_json.get("custom_module_tax", {}) or {}
+            tax_rate_val = custom_tax.get("tax_rank")
+            if tax_rate_val is None:
+                tax_rate_val = cfg.get_tax_percent() or "18.00"
+            tax_pct = Decimal(str(tax_rate_val)) / Decimal("100.00")
+        except Exception:
+            tax_pct = GST_RATE
+        gst_amount = q2(upgrade_amount * tax_pct)
         net_amount = q2(upgrade_amount - gst_amount)
 
         upg = RankUpgrade.objects.create(
@@ -364,13 +375,58 @@ class UpgradePayFromWalletView(APIView):
 
         w = Wallet.get_or_create_for_user(request.user)
 
-        wallet_source = str(request.data.get("wallet_source") or request.data.get("walletSource") or "package_upload").strip().lower()
-        if wallet_source not in {"internal", "package_coupon", "package_upload", "add_money"}:
+        wallet_source = str(request.data.get("wallet_source") or request.data.get("walletSource") or "main").strip().lower()
+        if wallet_source not in {"main", "main_wallet", "internal", "package_coupon", "package_upload", "add_money"}:
             return Response({"detail": "Invalid wallet_source."}, status=status.HTTP_400_BAD_REQUEST)
         if wallet_source == "add_money":
             wallet_source = "package_upload"
 
-        if wallet_source == "package_coupon":
+        if wallet_source in {"main", "main_wallet"}:
+            if w.balance < amount:
+                return Response({"detail": f"Insufficient Main Wallet balance (₹{w.balance}). Required: ₹{amount}"}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                w.debit(
+                    amount,
+                    tx_type="RANK_UPGRADE_DEBIT",
+                    meta={"reason": "RANK_UPGRADE", "upgrade_id": upg.id, "wallet_source": "main"},
+                    source_type="RANK_UPGRADE",
+                    source_id=str(upg.id),
+                )
+                tx = WalletTransaction.objects.filter(
+                    user=request.user,
+                    source_type="RANK_UPGRADE",
+                    source_id=str(upg.id)
+                ).order_by("-id").first()
+                if tx:
+                    try:
+                        from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
+                        from accounts.wallet_engine import WalletEngine, LedgerPosting
+                        
+                        system_user = WalletEngine.get_system_user()
+                        WalletEngine.post_transaction(
+                            category=FinanceCategories.PACKAGE_PURCHASE,
+                            user=request.user,
+                            source_module="RANK_UPGRADE",
+                            source_id=str(upg.id),
+                            destination_module=WalletTypes.SYSTEM,
+                            gross_amount=amount,
+                            net_amount=amount,
+                            idempotency_key=f"rank_upgrade_main_debit:{upg.id}",
+                            legacy_wallet_transaction=tx,
+                            created_by=request.user,
+                            approved_by=request.user,
+                            remarks="Rank upgrade debit from main wallet",
+                            metadata={"upgrade_id": upg.id, "wallet_source": "main"},
+                            postings=[
+                                LedgerPosting(request.user, WalletTypes.MAIN, LedgerDirections.DEBIT, amount, metadata={"upgrade_id": upg.id}),
+                                LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.CREDIT, amount, metadata={"counterparty_user_id": request.user.id}),
+                            ],
+                        )
+                    except Exception:
+                        pass
+            except Exception as e:
+                return Response({"detail": str(e) or "Failed to debit Main Wallet."}, status=status.HTTP_400_BAD_REQUEST)
+        elif wallet_source == "package_coupon":
             credit = WalletTransaction.objects.filter(
                 user=request.user,
                 type__in=["PACKAGE_COUPON_WALLET_CREDIT", "VOUCHER_REDEEM_CREDIT"],
@@ -639,6 +695,7 @@ class RankMatrixSubtreeView(APIView):
                 RankMatrixNode.objects
                 .select_related("placed_user")
                 .filter(root_user_id=root_user_id, parent_user_id=parent_user_id)
+                .exclude(placed_user_id=root_user_id)
                 .order_by("position", "id")
             )
         except Exception:
@@ -816,6 +873,7 @@ class RankMatrixBFSView(APIView):
                 rows = list(
                     RankMatrixNode.objects.select_related("placed_user")
                     .filter(root_user_id=root_user_id, parent_user_id__in=frontier)
+                    .exclude(placed_user_id=root_user_id)
                     .order_by("parent_user_id", "position", "id")
                 )
             except Exception:

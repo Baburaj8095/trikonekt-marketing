@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   AppBar,
@@ -963,7 +963,7 @@ export default function EmployeeDashboard({ embedded = false }) {
 
       <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff", mt: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>Prime Packages</Typography>
-        <Typography variant="body2" color="text.secondary">Join Trikonekt Prime packages to unlock exclusive benefits.</Typography>
+        <Typography variant="body2" color="text.secondary">Join Asiyapp Prime packages to unlock exclusive benefits.</Typography>
         <Button sx={{ mt: 1 }} variant="contained" onClick={() => navigate("/employee/join-prime")}>
           Explore Packages
         </Button>
@@ -977,7 +977,7 @@ export default function EmployeeDashboard({ embedded = false }) {
             <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>Employment Offer Letter</Typography>
               <Typography variant="body2" sx={{ color: "text.secondary", mb: 1 }}>
-                Download your dynamic offer letter with Trikonekt branding.
+                Download your dynamic offer letter with Asiyapp branding.
               </Typography>
               <Button variant="contained" onClick={downloadOfferLetter} disabled={offerBusy}>
                 {offerBusy ? "Preparing..." : "Download PDF"}
@@ -1433,7 +1433,7 @@ export default function EmployeeDashboard({ embedded = false }) {
           </IconButton>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Box component="img" src={LOGO} alt="Trikonekt" sx={{ height: 36 }} />
+            <Box component="img" src={LOGO} alt="asiyapp" sx={{ height: 36, borderRadius: 1 }} />
             <Typography variant="h6" sx={{ fontWeight: 700 }}></Typography>
           </Box>
 
@@ -1551,7 +1551,7 @@ export default function EmployeeDashboard({ embedded = false }) {
 
               <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff", mt: 2 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>Prime Packages</Typography>
-                <Typography variant="body2" color="text.secondary">Join Trikonekt Prime packages to unlock exclusive benefits.</Typography>
+                <Typography variant="body2" color="text.secondary">Join Asiyapp Prime packages to unlock exclusive benefits.</Typography>
                 <Button sx={{ mt: 1 }} variant="contained" onClick={() => navigate("/employee/join-prime")}>
                   Explore Packages
                 </Button>
@@ -1560,7 +1560,7 @@ export default function EmployeeDashboard({ embedded = false }) {
               <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff", mt: 2 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>Employment Offer Letter</Typography>
                 <Typography variant="body2" sx={{ color: "text.secondary", mb: 1 }}>
-                  Download your dynamic offer letter with Trikonekt branding.
+                  Download your dynamic offer letter with Asiyapp branding.
                 </Typography>
                 <Button variant="contained" onClick={downloadOfferLetter} disabled={offerBusy}>
                   {offerBusy ? "Preparing..." : "Download PDF"}
@@ -1606,7 +1606,7 @@ export default function EmployeeDashboard({ embedded = false }) {
                   <Paper elevation={3} sx={{ p: { xs: 2, md: 3 }, borderRadius: 3, backgroundColor: "#ffffff" }}>
                     <Typography variant="h6" sx={{ fontWeight: 700, color: "#0C2D48", mb: 1 }}>Employment Offer Letter</Typography>
                     <Typography variant="body2" sx={{ color: "text.secondary", mb: 1 }}>
-                      Download your dynamic offer letter with Trikonekt branding.
+                      Download your dynamic offer letter with Asiyapp branding.
                     </Typography>
                     <Button variant="contained" onClick={downloadOfferLetter} disabled={offerBusy}>
                       {offerBusy ? "Preparing..." : "Download PDF"}

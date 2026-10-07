@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { Box, Container, Typography } from "@mui/material";
 import PublicNavbar from "../components/PublicNavbar";
 import Footer from "../components/Footer";
@@ -10,12 +10,12 @@ export default function AboutPage() {
 
       <Container sx={{ py: { xs: 5, md: 8 }, flex: 1 }}>
         <Typography fontSize={{ xs: 28, md: 36 }} fontWeight={800} color="#0C2D48" mb={2}>
-          About Trikonekt
+          About Asiyapp
         </Typography>
 
         <Typography color="text.secondary" maxWidth={800}>
-          Trikonekt is a smart digital platform built to connect people, businesses, and
-          opportunities into one powerful network. Through our Connect â†’ Earn â†’ Grow model,
+          Asiyapp is a smart digital platform built to connect people, businesses, and
+          opportunities into one powerful network. Through our Connect → Earn → Grow model,
           everyday spending and interactions are transformed into meaningful income and
           long‑term growth.
         </Typography>

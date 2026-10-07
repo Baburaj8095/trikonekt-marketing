@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
+  Grid,
   Paper,
   Typography,
   LinearProgress,
@@ -40,6 +41,9 @@ import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
+import PremiumScreenHeader from "../components/common/PremiumScreenHeader";
+import BottomNav from "../components/common/BottomNav";
 
 /** ---------- helpers ---------- */
 function fmtAmount(value) {
@@ -76,9 +80,10 @@ function humanizeType(t) {
     DIRECT_REF_BONUS: "Direct Referral Bonus",
     AUTOPOOL_BONUS_FIVE: "Autopool Bonus",
     AUTOPOOL_BONUS_THREE: "Autopool Bonus",
-    INCOME_CREDIT_75: "Income Credited",
-    SELF_ACCOUNT_CREDIT: "Self Account Saved",
+    INCOME_CREDIT_75: "Main Wallet Income",
+    SELF_ACCOUNT_CREDIT: "Self Account Credit",
     SELF_ACCOUNT_DEBIT: "Self Account Allocation (₹250)",
+    TAX_POOL_CREDIT: "Tax / Admin Pool Credit",
     AUTO_ECOUPON_ISSUED: "E-Coupon Issued",
     AUTO_PURCHASE_DEBIT: "E-Coupon Issued",
   };
@@ -131,16 +136,24 @@ function describeSource(tx = {}) {
     return "Reward Points Earned";
   }
 
-  // Rank upgrade commissions (override labels)
+  // Self Rebirth 250 source
+  if (st === "SELF_REBIRTH_250" || src.includes("REBIRTH_250") || meta.auto_rule === "SELF_REBIRTH_250") {
+    if (type === "TAX_POOL_CREDIT") return "Self Rebirth - Franchise / Tax Share";
+    if (ot === "DIRECT_REF_BONUS" || type === "DIRECT_REF_BONUS") return "Self Rebirth - Direct Sponsor Bonus";
+    if (src.startsWith("FIVE_MATRIX") || ot === "AUTOPOOL_BONUS_FIVE") return "5 Blocks";
+    if (src.startsWith("THREE_MATRIX") || ot === "AUTOPOOL_BONUS_THREE") return "3 Blocks";
+  }
+
+  // Rank upgrade commissions (override labels to e-Edu)
   const isRankUpgrade = st === "RANK_UPGRADE" || String(meta.kind || "").toUpperCase().startsWith("RANK_UPGRADE_");
   if (isRankUpgrade) {
     const orig = String(meta.orig_type || type || "").toUpperCase();
     if (orig === "DIRECT_REF_BONUS" || type === "DIRECT_REF_BONUS") {
-      return "Digital Education Referral Bonus";
+      return "e-Edu Referral Bonus";
     }
     if (orig === "LEVEL_BONUS" || type === "LEVEL_BONUS") {
       const lvl = Number(meta.level ?? meta.level_index);
-      return Number.isFinite(lvl) && lvl > 0 ? `Rank Layer ${lvl} Bonus` : "Rank Layer Bonus";
+      return Number.isFinite(lvl) && lvl > 0 ? `e-Edu Layer ${lvl} Bonus` : "e-Edu Layer Bonus";
     }
   }
 
@@ -155,20 +168,36 @@ function describeSource(tx = {}) {
   if (ot === "PRIME_750_SELF" || src === "PRIME_750_SELF" || type === "PRIME_750_SELF") return "Join Subscription (₹1,000)";
   if (ot === "PRIME_759_SELF" || src === "PRIME_759_SELF" || type === "PRIME_759_SELF") return "Prime 1000 Self Activation";
 
-  // Monthly 759 flows
-  if (st === "MONTHLY_759" || src === "MONTHLY_759" || src.includes("759")) {
-    if (src.startsWith("FIVE_MATRIX")) return "5 Blocks 1000 Prime";
-    return "SPP 1000";
+  // Blocks autopool bonuses
+  if (src.startsWith("THREE_MATRIX") || ot === "AUTOPOOL_BONUS_THREE") {
+    return "3 Blocks";
+  }
+  if (src.startsWith("FIVE_MATRIX") || ot === "AUTOPOOL_BONUS_FIVE") {
+    return "5 Blocks";
   }
 
-  // Blocks autopool bonuses
-  if (src.startsWith("THREE_MATRIX")) {
-    const t = tier || (src.includes("150") ? 150 : src.includes("750") ? 750 : undefined);
-    return `3 Blocks ${t || ""} Prime`.trim();
-  }
-  if (src.startsWith("FIVE_MATRIX")) {
-    const t = tier || (src.includes("150") ? 150 : src.includes("750") ? 750 : src.includes("759") ? 759 : undefined);
-    return `5 Blocks ${t || ""} Prime`.trim();
+  // Monthly 759 / SPP 1000 flows
+  const isSpp = st === "MONTHLY_759" || src === "MONTHLY_759" || src.includes("759") || st.startsWith("MONTHLY_FIRST_SEASON") || ot.includes("MONTHLY_759");
+  if (isSpp) {
+    if (ot === "MONTHLY_759_DIRECT" || type === "MONTHLY_759_DIRECT") {
+      return "SPP Direct Referral Bonus";
+    }
+    if (ot === "MONTHLY_759_LEVEL" || type === "MONTHLY_759_LEVEL") {
+      const lvl = Number(meta.level_index ?? meta.level);
+      return Number.isFinite(lvl) && lvl > 0 ? `SPP Layer ${lvl} Bonus` : "SPP Layer Bonus";
+    }
+    if (ot === "AUTOPOOL_BONUS_FIVE" || src.startsWith("FIVE_MATRIX")) {
+      const lvl = Number(meta.level_index ?? meta.level);
+      return Number.isFinite(lvl) && lvl > 0 ? `5 Blocks Matrix - Layer ${lvl}` : "5 Blocks Matrix";
+    }
+    if (ot === "AUTOPOOL_BONUS_THREE" || src.startsWith("THREE_MATRIX")) {
+      const lvl = Number(meta.level_index ?? meta.level);
+      return Number.isFinite(lvl) && lvl > 0 ? `3 Blocks Matrix - Layer ${lvl}` : "3 Blocks Matrix";
+    }
+    if (ot === "MONTHLY_759_SELF") {
+      return "SPP Personal Cashback";
+    }
+    return "SPP Referral Commission";
   }
 
   // Main Wallet Specific Transactions
@@ -194,12 +223,16 @@ function describeSource(tx = {}) {
     return "Service / Transfer Charge";
   }
   if (type === "ADJUSTMENT_CREDIT") return "System Balance Adjustment";
-  if (type === "INCOME_CREDIT_75") {
+  if (type === "TAX_POOL_CREDIT") {
+    if (st === "ADMIN_SERVICE_CHARGE" || src.includes("SERVICE_CHARGE")) return "Admin Service Charge";
+    return "Tax / Admin Pool Credit";
+  }
+  if (type === "INCOME_CREDIT_75" || type === "SELF_ACCOUNT_CREDIT") {
     if (ot) {
       const parentLabel = describeSource({ ...tx, type: ot });
       return `${parentLabel}`;
     }
-    return "Income Credited";
+    return type === "SELF_ACCOUNT_CREDIT" ? "Self Account Credit" : "Income Credited";
   }
 
   // Prime direct/self
@@ -276,6 +309,57 @@ function groupByDay(items) {
   });
 }
 
+function groupByMonth(items) {
+  const map = new Map();
+  const order = [];
+
+  (items || []).forEach((it) => {
+    let key = "unknown";
+    let monthLabel = "Recent Activity";
+    if (it?.created_at) {
+      const d = new Date(it.created_at);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        key = `${year}-${month}`;
+        monthLabel = d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+      }
+    }
+    if (!map.has(key)) {
+      map.set(key, { label: monthLabel, rows: [], total: 0 });
+      order.push(key);
+    }
+    const entry = map.get(key);
+    entry.rows.push(it);
+    const amt = Number(it?.amount || 0);
+    if (amt > 0) {
+      entry.total += amt;
+    }
+  });
+
+  order.sort((a, b) => {
+    if (a === "unknown" && b === "unknown") return 0;
+    if (a === "unknown") return 1;
+    if (b === "unknown") return -1;
+    return a > b ? -1 : a < b ? 1 : 0;
+  });
+
+  return order.map((k) => {
+    const entry = map.get(k);
+    const sortedRows = (entry.rows || []).slice().sort((a, b) => {
+      const da = a?.created_at ? new Date(a.created_at).getTime() : 0;
+      const db = b?.created_at ? new Date(b.created_at).getTime() : 0;
+      return db - da;
+    });
+    return {
+      key: k,
+      title: entry.label,
+      total: entry.total,
+      rows: sortedRows,
+    };
+  });
+}
+
 /** ---------- UI atoms ---------- */
 function StatusChip({ tx }) {
   const pending =
@@ -326,11 +410,12 @@ function RowIcon({ value }) {
   return (
     <Avatar
       sx={{
-        width: 34,
-        height: 34,
-        // âœ… premium: neutral icon background, green only for amount/chip
-        bgcolor: isCredit ? "#F1F5F9" : "#FDECEC",
-        color: isCredit ? "#0C2D48" : "#B42318",
+        width: 38,
+        height: 38,
+        borderRadius: "50%",
+        bgcolor: isCredit ? "#ECFDF5" : "#FEF2F2",
+        color: isCredit ? "#059669" : "#DC2626",
+        border: isCredit ? "1.5px solid #A7F3D0" : "1.5px solid #FECACA",
       }}
       aria-label={isCredit ? "Credit" : "Debit"}
     >
@@ -340,28 +425,36 @@ function RowIcon({ value }) {
 }
 
 function MiniCard({ title, value, icon, color = "primary", onClick, selected }) {
+  const colorMap = {
+    primary: { border: "#BFDBFE", iconBg: "#EFF6FF", iconColor: "#1D4ED8" },
+    success: { border: "#BBF7D0", iconBg: "#ECFDF5", iconColor: "#059669" },
+    warning: { border: "#FDE68A", iconBg: "#FFFBEB", iconColor: "#D97706" },
+  };
+  const themeColors = colorMap[color] || colorMap.primary;
+
   return (
     <Paper
-      variant="outlined"
+      elevation={0}
       onClick={onClick}
       sx={{
-        minWidth: 150,
+        minWidth: 160,
         flexShrink: 0,
-        p: 1.2,
-        borderRadius: 2.2,
+        p: 1.4,
+        borderRadius: 2.5,
         borderColor: selected ? `${color}.main` : "#EEF2F6",
         borderWidth: selected ? 2 : 1,
+        borderStyle: "solid",
         cursor: onClick ? "pointer" : "default",
-        boxShadow: selected ? `0 4px 12px rgba(12, 45, 72, 0.12)` : "none",
+        boxShadow: selected ? "0 6px 18px rgba(12, 45, 72, 0.12)" : "0 1px 4px rgba(15, 23, 42, 0.03)",
         display: "flex",
         alignItems: "center",
-        gap: 1.1,
-        bgcolor: "#fff",
+        gap: 1.2,
+        bgcolor: "#FFFFFF",
         scrollSnapAlign: "start",
-        transition: "all 0.2s ease",
+        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
         "&:hover": onClick ? {
           borderColor: `${color}.main`,
-          boxShadow: "0 4px 12px rgba(12, 45, 72, 0.08)",
+          boxShadow: "0 6px 16px rgba(12, 45, 72, 0.08)",
           transform: "translateY(-1px)",
         } : {},
         "&:active": onClick ? {
@@ -371,19 +464,20 @@ function MiniCard({ title, value, icon, color = "primary", onClick, selected }) 
     >
       <Avatar
         sx={{
-          bgcolor: `${color}.light`,
-          color: `${color}.dark`,
-          width: 34,
-          height: 34,
+          bgcolor: themeColors.iconBg,
+          color: themeColors.iconColor,
+          width: 38,
+          height: 38,
+          borderRadius: 2,
         }}
       >
         {icon}
       </Avatar>
       <Box>
-        <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
+        <Typography variant="caption" sx={{ color: "#64748B", fontWeight: 800, fontSize: 11 }}>
           {title}
         </Typography>
-        <Typography variant="subtitle2" sx={{ fontWeight: 900, mt: 0.15 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 900, mt: 0.15, fontSize: 15, color: "#0F172A" }}>
           {value}
         </Typography>
       </Box>
@@ -391,20 +485,24 @@ function MiniCard({ title, value, icon, color = "primary", onClick, selected }) 
   );
 }
 
-function SectionHeader({ title }) {
+function SectionHeader({ title, total }) {
   return (
-    <Box sx={{ mt: 1.2, mb: 1 }}>
+    <Box sx={{ mt: 2, mb: 1.2, display: "flex", justifyContent: "space-between", alignItems: "center", px: 0.5 }}>
       <Typography
         sx={{
-          fontSize: 12,
-          fontWeight: 900,
-          color: "text.secondary",
-          letterSpacing: 0.6,
-          textTransform: "uppercase",
+          fontSize: 14,
+          fontWeight: 800,
+          color: "#0F172A",
+          letterSpacing: "0.2px",
         }}
       >
         {title}
       </Typography>
+      {Number(total) > 0 && (
+        <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#64748B" }}>
+          ₹ {fmtAmount(total)} ▾
+        </Typography>
+      )}
     </Box>
   );
 }
@@ -417,7 +515,17 @@ function classifyTransaction(tx) {
   const ot = String(meta.orig_type || "").toUpperCase();
   const trig = String(meta.trigger || "").toUpperCase();
 
-  // 1. LAYER & AUTOPOOL
+  // 1. SELF ACCOUNT / REPURCHASE POCKET
+  if (
+    type.startsWith("SELF_ACCOUNT") ||
+    meta.ledger === "SELF_ACCOUNT" ||
+    type === "SELF_ACCOUNT_CREDIT" ||
+    type === "SELF_ACCOUNT_DEBIT"
+  ) {
+    return "SELF_ACCOUNT";
+  }
+
+  // 2. LAYER & AUTOPOOL
   if (
     type === "LEVEL_BONUS" ||
     type === "AUTOPOOL_BONUS_FIVE" ||
@@ -440,7 +548,7 @@ function classifyTransaction(tx) {
     return "LAYER";
   }
 
-  // 2. DIRECT BONUS
+  // 3. DIRECT BONUS
   if (
     type === "DIRECT_REF_BONUS" ||
     type === "MONTHLY_759_DIRECT" ||
@@ -457,7 +565,7 @@ function classifyTransaction(tx) {
     return "DIRECT";
   }
 
-  // 3. P2P TRANSFERS
+  // 4. P2P TRANSFERS
   if (
     type === "P2P_PACKAGE_COUPON_SEND" ||
     type === "P2P_PACKAGE_COUPON_RECEIVE" ||
@@ -470,7 +578,7 @@ function classifyTransaction(tx) {
     return "P2P";
   }
 
-  // 4. ROYALTY BONUS
+  // 5. ROYALTY BONUS
   if (
     type === "GLOBAL_ROYALTY" ||
     type === "ROYALTY_BONUS" ||
@@ -481,7 +589,7 @@ function classifyTransaction(tx) {
     return "ROYALTY";
   }
 
-  // 5. MERCHANT, CAPTAIN & FRANCHISE
+  // 6. MERCHANT, CAPTAIN & FRANCHISE
   if (
     type === "FRANCHISE_INCOME" ||
     type === "CAPTAIN_INCOME" ||
@@ -495,7 +603,7 @@ function classifyTransaction(tx) {
     return "MERCHANT_CAPTAIN";
   }
 
-  // 6. WITHDRAWALS
+  // 7. WITHDRAWALS
   if (
     type === "WITHDRAWAL_DEBIT" ||
     type === "WITHDRAWABLE_CREDIT" ||
@@ -505,9 +613,8 @@ function classifyTransaction(tx) {
     return "WITHDRAWAL";
   }
 
-  // 7. REDEEM & POCKET / SELF ACCOUNT
+  // 8. REDEEM & COUPONS
   if (
-    type.startsWith("SELF_ACCOUNT") ||
     type.includes("ECOUPON") ||
     type.includes("VOUCHER") ||
     type === "REDEEM_ECOUPON_CREDIT" ||
@@ -522,7 +629,24 @@ function classifyTransaction(tx) {
 }
 
 function HistoryRow({ tx, onClick }) {
-  const amount = Number(tx?.amount || 0);
+  const rawAmount = Number(tx?.amount || 0);
+  const meta = tx?.meta || {};
+  const isP2pReceive = tx?.type === "P2P_PACKAGE_COUPON_RECEIVE";
+  const amount = isP2pReceive && rawAmount === 0
+    ? Number(meta.net_amount ?? meta.gross_amount ?? 0)
+    : rawAmount;
+  const isCouponUnredeemed = isP2pReceive && (meta.status === "VOUCHER_ASSIGNED" || !meta.redeemed_at);
+
+  const isSelfAccount =
+    tx?.type === "SELF_ACCOUNT_CREDIT" ||
+    tx?.type === "SELF_ACCOUNT_DEBIT" ||
+    meta?.ledger === "SELF_ACCOUNT" ||
+    String(tx?.type || "").startsWith("SELF_ACCOUNT");
+
+  const isMainWalletCredit =
+    tx?.type === "INCOME_CREDIT_75" ||
+    meta?.ledger === "MAIN" ||
+    (amount > 0 && !isSelfAccount && !isP2pReceive);
 
   const dateStr = tx?.created_at
     ? new Intl.DateTimeFormat(undefined, {
@@ -549,6 +673,7 @@ function HistoryRow({ tx, onClick }) {
 
   const cat = classifyTransaction(tx);
   const catChipLabels = {
+    SELF_ACCOUNT: "Self blocks",
     LAYER: "Layer & Blocks",
     DIRECT: "Direct Bonus",
     P2P: "P2P Transfer",
@@ -566,17 +691,19 @@ function HistoryRow({ tx, onClick }) {
       elevation={0}
       onClick={onClick}
       sx={{
-        p: 1.25,
-        borderRadius: 2.2,
+        p: 1.4,
+        borderRadius: 2.5,
         border: "1px solid",
-        borderColor: "#EEF2F6",
-        bgcolor: "#fff",
+        borderColor: isSelfAccount ? "#FDE68A" : "#EEF2F6",
+        bgcolor: isSelfAccount ? "#FFFDF5" : "#FFFFFF",
         cursor: onClick ? "pointer" : "default",
-        transition: "all 150ms ease",
+        transition: "all 180ms cubic-bezier(0.4, 0, 0.2, 1)",
+        boxShadow: "0 1px 3px rgba(15, 23, 42, 0.02)",
         "&:hover": onClick
           ? {
-              borderColor: "#CBD5E1",
-              boxShadow: "0 4px 12px rgba(12, 45, 72, 0.05)",
+              borderColor: isSelfAccount ? "#F59E0B" : "#CBD5E1",
+              boxShadow: "0 4px 14px rgba(12, 45, 72, 0.06)",
+              transform: "translateY(-1px)",
             }
           : {},
         "&:active": { transform: "scale(0.99)" },
@@ -599,7 +726,37 @@ function HistoryRow({ tx, onClick }) {
             >
               {typeName}
             </Typography>
-            {cat && cat !== "OTHER" && (
+
+            {/* Dedicated Primary Badge for Wallet Split Type */}
+            {isSelfAccount ? (
+              <Chip
+                size="small"
+                label="Self Account Credit"
+                sx={{
+                  height: 18,
+                  fontSize: 10,
+                  fontWeight: 800,
+                  borderRadius: 1,
+                  bgcolor: "#FEF3C7",
+                  color: "#92400E",
+                  border: "1px solid #FCD34D",
+                }}
+              />
+            ) : isMainWalletCredit ? (
+              <Chip
+                size="small"
+                label="Main Wallet Credit"
+                sx={{
+                  height: 18,
+                  fontSize: 10,
+                  fontWeight: 800,
+                  borderRadius: 1,
+                  bgcolor: "#DCFCE7",
+                  color: "#166534",
+                  border: "1px solid #86EFAC",
+                }}
+              />
+            ) : cat && cat !== "OTHER" && (
               <Chip
                 size="small"
                 label={catChipLabels[cat] || cat}
@@ -613,13 +770,28 @@ function HistoryRow({ tx, onClick }) {
                 }}
               />
             )}
+
+            {isP2pReceive && (
+              <Chip
+                size="small"
+                label={isCouponUnredeemed ? "Not Redeemed" : "Redeemed"}
+                sx={{
+                  height: 18,
+                  fontSize: 10,
+                  fontWeight: 800,
+                  borderRadius: 1,
+                  bgcolor: isCouponUnredeemed ? "#FEF3C7" : "#DCFCE7",
+                  color: isCouponUnredeemed ? "#92400E" : "#166534",
+                  border: isCouponUnredeemed ? "1px solid #FCD34D" : "1px solid #86EFAC",
+                }}
+              />
+            )}
           </Box>
 
-          {counterpartyLabel(tx) ? (
-            <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.2 }}>
-              {counterpartyLabel(tx)}
-            </Typography>
-          ) : null}
+          <Typography sx={{ fontSize: 12, color: isSelfAccount ? "#B45309" : isMainWalletCredit ? "#047857" : "text.secondary", fontWeight: 700, mt: 0.2 }}>
+            {isSelfAccount ? "25% Repurchase Self Account" : isMainWalletCredit ? "75% Withdrawable Main Wallet" : ""}
+            {counterpartyLabel(tx) ? ` • ${counterpartyLabel(tx)}` : ""}
+          </Typography>
 
           <Typography sx={{ fontSize: 11.5, color: "#94A3B8", mt: 0.25 }}>
             {dateStr} {timeStr ? `• ${timeStr}` : ""}
@@ -639,9 +811,14 @@ function HistoryRow({ tx, onClick }) {
 
 function TxDetailDrawer({ open, onClose, tx }) {
   if (!tx) return null;
-  const amount = Number(tx?.amount || 0);
-  const isCredit = amount >= 0;
+  const rawAmount = Number(tx?.amount || 0);
   const meta = tx?.meta || {};
+  const isP2pReceive = tx?.type === "P2P_PACKAGE_COUPON_RECEIVE";
+  const amount = isP2pReceive && rawAmount === 0
+    ? Number(meta.net_amount ?? meta.gross_amount ?? 0)
+    : rawAmount;
+  const isCredit = amount >= 0;
+  const isCouponUnredeemed = isP2pReceive && (meta.status === "VOUCHER_ASSIGNED" || !meta.redeemed_at);
   const cat = classifyTransaction(tx);
 
   const dateStr = tx?.created_at
@@ -742,6 +919,23 @@ function TxDetailDrawer({ open, onClose, tx }) {
           </>
         )}
 
+        {isP2pReceive && meta.voucher_code && (
+          <>
+            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+              <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Coupon Code</Typography>
+              <Typography sx={{ fontSize: 12, color: "#2563EB", fontWeight: 800 }}>{meta.voucher_code}</Typography>
+            </Box>
+            <Divider />
+            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+              <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Coupon Status</Typography>
+              <Typography sx={{ fontSize: 12, color: isCouponUnredeemed ? "#B45309" : "#166534", fontWeight: 800 }}>
+                {isCouponUnredeemed ? "Active (Not Redeemed)" : "Redeemed"}
+              </Typography>
+            </Box>
+            <Divider />
+          </>
+        )}
+
         {grossVal !== undefined && grossVal !== null && (
           <>
             <Box sx={{ display: "flex", justifyContent: "space-between" }}>
@@ -831,7 +1025,7 @@ function SectionList({ sections, fallbackRows = [], onRowClick }) {
     <Stack spacing={1.5}>
       {sections.map((sec, idx) => (
         <Box key={`${sec.title}-${idx}`}>
-          <SectionHeader title={sec.title} />
+          <SectionHeader title={sec.title} total={sec.total} />
           <Stack spacing={1}>
             {sec.rows.map((tx, i) => (
               <HistoryRow
@@ -874,11 +1068,12 @@ function PhonePeFilterDrawer({
   const flowOptions = [
     { label: "All", value: "ALL" },
     { label: "Money Received (+ Credits)", value: "CREDIT" },
-    { label: "Money Sent (- Debits)", value: "DEBIT" },
+    { label: "Self Account", value: "DEBIT" },
   ];
 
   const sourceOptions = [
     { label: "All Sources", value: "ALL" },
+    { label: "Self blocks", value: "SELF_ACCOUNT" },
     { label: "Layer & Blocks", value: "LAYER" },
     { label: "Direct Bonus", value: "DIRECT" },
     { label: "P2P Transfer", value: "P2P" },
@@ -1252,8 +1447,10 @@ export default function History() {
   });
 
   // Pockets Transfer State (Main Wallet -> P2P Coupon Pocket / Withdrawal Pocket)
-  const [pocketType, setPocketType] = useState("coupon"); // "coupon" or "withdrawal"
+  const [pocketType, setPocketType] = useState("withdrawal"); // "withdrawal" or "coupon"
   const [pocketAmount, setPocketAmount] = useState("");
+  const [pocketOtpSent, setPocketOtpSent] = useState(false);
+  const [pocketOtp, setPocketOtp] = useState("");
   const [pocketBusy, setPocketBusy] = useState(false);
   const [pocketError, setPocketError] = useState("");
   const [pocketSuccess, setPocketSuccess] = useState("");
@@ -1266,13 +1463,13 @@ export default function History() {
   const pocketNet = pocketGross > 0 ? Number((pocketGross - pocketTax).toFixed(2)) : 0;
 
   const handlePocketTransfer = async () => {
-    if (pocketGross <= 0) {
-      setPocketError("Please enter a valid transfer amount.");
+    if (pocketGross < 100) {
+      setPocketError("Minimum transfer amount is ₹100.");
       return;
     }
-    const avail = Number(top.main_income_balance || top.withdrawable_balance || 0);
+    const avail = Number(top.main_income_balance || 0);
     if (pocketGross > avail) {
-      setPocketError(`Insufficient balance. Available withdrawable balance is ₹${fmtAmount(avail)}.`);
+      setPocketError(`Insufficient balance. Available Main Wallet balance is ₹${fmtAmount(avail)}.`);
       return;
     }
     try {
@@ -1280,18 +1477,46 @@ export default function History() {
       setPocketError("");
       setPocketSuccess("");
 
-      const res = await API.post("/accounts/wallet/transfer/request-otp/", {
+      await API.post("/accounts/wallet/transfer/request-otp/", {
         transfer_type: pocketType,
         amount: pocketGross,
       });
 
+      setPocketOtpSent(true);
       setPocketSuccess(
-        `Transfer initiated for ₹${fmtAmount(pocketGross)} to ${pocketType === "withdrawal" ? "Withdrawal Pocket" : "P2P Coupon Pocket"} (${pocketTaxPercent}% Tax: ₹${fmtAmount(pocketTax)}, Net Credit: ₹${fmtAmount(pocketNet)}). OTP sent to registered email.`
+        `OTP sent to your registered email to confirm transfer of ₹${fmtAmount(pocketGross)} to ${pocketType === "withdrawal" ? "Withdrawable Pocket" : "P2P Coupon Pocket"}.`
+      );
+    } catch (err) {
+      setPocketError(err?.response?.data?.detail || "Failed to process transfer OTP.");
+    } finally {
+      setPocketBusy(false);
+    }
+  };
+
+  const handleConfirmPocketOtp = async () => {
+    if (!pocketOtp.trim()) {
+      setPocketError("Please enter the 6-digit OTP.");
+      return;
+    }
+    try {
+      setPocketBusy(true);
+      setPocketError("");
+      setPocketSuccess("");
+
+      await API.post("/accounts/wallet/transfer/confirm-otp/", {
+        transfer_type: pocketType,
+        otp: pocketOtp.trim(),
+      });
+
+      setPocketSuccess(
+        `Successfully transferred ₹${fmtAmount(pocketNet)} into ${pocketType === "withdrawal" ? "Withdrawable Pocket" : "P2P Coupon Pocket"} (${pocketTaxPercent}% Tax: ₹${fmtAmount(pocketTax)})!`
       );
       setPocketAmount("");
+      setPocketOtp("");
+      setPocketOtpSent(false);
       fetchHistory();
     } catch (err) {
-      setPocketError(err?.response?.data?.detail || "Failed to process pocket transfer.");
+      setPocketError(err?.response?.data?.detail || "Failed to confirm transfer.");
     } finally {
       setPocketBusy(false);
     }
@@ -1424,6 +1649,7 @@ export default function History() {
   const categoryCounts = useMemo(() => {
     const counts = {
       ALL: dateFilteredTransactions.length,
+      SELF_ACCOUNT: 0,
       LAYER: 0,
       DIRECT: 0,
       P2P: 0,
@@ -1443,10 +1669,13 @@ export default function History() {
   const filteredTransactions = useMemo(() => {
     return dateFilteredTransactions.filter((tx) => {
       const amt = Number(tx?.amount || 0);
+      const type = String(tx?.type || "");
+      const meta = tx?.meta || {};
+      const isSelf = type === "SELF_ACCOUNT_CREDIT" || type === "SELF_ACCOUNT_DEBIT" || meta?.ledger === "SELF_ACCOUNT";
 
       // Flow filter
-      if (flowFilter === "CREDIT" && amt < 0) return false;
-      if (flowFilter === "DEBIT" && amt >= 0) return false;
+      if (flowFilter === "CREDIT" && (isSelf || amt < 0)) return false;
+      if (flowFilter === "DEBIT" && !isSelf) return false;
 
       // Source filter
       if (sourceFilter !== "ALL" && classifyTransaction(tx) !== sourceFilter) return false;
@@ -1474,7 +1703,46 @@ export default function History() {
     });
   }, [dateFilteredTransactions, flowFilter, sourceFilter, searchQuery]);
 
-  const sections = useMemo(() => groupByDay(filteredTransactions), [filteredTransactions]);
+  const sections = useMemo(() => groupByMonth(filteredTransactions), [filteredTransactions]);
+
+  const ledgerSummary = useMemo(() => {
+    let mainCredits = 0;
+    let mainCount = 0;
+    let selfCredits = 0;
+    let selfDebits = 0;
+    let selfCount = 0;
+    let creditCount = 0;
+
+    (allTransactions || []).forEach((tx) => {
+      const raw = Number(tx?.amount || 0);
+      const meta = tx?.meta || {};
+      const type = String(tx?.type || "");
+      const isSelf = type === "SELF_ACCOUNT_CREDIT" || type === "SELF_ACCOUNT_DEBIT" || meta?.ledger === "SELF_ACCOUNT";
+      const isP2pReceive = tx?.type === "P2P_PACKAGE_COUPON_RECEIVE";
+      const amt = isP2pReceive && raw === 0 ? Number(meta.net_amount ?? meta.gross_amount ?? 0) : raw;
+
+      if (isSelf) {
+        if (amt > 0) {
+          selfCredits += amt;
+          creditCount += 1;
+        } else {
+          selfDebits += Math.abs(amt);
+        }
+        selfCount += 1;
+      } else if (amt > 0) {
+        mainCredits += amt;
+        mainCount += 1;
+        creditCount += 1;
+      }
+    });
+
+    // 100% Total Gross Credits = Combination of Main Credits (75%) + Self Account Credits (25%)
+    // (Never reduced by ₹250 rebirth debits or withdrawals)
+    const totalCredits = mainCredits + selfCredits;
+    const selfBalance = Number(top.self_account_balance || (selfCredits - selfDebits));
+
+    return { totalCredits, creditCount, mainCredits, mainCount, selfCredits, selfDebits, totalSelf: selfBalance, selfCount };
+  }, [allTransactions, top.self_account_balance]);
 
   const dateLabel = useMemo(() => {
     if (datePreset === "all") return "All Time";
@@ -1493,13 +1761,14 @@ export default function History() {
 
   const flowLabel = useMemo(() => {
     if (flowFilter === "CREDIT") return "Money Received (+)";
-    if (flowFilter === "DEBIT") return "Money Sent (-)";
+    if (flowFilter === "DEBIT") return "Self Account";
     return "All Flows";
   }, [flowFilter]);
 
   const sourceLabel = useMemo(() => {
     const map = {
       ALL: "All Sources",
+      SELF_ACCOUNT: "Self blocks",
       LAYER: "Layer & Blocks",
       DIRECT: "Direct Bonus",
       P2P: "P2P Transfer",
@@ -1583,142 +1852,169 @@ export default function History() {
   return (
     <Box
       sx={{
-        maxWidth: 560,
-        mx: "auto",
-        px: { xs: 1, sm: 1.5 },
-        py: 1,
-        bgcolor: "#F7FAFC",
-        minHeight: "100vh",
+        bgcolor: "#F4F7FC",
+        minHeight: "100dvh",
+        position: "relative",
+        pb: { xs: 12, sm: 14 },
       }}
     >
-      <Typography
-        variant="h6"
+      <PremiumScreenHeader
+        title="Transaction History"
+        onBack={() => navigate(-1)}
+        onNotifications={() => {
+          try {
+            window.dispatchEvent(new CustomEvent("trikonekt:open-consumer-sidebar"));
+          } catch (_) {}
+        }}
+        onSecondary={() => navigate("/user/spp-gift-cards")}
+        hasBackdrop={true}
+      />
+
+      <Box
         sx={{
-          mb: 1.2,
-          fontWeight: 900,
-          color: "#0C2D48",
+          maxWidth: 600,
+          mx: "auto",
+          px: { xs: 2, sm: 2.5 },
+          pt: 1,
+          position: "relative",
+          zIndex: 1,
         }}
       >
-        History & Wallet
-      </Typography>
-
-      {/* Main Wallet Summary Card with Top Actions */}
-      <Paper
-        elevation={0}
-        onClick={() => {
-          setTab(0);
-          setActionDrawerOpen(true);
-        }}
-        sx={{
-          p: 1.8,
-          borderRadius: 2.5,
-          mb: 1.5,
-          border: "1px solid",
-          borderColor: tab === 0 ? "primary.main" : "#EEF2F6",
-          borderWidth: tab === 0 ? 2 : 1,
-          bgcolor: "#fff",
-          cursor: "pointer",
-          transition: "all 0.2s ease",
-          boxShadow: tab === 0 ? "0 4px 12px rgba(12, 45, 72, 0.12)" : "0 2px 6px rgba(0,0,0,0.03)",
-        }}
-      >
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Avatar
-            sx={{
-              bgcolor: "primary.light",
-              color: "primary.dark",
-              width: 44,
-              height: 44,
-            }}
-          >
-            <AccountBalanceWalletIcon fontSize="medium" />
-          </Avatar>
-
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800 }}>
-              Main Wallet Balance (Tap for Actions)
-            </Typography>
-
-            <Typography
+        {/* 1. MAIN WALLET HERO CARD */}
+        <Paper
+          elevation={0}
+          sx={{
+            p: { xs: 2.2, sm: 2.5 },
+            borderRadius: "22px",
+            mb: 1.8,
+            position: "relative",
+            overflow: "hidden",
+            background: "linear-gradient(135deg, #07152E 0%, #091E3A 40%, #0256B4 100%)",
+            color: "#FFFFFF",
+            boxShadow: "0 14px 34px -8px rgba(2, 86, 180, 0.4)",
+            border: "1px solid rgba(255, 255, 255, 0.14)",
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Box
               sx={{
-                fontSize: isMobile ? 24 : 28,
-                fontWeight: 900,
-                lineHeight: 1.1,
-                mt: 0.2,
-                color: "#0F172A",
+                width: 44,
+                height: 44,
+                borderRadius: "14px",
+                bgcolor: "rgba(255, 255, 255, 0.15)",
+                backdropFilter: "blur(12px)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: "1px solid rgba(255, 255, 255, 0.25)",
+                flexShrink: 0,
               }}
             >
-              ₹ {fmtAmount(top.main_income_balance)}
-            </Typography>
-          </Box>
-        </Stack>
+              <AccountBalanceWalletIcon sx={{ fontSize: 24, color: "#FFFFFF" }} />
+            </Box>
+            <Box>
+              <Typography sx={{ color: "rgba(255, 255, 255, 0.8)", fontWeight: 700, fontSize: 11.5, letterSpacing: 0.3 }}>
+                Main Wallet Balance
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: { xs: 26, sm: 30 },
+                  fontWeight: 900,
+                  lineHeight: 1.1,
+                  mt: 0.2,
+                  color: "#FFFFFF",
+                  letterSpacing: "-0.5px",
+                }}
+              >
+                ₹ {fmtAmount(top.main_income_balance)}
+              </Typography>
+            </Box>
+          </Stack>
 
-        {/* Top 3 Quick Actions inside Wallet Card */}
-        <Stack direction="row" spacing={1} sx={{ mt: 1.5, pt: 1.5, borderTop: "1px solid #EEF2F6" }}>
-          <Button
-            size="small"
-            variant="contained"
-            startIcon={<SendRoundedIcon sx={{ fontSize: 16 }} />}
-            onClick={(e) => {
-              e.stopPropagation();
-              setDrawerMode("p2p");
-              setActionDrawerOpen(true);
-            }}
-            sx={{
-              flex: 1,
-              fontSize: 11.5,
-              fontWeight: 700,
-              textTransform: "none",
-              borderRadius: 2,
-              bgcolor: "#2563EB",
-              boxShadow: "none",
-              "&:hover": { bgcolor: "#1D4ED8" },
-            }}
-          >
-            P2P Send
-          </Button>
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<SchoolRoundedIcon sx={{ fontSize: 16 }} />}
-            onClick={(e) => {
-              e.stopPropagation();
-              window.open("https://triacademy.trikonekt.com", "_blank", "noopener,noreferrer");
-            }}
-            sx={{
-              flex: 1,
-              fontSize: 11.5,
-              fontWeight: 700,
-              textTransform: "none",
-              borderRadius: 2,
-              borderColor: "#2563EB",
-              color: "#2563EB",
-            }}
-          >
-            E-Edu Academy
-          </Button>
-          <Button
-            size="small"
-            variant="outlined"
-            startIcon={<AccountBalanceRoundedIcon sx={{ fontSize: 16 }} />}
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate("/user/withdrawal");
-            }}
-            sx={{
-              flex: 1,
-              fontSize: 11.5,
-              fontWeight: 700,
-              textTransform: "none",
-              borderRadius: 2,
-              borderColor: "#059669",
-              color: "#059669",
-            }}
-          >
-            Withdraw
-          </Button>
-        </Stack>
-      </Paper>
+          {/* 3 Action Buttons Inside Card - Sleek & Compact */}
+          <Stack direction="row" spacing={1} sx={{ mt: 1.8 }}>
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<ArrowUpwardIcon sx={{ fontSize: 14 }} />}
+              onClick={() => {
+                setDrawerMode("pockets");
+                setPocketType("withdrawal");
+                setActionDrawerOpen(true);
+              }}
+              sx={{
+                flex: 1.2,
+                py: 0.6,
+                minHeight: 36,
+                fontSize: { xs: 10.5, sm: 11.5 },
+                fontWeight: 800,
+                textTransform: "none",
+                borderRadius: "10px",
+                background: "linear-gradient(135deg, #059669 0%, #10B981 100%)",
+                boxShadow: "0 2px 8px rgba(5, 150, 105, 0.3)",
+                color: "#FFFFFF",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                whiteSpace: "nowrap",
+                "&:hover": { background: "linear-gradient(135deg, #047857 0%, #059669 100%)" },
+              }}
+            >
+              Withdraw Wallet
+            </Button>
+
+            <Button
+              size="small"
+              variant="contained"
+              startIcon={<RedeemIcon sx={{ fontSize: 14 }} />}
+              onClick={() => {
+                setDrawerMode("pockets");
+                setPocketType("coupon");
+                setActionDrawerOpen(true);
+              }}
+              sx={{
+                flex: 1.1,
+                py: 0.6,
+                minHeight: 36,
+                fontSize: { xs: 10.5, sm: 11.5 },
+                fontWeight: 800,
+                textTransform: "none",
+                borderRadius: "10px",
+                background: "linear-gradient(135deg, #0284C7 0%, #0256B4 100%)",
+                boxShadow: "0 2px 8px rgba(2, 86, 180, 0.3)",
+                color: "#FFFFFF",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                whiteSpace: "nowrap",
+                "&:hover": { background: "linear-gradient(135deg, #0369A1 0%, #0047AB 100%)" },
+              }}
+            >
+              P2P Coupon
+            </Button>
+
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => {
+                setDrawerMode("menu");
+                setActionDrawerOpen(true);
+              }}
+              sx={{
+                minWidth: 38,
+                height: 36,
+                p: 0,
+                fontSize: 11,
+                fontWeight: 800,
+                textTransform: "none",
+                borderRadius: "10px",
+                bgcolor: "rgba(255, 255, 255, 0.16)",
+                backdropFilter: "blur(8px)",
+                color: "#FFFFFF",
+                border: "1px solid rgba(255, 255, 255, 0.25)",
+                "&:hover": { bgcolor: "rgba(255, 255, 255, 0.25)" },
+              }}
+            >
+              <MoreHorizRoundedIcon sx={{ fontSize: 18 }} />
+            </Button>
+          </Stack>
+        </Paper>
 
       {/* Bottom Sheet Drawer for Main Wallet Actions & In-Drawer P2P Transfer */}
       <Drawer
@@ -1746,7 +2042,7 @@ export default function History() {
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
           <Box>
             <Typography sx={{ fontSize: 17, fontWeight: 900, color: "#0F172A" }}>
-              Main Wallet Transfer & Actions
+              Move to Pockets & Wallet Actions
             </Typography>
             <Typography sx={{ fontSize: 13, color: "#059669", fontWeight: 700 }}>
               Available Balance: ₹ {fmtAmount(top.main_income_balance)}
@@ -1761,6 +2057,23 @@ export default function History() {
         <Stack direction="row" spacing={0.8} sx={{ mb: 2 }}>
           <Button
             size="small"
+            variant={drawerMode === "withdrawal" || drawerMode === "pockets" || drawerMode === "coupon" ? "contained" : "outlined"}
+            onClick={() => { setDrawerMode("pockets"); }}
+            sx={{
+              flex: 1.2,
+              borderRadius: 999,
+              textTransform: "none",
+              fontWeight: 800,
+              fontSize: 12,
+              bgcolor: drawerMode === "withdrawal" || drawerMode === "pockets" || drawerMode === "coupon" ? "#0256B4" : "transparent",
+              borderColor: "#0256B4",
+              color: drawerMode === "withdrawal" || drawerMode === "pockets" || drawerMode === "coupon" ? "#fff" : "#0256B4",
+            }}
+          >
+            Transfer from Wallet
+          </Button>
+          <Button
+            size="small"
             variant={drawerMode === "p2p" ? "contained" : "outlined"}
             onClick={() => setDrawerMode("p2p")}
             sx={{
@@ -1769,9 +2082,9 @@ export default function History() {
               textTransform: "none",
               fontWeight: 800,
               fontSize: 12,
-              bgcolor: drawerMode === "p2p" ? "#2563EB" : "transparent",
-              borderColor: "#2563EB",
-              color: drawerMode === "p2p" ? "#fff" : "#2563EB",
+              bgcolor: drawerMode === "p2p" ? "#0066E6" : "transparent",
+              borderColor: "#0066E6",
+              color: drawerMode === "p2p" ? "#fff" : "#0066E6",
             }}
           >
             P2P Send ({p2pTaxPercent}%)
@@ -1794,6 +2107,193 @@ export default function History() {
             Quick Links
           </Button>
         </Stack>
+
+        {/* Unified Transfer from Main Wallet Sheet */}
+        {(drawerMode === "withdrawal" || drawerMode === "pockets" || drawerMode === "coupon") && (
+          <Box sx={{ mb: 2 }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A", mb: 1 }}>
+              Select Destination
+            </Typography>
+
+            {/* Destination Selection Cards */}
+            <Grid container spacing={1.2} sx={{ mb: 2 }}>
+              <Grid item xs={6}>
+                <Paper
+                  elevation={0}
+                  onClick={() => setPocketType("withdrawal")}
+                  sx={{
+                    p: 1.5,
+                    borderRadius: "14px",
+                    cursor: "pointer",
+                    border: "2px solid",
+                    borderColor: pocketType === "withdrawal" ? "#059669" : "#E2E8F0",
+                    bgcolor: pocketType === "withdrawal" ? "#ECFDF5" : "#FFFFFF",
+                    transition: "all 140ms ease",
+                  }}
+                >
+                  <Typography sx={{ fontSize: 13, fontWeight: 800, color: pocketType === "withdrawal" ? "#059669" : "#0F172A" }}>
+                    Withdrawable Wallet
+                  </Typography>
+                  <Typography sx={{ fontSize: 11, color: "#64748B", mt: 0.3 }}>
+                    Bank payout • 10% TDS
+                  </Typography>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={6}>
+                <Paper
+                  elevation={0}
+                  onClick={() => setPocketType("coupon")}
+                  sx={{
+                    p: 1.5,
+                    borderRadius: "14px",
+                    cursor: "pointer",
+                    border: "2px solid",
+                    borderColor: pocketType === "coupon" ? "#0256B4" : "#E2E8F0",
+                    bgcolor: pocketType === "coupon" ? "#EFF6FF" : "#FFFFFF",
+                    transition: "all 140ms ease",
+                  }}
+                >
+                  <Typography sx={{ fontSize: 13, fontWeight: 800, color: pocketType === "coupon" ? "#0256B4" : "#0F172A" }}>
+                    P2P Coupon Wallet
+                  </Typography>
+                  <Typography sx={{ fontSize: 11, color: "#64748B", mt: 0.3 }}>
+                    P2P transfer • 7% Fee
+                  </Typography>
+                </Paper>
+              </Grid>
+            </Grid>
+
+            {Number(top.main_income_balance) < 100 && (
+              <Alert severity="info" sx={{ mb: 1.5, borderRadius: 2, fontSize: 12.5 }}>
+                Minimum ₹100 in Main Wallet is required to transfer funds.
+              </Alert>
+            )}
+
+            {pocketError && <Alert severity="error" sx={{ mb: 1.5, borderRadius: 2, fontSize: 12.5 }}>{pocketError}</Alert>}
+            {pocketSuccess && <Alert severity="success" sx={{ mb: 1.5, borderRadius: 2, fontSize: 12.5 }}>{pocketSuccess}</Alert>}
+
+            {!pocketOtpSent ? (
+              <Stack spacing={1.5}>
+                <Box>
+                  <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: "#334155", mb: 0.6 }}>
+                    Enter Amount
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="Min ₹100"
+                    type="number"
+                    value={pocketAmount}
+                    onChange={(e) => {
+                      setPocketAmount(e.target.value);
+                      setPocketError("");
+                    }}
+                    disabled={Number(top.main_income_balance) < 100}
+                    InputProps={{
+                      startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                      endAdornment: (
+                        <Button
+                          size="small"
+                          onClick={() => {
+                            setPocketAmount(String(fmtAmount(top.main_income_balance)));
+                            setPocketError("");
+                          }}
+                          sx={{ fontWeight: 800, fontSize: 11.5, minWidth: 44, color: "#0256B4" }}
+                        >
+                          MAX
+                        </Button>
+                      ),
+                    }}
+                    sx={{ bgcolor: "#FFFFFF", borderRadius: "12px" }}
+                  />
+                  <Typography sx={{ fontSize: 11.5, color: "#64748B", mt: 0.5 }}>
+                    Available Balance: ₹ {fmtAmount(top.main_income_balance)}
+                  </Typography>
+                </Box>
+
+                {pocketGross > 0 && (
+                  <Box sx={{ p: 1.4, bgcolor: "#F8FAFC", borderRadius: "14px", border: "1px solid #E2E8F0" }}>
+                    <Stack spacing={0.5}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                        <Typography sx={{ fontSize: 12, color: "#64748B" }}>Gross Amount:</Typography>
+                        <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>₹ {pocketGross.toFixed(2)}</Typography>
+                      </Box>
+                      <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                        <Typography sx={{ fontSize: 12, color: "#DC2626" }}>{pocketTaxPercent}% Tax / Platform Fee:</Typography>
+                        <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#DC2626" }}>- ₹ {pocketTax.toFixed(2)}</Typography>
+                      </Box>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", pt: 0.5, borderTop: "1px dashed #CBD5E1" }}>
+                        <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: "#059669" }}>Net Credited to Destination:</Typography>
+                        <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#059669" }}>₹ {pocketNet.toFixed(2)}</Typography>
+                      </Box>
+                    </Stack>
+                  </Box>
+                )}
+
+                <Button
+                  fullWidth
+                  variant="contained"
+                  disabled={pocketBusy || pocketGross < 100 || pocketGross > Number(top.main_income_balance || 0) || Number(top.main_income_balance) < 100}
+                  onClick={handlePocketTransfer}
+                  sx={{
+                    py: 1.25,
+                    borderRadius: "14px",
+                    fontWeight: 800,
+                    fontSize: 13.5,
+                    textTransform: "none",
+                    background: "linear-gradient(135deg, #0256B4 0%, #0066E6 100%)",
+                    "&:hover": { background: "linear-gradient(135deg, #0047AB 0%, #0256B4 100%)" },
+                  }}
+                >
+                  {pocketBusy ? "Sending OTP..." : "Continue →"}
+                </Button>
+              </Stack>
+            ) : (
+              <Stack spacing={1.5}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Enter 6-Digit Email OTP"
+                  placeholder="e.g. 123456"
+                  value={pocketOtp}
+                  onChange={(e) => {
+                    setPocketOtp(e.target.value);
+                    setPocketError("");
+                  }}
+                  sx={{ bgcolor: "#fff", borderRadius: 2 }}
+                />
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      setPocketOtpSent(false);
+                      setPocketOtp("");
+                    }}
+                    sx={{ borderRadius: "12px", textTransform: "none", fontWeight: 700 }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    disabled={pocketBusy || !pocketOtp.trim()}
+                    onClick={handleConfirmPocketOtp}
+                    sx={{
+                      borderRadius: "12px",
+                      fontWeight: 800,
+                      textTransform: "none",
+                      bgcolor: "#059669",
+                      "&:hover": { bgcolor: "#047857" },
+                    }}
+                  >
+                    {pocketBusy ? "Verifying..." : "Confirm & Credit Pocket"}
+                  </Button>
+                </Stack>
+              </Stack>
+            )}
+          </Box>
+        )}
 
         {/* Drawer Mode 1: P2P Transfer */}
         {drawerMode === "p2p" && (
@@ -2016,273 +2516,102 @@ export default function History() {
         </Stack>
       </Drawer>
 
-      {/* Today & Yesterday Earnings Stats */}
-      <Box sx={{ display: "flex", gap: 1.2, mb: 1.5 }}>
-        <Paper
-          elevation={0}
-          sx={{
-            flex: 1,
-            p: 1.2,
-            borderRadius: 2.2,
-            border: "1px solid",
-            borderColor: "#EEF2F6",
-            bgcolor: "#EDFDF5",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            alignItems: "center",
-            minHeight: 64,
-          }}
-        >
-          <Typography variant="caption" sx={{ color: "success.dark", fontWeight: 800 }}>
-            {tab === 0 ? "Today's Earnings" : "Today's Self Reserve"}
-          </Typography>
-          <Typography sx={{ fontSize: 16, fontWeight: 900, color: "success.main", mt: 0.2 }}>
-            +₹ {fmtAmount(todaysEarnings)}
-          </Typography>
-        </Paper>
-        <Paper
-          elevation={0}
-          sx={{
-            flex: 1,
-            p: 1.2,
-            borderRadius: 2.2,
-            border: "1px solid",
-            borderColor: "#EEF2F6",
-            bgcolor: "#F8FAFC",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            alignItems: "center",
-            minHeight: 64,
-          }}
-        >
-          <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 800 }}>
-            {tab === 0 ? "Yesterday's Earnings" : "Yesterday's Self Reserve"}
-          </Typography>
-          <Typography sx={{ fontSize: 16, fontWeight: 900, color: "text.primary", mt: 0.2 }}>
-            +₹ {fmtAmount(yesterdaysEarnings)}
-          </Typography>
-        </Paper>
-      </Box>
-
-      {/* Mini Cards (Withdrawable Pocket & Self Account) */}
-      <Box
-        sx={{
-          display: "flex",
-          gap: 1.2,
-          overflowX: "auto",
-          pb: 1,
-          mb: 1.5,
-          px: 0.5,
-          scrollSnapType: "x mandatory",
-          "&::-webkit-scrollbar": { display: "none" },
-        }}
-      >
-        <MiniCard
-          title="Withdrawable Pocket"
-          value={`₹ ${fmtAmount(top.withdrawable_balance)}`}
-          icon={<SavingsIcon fontSize="small" />}
-          color="success"
-          onClick={() => navigate("/user/withdrawal")}
-          selected={false}
-        />
-        <MiniCard
-          title="Self Account Balance"
-          value={`₹ ${fmtAmount(top.self_account_balance)}`}
-          icon={<AccountBalanceWalletIcon fontSize="small" />}
-          color="warning"
-          onClick={() => setTab(1)}
-          selected={tab === 1}
-        />
-      </Box>
-
-      {/* Horizontal Sliding "My Earnings" breakdown */}
-      <Box sx={{ mb: 1.5 }}>
-        <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0C2D48", mb: 0.8, px: 0.5 }}>
-          My Earnings Breakdown
-        </Typography>
-        <Box
-          sx={{
-            display: "flex",
-            gap: 1.2,
-            overflowX: "auto",
-            pb: 1,
-            px: 0.5,
-            scrollSnapType: "x mandatory",
-            "&::-webkit-scrollbar": { display: "none" },
-          }}
-        >
-          {/* Card 1: Direct Referral / Package Direct */}
+      {/* 2. TOTAL CREDITS & SELF ACCOUNT SUMMARY CARDS */}
+      <Grid container spacing={1.5} sx={{ mb: 1.8 }}>
+        <Grid item xs={6}>
           <Paper
             elevation={0}
-            onClick={() => setSourceFilter(sourceFilter === "DIRECT" ? "ALL" : "DIRECT")}
             sx={{
-              minWidth: 165,
-              p: 1.3,
-              borderRadius: 2.2,
-              border: "2px solid",
-              borderColor: sourceFilter === "DIRECT" ? "#2563EB" : "#EEF2F6",
-              bgcolor: sourceFilter === "DIRECT" ? "#EFF6FF" : "#FFFFFF",
-              cursor: "pointer",
-              scrollSnapAlign: "start",
-              transition: "all 0.15s ease",
-              boxShadow: sourceFilter === "DIRECT" ? "0 4px 12px rgba(37, 99, 235, 0.15)" : "none",
-              "&:hover": { borderColor: "#2563EB" },
+              p: 1.8,
+              borderRadius: "18px",
+              bgcolor: "#FFFFFF",
+              border: "1px solid #EEF2F6",
+              boxShadow: "0 2px 8px rgba(15, 23, 42, 0.03)",
             }}
           >
-            <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-              Package Direct
-            </Typography>
-            <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#2563EB", mt: 0.3 }}>
-              ₹ {fmtAmount(earningsBreakdown.direct_referral || 0)}
-            </Typography>
-            <Chip size="small" label="E-edu & Prime Direct" sx={{ mt: 0.5, height: 18, fontSize: 10, bgcolor: sourceFilter === "DIRECT" ? "#DBEAFE" : "#EFF6FF", color: "#2563EB" }} />
-          </Paper>
-
-          {/* Card 2: Layer Matrix (5 & 3) */}
-          <Paper
-            elevation={0}
-            onClick={() => setSourceFilter(sourceFilter === "LAYER" ? "ALL" : "LAYER")}
-            sx={{
-              minWidth: 165,
-              p: 1.3,
-              borderRadius: 2.2,
-              border: "2px solid",
-              borderColor: sourceFilter === "LAYER" ? "#7C3AED" : "#EEF2F6",
-              bgcolor: sourceFilter === "LAYER" ? "#F5F3FF" : "#FFFFFF",
-              cursor: "pointer",
-              scrollSnapAlign: "start",
-              transition: "all 0.15s ease",
-              boxShadow: sourceFilter === "LAYER" ? "0 4px 12px rgba(124, 58, 237, 0.15)" : "none",
-              "&:hover": { borderColor: "#7C3AED" },
-            }}
-          >
-            <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-              Layer 5 & 3 Blocks
-            </Typography>
-            <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#7C3AED", mt: 0.3 }}>
-              ₹ {fmtAmount(earningsBreakdown.matrix_autopool || 0)}
-            </Typography>
-            <Chip size="small" label="5-Blocks & 3-Blocks" sx={{ mt: 0.5, height: 18, fontSize: 10, bgcolor: sourceFilter === "LAYER" ? "#EDE9FE" : "#F5F3FF", color: "#7C3AED" }} />
-          </Paper>
-
-          {/* Card 3: Direct Self Block Breakdown */}
-          <Paper
-            elevation={0}
-            onClick={() => setSourceFilter(sourceFilter === "REDEEM" ? "ALL" : "REDEEM")}
-            sx={{
-              minWidth: 220,
-              p: 1.3,
-              borderRadius: 2.2,
-              border: "2px solid",
-              borderColor: sourceFilter === "REDEEM" ? "#059669" : "#EEF2F6",
-              bgcolor: sourceFilter === "REDEEM" ? "#ECFDF5" : "#FFFFFF",
-              cursor: "pointer",
-              scrollSnapAlign: "start",
-              transition: "all 0.15s ease",
-              boxShadow: sourceFilter === "REDEEM" ? "0 4px 12px rgba(5, 150, 105, 0.15)" : "none",
-              "&:hover": { borderColor: "#059669" },
-            }}
-          >
-            <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-              Direct Self Block Breakdown
-            </Typography>
-            <Stack spacing={0.3} sx={{ mt: 0.5 }}>
-              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                <Typography sx={{ fontSize: 11, color: "text.secondary" }}>E-edu Agent:</Typography>
-                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#059669" }}>₹10 / ₹400</Typography>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+              <Box
+                sx={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  bgcolor: "#ECFDF5",
+                  color: "#059669",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px solid #A7F3D0",
+                }}
+              >
+                <ArrowUpwardIcon sx={{ fontSize: 16 }} />
               </Box>
-              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                <Typography sx={{ fontSize: 11, color: "text.secondary" }}>Shopping:</Typography>
-                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#059669" }}>₹2 / ₹50</Typography>
-              </Box>
-              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                <Typography sx={{ fontSize: 11, color: "text.secondary" }}>Franchise:</Typography>
-                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#059669" }}>₹4 / ₹100</Typography>
-              </Box>
-              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                <Typography sx={{ fontSize: 11, color: "text.secondary" }}>Captain:</Typography>
-                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#059669" }}>₹5 / ₹125</Typography>
-              </Box>
+              <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>
+                Total Credits
+              </Typography>
             </Stack>
+            <Typography sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 900, color: "#059669", letterSpacing: "-0.02em" }}>
+              ₹ {fmtAmount(ledgerSummary.totalCredits)}
+            </Typography>
+            <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", mt: 0.2 }}>
+              {ledgerSummary.creditCount} transactions
+            </Typography>
           </Paper>
+        </Grid>
 
-          {/* Card 4: Royalty */}
+        <Grid item xs={6}>
           <Paper
             elevation={0}
-            onClick={() => setSourceFilter(sourceFilter === "ROYALTY" ? "ALL" : "ROYALTY")}
             sx={{
-              minWidth: 175,
-              p: 1.3,
-              borderRadius: 2.2,
-              border: "2px solid",
-              borderColor: sourceFilter === "ROYALTY" ? "#D97706" : "#EEF2F6",
-              bgcolor: sourceFilter === "ROYALTY" ? "#FFFBEB" : "#FFFFFF",
-              cursor: "pointer",
-              scrollSnapAlign: "start",
-              transition: "all 0.15s ease",
-              boxShadow: sourceFilter === "ROYALTY" ? "0 4px 12px rgba(217, 119, 6, 0.15)" : "none",
-              "&:hover": { borderColor: "#D97706" },
+              p: 1.8,
+              borderRadius: "18px",
+              bgcolor: "#FFFFFF",
+              border: "1px solid #EEF2F6",
+              boxShadow: "0 2px 8px rgba(15, 23, 42, 0.03)",
             }}
           >
-            <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-              Royalty Bonus
-            </Typography>
-            <Stack spacing={0.3} sx={{ mt: 0.5 }}>
-              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                <Typography sx={{ fontSize: 11, color: "text.secondary" }}>Club 1:</Typography>
-                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#D97706" }}>₹10k / ₹2.5k</Typography>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+              <Box
+                sx={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  bgcolor: "#F5F3FF",
+                  color: "#7C3AED",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px solid #DDD6FE",
+                }}
+              >
+                <SavingsIcon sx={{ fontSize: 16 }} />
               </Box>
-              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                <Typography sx={{ fontSize: 11, color: "text.secondary" }}>Club 2:</Typography>
-                <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#D97706" }}>₹40k / ₹25k</Typography>
-              </Box>
+              <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>
+                Self Account
+              </Typography>
             </Stack>
-          </Paper>
-
-          {/* Card 5: Franchise / Captain */}
-          <Paper
-            elevation={0}
-            onClick={() => setSourceFilter(sourceFilter === "MERCHANT_CAPTAIN" ? "ALL" : "MERCHANT_CAPTAIN")}
-            sx={{
-              minWidth: 165,
-              p: 1.3,
-              borderRadius: 2.2,
-              border: "2px solid",
-              borderColor: sourceFilter === "MERCHANT_CAPTAIN" ? "#059669" : "#EEF2F6",
-              bgcolor: sourceFilter === "MERCHANT_CAPTAIN" ? "#ECFDF5" : "#FFFFFF",
-              cursor: "pointer",
-              scrollSnapAlign: "start",
-              transition: "all 0.15s ease",
-              boxShadow: sourceFilter === "MERCHANT_CAPTAIN" ? "0 4px 12px rgba(5, 150, 105, 0.15)" : "none",
-              "&:hover": { borderColor: "#059669" },
-            }}
-          >
-            <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700 }}>
-              Franchise / Captain
+            <Typography sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 900, color: "#7C3AED", letterSpacing: "-0.02em" }}>
+              ₹ {fmtAmount(Number(top.self_account_balance || 0) > 0 ? top.self_account_balance : ledgerSummary.totalSelf)}
             </Typography>
-            <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#059669", mt: 0.3 }}>
-              ₹ {fmtAmount(earningsBreakdown.franchise_captain || 0)}
+            <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", mt: 0.2 }}>
+              {ledgerSummary.selfCount} transactions
             </Typography>
-            <Chip size="small" label="Geo & Zonal Share" sx={{ mt: 0.5, height: 18, fontSize: 10, bgcolor: sourceFilter === "MERCHANT_CAPTAIN" ? "#D1FAE5" : "#ECFDF5", color: "#059669" }} />
           </Paper>
-        </Box>
-      </Box>
+        </Grid>
+      </Grid>
 
-      {/* PhonePe Search & Filter Bar */}
-      <Box sx={{ mb: 1.2 }}>
+      {/* 3. SEARCH + HORIZONTAL FILTER BAR */}
+      <Stack spacing={1.2} sx={{ mb: 1.8 }}>
         <Stack direction="row" spacing={1} alignItems="center">
           <TextField
             fullWidth
             size="small"
-            placeholder="Search by name, phone, amount..."
+            placeholder="Search by name, phone, reference..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchRoundedIcon sx={{ color: "#94A3B8", fontSize: 20 }} />
+                  <SearchRoundedIcon sx={{ color: "#0256B4", fontSize: 20 }} />
                 </InputAdornment>
               ),
               endAdornment: searchQuery ? (
@@ -2293,12 +2622,13 @@ export default function History() {
                 </InputAdornment>
               ) : null,
               sx: {
-                borderRadius: 2.5,
+                borderRadius: "24px",
                 bgcolor: "#FFFFFF",
                 fontSize: 13,
+                boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
                 "& fieldset": { borderColor: "#E2E8F0" },
                 "&:hover fieldset": { borderColor: "#CBD5E1" },
-                "&.Mui-focused fieldset": { borderColor: "primary.main" },
+                "&.Mui-focused fieldset": { borderColor: "#0256B4" },
               },
             }}
           />
@@ -2320,177 +2650,209 @@ export default function History() {
                   },
                 }}
               >
-                <TuneRoundedIcon sx={{ fontSize: 18, color: activeFilterCount > 0 ? "primary.main" : "#475569" }} />
+                <TuneRoundedIcon sx={{ fontSize: 18, color: activeFilterCount > 0 ? "#0256B4" : "#475569" }} />
               </Badge>
             }
             sx={{
               height: 40,
-              minWidth: 92,
-              borderRadius: 2.5,
+              minWidth: 96,
+              borderRadius: "24px",
               textTransform: "none",
               fontWeight: 800,
               fontSize: 12.5,
               bgcolor: activeFilterCount > 0 ? "#EFF6FF" : "#FFFFFF",
-              borderColor: activeFilterCount > 0 ? "primary.main" : "#E2E8F0",
-              color: activeFilterCount > 0 ? "primary.main" : "#334155",
-              boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-              "&:hover": {
-                borderColor: "primary.main",
-                bgcolor: activeFilterCount > 0 ? "#DBEAFE" : "#F8FAFC",
-              },
+              borderColor: activeFilterCount > 0 ? "#0256B4" : "#E2E8F0",
+              color: activeFilterCount > 0 ? "#0256B4" : "#334155",
+              boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
+              flexShrink: 0,
+              "&:hover": { borderColor: "#0256B4", bgcolor: "#EFF6FF" },
             }}
           >
             Filters
           </Button>
         </Stack>
 
-        {/* Quick Filter Pills (PhonePe Horizontal Pill Carousel) */}
+        {/* Horizontally Scrolling Filter Chips */}
         <Box
           sx={{
             display: "flex",
             alignItems: "center",
             gap: 0.8,
             overflowX: "auto",
-            pt: 1,
             pb: 0.4,
             "&::-webkit-scrollbar": { display: "none" },
+            scrollbarWidth: "none",
           }}
         >
-          {/* Date Range Quick Pill */}
           <Chip
-            icon={<CalendarMonthRoundedIcon sx={{ fontSize: "15px !important" }} />}
+            icon={<CalendarMonthRoundedIcon sx={{ fontSize: "14px !important" }} />}
             label={`Date: ${dateLabel} ▾`}
             onClick={() => setFilterDrawerOpen(true)}
             sx={{
-              fontWeight: 800,
-              fontSize: 11.5,
-              borderRadius: 999,
+              fontWeight: 700,
+              fontSize: 11,
+              borderRadius: "999px",
               bgcolor: datePreset !== "all" ? "#EFF6FF" : "#FFFFFF",
               color: datePreset !== "all" ? "#1D4ED8" : "#475569",
               border: "1px solid",
               borderColor: datePreset !== "all" ? "#3B82F6" : "#E2E8F0",
               cursor: "pointer",
-              "& .MuiChip-icon": {
-                color: datePreset !== "all" ? "#1D4ED8" : "#64748B",
-              },
-              "&:hover": { bgcolor: "#EFF6FF" },
             }}
           />
 
-          {/* Flow Quick Pill */}
           <Chip
             label={flowFilter === "ALL" ? "Flow: All ▾" : `Flow: ${flowLabel} ▾`}
             onClick={() => setFilterDrawerOpen(true)}
             sx={{
-              fontWeight: 800,
-              fontSize: 11.5,
-              borderRadius: 999,
+              fontWeight: 700,
+              fontSize: 11,
+              borderRadius: "999px",
               bgcolor: flowFilter !== "ALL" ? "#F5F3FF" : "#FFFFFF",
               color: flowFilter !== "ALL" ? "#7C3AED" : "#475569",
               border: "1px solid",
               borderColor: flowFilter !== "ALL" ? "#8B5CF6" : "#E2E8F0",
               cursor: "pointer",
-              "&:hover": { bgcolor: "#F5F3FF" },
             }}
           />
 
-          {/* Source Quick Pill */}
           <Chip
             label={sourceFilter === "ALL" ? "Source: All ▾" : `Source: ${sourceLabel} ▾`}
             onClick={() => setFilterDrawerOpen(true)}
             sx={{
-              fontWeight: 800,
-              fontSize: 11.5,
-              borderRadius: 999,
+              fontWeight: 700,
+              fontSize: 11,
+              borderRadius: "999px",
               bgcolor: sourceFilter !== "ALL" ? "#F0FDF4" : "#FFFFFF",
               color: sourceFilter !== "ALL" ? "#15803D" : "#475569",
               border: "1px solid",
               borderColor: sourceFilter !== "ALL" ? "#22C55E" : "#E2E8F0",
               cursor: "pointer",
-              "&:hover": { bgcolor: "#F0FDF4" },
             }}
           />
 
-          {/* Clear / Reset All Pill if filters active */}
+          <Chip
+            label="Wallet: All ▾"
+            onClick={() => setFilterDrawerOpen(true)}
+            sx={{
+              fontWeight: 700,
+              fontSize: 11,
+              borderRadius: "999px",
+              bgcolor: "#FFFFFF",
+              color: "#475569",
+              border: "1px solid #E2E8F0",
+              cursor: "pointer",
+            }}
+          />
+
+          <Chip
+            label="Category: All ▾"
+            onClick={() => setFilterDrawerOpen(true)}
+            sx={{
+              fontWeight: 700,
+              fontSize: 11,
+              borderRadius: "999px",
+              bgcolor: "#FFFFFF",
+              color: "#475569",
+              border: "1px solid #E2E8F0",
+              cursor: "pointer",
+            }}
+          />
+
           {activeFilterCount > 0 && (
             <Chip
               label={`✕ Reset (${activeFilterCount})`}
               onClick={handleResetFilters}
               sx={{
-                fontWeight: 800,
-                fontSize: 11.5,
-                borderRadius: 999,
+                fontWeight: 700,
+                fontSize: 11,
+                borderRadius: "999px",
                 bgcolor: "#FEF2F2",
                 color: "#DC2626",
                 border: "1px solid #FCA5A5",
                 cursor: "pointer",
-                "&:hover": { bgcolor: "#FEE2E2" },
               }}
             />
           )}
         </Box>
-      </Box>
 
-      {/* Source Category Filter Chips Bar */}
-      <Box sx={{ mb: 1.5 }}>
-        <Box
-          sx={{
-            display: "flex",
-            gap: 0.8,
-            overflowX: "auto",
-            pb: 0.5,
-            "&::-webkit-scrollbar": { display: "none" },
-          }}
-        >
-          {[
-            { key: "ALL", label: `All (${categoryCounts.ALL})` },
-            { key: "LAYER", label: `Layer & Blocks (${categoryCounts.LAYER})` },
-            { key: "DIRECT", label: `Direct Bonus (${categoryCounts.DIRECT})` },
-            { key: "P2P", label: `P2P Transfer (${categoryCounts.P2P})` },
-            { key: "ROYALTY", label: `Royalty (${categoryCounts.ROYALTY})` },
-            { key: "MERCHANT_CAPTAIN", label: `Merchant / Captain (${categoryCounts.MERCHANT_CAPTAIN})` },
-            { key: "WITHDRAWAL", label: `Withdrawals (${categoryCounts.WITHDRAWAL})` },
-          ].map((item) => {
-            const isSelected = sourceFilter === item.key;
-            return (
-              <Chip
-                key={item.key}
-                label={item.label}
-                onClick={() => setSourceFilter(item.key)}
-                sx={{
-                  fontWeight: 800,
-                  fontSize: 11.5,
-                  borderRadius: 999,
-                  bgcolor: isSelected ? "#0F172A" : "#FFFFFF",
-                  color: isSelected ? "#FFFFFF" : "#475569",
-                  border: "1px solid",
-                  borderColor: isSelected ? "#0F172A" : "#E2E8F0",
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                  "&:hover": {
-                    bgcolor: isSelected ? "#1E293B" : "#F1F5F9",
-                  },
-                }}
-              />
-            );
-          })}
-        </Box>
-      </Box>
+        {/* Compact Segmented Tabs: All (X), Credits (X), Debits (X) */}
+        <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+          <Button
+            size="small"
+            onClick={() => setFlowFilter("ALL")}
+            sx={{
+              flex: 1,
+              py: 0.7,
+              borderRadius: "20px",
+              fontSize: 12,
+              fontWeight: 800,
+              textTransform: "none",
+              bgcolor: flowFilter === "ALL" ? "#0F172A" : "#FFFFFF",
+              color: flowFilter === "ALL" ? "#FFFFFF" : "#64748B",
+              border: "1px solid",
+              borderColor: flowFilter === "ALL" ? "#0F172A" : "#E2E8F0",
+              "&:hover": { bgcolor: flowFilter === "ALL" ? "#1E293B" : "#F8FAFC" },
+            }}
+          >
+            All ({allTransactions.length})
+          </Button>
 
-      {/* Unified Transaction Stream List */}
+          <Button
+            size="small"
+            onClick={() => setFlowFilter("CREDIT")}
+            sx={{
+              flex: 1,
+              py: 0.7,
+              borderRadius: "20px",
+              fontSize: 12,
+              fontWeight: 800,
+              textTransform: "none",
+              bgcolor: flowFilter === "CREDIT" ? "#059669" : "#FFFFFF",
+              color: flowFilter === "CREDIT" ? "#FFFFFF" : "#64748B",
+              border: "1px solid",
+              borderColor: flowFilter === "CREDIT" ? "#059669" : "#E2E8F0",
+              "&:hover": { bgcolor: flowFilter === "CREDIT" ? "#047857" : "#F8FAFC" },
+            }}
+          >
+            Credits ({ledgerSummary.creditCount})
+          </Button>
+
+          <Button
+            size="small"
+            onClick={() => setFlowFilter("DEBIT")}
+            sx={{
+              flex: 1,
+              py: 0.7,
+              borderRadius: "20px",
+              fontSize: 12,
+              fontWeight: 800,
+              textTransform: "none",
+              bgcolor: flowFilter === "DEBIT" ? "#7C3AED" : "#FFFFFF",
+              color: flowFilter === "DEBIT" ? "#FFFFFF" : "#64748B",
+              border: "1px solid",
+              borderColor: flowFilter === "DEBIT" ? "#7C3AED" : "#E2E8F0",
+              "&:hover": { bgcolor: flowFilter === "DEBIT" ? "#6D28D9" : "#F8FAFC" },
+            }}
+          >
+            Self Account ({ledgerSummary.selfCount})
+          </Button>
+        </Stack>
+      </Stack>
+
+      {/* 4. MONTHLY TRANSACTION GROUPING STREAM */}
       <Paper
         elevation={0}
         sx={{
-          borderRadius: 2.5,
-          border: "1px solid",
-          borderColor: "#EEF2F6",
-          bgcolor: "#fff",
-          p: 1.2,
+          borderRadius: "20px",
+          border: "1px solid #EEF2F6",
+          bgcolor: "#FFFFFF",
+          p: { xs: 1.5, sm: 2 },
           overflow: "hidden",
+          boxShadow: "0 2px 12px rgba(15, 23, 42, 0.04)",
         }}
       >
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.2, px: 0.5 }}>
-          <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A" }}>
+          <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A" }}>
             Transactions ({filteredTransactions.length})
           </Typography>
           {activeFilterCount > 0 && (
@@ -2545,7 +2907,7 @@ export default function History() {
         tx={selectedTx}
       />
 
-      <Box sx={{ height: 16 }} />
+      </Box>
     </Box>
   );
 }

@@ -44,7 +44,7 @@ import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import NotificationsActiveRoundedIcon from "@mui/icons-material/NotificationsActiveRounded";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 
-import {
+import API, {
   getRanks,
   getUpgradeEligibility,
   initiateUpgrade,
@@ -60,10 +60,12 @@ import {
 } from "../api/api";
 import normalizeMediaUrl from "../utils/media";
 import {
+  getMainWalletBalance,
   getAddMoneyPocketBalance,
   getPackagePurchaseCouponBalance,
   getSelfPackageWalletBalance,
 } from "../utils/walletBalances";
+import AccordionTree from "../components/genealogy/AccordionTree";
 
 function fmt(val) {
   const num = Number(val || 0);
@@ -86,57 +88,77 @@ const RANK_TIERS = [
 function RankPaymentMethodDialog({ open, onClose, data, walletMe, walletHistory, busy, onPickManual, onPickWallet }) {
   if (!open || !data?.upgrade) return null;
   const amount = Number(data.upgrade.upgrade_amount || 0);
-  const internalBal = getSelfPackageWalletBalance(walletMe);
-  const packageCouponBal = getPackagePurchaseCouponBalance(walletMe);
-  const addMoneyBal = getAddMoneyPocketBalance(walletMe, walletHistory);
-  const canWallet = internalBal >= amount && amount > 0;
-  const canPackageCoupon = packageCouponBal >= amount && amount > 0;
-  const canAddMoney = addMoneyBal >= amount && amount > 0;
+  const mainBal = getMainWalletBalance(walletMe);
+  const canMainWallet = mainBal >= amount && amount > 0;
   const money = (value) => Number(value || 0).toFixed(2);
-  const WalletButtonLabel = ({ title, balance }) => (
-    <Stack component="span" spacing={0.25} alignItems="center" sx={{ lineHeight: 1.15 }}>
-      <span>{title}</span>
-      <Typography component="span" sx={{ fontSize: 11, fontWeight: 800, color: "inherit", opacity: 0.86 }}>
-        Available Rs. {money(balance)}
-      </Typography>
-    </Stack>
-  );
 
   return (
-    <Dialog open={open} onClose={busy ? undefined : onClose} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 4, overflow: "hidden" } }}>
+    <Dialog
+      open={open}
+      onClose={busy ? undefined : onClose}
+      fullWidth
+      maxWidth="xs"
+      PaperProps={{
+        sx: {
+          borderRadius: 4,
+          background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+          boxShadow: "0 24px 80px rgba(15,23,42,0.24)",
+          overflow: "hidden",
+        },
+      }}
+      BackdropProps={{ sx: { backgroundColor: "rgba(15, 23, 42, 0.44)", backdropFilter: "blur(8px)" } }}
+    >
       <DialogTitle sx={{ fontWeight: 900, color: "#0f172a", pb: 1 }}>Select Payment Method</DialogTitle>
-      <DialogContent dividers sx={{ pt: 1.5 }}>
-        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.8 }}>
-          Amount: <b>₹{money(amount)}</b>
+      <DialogContent dividers sx={{ borderColor: "rgba(226,232,240,0.9)", pt: 2, pb: 2.5 }}>
+        <Box sx={{ mb: 2, p: 2, bgcolor: "#f8fafc", borderRadius: 2, border: "1px solid #e2e8f0" }}>
+          <Typography variant="body2" color="text.secondary">Total Payable Amount</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 900, color: "#0f172a" }}>₹{money(amount)}</Typography>
+        </Box>
+        <Typography variant="body2" color="text.secondary" sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+          <span>Main Wallet Balance:</span>
+          <b style={{ color: canMainWallet ? "#16a34a" : "#dc2626" }}>₹{money(mainBal)}</b>
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.8 }}>
-          Self Package Wallet Balance: <b>₹{money(internalBal)}</b>
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.8 }}>
-          Package Purchase Coupon Received (Buy Package) Balance: <b>₹{money(packageCouponBal)}</b>
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.8 }}>
-          Add Money Pocket Balance: <b>₹{money(addMoneyBal)}</b>
-        </Typography>
-        {!canWallet && !canPackageCoupon && !canAddMoney ? (
-          <Alert severity="info" sx={{ mt: 1.5, borderRadius: 3 }}>
-            Wallet payment is available only when one package wallet balance is enough.
-          </Alert>
-        ) : null}
       </DialogContent>
-      <DialogActions sx={{ p: 1.5, gap: 1, flexWrap: "wrap" }}>
-        <Button onClick={onClose} disabled={busy} sx={{ borderRadius: 3 }}>Cancel</Button>
-        <Button variant="outlined" onClick={onPickManual} disabled sx={{ borderRadius: 3, fontWeight: 900 }}>
-          Manual Payment
+      <DialogActions sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.25 }}>
+        <Button
+          variant="contained"
+          fullWidth
+          disabled={!canMainWallet || busy}
+          onClick={() => onPickWallet("main")}
+          sx={{
+            py: 1.25,
+            borderRadius: 3,
+            fontWeight: 800,
+            bgcolor: "#0284c7",
+            "&:hover": { bgcolor: "#0369a1" },
+            textTransform: "none",
+          }}
+        >
+          {canMainWallet ? `Pay from Main Wallet (₹${money(mainBal)})` : `Insufficient Main Wallet (Available: ₹${money(mainBal)})`}
         </Button>
-        <Button variant="contained" disabled={!canWallet || busy} onClick={() => onPickWallet("internal")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
-          <WalletButtonLabel title="Pay from Self Package" balance={internalBal} />
+        <Button
+          variant="outlined"
+          fullWidth
+          disabled={busy}
+          onClick={onPickManual}
+          sx={{
+            py: 1.25,
+            borderRadius: 3,
+            fontWeight: 800,
+            borderColor: "#0f172a",
+            color: "#0f172a",
+            "&:hover": { bgcolor: "#f1f5f9", borderColor: "#0f172a" },
+            textTransform: "none",
+          }}
+        >
+          Pay via Payment Gateway / Online
         </Button>
-        <Button variant="contained" disabled={!canPackageCoupon || busy} onClick={() => onPickWallet("package_coupon")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
-          <WalletButtonLabel title="Pay from Package Purchase Coupon Received" balance={packageCouponBal} />
-        </Button>
-        <Button variant="contained" disabled={!canAddMoney || busy} onClick={() => onPickWallet("package_upload")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
-          <WalletButtonLabel title="Pay from Add Money Pocket" balance={addMoneyBal} />
+        <Button
+          onClick={onClose}
+          disabled={busy}
+          sx={{ mt: 0.5, borderRadius: 3, textTransform: "none", color: "#64748b" }}
+        >
+          Cancel
         </Button>
       </DialogActions>
     </Dialog>
@@ -340,7 +362,7 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
   );
 }
 
-export default function RankUpgrade({ defaultToRankId = null } = {}) {
+export default function RankUpgrade({ defaultToRankId = null, teamSummary: propTeamSummary = null } = {}) {
   const navigate = useNavigate();
 
   const [ranks, setRanks] = useState([]);
@@ -367,6 +389,12 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
   const [lbHolds, setLbHolds] = useState([]);
   const [lbLoading, setLbLoading] = useState(false);
   const [hasApprovedBase, setHasApprovedBase] = useState(false);
+  const [teamSummary, setTeamSummary] = useState(propTeamSummary);
+  const [fiveCounts, setFiveCounts] = useState(null);
+
+  useEffect(() => {
+    if (propTeamSummary) setTeamSummary(propTeamSummary);
+  }, [propTeamSummary]);
 
   useEffect(() => {
     let alive = true;
@@ -381,6 +409,8 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
           getMyLevelBonusProgress(),
           getMyRankCommissionHolds(),
           listMyPromoPurchases(),
+          API.get("/accounts/team/summary/").then((r) => r?.data || null),
+          API.get("/accounts/genealogy/5m/counts/?pool=FIVE_150&depth=10").then((r) => r?.data || null),
         ]);
         if (!alive) return;
 
@@ -398,6 +428,8 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
           });
           setHasApprovedBase(!!ok);
         }
+        if (results[6].status === "fulfilled") setTeamSummary(results[6].value || null);
+        if (results[7].status === "fulfilled") setFiveCounts(results[7].value || null);
       } catch (e) {
         if (!alive) return;
         setError(e?.response?.data?.detail || e?.message || "Failed to load rank data");
@@ -516,20 +548,45 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
     }
   }, []);
 
-  const savedRoyaltyConfig = useMemo(() => {
+  const [royaltyConfig, setRoyaltyConfig] = useState(() => {
     try {
       const raw = localStorage.getItem("tri_royalty_config");
-      if (!raw) return null;
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return {
+      tier1_percent: 4,
+      tier1_cap: 10000,
+      tier1_days: 40,
+      tier1_levels: "Layer 1 to Layer 7",
+      tier2_percent: 6,
+      tier2_cap: 40000,
+      tier2_days: 7,
+      tier2_levels: "Layer 8 to Layer 10",
+    };
+  });
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/royalty-config.json");
+        if (res.ok) {
+          const cfg = await res.json();
+          if (alive && cfg && typeof cfg === "object") {
+            setRoyaltyConfig((prev) => ({ ...prev, ...cfg }));
+          }
+        }
+      } catch (_) {}
+    })();
+    return () => { alive = false; };
   }, []);
+
+  const savedRoyaltyConfig = royaltyConfig;
 
   const royaltyShopping = useMemo(() => {
     let total = 0;
-    const tier1 = Number(savedRoyaltyConfig?.tier1_cap ?? 10000);
-    const tier2 = Number(savedRoyaltyConfig?.tier2_cap ?? 40000);
+    const tier1 = Number(royaltyConfig?.tier1_cap ?? 10000);
+    const tier2 = Number(royaltyConfig?.tier2_cap ?? 40000);
     if (currentLevel >= 7) {
       total += tier1;
     }
@@ -537,7 +594,43 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
       total += tier2;
     }
     return total;
-  }, [currentLevel, savedRoyaltyConfig]);
+  }, [currentLevel, royaltyConfig]);
+
+  // ── 5-Matrix Education Rank Tree Community Blocks Data ──
+  const [communityExpanded, setCommunityExpanded] = useState(false);
+
+  const eEduCommunityGrid = useMemo(() => {
+    return Array.from({ length: 10 }, (_, i) => {
+      const lvl = i + 1;
+      const maxCap = Math.pow(5, lvl);
+      const fiveLvlCount = fiveCounts?.levels?.find((x) => Number(x.level) === lvl)?.team_count;
+      const eligLvlCount = elig?.level_team_counts?.[lvl] ?? elig?.team_counts_by_level?.[lvl] ?? elig?.levels?.[lvl]?.team_count;
+      const rankLvlCount = ranks?.find((r) => Number(r.level_number) === lvl)?.approved_team_count;
+      
+      const count = Number(eligLvlCount ?? fiveLvlCount ?? rankLvlCount ?? 0);
+      return {
+        level: lvl,
+        count,
+        max_count: maxCap,
+        isFull: count >= maxCap && count > 0,
+        hasMembers: count > 0,
+      };
+    });
+  }, [fiveCounts, elig, ranks]);
+
+  const totalCommunityBlocks = useMemo(() => {
+    return eEduCommunityGrid.reduce((sum, row) => sum + row.count, 0);
+  }, [eEduCommunityGrid]);
+
+  const activeCommunityLayers = useMemo(() => {
+    return eEduCommunityGrid.filter((r) => r.count > 0).length;
+  }, [eEduCommunityGrid]);
+
+  const completedCommunityLayers = useMemo(() => {
+    return eEduCommunityGrid.filter((r) => r.isFull).length;
+  }, [eEduCommunityGrid]);
+
+  const visibleCommunityRows = communityExpanded ? eEduCommunityGrid : eEduCommunityGrid.slice(0, 5);
 
   const upgradeWindowInfo = useMemo(() => {
     const isL8Plus = currentLevel >= 8;
@@ -639,7 +732,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
               <Box>
                 <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Current Layer</Typography>
                 <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#1e1b4b" }}>
-                  Layer {currentLevel} <Chip label="Eligible" size="small" color="primary" sx={{ height: 18, fontSize: 10, fontWeight: 800 }} />
+                  Layer {currentLevel} <Chip label={currentLevel >= 10 ? "Max Layer" : "Eligible"} size="small" color={currentLevel >= 10 ? "success" : "primary"} sx={{ height: 18, fontSize: 10, fontWeight: 800 }} />
                 </Typography>
               </Box>
             </Stack>
@@ -647,13 +740,15 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
 
           <Grid item xs={4}>
             <Stack direction="row" spacing={1} alignItems="center">
-              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "#fff7ed", color: "#d97706", display: "grid", placeItems: "center" }}>
+              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: currentLevel >= 10 ? "#f0fdf4" : "#fff7ed", color: currentLevel >= 10 ? "#16a34a" : "#d97706", display: "grid", placeItems: "center" }}>
                 <AccessTimeRoundedIcon sx={{ fontSize: 22 }} />
               </Box>
               <Box>
                 <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Upgrade Window ({upgradeWindowInfo.levelRange})</Typography>
-                <Typography sx={{ fontSize: 13, fontWeight: 900, color: upgradeWindowInfo.started ? "#d97706" : "#2563eb" }}>
-                  {upgradeWindowInfo.started ? (
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: currentLevel >= 10 ? "#16a34a" : upgradeWindowInfo.started ? "#d97706" : "#2563eb" }}>
+                  {currentLevel >= 10 ? (
+                    "All Layers Completed"
+                  ) : upgradeWindowInfo.started ? (
                     <>
                       {`${upgradeWindowInfo.daysLeft} Days Left `}
                       <Typography component="span" sx={{ fontSize: 10, color: "#92400e" }}>
@@ -681,7 +776,15 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
               <Box>
                 <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Next Layer</Typography>
                 <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#15803d" }}>
-                  Layer {nextLevel} <Typography component="span" sx={{ fontSize: 10, color: "#166534" }}>(Upgrade to Continue)</Typography>
+                  {currentLevel >= 10 ? (
+                    <>
+                      Max Layer <Chip label="Completed" size="small" color="success" sx={{ height: 18, fontSize: 10, fontWeight: 800, ml: 0.5 }} />
+                    </>
+                  ) : (
+                    <>
+                      Layer {nextLevel} <Typography component="span" sx={{ fontSize: 10, color: "#166534" }}>(Upgrade to Continue)</Typography>
+                    </>
+                  )}
                 </Typography>
               </Box>
             </Stack>
@@ -728,16 +831,25 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
                 </Stack>
                 <Typography sx={{ fontSize: 11, opacity: 0.9, mb: 1.5 }}>
                   {isLimitReached
-                    ? `Limit reached for Layer ${currentLevel}. Upgrade to next layer to continue income.`
+                    ? `Limit reached for Layer ${currentLevel}. Upgrade or re-top up to continue income.`
+                    : currentLevel >= 10
+                    ? `Layer 10 unlocked. Max earning limit is ₹${fmt(currentLimit)}.`
                     : `Layer ${currentLevel} earning limit is ₹${fmt(currentLimit)}.`}
                 </Typography>
                 <Button
                   fullWidth
                   variant="contained"
-                  sx={{ bgcolor: "#ffffff", color: "#1e1b4b", fontWeight: 900, "&:hover": { bgcolor: "#f3f4f6" } }}
+                  disabled={currentLevel >= 10 && !isLimitReached}
+                  sx={{
+                    bgcolor: currentLevel >= 10 && !isLimitReached ? "#059669" : "#ffffff",
+                    color: currentLevel >= 10 && !isLimitReached ? "#ffffff" : "#1e1b4b",
+                    fontWeight: 900,
+                    "&.Mui-disabled": { bgcolor: "#059669", color: "#ffffff", opacity: 0.95 },
+                    "&:hover": { bgcolor: "#f3f4f6" },
+                  }}
                   onClick={() => handleUpgradeClick()}
                 >
-                  Upgrade Now
+                  {currentLevel >= 10 && !isLimitReached ? "✓ Fully Upgraded (Layer 10)" : "Upgrade Now"}
                 </Button>
               </Paper>
             </Grid>
@@ -761,12 +873,16 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
 
         <Grid item xs={12} sm={4}>
           <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff" }}>
-            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>EARNING LIMIT (LAYER 10)</Typography>
-            <Typography sx={{ fontSize: 20, fontWeight: 900, color: "#0f172a", my: 0.5 }}>₹1,50,000</Typography>
-            {currentLevel >= 10 && isLimitReached ? (
-              <Chip icon={<CheckCircleRoundedIcon />} label="Completed" color="success" size="small" sx={{ fontWeight: 800 }} />
+            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>
+              {currentLevel >= 10 ? "TOTAL LAYER CAPACITY" : `NEXT TARGET (LAYER ${nextLevel})`}
+            </Typography>
+            <Typography sx={{ fontSize: 20, fontWeight: 900, color: "#0f172a", my: 0.5 }}>
+              ₹{fmt(currentLevel >= 10 ? 100000 : (RANK_TIERS.find((t) => t.level === nextLevel)?.limit || 0))}
+            </Typography>
+            {currentLevel >= 10 ? (
+              <Chip icon={<CheckCircleRoundedIcon />} label="All Layers Unlocked" color="success" size="small" sx={{ fontWeight: 800 }} />
             ) : (
-              <Chip icon={<CancelRoundedIcon />} label="Not Completed" color="error" size="small" sx={{ fontWeight: 800 }} />
+              <Chip label="Upcoming" color="default" size="small" sx={{ fontWeight: 800 }} />
             )}
           </Paper>
         </Grid>
@@ -791,17 +907,17 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
                 <ShoppingBagRoundedIcon color="success" sx={{ fontSize: 18 }} />
                 <Typography sx={{ fontWeight: 900, fontSize: 12, color: "#15803d" }}>ROYALTY INCOME (SHOPPING) ⓘ</Typography>
               </Stack>
-              <Chip label={`₹${fmt(royaltyShopping)}`} color="success" size="small" sx={{ fontWeight: 900, fontSize: 11 }} />
+              <Chip label={`₹${fmt((Number(royaltyConfig?.tier1_cap ?? 10000) + Number(royaltyConfig?.tier2_cap ?? 40000)))}`} color="success" size="small" sx={{ fontWeight: 900, fontSize: 11 }} />
             </Stack>
             <Divider sx={{ my: 1 }} />
             <Stack spacing={1}>
               <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Box>
                   <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>
-                    {savedRoyaltyConfig?.tier1_levels ? String(savedRoyaltyConfig.tier1_levels).replace(/Level/gi, "LAYER") : "LAYER 1 TO LAYER 7"}
+                    {royaltyConfig?.tier1_levels ? String(royaltyConfig.tier1_levels).replace(/Level/gi, "LAYER") : "LAYER 1 TO LAYER 7"}
                   </Typography>
                   <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#15803d" }}>
-                    {savedRoyaltyConfig?.tier1_percent ?? 3}% ₹{fmt(savedRoyaltyConfig?.tier1_cap ?? 10000)}
+                    {royaltyConfig?.tier1_percent ?? 4}% ₹{fmt(royaltyConfig?.tier1_cap ?? 10000)}
                   </Typography>
                 </Box>
                 {currentLevel >= 7 ? (
@@ -813,10 +929,10 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
               <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Box>
                   <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>
-                    {savedRoyaltyConfig?.tier2_levels ? String(savedRoyaltyConfig.tier2_levels).replace(/Level/gi, "LAYER") : "LAYER 10 TO LAYER 10"}
+                    {royaltyConfig?.tier2_levels ? String(royaltyConfig.tier2_levels).replace(/Level/gi, "LAYER") : "LAYER 8 TO LAYER 10"}
                   </Typography>
                   <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#15803d" }}>
-                    {savedRoyaltyConfig?.tier2_percent ?? 7}% ₹{fmt(savedRoyaltyConfig?.tier2_cap ?? 40000)}
+                    {royaltyConfig?.tier2_percent ?? 6}% ₹{fmt(royaltyConfig?.tier2_cap ?? 40000)}
                   </Typography>
                 </Box>
                 {currentLevel >= 10 ? (
@@ -828,7 +944,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
             </Stack>
             <Divider sx={{ my: 1 }} />
             <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#15803d" }}>
-              TOTAL ELIGIBLE ROYALTY INCOME (SHOPPING) ₹{fmt(royaltyShopping)}
+              TOTAL ELIGIBLE ROYALTY INCOME (SHOPPING) ₹{fmt((Number(royaltyConfig?.tier1_cap ?? 10000) + Number(royaltyConfig?.tier2_cap ?? 40000)))}
             </Typography>
           </Paper>
         </Grid>
@@ -873,79 +989,165 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
         </Grid>
       </Grid>
 
-      {/* ── Rank Upgrade Layer Table (Dark Blue Header) ── */}
-      <Paper variant="outlined" sx={{ p: 0, mb: 2, borderRadius: 3, overflow: "hidden" }}>
-        <TableContainer>
+      {/* ── 5-Matrix Education Community Blocks KPI Grid ── */}
+      <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
+        <Paper
+          variant="outlined"
+          sx={{
+            flex: "1 1 0",
+            minWidth: 75,
+            p: 1.5,
+            textAlign: "center",
+            borderRadius: 2.5,
+            borderColor: "#c7d2fe",
+            bgcolor: "#fff",
+          }}
+        >
+          <Typography sx={{ fontSize: 9.5, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.4, mb: 0.5, whiteSpace: "nowrap" }}>
+            Total Comm...
+          </Typography>
+          <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#4f46e5" }}>
+            {totalCommunityBlocks}
+          </Typography>
+        </Paper>
+
+        <Paper
+          variant="outlined"
+          sx={{
+            flex: "1 1 0",
+            minWidth: 75,
+            p: 1.5,
+            textAlign: "center",
+            borderRadius: 2.5,
+            borderColor: "#bbf7d0",
+            bgcolor: "#fff",
+          }}
+        >
+          <Typography sx={{ fontSize: 9.5, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.4, mb: 0.5, whiteSpace: "nowrap" }}>
+            Active Layer...
+          </Typography>
+          <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#16a34a" }}>
+            {activeCommunityLayers}
+          </Typography>
+        </Paper>
+
+        <Paper
+          variant="outlined"
+          sx={{
+            flex: "1 1 0",
+            minWidth: 75,
+            p: 1.5,
+            textAlign: "center",
+            borderRadius: 2.5,
+            borderColor: "#fed7aa",
+            bgcolor: "#fff",
+          }}
+        >
+          <Typography sx={{ fontSize: 9.5, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.4, mb: 0.5, whiteSpace: "nowrap" }}>
+            Layers Comp...
+          </Typography>
+          <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#d97706" }}>
+            {completedCommunityLayers > 0 ? `L${completedCommunityLayers}` : "–"}
+          </Typography>
+        </Paper>
+
+        <Paper
+          variant="outlined"
+          sx={{
+            flex: "1 1 0",
+            minWidth: 75,
+            p: 1.5,
+            textAlign: "center",
+            borderRadius: 2.5,
+            borderColor: "#ddd6fe",
+            bgcolor: "#fff",
+          }}
+        >
+          <Typography sx={{ fontSize: 9.5, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.4, mb: 0.5, whiteSpace: "nowrap" }}>
+            e-Edu Ear...
+          </Typography>
+          <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#7c3aed" }}>
+            ₹{fmt(layerMatrixEarned || totalEarnings)}
+          </Typography>
+        </Paper>
+      </Box>
+
+      {/* ── Unified E-Education Layer & Community Blocks Table ── */}
+      <Paper variant="outlined" sx={{ p: 0, mb: 2.5, borderRadius: 3, overflow: "hidden", borderColor: "#e2e8f0" }}>
+        <TableContainer sx={{ touchAction: "pan-x pan-y", WebkitOverflowScrolling: "touch" }}>
           <Table size="small">
             <TableHead sx={{ bgcolor: "#1e1b4b" }}>
               <TableRow sx={{ bgcolor: "#1e1b4b" }}>
-                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5 }}>Layer</TableCell>
-                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5 }}>Upgrade Amount (₹)</TableCell>
-                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5 }}>Earning Limit (₹)</TableCell>
-                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5 }}>Team Count ⓘ</TableCell>
-                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5, textAlign: "right" }}>Next Rank Upgrade</TableCell>
+                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5, fontSize: 12 }}>Layer</TableCell>
+                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5, fontSize: 12 }}>Upgrade (₹)</TableCell>
+                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5, fontSize: 12 }}>Earning Limit (₹)</TableCell>
+                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5, fontSize: 12, textAlign: "center" }}>Community Blocks</TableCell>
+                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5, textAlign: "right", fontSize: 12 }}>Action / Status</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {(() => {
                 const DEFAULT_LIMITS = [1750, 2000, 4000, 6000, 7500, 8750, 10000, 15000, 20000, 100000];
-                const DEFAULT_TEAM_COUNTS = ["5", "25", "125", "625", "3125", "15625", "78125", "-", "-", "-"];
                 return (ranks || []).map((r, idx) => {
                   const level = Number(r.level_number || idx + 1);
+                  const maxCap = Math.pow(5, level);
                   const achieved = effectiveAchievedLevel >= level;
                   const isCurrentActive = level === effectiveAchievedLevel;
                   const canBuy = level === effectiveAchievedLevel + 1;
 
                   const cfgLvl = savedRankConfig?.levels?.[idx];
                   const limitVal = cfgLvl?.earning_limit ? Number(cfgLvl.earning_limit) : (DEFAULT_LIMITS[idx] || (r.earning_limit ? Number(r.earning_limit) : 0));
+                  
+                  // Compute exact real-time active community count for this layer
+                  const fiveLvlCount = fiveCounts?.levels?.find((x) => Number(x.level) === level)?.team_count;
+                  const eligLvlCount = elig?.level_team_counts?.[level] ?? elig?.team_counts_by_level?.[level] ?? elig?.levels?.[level]?.team_count;
+                  const rankLvlCount = ranks?.find((rr) => Number(rr.level_number) === level)?.approved_team_count;
+
                   const userTeamCount = Number(
+                    eligLvlCount ??
+                    fiveLvlCount ??
+                    rankLvlCount ??
                     r.current_team_count ??
-                    r.team_size_achieved ??
-                    r.current_team_size ??
-                    elig?.level_team_counts?.[level] ??
-                    elig?.team_counts_by_level?.[level] ??
-                    elig?.team_by_level?.[level] ??
                     0
                   );
 
-                  const teamVal = cfgLvl?.team_count != null ? String(cfgLvl.team_count) : (DEFAULT_TEAM_COUNTS[idx] || (r.team_size_required ? String(r.team_size_required) : "-"));
                   const amtVal = cfgLvl?.upgrade_amount ? Number(cfgLvl.upgrade_amount) : Number(r.upgrade_amount || 0);
                   const rankTitle = cfgLvl?.name ? String(cfgLvl.name).replace(/Level/gi, "Layer") : (r.rank_name ? String(r.rank_name).replace(/Level/gi, "Layer") : `Layer ${level}`);
-
-                  let teamDisplay = "-";
-                  if (teamVal !== "-") {
-                    teamDisplay = userTeamCount > 0 ? `👥 ${userTeamCount} / ${teamVal}` : `👥 ${teamVal}`;
-                  } else {
-                    teamDisplay = userTeamCount > 0 ? `👥 ${userTeamCount}` : "-";
-                  }
+                  const isFull = userTeamCount >= maxCap && userTeamCount > 0;
 
                   return (
                     <TableRow
                       key={r.id || idx}
                       sx={{
-                        bgcolor: isCurrentActive ? "#f3e8ff" : achieved ? "#f8fafc" : "inherit",
+                        bgcolor: isCurrentActive ? "#f3e8ff" : isFull ? "#f0fdf4" : achieved ? "#f8fafc" : "inherit",
                         "&:hover": { bgcolor: "#f1f5f9" },
                       }}
                     >
-                      <TableCell sx={{ fontWeight: isCurrentActive ? 900 : 700, color: isCurrentActive ? "#6b21a8" : "inherit" }}>
+                      <TableCell sx={{ fontWeight: isCurrentActive ? 900 : 700, color: isCurrentActive ? "#6b21a8" : "inherit", fontSize: 12.5 }}>
                         {rankTitle}
                       </TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>{amtVal.toLocaleString("en-IN")}</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>{limitVal.toLocaleString("en-IN")}</TableCell>
-                      <TableCell sx={{ color: teamDisplay !== "-" ? "#4c1d95" : "text.secondary", fontWeight: teamDisplay !== "-" ? 700 : 400 }}>
-                        {teamDisplay}
+                      <TableCell sx={{ fontWeight: 700, fontSize: 12.5 }}>{amtVal.toLocaleString("en-IN")}</TableCell>
+                      <TableCell sx={{ fontWeight: 700, fontSize: 12.5 }}>{limitVal.toLocaleString("en-IN")}</TableCell>
+                      <TableCell align="center">
+                        <span style={{ fontWeight: 800, color: userTeamCount > 0 ? "#4f46e5" : "#64748b", fontSize: 12 }}>
+                          {userTeamCount}
+                        </span>
+                        <span style={{ fontSize: 11, color: "#94a3b8" }}> / {maxCap.toLocaleString("en-IN")}</span>
+                        {isFull && (
+                          <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 800, color: "#16a34a" }}>● Full</span>
+                        )}
                       </TableCell>
                       <TableCell align="right">
                         {isCurrentActive && isLimitReached ? (
-                          <Typography sx={{ color: "#ef4444", fontWeight: 900, fontSize: 13 }}>Limit Reached</Typography>
+                          <Typography sx={{ color: "#ef4444", fontWeight: 900, fontSize: 12 }}>Limit Reached</Typography>
                         ) : achieved ? (
-                          <Chip size="small" label="Purchased" color="success" variant="outlined" sx={{ fontWeight: 700 }} />
+                          <Chip size="small" label="Purchased" color="success" variant="outlined" sx={{ fontWeight: 800, fontSize: 11 }} />
                         ) : canBuy ? (
                           <Button
                             size="small"
                             variant="contained"
                             color="primary"
-                            sx={{ fontWeight: 800, borderRadius: 1.5 }}
+                            sx={{ fontWeight: 800, borderRadius: 1.5, fontSize: 11, textTransform: "none", py: 0.5 }}
                             onClick={() => {
                               setSelectedToRankId(r.id);
                               setSelectedToRankName(r.rank_name);
@@ -959,7 +1161,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
                             size="small"
                             variant="outlined"
                             disabled
-                            sx={{ fontWeight: 700, borderRadius: 1.5 }}
+                            sx={{ fontWeight: 700, borderRadius: 1.5, fontSize: 11, textTransform: "none", py: 0.5 }}
                           >
                             Upgrade
                           </Button>
@@ -974,107 +1176,108 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
         </TableContainer>
         <Box sx={{ p: 1.25, bgcolor: "#f8fafc", borderTop: "1px solid #e2e8f0", textAlign: "center" }}>
           <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>
-            ⓘ Total Cycle Limit: ₹1,50,000 for Level 10
+            ⓘ Total Cycle Limit: ₹1,50,000 for Layer 10
           </Typography>
         </Box>
       </Paper>
 
-      {/* ── HOW TEAM COUNT WORKS Banner ── */}
-      <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3, bgcolor: "#fff" }}>
-        <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#4338ca", mb: 1.5, textAlign: "center", letterSpacing: 0.5 }}>
-          HOW TEAM COUNT WORKS?
-        </Typography>
-        <Grid container spacing={2} alignItems="center" justifyContent="center">
-          <Grid item xs={12} sm={5}>
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <Box sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: "#e0e7ff", color: "#4338ca", display: "grid", placeItems: "center", flexShrink: 0 }}>
-                <GroupRoundedIcon />
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>Team Count</Typography>
-                <Typography sx={{ fontSize: 11, color: "#64748b" }}>Total direct members in your team at each level.</Typography>
-              </Box>
-            </Stack>
-          </Grid>
-          <Grid item xs={12} sm={1} sx={{ textAlign: "center", display: { xs: "none", sm: "block" } }}>
-            <ArrowForwardRoundedIcon sx={{ color: "#94a3b8" }} />
-          </Grid>
-          <Grid item xs={12} sm={5}>
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <Box sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: "#f3e8ff", color: "#7e22ce", display: "grid", placeItems: "center", flexShrink: 0 }}>
-                <TouchAppRoundedIcon />
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0f172a" }}>Tap on Team Count</Typography>
-                <Typography sx={{ fontSize: 11, color: "#64748b" }}>Tap on any team count number to view member list.</Typography>
-              </Box>
-            </Stack>
-          </Grid>
-        </Grid>
-      </Paper>
+      {/* ── 5-Matrix Education Rank Hierarchy Trail View ── */}
+      <div
+        style={{
+          fontSize: 14,
+          fontWeight: 800,
+          color: "#111827",
+          letterSpacing: "-0.2px",
+          marginBottom: 8,
+        }}
+      >
+        5‑Matrix Education View
+      </div>
+      <div
+        style={{
+          background: "#ede9fe",
+          color: "#4f46e5",
+          padding: "8px 12px",
+          borderRadius: 10,
+          fontSize: 11,
+          fontWeight: 600,
+          marginBottom: 14,
+        }}
+      >
+        💡 <strong>Tap</strong> a member to drill down into their layer downline · tap root in trail to reset
+      </div>
 
-      {/* ── Bottom Call-to-Action Cards ── */}
-      <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} sm={6}>
-          <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, bgcolor: "#f0fdf4", borderColor: "#bbf7d0" }}>
-            <Stack direction="row" spacing={1.5} alignItems="flex-start">
-              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "#16a34a", color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}>
-                <TrendingUpRoundedIcon sx={{ fontSize: 20 }} />
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#166534", mb: 0.5 }}>NEXT RANK UPGRADE</Typography>
-                <Typography sx={{ fontSize: 11, color: "#15803d", mb: 1 }}>
-                  Upgrade to Level {nextLevel} to start new earning cycle and continue income. Re-Top Up or Upgrade to continue.
-                </Typography>
-                <Button
-                  size="small"
-                  variant="contained"
-                  color="success"
-                  sx={{ textTransform: "none", fontWeight: 800, borderRadius: 1.5 }}
-                  onClick={() => handleUpgradeClick()}
-                >
-                  Upgrade Now
-                </Button>
-              </Box>
-            </Stack>
-          </Paper>
-        </Grid>
+      {effectiveAchievedLevel > 0 ? (
+        <AccordionTree
+          useRankMatrix={true}
+          pool="FIVE_150"
+          maxDepth={10}
+          currentRankLevel={effectiveAchievedLevel}
+        />
+      ) : (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 3,
+            borderRadius: "20px",
+            bgcolor: "#FFFFFF",
+            border: "1.5px dashed #E2E8F0",
+            textAlign: "center",
+          }}
+        >
+          <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: "#64748B", mb: 0.5 }}>
+            No active 5-Matrix Education positions found.
+          </Typography>
+          <Typography sx={{ fontSize: 12, color: "#94A3B8" }}>
+            Purchase the ₹2,000 Digital Education Package (₹750 Prime + ₹1,000 SPP + ₹250 Layer 1 Upgrade) on <strong style={{ color: "#4F46E5" }}>trieducation.in</strong> to activate your 5-Matrix position.
+          </Typography>
+        </Paper>
+      )}
 
-        <Grid item xs={12} sm={6}>
-          <Paper variant="outlined" sx={{ p: 2, borderRadius: 3, bgcolor: "#fff7ed", borderColor: "#fed7aa" }}>
-            <Stack direction="row" spacing={1.5} alignItems="flex-start">
-              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "#ea580c", color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}>
-                <NotificationsActiveRoundedIcon sx={{ fontSize: 20 }} />
-              </Box>
-              <Box sx={{ flex: 1 }}>
-                <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#c2410c", mb: 0.5 }}>NOTIFICATIONS</Typography>
-                <Typography sx={{ fontSize: 11, color: "#ea580c", mb: 1 }}>
-                  You will be notified for next rank upgrade and missing income.
-                </Typography>
-                <Button
-                  size="small"
-                  variant="contained"
-                  sx={{ textTransform: "none", fontWeight: 800, borderRadius: 1.5, bgcolor: "#ea580c", "&:hover": { bgcolor: "#c2410c" } }}
-                >
-                  View Notifications
-                </Button>
-              </Box>
-            </Stack>
-          </Paper>
-        </Grid>
-      </Grid>
+      <div
+        style={{
+          display: "flex",
+          gap: 16,
+          justifyContent: "center",
+          marginTop: 16,
+          marginBottom: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        {[
+          { label: "Active", bg: "#dcfce7", color: "#16a34a" },
+          { label: "Empty / Open", bg: "#f3f4f6", color: "#9ca3af" },
+        ].map((it) => (
+          <div
+            key={it.label}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 11,
+              color: "#6b7280",
+              fontWeight: 600,
+            }}
+          >
+            <span
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                background: it.bg,
+                border: `1.5px solid ${it.color}`,
+                display: "inline-block",
+              }}
+            />
+            {it.label}
+          </div>
+        ))}
+      </div>
 
-      {/* ── Footer Hint ── */}
-      <Box sx={{ textAlign: "center", py: 1, px: 2, bgcolor: "#f8fafc", borderRadius: 2, border: "1px dashed #cbd5e1", mb: 2 }}>
-        <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>
-          ⓘ Upgrade within {upgradeWindowInfo.totalDays} days ({upgradeWindowInfo.levelRange}) to remain eligible for income.
-        </Typography>
-      </Box>
-
-      {/* ── Level Bonus Progress (Collapsible/Detailed) ── */}
+      {/* ── Layer Bonus Progress (Collapsible/Detailed) ── */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
         <Typography fontWeight={800} sx={{ mb: 1 }}>
-          Level Bonus Progress
+          Layer Bonus Progress
         </Typography>
         {lbLoading ? <LinearProgress sx={{ mb: 1 }} /> : null}
         {lbProgress ? (
@@ -1094,7 +1297,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
           </Box>
         ) : (
           <Typography color="text.secondary">
-            Level Bonus progress will appear here after you receive level commissions.
+            Layer Bonus progress will appear here after you receive layer commissions.
           </Typography>
         )}
       </Paper>
@@ -1163,7 +1366,7 @@ export default function RankUpgrade({ defaultToRankId = null } = {}) {
           setMethodOpen(false);
           setPaymentOpen(true);
         }}
-        onPickWallet={async (walletSource = "package_upload") => {
+        onPickWallet={async (walletSource = "main") => {
           let upgrade = (paymentData || (createdUpgrade ? { upgrade: createdUpgrade } : null))?.upgrade;
           setWalletBusy(true);
           setWalletErr("");

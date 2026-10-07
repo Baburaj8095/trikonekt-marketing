@@ -1,19 +1,20 @@
 /**
  * FiveMatrixTab.jsx
- * 5 Matrix & Chart tab:
- *  • KPI boxes: Total Team | Active Levels Open | Levels Completed | Total Earning
- *  • Account ID dropdown selector (self 5-matrix positions)
- *  • Level table: S.No | Level | Team Active Count | Status
- *  • Interactive 5-matrix tree below (keyed to selected account)
+ * 5 Matrix Tree tab:
+ *  • 3-category type selector (Join Prime / Smart SSP / Self Rebirth)
+ *  • Account ID selector (filtered by chosen category)
+ *  • KPI boxes: Total Team | Active Layers Open | Levels Completed | Total Earning
+ *  • Layer-wise table (levels 1-10)
+ *  • Interactive 5-matrix tree
  */
 
 import React from "react";
-import InteractiveTree from "./InteractiveTree";
+import AccordionTree from "./AccordionTree";
 
 // ─── Design tokens ─────────────────────────────────────────────────────────
 const C = {
-  primary:   "#4f46e5",
-  primaryL:  "#ede9fe",
+  primary:   "#4f46e5",   // indigo for 5-matrix
+  primaryL:  "#eef2ff",
   surface:   "#ffffff",
   text:      "#111827",
   textSec:   "#6b7280",
@@ -22,15 +23,11 @@ const C = {
   greenL:    "#dcfce7",
   amber:     "#d97706",
   amberL:    "#fef3c7",
-  red:       "#dc2626",
-  redL:      "#fef2f2",
   shadow:    "0 2px 12px rgba(79,70,229,0.08)",
 };
 
 // ─── Account category definitions ──────────────────────────────────────────
 function looksLikeSmartSspSourceId(sourceId) {
-  // Smart SSP source_id usually: "{purchase_id}:{package_number}:{box_number}"
-  // Some legacy rows may be missing a clean source_type; this heuristic keeps them visible.
   try {
     const parts = String(sourceId || "").split(":");
     if (parts.length < 2) return false;
@@ -39,7 +36,6 @@ function looksLikeSmartSspSourceId(sourceId) {
     const box = parts.length >= 3 ? parseInt(parts[2], 10) : null;
 
     if (Number.isNaN(season) || season <= 0) return false;
-    // purchaseId is typically numeric, but avoid being overly strict for safety.
     if (!Number.isNaN(purchaseId) && purchaseId <= 0) return false;
     if (box != null && (Number.isNaN(box) || box <= 0)) return false;
     return true;
@@ -51,8 +47,8 @@ function looksLikeSmartSspSourceId(sourceId) {
 const ACCOUNT_CATEGORIES = [
   {
     id: "SUBSCRIPTION_750",
-    label: "Subscription Joining 1000",
-    hint: "5-matrix accounts from ₹1000 promo package",
+    label: "Join Prime",
+    hint: "5-matrix accounts from Prime package",
     match: (src) => {
       const s = (src || "").toUpperCase();
       return (
@@ -64,7 +60,12 @@ const ACCOUNT_CATEGORIES = [
         s.includes("PRIME750") ||
         s.includes("JOIN_SUBSCRIPTION") ||
         s.includes("SUBSCRIPTION_750") ||
-        s.includes("SUBSCRIPTION_1000")
+        s.includes("SUBSCRIPTION_1000") ||
+        s.includes("SENTINEL") ||
+        s.includes("ROOT") ||
+        s.includes("2K") ||
+        s.includes("PACKAGE") ||
+        s.includes("PROMO")
       );
     },
   },
@@ -104,28 +105,18 @@ const ACCOUNT_CATEGORIES = [
       );
     },
   },
-  {
-    id: "OTHER",
-    label: "Other / Legacy",
-    hint: "Fallback bucket for unknown/legacy source tags (should be rare)",
-    match: () => false,
-  },
 ];
 
-/** Classify a source_type string into one of the 3 category IDs (or "OTHER") */
+/** Classify a source_type string into one of the 3 category IDs */
 function classifySource(sourceType, sourceId) {
   for (const cat of ACCOUNT_CATEGORIES) {
     if (cat.match(sourceType)) return cat.id;
   }
-  // If tag is missing/unknown, infer Smart SSP by its source_id format.
   if (looksLikeSmartSspSourceId(sourceId)) return "SMART_SSP";
-  // Unknown sources should not be counted under any purchase-driven category
-  return "OTHER";
+  return "SUBSCRIPTION_750";
 }
 
 function categoryForRow(r) {
-  // Only trust inferred_category if it's one of the known categories.
-  // (Avoids future backend values causing the row to disappear from ALL UI filters.)
   const inferred = String(r?.inferred_category || "").trim().toUpperCase();
   if (inferred && ACCOUNT_CATEGORIES.some((c) => c.id === inferred)) return inferred;
   return classifySource(r?.source_type, r?.source_id);
@@ -167,162 +158,184 @@ function KpiCard({ label, value, accent }) {
       <div
         style={{
           fontSize: 10,
+          fontWeight: 800,
           color: C.textSec,
-          fontWeight: 600,
-          letterSpacing: "0.03em",
-          lineHeight: 1.3,
-          marginBottom: 4,
           textTransform: "uppercase",
+          letterSpacing: "0.05em",
+          marginBottom: 4,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
         }}
       >
         {label}
       </div>
       <div
         style={{
-          fontSize: 22,
+          fontSize: 17,
           fontWeight: 900,
-          color: accent || C.primary,
-          lineHeight: 1,
+          color: accent || C.text,
+          lineHeight: 1.1,
         }}
       >
-        {value ?? "–"}
+        {value}
       </div>
     </div>
   );
 }
 
-// ─── Level table ───────────────────────────────────────────────────────────
-function LevelTable({ levelGrid }) {
-  if (!levelGrid || levelGrid.length === 0) return null;
+// ─── Layer table ───────────────────────────────────────────────────────────
+function LevelTable({ levelGrid = [] }) {
+  const [expanded, setExpanded] = React.useState(false);
+  const rows = expanded ? levelGrid : levelGrid.slice(0, 5);
 
   return (
     <div
       style={{
         background: C.surface,
         borderRadius: 14,
-        overflow: "hidden",
+        border: `1.5px solid ${C.border}`,
         boxShadow: C.shadow,
+        overflow: "hidden",
         marginBottom: 16,
       }}
     >
-      {/* Table header */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "36px 1fr 60px 60px 90px",
-          background: C.primary,
-          color: "#fff",
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: "0.04em",
-          textTransform: "uppercase",
-          padding: "10px 14px",
-          gap: 4,
-        }}
-      >
-        <div>S.No</div>
-        <div>Layer</div>
-        <div style={{ textAlign: "center" }}>Total</div>
-        <div style={{ textAlign: "center" }}>Active</div>
-        <div style={{ textAlign: "right" }}>Status</div>
-      </div>
-
-      {levelGrid.map((row, i) => {
-        const count = Number(row.count || 0);
-        const maxCount = Number(row.max_count || Math.pow(5, row.level));
-        const isCompleted = count > 0 && count >= maxCount;
-        const hasMembers = count > 0;
-
-        const statusLabel = !hasMembers ? "–" : isCompleted ? "Completed" : "Not Completed";
-        const statusColor = !hasMembers ? C.textSec : isCompleted ? C.green : C.amber;
-        const statusBg   = !hasMembers ? "transparent" : isCompleted ? C.greenL : C.amberL;
-
-        return (
-          <div
-            key={row.level}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "36px 1fr 60px 60px 90px",
-              padding: "10px 14px",
-              borderBottom: i < levelGrid.length - 1 ? `1px solid ${C.border}` : "none",
-              background: hasMembers ? (i % 2 === 0 ? "#fafbff" : C.surface) : C.surface,
-              gap: 4,
-              alignItems: "center",
-            }}
-          >
-            <div style={{ fontSize: 12, color: C.textSec, fontWeight: 600 }}>{row.sn}</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
-              Layer – {row.level}
-            </div>
-            {/* Total Count (5^level) */}
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.textSec, textAlign: "center" }}>
-              {maxCount.toLocaleString()}
-            </div>
-            {/* Active Count */}
-            <div style={{ fontSize: 13, fontWeight: 800, color: hasMembers ? C.primary : C.textSec, textAlign: "center" }}>
-              {hasMembers ? count : "–"}
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <span
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <thead>
+          <tr style={{ background: "#f9fafb", borderBottom: `1.5px solid ${C.border}` }}>
+            <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: C.textSec }}>Layer</th>
+            <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 700, color: C.textSec }}>Blocks</th>
+            <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 700, color: C.textSec }}>Max Capacity</th>
+            <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: C.textSec }}>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const count = Number(row.count || 0);
+            const max = Number(row.max_count || Math.pow(5, row.level));
+            const isFull = count >= max;
+            const hasMembers = count > 0;
+            return (
+              <tr
+                key={row.level}
                 style={{
-                  display: "inline-block",
-                  padding: "3px 8px",
-                  borderRadius: 99,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  background: statusBg,
-                  color: statusColor,
+                  borderBottom: `1px solid ${C.border}`,
+                  background: isFull ? C.greenL : hasMembers ? C.primaryL : "transparent",
                 }}
               >
-                {statusLabel}
-              </span>
-            </div>
-          </div>
-        );
-      })}
+                <td style={{ padding: "8px 12px", fontWeight: 700, color: C.text }}>
+                  Layer {row.level}
+                </td>
+                <td style={{ padding: "8px 12px", textAlign: "center", fontWeight: 800, color: count > 0 ? C.primary : C.textSec }}>
+                  {count}
+                </td>
+                <td style={{ padding: "8px 12px", textAlign: "center", color: C.textSec }}>
+                  {max.toLocaleString()}
+                </td>
+                <td style={{ padding: "8px 12px", textAlign: "right" }}>
+                  {isFull ? (
+                    <span style={{ color: C.green, fontWeight: 700, fontSize: 11 }}>● Complete</span>
+                  ) : hasMembers ? (
+                    <span style={{ color: C.primary, fontWeight: 700, fontSize: 11 }}>● Active</span>
+                  ) : (
+                    <span style={{ color: C.textSec, fontSize: 11 }}>–</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {levelGrid.length > 5 && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          style={{
+            width: "100%",
+            padding: "8px",
+            background: "#f9fafb",
+            border: "none",
+            borderTop: `1px solid ${C.border}`,
+            fontSize: 11,
+            fontWeight: 700,
+            color: C.primary,
+            cursor: "pointer",
+          }}
+        >
+          {expanded ? "Show Less ▲" : `Show All ${levelGrid.length} Layers ▼`}
+        </button>
+      )}
     </div>
   );
 }
 
 // ─── Legend ────────────────────────────────────────────────────────────────
 function Legend() {
+  const items = [
+    { label: "Active", bg: "#dcfce7", color: "#16a34a" },
+    { label: "Empty / Open", bg: "#f3f4f6", color: "#9ca3af" },
+  ];
   return (
-    <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 12, flexWrap: "wrap" }}>
-      {[
-        { color: "#059669", label: "Active" },
-        { color: "#9ca3af", label: "Inactive" },
-        { color: C.primary, label: "Expanded" },
-      ].map(({ color, label }) => (
-        <div key={label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.textSec, fontWeight: 600 }}>
-          <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, display: "inline-block", flexShrink: 0 }} />
-          {label}
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        marginTop: 12,
+        fontSize: 11,
+        color: C.textSec,
+        flexWrap: "wrap",
+      }}
+    >
+      {items.map((it) => (
+        <div key={it.label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: "50%",
+              background: it.bg,
+              border: `1.5px solid ${it.color}`,
+              display: "inline-block",
+            }}
+          />
+          <span>{it.label}</span>
         </div>
       ))}
     </div>
   );
 }
 
-// ─── Main component ─────────────────────────────────────────────────────────
+// ─── Main Component ────────────────────────────────────────────────────────
 export default function FiveMatrixTab({
-  fiveRootsList  = [],
-  selectedRoot   = null,
-  setSelectedRoot,
-  fiveCategory   = null,
-  setFiveCategory,
-  fiveLevelGrid  = [],
-  fiveCounts     = null,
-  totalTeam      = 0,
+  fiveRootsList = [],
+  selectedRoot = null,
+  setSelectedRoot = () => {},
+  fiveCounts = null,
+  fiveLevelGrid = [],
+  totalTeam = 0,
   activeLevelsReached = 0,
-  totalFiveEarning    = 0,
-  levels         = { five: 10 },
+  totalFiveEarning = 0,
+  levels = {},
+  fiveCategory = null,
+  setFiveCategory = null,
 }) {
   const hasPools = fiveRootsList.length > 0;
 
-  // ── Classify each position into a category ──
+  // ── Classify each position into a category (with Sentinel deduplication) ──
   const categorizedPools = React.useMemo(() => {
     const map = {};
     for (const cat of ACCOUNT_CATEGORIES) {
-      map[cat.id] = fiveRootsList.filter((r) => categoryForRow(r) === cat.id);
+      let items = fiveRootsList.filter((r) => categoryForRow(r) === cat.id);
+      if (cat.id === "SUBSCRIPTION_750" && items.length > 1) {
+        const hasRealPrime = items.some((r) =>
+          String(r.source_type || "").toUpperCase().includes("PRIME_750") ||
+          String(r.source_type || "").toUpperCase().includes("PROMO_PURCHASE")
+        );
+        if (hasRealPrime) {
+          items = items.filter((r) => String(r.source_type || "").toUpperCase() !== "SENTINEL" || Number(r.entry_amount || 0) > 0);
+        }
+      }
+      map[cat.id] = items;
     }
     return map;
   }, [fiveRootsList]);
@@ -358,7 +371,7 @@ export default function FiveMatrixTab({
     }).length;
 
   // Earning: prefer the value from the counts API (refreshes per account selection)
-  const earning = Number(fiveCounts?.total_earned || totalFiveEarning || 0);
+  const earning = hasPools ? Number(fiveCounts?.total_earned || totalFiveEarning || 0) : 0;
 
   // Enrich levelGrid rows with max_count if missing
   const enrichedGrid = fiveLevelGrid.map((row) => ({
@@ -372,7 +385,6 @@ export default function FiveMatrixTab({
     const base = key.replace(/-\d+$/, "");
     const idx = r?.user_entry_index || (i + 1);
     const baseLabel = key || (idx === 1 ? base : `${base}-${idx}`) || `ID ${idx}`;
-    // For Smart SSP: append season number
     const earned = r?.total_earned;
     const earnedLabel =
       earned != null && earned !== ""
@@ -526,7 +538,7 @@ export default function FiveMatrixTab({
 
       {/* ── KPI grid ── */}
       <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        <KpiCard label="Total Team" value={totalTeam} accent={C.primary} />
+        <KpiCard label="Total Community" value={totalTeam} accent={C.primary} />
         <KpiCard label="Active Layers Open" value={activeLevelsReached} accent={C.green} />
         <KpiCard label="Layers Completed" value={levelsCompleted > 0 ? `L${levelsCompleted}` : "–"} accent={C.amber} />
         <KpiCard label="5 Blocks Earning" value={`\u20b9${earning.toFixed(0)}`} accent="#7c3aed" />
@@ -542,7 +554,7 @@ export default function FiveMatrixTab({
           marginBottom: 10,
         }}
       >
-        Layer-wise Team Count
+        Layer-wise Community Count
       </div>
       {hasPools ? (
         <LevelTable levelGrid={enrichedGrid} />
@@ -565,7 +577,7 @@ export default function FiveMatrixTab({
       {/* ── Tree section ── */}
       <div
         style={{
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: 800,
           color: C.text,
           letterSpacing: "-0.2px",
@@ -582,14 +594,14 @@ export default function FiveMatrixTab({
           borderRadius: 10,
           fontSize: 11,
           fontWeight: 600,
-          marginBottom: 10,
+          marginBottom: 14,
         }}
       >
-        💡 <strong>Tap</strong> a member to view their downline · tap root to expand/collapse
+        💡 <strong>Tap</strong> a member to drill down into their layer downline · tap root in trail to reset
       </div>
 
       {hasPools ? (
-        <InteractiveTree
+        <AccordionTree
           key={`FIVE_150-${String(selectedRoot)}`}
           entryRootId={selectedRoot}
           useEntriesTree={!!selectedRoot}

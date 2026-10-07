@@ -1,7 +1,7 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { adminGetLevelCommission, adminUpdateLevelCommission, adminSeedLevelCommission } from "../../api/api";
 
-export default function AdminLevelCommission() {
+export default function AdminLayerCommission() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [seeding, setSeeding] = useState(false);
@@ -216,9 +216,9 @@ export default function AdminLevelCommission() {
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a" }}>Master Level Commission</div>
+          <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a" }}>Master Layer Commission</div>
           <div style={{ fontSize: 12, color: "#64748b" }}>
-            Configure fixed rupee amounts for Direct and L1”“L5. Applies on referral join payouts.
+            Configure fixed rupee amounts for Direct and Layer 1 to Layer 5. Applies on referral join payouts.
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -304,11 +304,11 @@ export default function AdminLevelCommission() {
           <>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               <Field label="Direct (₹)" name="direct" />
-              <Field label="Level 1 (₹)" name="l1" />
-              <Field label="Level 2 (₹)" name="l2" />
-              <Field label="Level 3 (₹)" name="l3" />
-              <Field label="Level 4 (₹)" name="l4" />
-              <Field label="Level 5 (₹)" name="l5" />
+              <Field label="Layer 1 (₹)" name="l1" />
+              <Field label="Layer 2 (₹)" name="l2" />
+              <Field label="Layer 3 (₹)" name="l3" />
+              <Field label="Layer 4 (₹)" name="l4" />
+              <Field label="Layer 5 (₹)" name="l5" />
             </div>
             <div style={{ marginTop: 10, fontSize: 12, color: "#64748b" }}>
               Last updated:{" "}

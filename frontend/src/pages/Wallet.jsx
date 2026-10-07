@@ -35,8 +35,11 @@ function computeWindowLocal(cfg) {
   // Uses the browser's local timezone; backend enforcement is done in IST.
   const now = new Date();
   const enabled = Boolean(cfg?.enabled ?? true);
-  // JS weekday: 0=Sun..6=Sat. Python weekday: 0=Mon..6=Sun.
   const pyWeekday = Number(cfg?.weekday ?? 2);
+  if (pyWeekday === -1) {
+    return { isOpen: enabled, enabled, nextWindowAt: now, currentStart: now, currentEnd: now };
+  }
+  // JS weekday: 0=Sun..6=Sat. Python weekday: 0=Mon..6=Sun.
   const jsTargetDay = (pyWeekday + 1) % 7;
 
   const parseHHMM = (s, fallback) => {
@@ -81,6 +84,7 @@ function computeWindowLocal(cfg) {
 
 function weekdayLabel(pyWeekday) {
   const w = Number(pyWeekday ?? 2);
+  if (w === -1) return "Everyday (24x7)";
   const map = [
     "Monday",
     "Tuesday",
@@ -115,6 +119,13 @@ export default function Wallet() {
   const [nextBlock, setNextBlock] = useState({ completed_in_current_block: "0.00", remaining_to_next_block: "1000.00", progress_percent: 0 });
   const [kyc, setKyc] = useState({ verified: false });
   const [withdrawalsWindowCfg, setWithdrawalsWindowCfg] = useState({ enabled: true, weekday: 2, start_time: "00:00", end_time: "23:59" });
+  const [withdrawalLimits, setWithdrawalLimits] = useState(() => {
+    try {
+      const raw = localStorage.getItem("tri_withdrawal_limits");
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return { min_withdrawal: 500, max_withdrawal: 25000, daily_max_withdrawal: 50000 };
+  });
   const [windowInfo, setWindowInfo] = useState(computeWindowLocal(withdrawalsWindowCfg));
   const [primeInfo, setPrimeInfo] = useState({ has150: false, has750: false, hasMonthly: false, primeDate: null, monthlyDate: null });
   const [rewards, setRewards] = useState({ total: 0, redeemed: 0 });
@@ -129,7 +140,7 @@ export default function Wallet() {
   const [allEarningsGross, setAllEarningsGross] = useState("0.00");
   const [couponSummary, setCouponSummary] = useState({ selfActivated: 0, monthlyActivated: 0 });
   const [profile, setProfile] = useState(null);
-  const [withdrawalMode, setWithdrawalMode] = useState("bank");
+  const [withdrawalMode, setWithdrawalMode] = useState("direct");
   const storedUser = useMemo(() => readStoredUser(), []);
 
   // Sum of money earnings (wallet credits) per spec: direct refer, 5/3 matrix, global incomes, withdrawal benefits, any bonus
@@ -260,18 +271,27 @@ export default function Wallet() {
     return sorted.slice(0, 5);
   }, [myWithdrawals]);
 
+  const minWd = Number(withdrawalLimits?.min_withdrawal || 500);
+  const maxWd = Number(withdrawalLimits?.max_withdrawal || 25000);
+
   const disableReason = useMemo(() => {
     if (!kyc?.verified) return "KYC verification required";
-    if (Number(withdrawableBalance) < 500) return "Minimum withdrawable balance ₹500 required";
+    const available = withdrawalMode === "direct" ? Number(mainBalance || 0) : Number(withdrawableBalance || 0);
+    const balanceName = withdrawalMode === "direct" ? "Main Wallet" : "Withdrawable Pocket";
+    if (available < minWd) return `Minimum ${balanceName} balance ₹${minWd} required`;
     if (!windowInfo?.enabled) return "Withdrawals are currently disabled.";
     if (!windowInfo?.isOpen) {
-      const day = weekdayLabel(withdrawalsWindowCfg?.weekday);
-      const st = hhmm(withdrawalsWindowCfg?.start_time, "00:00");
-      const et = hhmm(withdrawalsWindowCfg?.end_time, "23:59");
-      return `Withdrawals are allowed only on ${day} between ${st} and ${et} (IST).`;
+      if (withdrawalsWindowCfg?.weekday === -1) {
+        // All days open
+      } else {
+        const day = weekdayLabel(withdrawalsWindowCfg?.weekday);
+        const st = hhmm(withdrawalsWindowCfg?.start_time, "00:00");
+        const et = hhmm(withdrawalsWindowCfg?.end_time, "23:59");
+        return `Withdrawals are allowed only on ${day} between ${st} and ${et} (IST).`;
+      }
     }
     return "";
-  }, [kyc, withdrawableBalance, windowInfo, withdrawalsWindowCfg]);
+  }, [kyc, withdrawalMode, mainBalance, withdrawableBalance, windowInfo, withdrawalsWindowCfg, minWd]);
 
   const consumerDetails = useMemo(() => {
     const src = { ...(storedUser || {}), ...(profile || {}) };
@@ -357,6 +377,16 @@ export default function Wallet() {
         try {
           const cfgRes = await API.get("/admin/commission/master/", { cacheTTL: 10_000, dedupe: "cancelPrevious" });
           const wwin = cfgRes?.data?.withdrawals_window;
+          const wlim = cfgRes?.data?.withdrawal_limits;
+          if (wlim) {
+            const limMerged = {
+              min_withdrawal: Number(wlim.min_withdrawal ?? 500),
+              max_withdrawal: Number(wlim.max_withdrawal ?? 25000),
+              daily_max_withdrawal: Number(wlim.daily_max_withdrawal ?? 50000),
+            };
+            setWithdrawalLimits(limMerged);
+            try { localStorage.setItem("tri_withdrawal_limits", JSON.stringify(limMerged)); } catch (_) {}
+          }
           if (wwin) {
             activeCfg = {
               enabled: Boolean(wwin?.enabled ?? true),
@@ -447,6 +477,12 @@ export default function Wallet() {
     })();
   }, []);
 
+  const curGross = Number(wdrForm.amount || 0);
+  const directTds = curGross > 0 ? Number(((curGross * 10) / 100).toFixed(2)) : 0;
+  const directFee = curGross > 0 ? Number(((curGross * 2.5) / 100).toFixed(2)) : 0;
+  const directTotalDeduct = curGross > 0 ? Number((directTds + directFee).toFixed(2)) : 0;
+  const directNet = curGross > 0 ? Number((curGross - directTotalDeduct).toFixed(2)) : 0;
+
   async function submitWithdrawal(e) {
     e.preventDefault();
     setWdrErr("");
@@ -459,14 +495,26 @@ export default function Wallet() {
       setWdrErr("Enter a valid amount.");
       return;
     }
-    const availableToWithdraw = Number(withdrawableBalance || 0);
+    if (amtNum < minWd) {
+      setWdrErr(`Minimum withdrawal amount is ₹${minWd}.`);
+      return;
+    }
+    if (amtNum > maxWd) {
+      setWdrErr(`Maximum withdrawal amount per request is ₹${maxWd}.`);
+      return;
+    }
+    const availableToWithdraw = withdrawalMode === "direct" ? Number(mainBalance || 0) : Number(withdrawableBalance || 0);
+    const balanceName = withdrawalMode === "direct" ? "Main Wallet" : "Withdrawable Pocket";
     if (amtNum > availableToWithdraw) {
-      setWdrErr(`Amount cannot exceed your available balance (₹${fmtAmount(availableToWithdraw)}).`);
+      setWdrErr(`Amount cannot exceed your available ${balanceName} balance (₹${fmtAmount(availableToWithdraw)}).`);
       return;
     }
     const payload = {
       amount: amtNum,
       method: "bank",
+      withdrawal_type: withdrawalMode === "direct" ? "instant_direct" : "standard_pocket",
+      instant_fee_percent: withdrawalMode === "direct" ? 2.5 : 0,
+      tax_percent: withdrawalMode === "direct" ? 10 : 0,
     };
     // Bank details are captured from KYC; not collected on this screen.
     try {
@@ -515,6 +563,7 @@ export default function Wallet() {
       "Spin and win coupon": "#f59e0b",
       "Direct Refer Commission": "#f472b6",
       "Matrix Level Income": "#6366f1",
+      "Block Layer Income": "#6366f1",
       "Global TRI income": "#0ea5e9",
       "Global turnover income": "#84cc16",
       "Self coupon benefits (Activated coupon)": "#a78bfa",
@@ -612,9 +661,9 @@ export default function Wallet() {
                   Please complete KYC in the KYC section.
                 </Alert>
               ) : null}
-              {Number(withdrawableBalance) < 500 ? (
+              {Number(withdrawableBalance) < minWd ? (
                 <Alert severity="warning" sx={{ mb: 1 }}>
-                  Minimum Balance to Withdraw 500
+                  Minimum Balance to Withdraw ₹{minWd}
                 </Alert>
               ) : null}
               {!windowInfo?.enabled ? (
@@ -669,112 +718,117 @@ export default function Wallet() {
             </Paper>
 
             {/* Move from Main Wallet into Withdrawable Pocket */}
-            {Number(mainBalance) > 0 && (
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 1.6,
-                  borderRadius: 2.5,
-                  border: "1.5px dashed #93C5FD",
-                  bgcolor: "#EFF6FF",
-                }}
-              >
-                <Typography sx={{ fontWeight: 800, fontSize: 13.5, color: "#1E40AF", mb: 0.5 }}>
-                  Move Funds from Main Wallet
-                </Typography>
-                <Typography sx={{ fontSize: 12, color: "#3B82F6", mb: 1.5 }}>
-                  Available in Main Wallet: <b>₹ {fmtAmount(mainBalance)}</b> (10% TDS/Tax applied on allocation)
-                </Typography>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.6,
+                borderRadius: 2.5,
+                border: "1.5px dashed #93C5FD",
+                bgcolor: "#EFF6FF",
+              }}
+            >
+              <Typography sx={{ fontWeight: 800, fontSize: 13.5, color: "#1E40AF", mb: 0.5 }}>
+                Move Funds from Main Wallet to Withdrawable Pocket
+              </Typography>
+              <Typography sx={{ fontSize: 12, color: "#3B82F6", mb: 1.5 }}>
+                Available in Main Wallet: <b>₹ {fmtAmount(mainBalance)}</b> (10% TDS/Tax applied on allocation)
+              </Typography>
 
-                {moveErr && <Alert severity="error" sx={{ mb: 1.2, borderRadius: 2, fontSize: 12 }}>{moveErr}</Alert>}
-                {moveSuccess && <Alert severity="success" sx={{ mb: 1.2, borderRadius: 2, fontSize: 12 }}>{moveSuccess}</Alert>}
+              {Number(mainBalance) < 100 && (
+                <Alert severity="info" sx={{ mb: 1.2, borderRadius: 2, fontSize: 12 }}>
+                  Minimum ₹100 in Main Wallet is required to transfer to Withdrawable Pocket.
+                </Alert>
+              )}
 
-                {!moveOtpSent ? (
-                  <Stack spacing={1.2}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      type="number"
-                      label="Transfer Amount (₹)"
-                      placeholder="e.g. 2500"
-                      value={moveAmount}
-                      onChange={(e) => setMoveAmount(e.target.value)}
-                      sx={{ bgcolor: "#fff", borderRadius: 2 }}
-                    />
+              {moveErr && <Alert severity="error" sx={{ mb: 1.2, borderRadius: 2, fontSize: 12 }}>{moveErr}</Alert>}
+              {moveSuccess && <Alert severity="success" sx={{ mb: 1.2, borderRadius: 2, fontSize: 12 }}>{moveSuccess}</Alert>}
 
-                    {moveGross > 0 && (
-                      <Box sx={{ p: 1.2, bgcolor: "#DBEAFE", borderRadius: 2 }}>
-                        <Stack spacing={0.4}>
-                          <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                            <Typography sx={{ fontSize: 11.5, color: "#1E3A8A" }}>Amount:</Typography>
-                            <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#1E3A8A" }}>₹ {moveGross.toFixed(2)}</Typography>
-                          </Box>
-                          <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                            <Typography sx={{ fontSize: 11.5, color: "#DC2626" }}>10% TDS / Platform Tax:</Typography>
-                            <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#DC2626" }}>- ₹ {moveTax.toFixed(2)}</Typography>
-                          </Box>
-                          <Box sx={{ display: "flex", justifyContent: "space-between", pt: 0.4, borderTop: "1px dashed #93C5FD" }}>
-                            <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#1D4ED8" }}>Credited to Withdrawable:</Typography>
-                            <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#1D4ED8" }}>₹ {moveNet.toFixed(2)}</Typography>
-                          </Box>
-                        </Stack>
-                      </Box>
-                    )}
+              {!moveOtpSent ? (
+                <Stack spacing={1.2}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    type="number"
+                    label="Transfer Amount (₹)"
+                    placeholder="Min ₹100"
+                    value={moveAmount}
+                    onChange={(e) => setMoveAmount(e.target.value)}
+                    sx={{ bgcolor: "#fff", borderRadius: 2 }}
+                    disabled={Number(mainBalance) < 100}
+                  />
 
+                  {moveGross > 0 && (
+                    <Box sx={{ p: 1.2, bgcolor: "#DBEAFE", borderRadius: 2 }}>
+                      <Stack spacing={0.4}>
+                        <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                          <Typography sx={{ fontSize: 11.5, color: "#1E3A8A" }}>Amount:</Typography>
+                          <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#1E3A8A" }}>₹ {moveGross.toFixed(2)}</Typography>
+                        </Box>
+                        <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                          <Typography sx={{ fontSize: 11.5, color: "#DC2626" }}>10% TDS / Platform Tax:</Typography>
+                          <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#DC2626" }}>- ₹ {moveTax.toFixed(2)}</Typography>
+                        </Box>
+                        <Box sx={{ display: "flex", justifyContent: "space-between", pt: 0.4, borderTop: "1px dashed #93C5FD" }}>
+                          <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#1D4ED8" }}>Credited to Withdrawable:</Typography>
+                          <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#1D4ED8" }}>₹ {moveNet.toFixed(2)}</Typography>
+                        </Box>
+                      </Stack>
+                    </Box>
+                  )}
+
+                  <Button
+                    variant="contained"
+                    disabled={moveBusy || moveGross < 100 || moveGross > Number(mainBalance) || Number(mainBalance) < 100}
+                    onClick={handleRequestMoveOtp}
+                    sx={{
+                      borderRadius: 2,
+                      fontWeight: 800,
+                      textTransform: "none",
+                      bgcolor: "#2563EB",
+                      "&:hover": { bgcolor: "#1D4ED8" },
+                    }}
+                  >
+                    {moveBusy ? "Sending OTP..." : `Move ₹${moveGross > 0 ? fmtAmount(moveGross) : "0.00"} to Withdrawable Pocket`}
+                  </Button>
+                </Stack>
+              ) : (
+                <Stack spacing={1.2}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Enter 6-Digit Email OTP"
+                    placeholder="e.g. 123456"
+                    value={moveOtp}
+                    onChange={(e) => setMoveOtp(e.target.value)}
+                    sx={{ bgcolor: "#fff", borderRadius: 2 }}
+                  />
+                  <Stack direction="row" spacing={1}>
                     <Button
+                      variant="outlined"
+                      onClick={() => setMoveOtpSent(false)}
+                      sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700 }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      fullWidth
                       variant="contained"
-                      disabled={moveBusy || moveGross < 100 || moveGross > Number(mainBalance)}
-                      onClick={handleRequestMoveOtp}
+                      disabled={moveBusy || !moveOtp.trim()}
+                      onClick={handleConfirmMoveOtp}
                       sx={{
                         borderRadius: 2,
                         fontWeight: 800,
                         textTransform: "none",
-                        bgcolor: "#2563EB",
-                        "&:hover": { bgcolor: "#1D4ED8" },
+                        bgcolor: "#059669",
+                        "&:hover": { bgcolor: "#047857" },
                       }}
                     >
-                      {moveBusy ? "Sending OTP..." : `Move ₹${moveGross > 0 ? fmtAmount(moveGross) : "0.00"} to Withdrawable Pocket`}
+                      {moveBusy ? "Verifying..." : "Confirm & Credit Pocket"}
                     </Button>
                   </Stack>
-                ) : (
-                  <Stack spacing={1.2}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      label="Enter 6-Digit Email OTP"
-                      placeholder="e.g. 123456"
-                      value={moveOtp}
-                      onChange={(e) => setMoveOtp(e.target.value)}
-                      sx={{ bgcolor: "#fff", borderRadius: 2 }}
-                    />
-                    <Stack direction="row" spacing={1}>
-                      <Button
-                        variant="outlined"
-                        onClick={() => setMoveOtpSent(false)}
-                        sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700 }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        fullWidth
-                        variant="contained"
-                        disabled={moveBusy || !moveOtp.trim()}
-                        onClick={handleConfirmMoveOtp}
-                        sx={{
-                          borderRadius: 2,
-                          fontWeight: 800,
-                          textTransform: "none",
-                          bgcolor: "#059669",
-                          "&:hover": { bgcolor: "#047857" },
-                        }}
-                      >
-                        {moveBusy ? "Verifying..." : "Confirm & Credit Pocket"}
-                      </Button>
-                    </Stack>
-                  </Stack>
-                )}
-              </Paper>
-            )}
+                </Stack>
+              )}
+            </Paper>
 
             <Paper
               elevation={0}
@@ -786,11 +840,23 @@ export default function Wallet() {
                 bgcolor: "#fff",
               }}
             >
-              <Typography sx={{ fontWeight: 900, mb: 1 }}>Withdrawal Option</Typography>
+              <Typography sx={{ fontWeight: 900, mb: 1 }}>Withdrawal Route & Option</Typography>
               <Grid container spacing={1}>
                 {[
-                  { key: "upi", title: "Option 1 Instant UPI Withdrawal", hint: "Payment gateway will connect here." },
-                  { key: "bank", title: "Option 2 Bank Account Withdrawal", hint: "Submit to admin using KYC bank details." },
+                  {
+                    key: "direct",
+                    title: "⚡ Option 1: Direct Instant Withdrawal",
+                    badge: "12.5% Total Fee (Direct from Main Wallet)",
+                    hint: "Debits directly from Main Earnings / TriAcademy without pre-allocating to pocket. 10% TDS + 2.5% Instant processing fee applies.",
+                    color: "#059669",
+                  },
+                  {
+                    key: "bank",
+                    title: "🏦 Option 2: Standard Bank Payout",
+                    badge: "0.0% Extra Fee (From Withdrawable Pocket)",
+                    hint: "Debits from your Withdrawable Pocket balance. 0% extra deduction (10% TDS already paid when moved to pocket).",
+                    color: "#2563EB",
+                  },
                 ].map((option) => {
                   const selected = withdrawalMode === option.key;
                   return (
@@ -801,29 +867,42 @@ export default function Wallet() {
                         sx={{
                           p: 1.25,
                           borderRadius: 2,
-                          border: "1px solid",
-                          borderColor: selected ? "primary.main" : "#E2E8F0",
-                          bgcolor: selected ? "#EFF6FF" : "#fff",
+                          border: "1.5px solid",
+                          borderColor: selected ? option.color : "#E2E8F0",
+                          bgcolor: selected ? (option.key === "direct" ? "#F0FDF4" : "#EFF6FF") : "#fff",
                           cursor: "pointer",
-                          minHeight: 86,
+                          minHeight: 96,
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "space-between",
+                          transition: "all 0.2s ease",
                         }}
                       >
-                        <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0C2D48" }}>
-                          {option.title}
-                        </Typography>
-                        <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.5 }}>
-                          {option.hint}
-                        </Typography>
+                        <Box>
+                          <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0C2D48" }}>
+                            {option.title}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11.5, color: "text.secondary", mt: 0.4 }}>
+                            {option.hint}
+                          </Typography>
+                        </Box>
+                        <Chip
+                          size="small"
+                          label={option.badge}
+                          sx={{
+                            mt: 1,
+                            alignSelf: "flex-start",
+                            fontWeight: 800,
+                            fontSize: 10.5,
+                            bgcolor: selected ? (option.key === "direct" ? "#DCFCE7" : "#DBEAFE") : "#F1F5F9",
+                            color: selected ? (option.key === "direct" ? "#166534" : "#1E40AF") : "#475569",
+                          }}
+                        />
                       </Paper>
                     </Grid>
                   );
                 })}
               </Grid>
-              {withdrawalMode === "upi" ? (
-                <Alert severity="info" sx={{ mt: 1 }}>
-                  Instant UPI withdrawal will be enabled after the payment gateway is connected.
-                </Alert>
-              ) : null}
             </Paper>
 
             <Paper
@@ -885,57 +964,111 @@ export default function Wallet() {
                 <Avatar sx={{ bgcolor: "#F1F5F9", color: "#0C2D48", width: 34, height: 34 }}>
                   <PaymentsIcon fontSize="small" />
                 </Avatar>
-                <Typography sx={{ fontWeight: 900 }}>Request Withdrawal</Typography>
+                <Box>
+                  <Typography sx={{ fontWeight: 900 }}>
+                    {withdrawalMode === "direct" ? "Request Direct Instant Withdrawal" : "Request Standard Bank Withdrawal"}
+                  </Typography>
+                  <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                    Source: {withdrawalMode === "direct" ? `Main Wallet (Available: ₹${fmtAmount(mainBalance)})` : `Withdrawable Pocket (Available: ₹${fmtAmount(withdrawableBalance)})`}
+                  </Typography>
+                </Box>
               </Stack>
 
-              {withdrawalMode === "bank" ? (
-                <Box component="form" onSubmit={submitWithdrawal}>
-                  <Stack spacing={1.2}>
-                    <TextField
-                      size="small"
-                      label="Amount"
-                      placeholder="Enter amount"
-                      name="amount"
-                      value={wdrForm.amount}
-                      onChange={onWdrChange}
-                      type="number"
-                      inputProps={{ inputMode: "decimal", max: Number(withdrawableBalance || 0), step: "0.01" }}
-                      required
-                    />
+              <Box component="form" onSubmit={submitWithdrawal}>
+                <Stack spacing={1.2}>
+                  <TextField
+                    size="small"
+                    label="Withdrawal Amount (₹)"
+                    placeholder={`Enter amount (₹${minWd} - ₹${maxWd})`}
+                    name="amount"
+                    value={wdrForm.amount}
+                    onChange={onWdrChange}
+                    type="number"
+                    inputProps={{
+                      inputMode: "decimal",
+                      min: minWd,
+                      max: Math.min(Number((withdrawalMode === "direct" ? mainBalance : withdrawableBalance) || 0), maxWd),
+                      step: "0.01",
+                    }}
+                    helperText={`Limit per request: Min ₹${minWd} | Max ₹${maxWd} (Available: ₹${fmtAmount(withdrawalMode === "direct" ? mainBalance : withdrawableBalance)})`}
+                    required
+                  />
 
-                    <Button
-                      type="submit"
-                      variant="contained"
-                      disabled={Boolean(disableReason) || wdrSubmitting}
-                      sx={{
-                        height: 48,
-                        fontWeight: 900,
-                        fontSize: 15,
-                        textTransform: "none",
-                        borderRadius: "14px",
-                        background: "linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #2563eb 100%)",
-                        boxShadow: "0 8px 20px rgba(37,99,235,0.28)",
-                        "&:hover": { background: "linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%)" },
-                      }}
-                    >
-                      {wdrSubmitting ? "Requesting..." : "Submit Bank Withdrawal"}
-                    </Button>
+                  {curGross > 0 && (
+                    <Box sx={{ p: 1.2, bgcolor: withdrawalMode === "direct" ? "#F0FDF4" : "#EFF6FF", borderRadius: 2, border: `1px solid ${withdrawalMode === "direct" ? "#BBF7D0" : "#BFDBFE"}` }}>
+                      <Stack spacing={0.4}>
+                        <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                          <Typography sx={{ fontSize: 11.5, color: "#1E293B" }}>Requested Gross Amount:</Typography>
+                          <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#1E293B" }}>₹ {curGross.toFixed(2)}</Typography>
+                        </Box>
+                        {withdrawalMode === "direct" ? (
+                          <>
+                            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                              <Typography sx={{ fontSize: 11.5, color: "#DC2626" }}>10% TDS / Platform Tax:</Typography>
+                              <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#DC2626" }}>- ₹ {directTds.toFixed(2)}</Typography>
+                            </Box>
+                            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                              <Typography sx={{ fontSize: 11.5, color: "#D97706" }}>2.5% Instant Gateway Processing Fee:</Typography>
+                              <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#D97706" }}>- ₹ {directFee.toFixed(2)}</Typography>
+                            </Box>
+                            <Box sx={{ display: "flex", justifyContent: "space-between", pt: 0.4, borderTop: "1px dashed #86EFAC" }}>
+                              <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#15803D" }}>Net Payout Credited (87.5%):</Typography>
+                              <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#15803D" }}>₹ {directNet.toFixed(2)}</Typography>
+                            </Box>
+                          </>
+                        ) : (
+                          <>
+                            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                              <Typography sx={{ fontSize: 11.5, color: "#059669" }}>Extra Gateway Deductions:</Typography>
+                              <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#059669" }}>₹ 0.00 (10% TDS already paid)</Typography>
+                            </Box>
+                            <Box sx={{ display: "flex", justifyContent: "space-between", pt: 0.4, borderTop: "1px dashed #93C5FD" }}>
+                              <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#1D4ED8" }}>Net Payout Credited (100%):</Typography>
+                              <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#1D4ED8" }}>₹ {curGross.toFixed(2)}</Typography>
+                            </Box>
+                          </>
+                        )}
+                      </Stack>
+                    </Box>
+                  )}
 
-                    <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-                      Note: Withdrawals are debited from your withdraw pocket. Bank details are captured in the KYC screen.
-                    </Typography>
-                  </Stack>
-                </Box>
-              ) : (
-                <Button
-                  variant="contained"
-                  disabled
-                  fullWidth
-                  sx={{ fontWeight: 900, textTransform: "none", borderRadius: 2, py: 1.2 }}
-                >
-                  Instant UPI Withdrawal Coming Soon
-                </Button>
-              )}
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disabled={Boolean(disableReason) || wdrSubmitting}
+                    sx={{
+                      height: 48,
+                      fontWeight: 900,
+                      fontSize: 15,
+                      textTransform: "none",
+                      borderRadius: "14px",
+                      background: withdrawalMode === "direct"
+                        ? "linear-gradient(135deg, #064e3b 0%, #059669 60%, #10b981 100%)"
+                        : "linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #2563eb 100%)",
+                      boxShadow: withdrawalMode === "direct"
+                        ? "0 8px 20px rgba(5,150,105,0.28)"
+                        : "0 8px 20px rgba(37,99,235,0.28)",
+                      "&:hover": {
+                        background: withdrawalMode === "direct"
+                          ? "linear-gradient(135deg, #064e3b 0%, #047857 100%)"
+                          : "linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%)",
+                      },
+                    }}
+                  >
+                    {wdrSubmitting
+                      ? "Requesting..."
+                      : withdrawalMode === "direct"
+                      ? `Submit Instant Direct Withdrawal (${curGross > 0 ? `Net ₹${fmtAmount(directNet)}` : "12.5% Total Fee"})`
+                      : `Submit Bank Withdrawal (₹${curGross > 0 ? fmtAmount(curGross) : "0.00"})`}
+                  </Button>
+
+                  <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                    {withdrawalMode === "direct"
+                      ? "Note: Instant Direct Withdrawal debits directly from your Main Earnings without moving to Withdrawable Pocket. Bank details are captured from KYC."
+                      : "Note: Debited directly from your Withdrawable Pocket. Bank details are captured from KYC."}
+                  </Typography>
+                </Stack>
+              </Box>
             </Paper>
 
             <Paper

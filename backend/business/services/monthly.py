@@ -276,8 +276,21 @@ def distribute_monthly_759_payouts(
     except Exception:
         pass
 
-    # 1) Direct sponsor and optional self from policy
-    direct_amt = _q2(box_cfg.direct_sponsor)
+    # 1) Direct sponsor and optional self (Personal Cashback)
+    # Check authoritative spp_1000_config first, falling back to policy box_cfg
+    cfg_solo = CommissionConfig.get_solo()
+    master_solo = dict(getattr(cfg_solo, "master_commission_json", {}) or {})
+    spp_cfg_live = dict(master_solo.get("spp_1000_config", {}) or {})
+
+    direct_amt = None
+    if spp_cfg_live.get("direct_bonus_sponsor") is not None:
+        try:
+            direct_amt = _q2(spp_cfg_live["direct_bonus_sponsor"])
+        except Exception:
+            pass
+    if direct_amt is None:
+        direct_amt = _q2(box_cfg.direct_sponsor)
+
     if sponsor and direct_amt > 0:
         _credit_wallet(
             sponsor,
@@ -288,29 +301,32 @@ def distribute_monthly_759_payouts(
             source_id=src_id,
         )
 
-    # If admin configured self bonus for monthly in policy via first/recurring boxes (not required).
-    # We model this by allowing monthly_759.first_box/recurring_box.direct.self in the future policy.
-    # For now, self is derived only if present in policy raw payload to avoid hardcoding.
-    # This keeps engine future-proof without adding defaults here.
-    try:
-        # Not required; safe lookup
-        raw = policy.raw_policy()
-        fb = (raw.get("commissions", {}).get("monthly_759", {}) or {})
-        dnode = (fb.get("first_box", {}) if is_first_month else fb.get("recurring_box", {})).get("direct", {}) or {}
-        if "self" in dnode:
-            self_amt = _q2(dnode.get("self"))
-            if self_amt > 0:
-                _credit_wallet(
-                    consumer,
-                    self_amt,
-                    tx_type="MONTHLY_759_SELF",
-                    meta={"source": "MONTHLY_759", "is_first_month": bool(is_first_month)},
-                    source_type=src_type,
-                    source_id=src_id,
-                )
-    except Exception:
-        # ignore optional self if not configured
-        pass
+    # Self bonus (Personal Cashback)
+    self_amt = None
+    if spp_cfg_live.get("direct_bonus_self") is not None:
+        try:
+            self_amt = _q2(spp_cfg_live["direct_bonus_self"])
+        except Exception:
+            pass
+    if self_amt is None:
+        try:
+            raw = policy.raw_policy()
+            fb = (raw.get("commissions", {}).get("monthly_759", {}) or {})
+            dnode = (fb.get("first_box", {}) if is_first_month else fb.get("recurring_box", {})).get("direct", {}) or {}
+            if "self" in dnode:
+                self_amt = _q2(dnode.get("self"))
+        except Exception:
+            pass
+
+    if self_amt is not None and self_amt > 0:
+        _credit_wallet(
+            consumer,
+            self_amt,
+            tx_type="MONTHLY_759_SELF",
+            meta={"source": "MONTHLY_759", "is_first_month": bool(is_first_month)},
+            source_type=src_type,
+            source_id=src_id,
+        )
 
     # 2) L1..L5 fixed amounts from master.monthly_759.levels_fixed.
     # These values were loaded but never distributed, which meant SPP matrix
@@ -437,11 +453,18 @@ def distribute_monthly_759_payouts(
             cm3 = dict(master.get("consumer_matrix_3", {}) or {})
 
             if effective_enable5:
-                cm5_759 = (cm5.get("759", {}) or cm5.get("rs759", {}) or cm5.get("prime759", {}) or cm5.get("prime_759", {}) or cm5.get("monthly_759", {}) or cm5.get("monthly759", {}) or {})
+                cm5_759 = (cm5.get("759", {}) or cm5.get("1000", {}) or cm5.get("spp", {}) or cm5.get("spp_1000", {}) or cm5.get("rs759", {}) or cm5.get("prime759", {}) or cm5.get("prime_759", {}) or cm5.get("monthly_759", {}) or cm5.get("monthly759", {}) or {})
                 five_levels = int((cm5_759.get("levels") or cfg2.get_matrix_five_levels()))
                 upline6_accounts = _matrix_ancestor_accounts(acc5, depth=five_levels) if acc5 else []
                 upline6_users = _resolve_upline(consumer, depth=five_levels) if not acc5 else []
                 fixed5 = list(cm5_759.get("fixed_amounts") or getattr(cfg2, "five_matrix_amounts_json", []) or [])
+                if not fixed5:
+                    spp_m5_raw = spp_cfg_live.get("five_amounts")
+                    if spp_m5_raw:
+                        if isinstance(spp_m5_raw, list):
+                            fixed5 = spp_m5_raw
+                        elif isinstance(spp_m5_raw, str):
+                            fixed5 = [float(x.strip()) for x in spp_m5_raw.split(",") if x.strip()]
                 if fixed5:
                     if acc5:
                         for idx, node in enumerate(upline6_accounts):
@@ -577,11 +600,18 @@ def distribute_monthly_759_payouts(
                             _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
 
             if effective_enable3:
-                cm3_759 = (cm3.get("759", {}) or cm3.get("rs759", {}) or cm3.get("prime759", {}) or cm3.get("prime_759", {}) or cm3.get("monthly_759", {}) or cm3.get("monthly759", {}) or {})
+                cm3_759 = (cm3.get("759", {}) or cm3.get("1000", {}) or cm3.get("spp", {}) or cm3.get("spp_1000", {}) or cm3.get("rs759", {}) or cm3.get("prime759", {}) or cm3.get("prime_759", {}) or cm3.get("monthly_759", {}) or cm3.get("monthly759", {}) or {})
                 three_levels = int((cm3_759.get("levels") or cfg2.get_matrix_three_levels()))
                 upline15_accounts = _matrix_ancestor_accounts(acc3, depth=three_levels) if acc3 else []
                 upline15_users = _resolve_upline(consumer, depth=three_levels) if not acc3 else []
                 fixed3 = list(cm3_759.get("fixed_amounts") or getattr(cfg2, "three_matrix_amounts_json", []) or [])
+                if not fixed3:
+                    spp_m3_raw = spp_cfg_live.get("three_amounts")
+                    if spp_m3_raw:
+                        if isinstance(spp_m3_raw, list):
+                            fixed3 = spp_m3_raw
+                        elif isinstance(spp_m3_raw, str):
+                            fixed3 = [float(x.strip()) for x in spp_m3_raw.split(",") if x.strip()]
                 if fixed3:
                     if acc3:
                         for idx, node in enumerate(upline15_accounts):

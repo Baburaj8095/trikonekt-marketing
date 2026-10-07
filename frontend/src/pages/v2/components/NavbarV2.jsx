@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Box } from "@mui/material";
 import LOGO from "../../../assets/TRIKONEKT.jpg";
@@ -12,7 +12,7 @@ export default function NavbarV2() {
     <Box component="nav" className="v2-navbar">
       <Box className="v2-nav-inner">
         <Link to="/v2/home" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none" }}>
-          <img src={LOGO} alt="TRIKONEKT" className="tri-logo" />
+          <img src={LOGO} alt="asiyapp" className="tri-logo" style={{ borderRadius: 6 }} />
         </Link>
 
         <div className="v2-nav-links">

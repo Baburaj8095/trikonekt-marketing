@@ -1555,7 +1555,7 @@ export async function listCategoryBanners({ params = {} } = {}) {
 
 
 /**
- * MLM Ranks APIs
+ * Commission Ranks APIs
  */
 export async function getRanks() {
   const res = await API.get("/ranks/", { cacheTTL: 10_000, dedupe: "cancelPrevious" });

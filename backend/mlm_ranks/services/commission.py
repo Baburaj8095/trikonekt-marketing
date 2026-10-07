@@ -210,29 +210,37 @@ class CommissionDistributor:
         direct_bonus = q2(net * Decimal("0.50"))
         level_pool = q2(net * Decimal("0.50"))
 
+        # Retained Platform Tax Credit to Company Root/Tax Account
+        gst_amt = q2(getattr(upgrade, "gst_amount", Decimal("0.00")) or Decimal("0.00"))
+        if gst_amt > 0:
+            try:
+                from business.models import CommissionConfig
+                cfg = CommissionConfig.get_solo()
+                cu = cfg.get_company_user()
+                if not cu:
+                    from accounts.models import CustomUser
+                    cu = CustomUser.objects.filter(id=1).first() or CustomUser.objects.filter(is_superuser=True).first()
+                if cu:
+                    WalletPoster.credit_company_gst(cu, gst_amt, upgrade_id=upgrade.id)
+            except Exception:
+                pass
+
         # 1) Direct sponsor share (level=0)
         sponsor = UplineService.get_direct_sponsor(payer)
-        recipient_direct = None
-        if sponsor and cls._is_recipient_eligible_for_direct(sponsor):
-            recipient_direct = sponsor
+        if sponsor and getattr(sponsor, "id", None) != getattr(payer, "id", None) and cls._is_recipient_eligible_for_direct(sponsor):
+            if direct_bonus > 0:
+                cls._apply_hold_and_credit(
+                    upgrade=upgrade,
+                    from_user=payer,
+                    to_user=sponsor,
+                    base_amount=direct_bonus,
+                    level=0,
+                    tx_type="DIRECT",
+                    now=now,
+                )
         else:
-            # fallback to company root user (id=COMPANY_ROOT_USER_ID)
-            try:
-                from accounts.models import CustomUser
-                recipient_direct = CustomUser.objects.filter(id=int(COMPANY_ROOT_USER_ID)).first()
-            except Exception:
-                recipient_direct = None
-
-        if recipient_direct and direct_bonus > 0:
-            cls._apply_hold_and_credit(
-                upgrade=upgrade,
-                from_user=payer,
-                to_user=recipient_direct,
-                base_amount=direct_bonus,
-                level=0,
-                tx_type="DIRECT",
-                now=now,
-            )
+            # Washout to overhead (do NOT credit any user account)
+            pass
 
         # 2) Level bonus to the R-th ancestor in the Rank Matrix parent chain:
         target_level = int(getattr(getattr(upgrade, "to_rank", None), "level_number", 0) or 0)
@@ -252,35 +260,10 @@ class CommissionDistributor:
 
             recipient = None
             cand = ancestors[target_level - 1] if len(ancestors) >= target_level else None
-            if cand and cls._is_recipient_eligible_for_level(cand, target_level):
+            if cand and getattr(cand, "id", None) != getattr(payer, "id", None) and cls._is_recipient_eligible_for_level(cand, target_level):
                 recipient = cand
 
-            if not recipient:
-                # Fallback to Company Root ID for this level share
-                try:
-                    from accounts.models import CustomUser
-                    company = CustomUser.objects.filter(id=int(COMPANY_ROOT_USER_ID)).first()
-                except Exception:
-                    company = None
-                if company:
-                    # Credit immediately to company (no holds for company fallback)
-                    WalletPoster.credit_level(
-                        company,
-                        level_pool,
-                        from_user_id=getattr(payer, "id", None) or 0,
-                        upgrade_id=upgrade.id,
-                        level=target_level,
-                    )
-                    UpgradeCommission.objects.create(
-                        upgrade=upgrade,
-                        from_user=payer,
-                        to_user=company,
-                        level=target_level,
-                        commission_amount=level_pool,
-                        commission_type="LEVEL",
-                        status=UpgradeCommission.STATUS_CREDITED,
-                    )
-            else:
+            if recipient:
                 res = cls._apply_hold_and_credit(
                     upgrade=upgrade,
                     from_user=payer,
@@ -290,6 +273,9 @@ class CommissionDistributor:
                     tx_type="LEVEL",
                     now=now,
                 )
+            else:
+                # Washout to overhead (do NOT credit any user account)
+                pass
                 # Event-driven reevaluation for this recipient's holds (early release/expiry)
                 try:
                     from .five_matrix import FiveMatrixService  # local import to avoid cycle

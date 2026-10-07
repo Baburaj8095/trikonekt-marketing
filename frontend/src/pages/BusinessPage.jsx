@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { Box, Container, Typography, Grid, Card, CardContent } from "@mui/material";
 import PublicNavbar from "../components/PublicNavbar";
 import Footer from "../components/Footer";
@@ -10,17 +10,17 @@ export default function BusinessPage() {
 
       <Container sx={{ py: { xs: 5, md: 8 }, flex: 1 }}>
         <Typography fontSize={{ xs: 28, md: 36 }} fontWeight={800} color="#0C2D48" mb={2}>
-          Trikonekt for Business
+          Asiyapp for Business
         </Typography>
 
         <Typography color="text.secondary" maxWidth={800} mb={3}>
-          Grow your business with Trikonekt  acquire customers, accept e‑payments, list your shop,
+          Grow your business with Asiyapp — acquire customers, accept e‑payments, list your shop,
           and run targeted promotions across our network.
         </Typography>
 
         <Grid container spacing={2}>
           {[
-            { title: "List Your Shop", desc: "Get discovered by nearby customers in the Trikonekt marketplace." },
+            { title: "List Your Shop", desc: "Get discovered by nearby customers in the Asiyapp marketplace." },
             { title: "Promotions", desc: "Run offers and campaigns to boost footfall and sales." },
             { title: "Insights", desc: "Track engagement and performance with simple dashboards." },
           ].map((p) => (

@@ -126,7 +126,7 @@ export default function AdminTeamConsumerBlockUsers() {
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: "#0f172a" }}>Block Team Consumers</h2>
+        <h2 style={{ margin: 0, color: "#0f172a" }}>Block Community Consumers</h2>
         <div style={{ color: "#64748b", fontSize: 13, marginTop: 4 }}>
           Blocking uses access status. It sets login access off/on and does not change package activation or wallet eligibility.
         </div>

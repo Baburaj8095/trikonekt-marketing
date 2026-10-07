@@ -127,7 +127,7 @@ function LevelCard({ level, count, pct, isActive, isLocked }) {
         }}
       >
         <span style={{ fontWeight: 700, fontSize: 14, color: C.text }}>
-          Level {level}
+          Layer {level}
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span
@@ -312,7 +312,7 @@ function PositionCard({ pos }) {
         }}
       >
         <span style={{ color: C.textSec }}>
-          Level{" "}
+          Layer{" "}
           <strong style={{ color: C.text }}>{pos?.level ?? "—"}</strong>
         </span>
         <span style={{ color: C.textSec }}>
@@ -425,7 +425,7 @@ export default function ProgressTab({
         }}
       >
         <StatTile
-          label="Total Team"
+          label="Total Community"
           value={totalTeam.toLocaleString("en-IN")}
         />
         <StatTile label="Direct" value={String(directCount)} />
@@ -506,7 +506,7 @@ export default function ProgressTab({
                 fontSize: 14,
               }}
             >
-              No level data yet.
+              No layer data yet.
             </div>
           ) : (
             (fiveLevelGrid || []).map((r) => {

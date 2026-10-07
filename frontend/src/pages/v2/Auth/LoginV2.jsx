@@ -1,4 +1,4 @@
-﻿/**
+/**
  * LoginV2.jsx  UI-only refactor (NO logic changes)
  * - Fintech-grade, native app-style layout
  * - All auth logic, API calls, redirects, handlers, field names and labels preserved
@@ -330,7 +330,7 @@ export default function LoginV2() {
               <ArrowBackIosNew fontSize="small" />
             </IconButton>
             <Box sx={{ flex: 1, display: "flex", justifyContent: "center" }}>
-              <img src={LOGO} alt="Trikonekt" style={{ height: 28 }} />
+              <img src={LOGO} alt="asiyapp" style={{ height: 28, borderRadius: 6 }} />
             </Box>
             {/* Spacer to balance the back button width */}
             <Box sx={{ width: 40 }} />

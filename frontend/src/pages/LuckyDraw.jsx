@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   AppBar,
@@ -659,7 +659,7 @@ export default function LuckyDraw({ embedded = false }) {
           </IconButton>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Box component="img" src={LOGO} alt="Trikonekt" sx={{ height: 36 }} />
+            <Box component="img" src={LOGO} alt="asiyapp" sx={{ height: 36, borderRadius: 1 }} />
             <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 700 }}></Typography>
           </Box>
 

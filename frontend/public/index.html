@@ -3,27 +3,57 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Noto+Sans:wght@400;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
       rel="stylesheet"
-      media="print"
-      onload="this.media='all'"
     />
-    <noscript>
-      <link
-        href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Noto+Sans:wght@400;600;700&display=swap"
-        rel="stylesheet"
-      />
-    </noscript>
     <link rel="icon" type="image/png" href="%PUBLIC_URL%/logo.png" />
-    <title>Growth</title>
+    <title>asiyapp</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="position:fixed;inset:0;background:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Inter,-apple-system,sans-serif;z-index:99999;">
+        <style>
+          @keyframes triPreloadStroke {
+            0% { stroke-dashoffset: 0; }
+            100% { stroke-dashoffset: -300; }
+          }
+          @keyframes triPreloadPulse {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(30, 64, 175, 0.3)); }
+            50% { transform: scale(1.05); filter: drop-shadow(0 0 12px rgba(6, 182, 212, 0.5)); }
+          }
+        </style>
+        <div style="animation: triPreloadPulse 2.2s ease-in-out infinite; display:flex; align-items:center; justify-content:center;">
+          <svg viewBox="0 0 120 70" width="100" height="60" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="triInitGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#1E40AF" />
+                <stop offset="35%" stop-color="#2563EB" />
+                <stop offset="70%" stop-color="#06B6D4" />
+                <stop offset="100%" stop-color="#7C3AED" />
+              </linearGradient>
+            </defs>
+            <path
+              d="M32 20 C18 20 10 28 10 35 C10 42 18 50 32 50 C48 50 56 35 60 35 C64 35 72 50 88 50 C102 50 110 42 110 35 C110 28 102 20 88 20 C72 20 64 35 60 35 C56 35 48 20 32 20 Z"
+              stroke="#e2e8f0"
+              stroke-width="6"
+              stroke-linecap="round"
+            />
+            <path
+              d="M32 20 C18 20 10 28 10 35 C10 42 18 50 32 50 C48 50 56 35 60 35 C64 35 72 50 88 50 C102 50 110 42 110 35 C110 28 102 20 88 20 C72 20 64 35 60 35 C56 35 48 20 32 20 Z"
+              stroke="url(#triInitGrad)"
+              stroke-width="6"
+              stroke-linecap="round"
+              stroke-dasharray="90 210"
+              style="animation: triPreloadStroke 1.8s linear infinite;"
+            />
+            <circle cx="60" cy="35" r="3.5" fill="#06B6D4" />
+          </svg>
+        </div>
+        <div style="margin-top:14px;font-size:12px;font-weight:700;letter-spacing:0.1em;color:#475569;text-transform:uppercase;">asiyapp</div>
+      </div>
+    </div>
   </body>
 </html>

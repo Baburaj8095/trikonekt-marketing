@@ -33,11 +33,11 @@ export default function AdminUserTree() {
   const [tab, setTab] = useState(0);
   const [levels, setLevels] = useState({ five: 10, three: 15 });
   
-  // Drilldown & Search States
-  const [treeSearchInput, setTreeSearchInput] = useState("");
-  const [treeSearchIdent, setTreeSearchIdent] = useState("");
+  // Drilldown & Search States (defaults to Consumer Network Root 9999999999)
+  const [treeSearchInput, setTreeSearchInput] = useState("9999999999");
+  const [treeSearchIdent, setTreeSearchIdent] = useState("9999999999");
   const [treeStartEntryId, setTreeStartEntryId] = useState(null);
-  const [trail, setTrail] = useState([]); // [{ identifier, startEntryId, label }]
+  const [trail, setTrail] = useState([{ identifier: "9999999999", startEntryId: null, label: "9999999999" }]);
   const [selectedNodeData, setSelectedNodeData] = useState(null);
 
   // Auditor States
@@ -47,7 +47,7 @@ export default function AdminUserTree() {
   const [auditResults, setAuditResults] = useState(null);
 
   const activePool = useMemo(() => {
-    return tab === 0 ? "FIVE_750" : "THREE_750";
+    return tab === 0 ? "FIVE_150" : "THREE_150";
   }, [tab]);
 
   useEffect(() => {
@@ -77,10 +77,10 @@ export default function AdminUserTree() {
   };
 
   const onTreeReset = () => {
-    setTreeSearchInput("");
-    setTreeSearchIdent("");
+    setTreeSearchInput("9999999999");
+    setTreeSearchIdent("9999999999");
     setTreeStartEntryId(null);
-    setTrail([]);
+    setTrail([{ identifier: "9999999999", startEntryId: null, label: "9999999999" }]);
     setSelectedNodeData(null);
   };
 
@@ -122,7 +122,7 @@ export default function AdminUserTree() {
     const newTrail = trail.slice(0, -1);
     const parent = newTrail[newTrail.length - 1];
     setTrail(newTrail);
-    setTreeSearchIdent(parent?.identifier || "");
+    setTreeSearchIdent(parent?.identifier || "9999999999");
     setTreeStartEntryId(parent?.startEntryId || null);
     setSelectedNodeData(null);
   };
@@ -341,7 +341,7 @@ export default function AdminUserTree() {
               Current Node: {selectedNodeData.username} {selectedNodeData.entryId ? `(Entry #${selectedNodeData.entryId})` : ""}
             </Typography>
             <Typography variant="caption" sx={{ color: "#4338ca", fontWeight: 700 }}>
-              {selectedNodeData.matrixPos > 0 ? `Layer Position #${selectedNodeData.matrixPos}` : "Active Layer Root"}
+              {selectedNodeData.matrixPos > 0 ? `Block Position #${selectedNodeData.matrixPos}` : "Active Block Root"}
             </Typography>
           </Box>
           <Stack direction="row" spacing={2} alignItems="center">

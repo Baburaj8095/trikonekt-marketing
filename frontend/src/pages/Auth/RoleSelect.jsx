@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Container,
@@ -235,7 +235,7 @@ export default function RoleSelect() {
           gap: 1,
         }}
       >
-        <img src={LOGO} alt="Trikonekt" style={{ height: 44, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.15))" }} />
+        <img src={LOGO} alt="asiyapp" style={{ height: 44, borderRadius: 8, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.15))" }} />
       </Box>
 
       <Container maxWidth="lg" sx={{ pb: 6 }}>

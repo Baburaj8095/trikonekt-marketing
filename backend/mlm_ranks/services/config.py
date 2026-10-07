@@ -5,11 +5,14 @@ from decimal import Decimal
 from typing import Iterable, List, Optional, Set
 
 
+import os
+
 # -------- Global constants (override via env if wired later) --------
 GST_RATE = Decimal("0.15")
 LEVELS = 10
 LEVEL_SPLIT_EQUAL = True  # If True, level pool is split equally across 10 levels
-COMPANY_ROOT_USER_ID = 32  # Provided by client; can be overridden by env later
+COMPANY_ROOT_USER_ID = int(os.environ.get("MLM_COMPANY_ROOT_USER_ID", "2"))
+
 HOLD_DAYS = 7
 HOLD_REQUIRE_DIRECTS_GTE = 5
 HOLD_EARLY_RELEASE = True

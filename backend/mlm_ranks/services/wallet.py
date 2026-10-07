@@ -60,6 +60,5 @@ class WalletPoster:
 
     @classmethod
     def credit_company_gst(cls, company_user, amount: Decimal, *, upgrade_id: int) -> WalletPostResult:
-        # Optional GST posting if you want a ledger marker. Not required by spec.
-        meta = {"upgrade_id": upgrade_id, "kind": "RANK_UPGRADE_GST"}
+        meta = {"upgrade_id": upgrade_id, "kind": "RANK_UPGRADE_GST", "no_withhold": True}
         return cls._credit(company_user, amount, cls.COMPANY_GST_TX, source_type="RANK_UPGRADE", source_id=str(upgrade_id), meta=meta)

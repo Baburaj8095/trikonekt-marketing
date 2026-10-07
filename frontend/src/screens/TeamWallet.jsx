@@ -35,6 +35,12 @@ import VerifiedUserIcon from "@mui/icons-material/VerifiedUser";
 import WorkIcon from "@mui/icons-material/Work";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import RedeemIcon from "@mui/icons-material/Redeem";
+import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
+import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
+import CalendarTodayRoundedIcon from "@mui/icons-material/CalendarTodayRounded";
+import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
+import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
+import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 
 function fmtAmount(value) {
   const num = Number(value || 0);
@@ -61,7 +67,7 @@ const TRANSFER_OPTIONS = [
 
 const WALLET_DEFINITIONS = [
   { slNo: 1, name: "Bonus Wallet", section: "core" },
-  { slNo: 2, name: "Team Consumer Self Re-birth", section: "core" },
+  { slNo: 2, name: "Community Consumer Self Re-birth", section: "core" },
   { slNo: 3, name: "Shopping Self Re-birth", section: "core" },
   { slNo: 4, name: "Redeem Points Wallet", section: "core" },
   { slNo: 5, name: "Main Wallet", section: "core", highlight: true },
@@ -72,7 +78,7 @@ const WALLET_DEFINITIONS = [
   { slNo: 11, name: "Package Purchase Coupon Received (Buy Package)", section: "operational" },
   { slNo: 12, name: "Direct Benefit Wallet", section: "rewards" },
   { slNo: 13, name: "Prime Subscription Spin & Win", section: "rewards" },
-  { slNo: 14, name: "Level Benefit Wallet", section: "rewards" },
+  { slNo: 14, name: "Layer Benefit Wallet", section: "rewards" },
   { slNo: 15, name: "Reward Gift", section: "rewards" },
   { slNo: 16, name: "Franchisee Self Re-birth", section: "rewards" },
   { slNo: 17, name: "Captain Self Re-birth", section: "rewards" },
@@ -539,7 +545,7 @@ export default function TeamWallet() {
         case 14:
           amount = Number(income?.matrixLevel || income?.levelBonus || 0);
           icon = <WorkIcon />;
-          label = "Level income";
+          label = "Layer income";
           break;
         case 15:
           amount = Number(walletData?.totals?.allEarnings || 0);
@@ -606,7 +612,7 @@ export default function TeamWallet() {
   const summaryWallets = useMemo(
     () => [
       { title: "Bonus Wallet", wallet: walletByNo[1] },
-      { title: "Team Consumer Self Re-birth", wallet: walletByNo[2], idCount: selfRebirthStats.count || 0 },
+      { title: "Community Consumer Self Re-birth", wallet: walletByNo[2], idCount: selfRebirthStats.count || 0 },
     ],
     [selfRebirthStats, walletByNo]
   );
@@ -652,10 +658,10 @@ export default function TeamWallet() {
         tone: 1,
       },
       {
-        title: "Level Benefit",
+        title: "Layer Benefit",
         amount: Number(income?.matrixLevel || income?.levelBonus || 0),
         icon: <AccountBalanceWalletIcon />,
-        caption: "Level income",
+        caption: "Layer income",
         tone: 2,
       },
       {
@@ -786,6 +792,7 @@ export default function TeamWallet() {
   };
 
   const [activeTab, setActiveTab] = useState(0);
+  const [showBalance, setShowBalance] = useState(true);
 
   const totalCalculatedBalance = useMemo(() => {
     // Exclude Add Money pocket as it is dedicated deposit solely for buying packages
@@ -872,143 +879,462 @@ export default function TeamWallet() {
 
       {/* ════════ TAB 0: OVERVIEW (Screen 2 Target) ════════ */}
       {activeTab === 0 && (
-        <Stack spacing={2}>
-          {/* 1. Total Balance Card */}
+        <Stack spacing={2.25}>
+          {/* 1. HERO MAIN WALLET BALANCE CARD (Mockup Screen 2) */}
           <Paper
             elevation={0}
             sx={{
-              p: { xs: 2, sm: 2.5 },
-              borderRadius: "16px",
-              bgcolor: "#ffffff",
-              border: "1px solid #e2e8f0",
-              boxShadow: "0 4px 16px rgba(15,23,42,0.06)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
+              p: { xs: 2.25, sm: 2.75 },
+              borderRadius: "22px",
+              background: "linear-gradient(135deg, #0B3B8A 0%, #1D4ED8 50%, #2563EB 100%)",
+              color: "#ffffff",
+              boxShadow: "0 12px 32px rgba(30, 64, 175, 0.28)",
+              position: "relative",
+              overflow: "hidden",
             }}
           >
-            <Stack direction="row" spacing={1.5} alignItems="center">
+            {/* Ambient Background Circle */}
+            <Box
+              sx={{
+                position: "absolute",
+                top: -30,
+                right: -30,
+                width: 140,
+                height: 140,
+                borderRadius: "50%",
+                background: "radial-gradient(circle, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 70%)",
+                pointerEvents: "none",
+              }}
+            />
+
+            <Stack spacing={2.25}>
+              {/* Top row: Avatar icon + Balance + Eye Toggle */}
+              <Stack direction="row" alignItems="center" justifyContent="space-between">
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Box
+                    sx={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: "50%",
+                      bgcolor: "rgba(255, 255, 255, 0.2)",
+                      backdropFilter: "blur(6px)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#ffffff",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                    }}
+                  >
+                    <AccountBalanceWalletIcon sx={{ fontSize: 24 }} />
+                  </Box>
+                  <Box>
+                    <Typography
+                      sx={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "rgba(255, 255, 255, 0.85)",
+                        letterSpacing: "0.5px",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Main Wallet Balance
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: { xs: 26, sm: 30 },
+                        fontWeight: 900,
+                        color: "#ffffff",
+                        lineHeight: 1.15,
+                        letterSpacing: "-0.02em",
+                      }}
+                    >
+                      ₹ {showBalance ? totalCalculatedBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "••••••"}
+                    </Typography>
+                  </Box>
+                </Stack>
+
+                <IconButton
+                  size="small"
+                  onClick={() => setShowBalance(!showBalance)}
+                  sx={{
+                    color: "rgba(255, 255, 255, 0.9)",
+                    bgcolor: "rgba(255, 255, 255, 0.15)",
+                    "&:hover": { bgcolor: "rgba(255, 255, 255, 0.25)" },
+                  }}
+                >
+                  {showBalance ? <VisibilityRoundedIcon sx={{ fontSize: 20 }} /> : <VisibilityOffRoundedIcon sx={{ fontSize: 20 }} />}
+                </IconButton>
+              </Stack>
+
+              {/* Bottom 3 Pill Action Buttons (Move to Pockets, E-Edu Academy, Withdraw) */}
               <Box
                 sx={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: "12px",
-                  bgcolor: "#dcfce7",
-                  color: "#16a34a",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: 1.25,
                 }}
               >
-                <AccountBalanceWalletIcon sx={{ fontSize: 24 }} />
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: 12.5, color: "#64748b", fontWeight: 500 }}>
-                  Total Balance
-                </Typography>
-                <Typography sx={{ fontSize: { xs: 22, sm: 26 }, fontWeight: 700, color: "#0f172a", lineHeight: 1.2 }}>
-                  ₹ {totalCalculatedBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </Typography>
-                <Typography
-                  onClick={() => setActiveTab(1)}
-                  sx={{ fontSize: 12, color: "#2563eb", fontWeight: 600, mt: 0.5, cursor: "pointer", display: "inline-block" }}
+                <Button
+                  onClick={() => openTransferType("coupon")}
+                  variant="contained"
+                  size="small"
+                  startIcon={<SwapHorizIcon sx={{ fontSize: 18 }} />}
+                  sx={{
+                    bgcolor: "#10b981",
+                    color: "#ffffff",
+                    fontWeight: 800,
+                    fontSize: { xs: 11, sm: 12 },
+                    textTransform: "none",
+                    borderRadius: "12px",
+                    py: 0.9,
+                    boxShadow: "0 4px 12px rgba(16, 185, 129, 0.3)",
+                    "&:hover": { bgcolor: "#059669" },
+                    whiteSpace: "nowrap",
+                  }}
                 >
-                  View all wallets →
-                </Typography>
+                  Move to Pockets
+                </Button>
+
+                <Button
+                  component="a"
+                  href="https://triacademy.trikonekt.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="contained"
+                  size="small"
+                  startIcon={<SchoolRoundedIcon sx={{ fontSize: 18 }} />}
+                  sx={{
+                    bgcolor: "#0284c7",
+                    color: "#ffffff",
+                    fontWeight: 800,
+                    fontSize: { xs: 11, sm: 12 },
+                    textTransform: "none",
+                    borderRadius: "12px",
+                    py: 0.9,
+                    boxShadow: "0 4px 12px rgba(2, 132, 199, 0.3)",
+                    "&:hover": { bgcolor: "#0369a1" },
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  E-Edu Academy
+                </Button>
+
+                <Button
+                  onClick={() => openTransferType("withdrawal")}
+                  variant="contained"
+                  size="small"
+                  startIcon={<RedeemIcon sx={{ fontSize: 18 }} />}
+                  sx={{
+                    bgcolor: "#f97316",
+                    color: "#ffffff",
+                    fontWeight: 800,
+                    fontSize: { xs: 11, sm: 12 },
+                    textTransform: "none",
+                    borderRadius: "12px",
+                    py: 0.9,
+                    boxShadow: "0 4px 12px rgba(249, 115, 22, 0.3)",
+                    "&:hover": { bgcolor: "#ea580c" },
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Withdraw
+                </Button>
               </Box>
             </Stack>
-            <IconButton onClick={() => setActiveTab(1)} size="small" sx={{ color: "#94a3b8" }}>
-              <ArrowForwardIosRoundedIcon sx={{ fontSize: 16 }} />
-            </IconButton>
           </Paper>
 
-          {/* 2. 4 Quick Actions Row */}
-          <QuickActionGrid variant="wallet" />
+          {/* 2. 4 KPI MINI CARDS (2x2 Grid - Mockup Screen 2) */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, 1fr)",
+              gap: 1.5,
+            }}
+          >
+            {/* Card 1: Today's Earnings */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.75,
+                borderRadius: "16px",
+                bgcolor: "#ffffff",
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
+              }}
+            >
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748b" }}>
+                  Today's Earnings
+                </Typography>
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "10px",
+                    bgcolor: "#ecfdf5",
+                    color: "#10b981",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <AutoAwesomeRoundedIcon sx={{ fontSize: 18 }} />
+                </Box>
+              </Stack>
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#0f172a" }}>
+                  ₹ {Number(top?.today_earnings || walletData?.today_earnings || 0).toFixed(2)}
+                </Typography>
+                <Chip
+                  size="small"
+                  label="↑ 100%"
+                  sx={{
+                    height: 20,
+                    fontSize: 10,
+                    fontWeight: 800,
+                    bgcolor: "#dcfce7",
+                    color: "#16a34a",
+                  }}
+                />
+              </Stack>
+            </Paper>
 
-          {/* 3. Primary Wallet Pockets 2-Column Grid */}
+            {/* Card 2: Yesterday's Earnings */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.75,
+                borderRadius: "16px",
+                bgcolor: "#ffffff",
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
+              }}
+            >
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748b" }}>
+                  Yesterday's Earnings
+                </Typography>
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "10px",
+                    bgcolor: "#f5f3ff",
+                    color: "#7c3aed",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <CalendarTodayRoundedIcon sx={{ fontSize: 16 }} />
+                </Box>
+              </Stack>
+              <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#0f172a" }}>
+                ₹ {Number(top?.yesterday_earnings || walletData?.yesterday_earnings || 0).toFixed(2)}
+              </Typography>
+            </Paper>
+
+            {/* Card 3: Withdrawable Pocket */}
+            <Paper
+              elevation={0}
+              onClick={() => openTransferType("withdrawal")}
+              sx={{
+                p: 1.75,
+                borderRadius: "16px",
+                bgcolor: "#ffffff",
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
+                cursor: "pointer",
+                transition: "transform 140ms ease",
+                "&:hover": { transform: "translateY(-2px)" },
+              }}
+            >
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748b" }}>
+                  Withdrawable Pocket
+                </Typography>
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "10px",
+                    bgcolor: "#fee2e2",
+                    color: "#ef4444",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <CardGiftcardIcon sx={{ fontSize: 18 }} />
+                </Box>
+              </Stack>
+              <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#0f172a" }}>
+                ₹ {Number(walletByNo[10]?.amount || walletData?.pockets?.withdrawal || 0).toFixed(2)}
+              </Typography>
+            </Paper>
+
+            {/* Card 4: Self Account Balance */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.75,
+                borderRadius: "16px",
+                bgcolor: "#ffffff",
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
+              }}
+            >
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748b" }}>
+                  Self Account Balance
+                </Typography>
+                <Box
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: "10px",
+                    bgcolor: "#ffedd5",
+                    color: "#ea580c",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <StoreIcon sx={{ fontSize: 18 }} />
+                </Box>
+              </Stack>
+              <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#0f172a" }}>
+                ₹ {Number(top?.self_account_balance || walletData?.self_account_balance || 0).toFixed(2)}
+              </Typography>
+            </Paper>
+          </Box>
+
+          {/* 3. MY EARNINGS BREAKDOWN (Mockup Screen 2) */}
           <Box>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.25, px: 0.5 }}>
-              <Typography sx={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
-                Wallet Pockets
+              <Typography sx={{ fontSize: 15, fontWeight: 800, color: "#0f172a" }}>
+                My Earnings Breakdown
               </Typography>
               <Typography
                 onClick={() => setActiveTab(1)}
-                sx={{ fontSize: 12.5, fontWeight: 600, color: "#2563eb", cursor: "pointer" }}
+                sx={{ fontSize: 12.5, fontWeight: 700, color: "#2563eb", cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
               >
-                See All
+                View Details →
               </Typography>
             </Stack>
 
             <Box
               sx={{
                 display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                gridTemplateColumns: "repeat(2, 1fr)",
                 gap: 1.5,
               }}
             >
-              {[
-                { title: "Main Wallet", amount: walletByNo[5]?.amount || 0, color: "#2563eb", bg: "#eff6ff", icon: AccountBalanceWalletIcon, onClick: () => openTransferType("coupon") },
-                { title: "Add Money Pocket", amount: addMoneyPocketBalance || 0, color: "#16a34a", bg: "#dcfce7", icon: PaymentsIcon, onClick: () => (window.location.href = "/user/upload-wallet") },
-                { title: "Self Package", amount: walletByNo[7]?.amount || 0, color: "#ea580c", bg: "#fff7ed", icon: ShoppingCartIcon, onClick: () => openTransferType("internal") },
-                { title: "Coupon Pocket", amount: walletByNo[6]?.amount || 0, color: "#7c3aed", bg: "#f5f3ff", icon: CardGiftcardIcon, onClick: () => (window.location.href = "/user/coupon-pocket") },
-              ].map((p) => {
-                const IconComp = p.icon;
-                return (
-                  <Paper
-                    key={p.title}
-                    elevation={0}
-                    onClick={p.onClick}
+              {/* Box 1: Package Direct */}
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 1.75,
+                  borderRadius: "16px",
+                  bgcolor: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
+                }}
+              >
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.75 }}>
+                  <Box
                     sx={{
-                      p: 1.5,
-                      borderRadius: "14px",
-                      bgcolor: "#ffffff",
-                      border: "1px solid #e2e8f0",
-                      boxShadow: "0 2px 8px rgba(15,23,42,0.04)",
-                      cursor: "pointer",
-                      transition: "transform 140ms ease, box-shadow 140ms ease",
-                      "&:active": { transform: "scale(0.98)" },
+                      width: 28,
+                      height: 28,
+                      borderRadius: "8px",
+                      bgcolor: "#eff6ff",
+                      color: "#2563eb",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                     }}
                   >
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                      <Box
-                        sx={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: "8px",
-                          bgcolor: p.bg,
-                          color: p.color,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <IconComp sx={{ fontSize: 18 }} />
-                      </Box>
-                      <Typography sx={{ fontSize: 12, fontWeight: 600, color: "#64748b" }} noWrap>
-                        {p.title}
-                      </Typography>
-                    </Stack>
-                    <Typography sx={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
-                      ₹ {Number(p.amount || 0).toFixed(2)}
-                    </Typography>
-                  </Paper>
-                );
-              })}
+                    <PaymentsIcon sx={{ fontSize: 16 }} />
+                  </Box>
+                  <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>
+                    Package Direct
+                  </Typography>
+                </Stack>
+                <Typography sx={{ fontSize: 17, fontWeight: 900, color: "#0f172a", mb: 0.75 }}>
+                  ₹ {Number(income?.directReferral || 0).toFixed(2)}
+                </Typography>
+                <Chip
+                  size="small"
+                  label="E-edu & Prime Direct"
+                  sx={{
+                    height: 20,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    bgcolor: "#f1f5f9",
+                    color: "#475569",
+                  }}
+                />
+              </Paper>
+
+              {/* Box 2: Layer 5 & 3 Blocks */}
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 1.75,
+                  borderRadius: "16px",
+                  bgcolor: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
+                }}
+              >
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.75 }}>
+                  <Box
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: "8px",
+                      bgcolor: "#f5f3ff",
+                      color: "#7c3aed",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <AccountBalanceWalletIcon sx={{ fontSize: 16 }} />
+                  </Box>
+                  <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>
+                    Layer 5 & 3 Blocks
+                  </Typography>
+                </Stack>
+                <Typography sx={{ fontSize: 17, fontWeight: 900, color: "#0f172a", mb: 0.75 }}>
+                  ₹ {Number(income?.matrixLevel || income?.levelBonus || 0).toFixed(2)}
+                </Typography>
+                <Chip
+                  size="small"
+                  label="5-Blocks & 3-Blocks"
+                  sx={{
+                    height: 20,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    bgcolor: "#f1f5f9",
+                    color: "#475569",
+                  }}
+                />
+              </Paper>
             </Box>
           </Box>
 
-          {/* 4. Recent Transactions */}
+          {/* 4. RECENT TRANSACTIONS (Mockup Screen 2) */}
           <Box>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.25, px: 0.5 }}>
-              <Typography sx={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
+              <Typography sx={{ fontSize: 15, fontWeight: 800, color: "#0f172a" }}>
                 Recent Transactions
               </Typography>
               <Typography
                 onClick={() => (window.location.href = "/user/history")}
-                sx={{ fontSize: 12.5, fontWeight: 600, color: "#2563eb", cursor: "pointer" }}
+                sx={{ fontSize: 12.5, fontWeight: 700, color: "#2563eb", cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
               >
-                See All
+                View All →
               </Typography>
             </Stack>
 
@@ -1028,6 +1354,8 @@ export default function TeamWallet() {
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
+                        transition: "transform 140ms ease",
+                        "&:hover": { bgcolor: "#f8fafc" },
                       }}
                     >
                       <Stack direction="row" spacing={1.25} alignItems="center">
@@ -1046,26 +1374,23 @@ export default function TeamWallet() {
                           <AccountBalanceWalletIcon sx={{ fontSize: 18 }} />
                         </Box>
                         <Box>
-                          <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: "#0f172a" }} noWrap>
+                          <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: "#0f172a" }} noWrap>
                             {tx.description || tx.title || tx.source_type || "Transaction"}
                           </Typography>
-                          <Typography sx={{ fontSize: 11.5, color: "#94a3b8" }}>
-                            {tx.created_at ? new Date(tx.created_at).toLocaleString() : "-"}
+                          <Typography sx={{ fontSize: 11, color: "#64748b" }}>
+                            {tx.created_at ? new Date(tx.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "-"}
                           </Typography>
                         </Box>
                       </Stack>
-                      <Stack direction="column" alignItems="flex-end" spacing={0.5}>
-                        <Typography sx={{ fontSize: 14, fontWeight: 700, color: isCredit ? "#16a34a" : "#0f172a" }}>
-                          {isCredit ? `+ ₹${Math.abs(Number(tx.amount || 0)).toFixed(2)}` : `- ₹${Math.abs(Number(tx.amount || 0)).toFixed(2)}`}
-                        </Typography>
-                        <StatusBadge status={tx.status || "SUCCESS"} />
-                      </Stack>
+                      <Typography sx={{ fontSize: 14, fontWeight: 800, color: isCredit ? "#16a34a" : "#ef4444" }}>
+                        {isCredit ? "+" : ""} ₹ {Number(tx.amount || 0).toFixed(2)}
+                      </Typography>
                     </Paper>
                   );
                 })
               ) : (
-                <Paper elevation={0} sx={{ p: 2, borderRadius: "14px", textAlign: "center", bgcolor: "#ffffff", border: "1px dashed #e2e8f0" }}>
-                  <Typography sx={{ fontSize: 13, color: "#94a3b8" }}>No recent transactions found.</Typography>
+                <Paper elevation={0} sx={{ p: 2.5, borderRadius: "14px", border: "1px dashed #e2e8f0", textAlign: "center" }}>
+                  <Typography sx={{ fontSize: 13, color: "#94a3b8", fontWeight: 500 }}>No recent transactions</Typography>
                 </Paper>
               )}
             </Stack>

@@ -7,13 +7,15 @@ import AppDrawer from "./AppDrawer";
 import { C, R, S } from "../../theme/tokens";
 
 export default function AppShell({
-  title = "Trikonekt",
+  title = "asiyapp",
   children,
   user: propUser,
   onLogout: propLogout,
   isTeam = true,
   rootPaths = ["/user/team-dashboard", "/user/dashboard", "/v4/home"],
   onBackFallbackPath = "/user/team-dashboard",
+  hideHeader: propHideHeader,
+  edgeToEdge: propEdgeToEdge,
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -61,29 +63,52 @@ export default function AppShell({
     return () => window.removeEventListener("trikonekt:open-consumer-sidebar", handleOpen);
   }, []);
 
+  const isHomeScreen = useMemo(() => {
+    const p = location.pathname;
+    return p === "/user/team-dashboard" || p === "/user/dashboard" || p === "/v4/home";
+  }, [location.pathname]);
+
+  const isIntegratedHeaderScreen = useMemo(() => {
+    const p = location.pathname;
+    return (
+      isHomeScreen ||
+      p === "/user/history" ||
+      p.includes("/user/coupon-pocket") ||
+      p.includes("/user/package-coupon-pocket") ||
+      p.includes("/user/spp-gift-cards") ||
+      p.includes("/user/packages/spp-gift-cards") ||
+      p === "/user/spp"
+    );
+  }, [location.pathname, isHomeScreen]);
+
+  const shouldHideHeader = Boolean(propHideHeader || isIntegratedHeaderScreen);
+  const shouldBeEdgeToEdge = Boolean(propEdgeToEdge || isIntegratedHeaderScreen);
+
   return (
     <Box
       sx={{
         minHeight: "100dvh",
-        bgcolor: C.bg,
+        bgcolor: "#F4F7FC",
         display: "flex",
         flexDirection: "column",
       }}
     >
-      {/* Top Header */}
-      <AppHeader
-        title={title}
-        user={user}
-        isRootScreen={isRootScreen}
-        onToggleDrawer={() => setDrawerOpen((v) => !v)}
-        onBack={() => {
-          if (window.history.length > 1) {
-            navigate(-1);
-          } else {
-            navigate(onBackFallbackPath, { replace: true });
-          }
-        }}
-      />
+      {/* Top Header - Rendered on standard sub-pages; on Integrated/Home screens header is handled seamlessly */}
+      {!shouldHideHeader && (
+        <AppHeader
+          title={title}
+          user={user}
+          isRootScreen={isRootScreen}
+          onToggleDrawer={() => setDrawerOpen((v) => !v)}
+          onBack={() => {
+            if (window.history.length > 1) {
+              navigate(-1);
+            } else {
+              navigate(onBackFallbackPath, { replace: true });
+            }
+          }}
+        />
+      )}
 
       {/* Main Content Area */}
       <Box
@@ -93,11 +118,11 @@ export default function AppShell({
           width: "100%",
           maxWidth: 1200,
           mx: "auto",
-          px: { xs: 1.5, sm: 2, md: 2.5 },
-          pt: { xs: 1.5, sm: 2, md: 2.5 },
+          px: shouldBeEdgeToEdge ? { xs: 0, sm: 2, md: 2.5 } : { xs: 1.5, sm: 2, md: 2.5 },
+          pt: shouldBeEdgeToEdge ? 0 : { xs: 1.5, sm: 2, md: 2.5 },
           pb: {
-            xs: "calc(78px + env(safe-area-inset-bottom))",
-            sm: "calc(82px + env(safe-area-inset-bottom))",
+            xs: "calc(90px + env(safe-area-inset-bottom))",
+            sm: "calc(96px + env(safe-area-inset-bottom))",
             md: 3,
           },
         }}

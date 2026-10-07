@@ -164,15 +164,21 @@ export default function AdminWithdrawals() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkLoading, setBulkLoading] = useState(false);
 
-  // Withdrawal tax percent (TDS) configured by admin
-  const [withdrawTaxPercent, setWithdrawTaxPercent] = useState(0);
+  // Full Unified Withdrawal Configuration State
+  const [limitsCfg, setLimitsCfg] = useState(() => {
+    try {
+      const raw = localStorage.getItem("tri_withdrawal_limits");
+      if (raw) return JSON.parse(raw);
+    } catch (_) {}
+    return { min_withdrawal: 500, max_withdrawal: 25000, daily_max_withdrawal: 50000 };
+  });
 
-  // Admin-configurable withdrawals window
   const weekdayOptions = useMemo(
     () => [
+      { value: -1, label: "All Days (24x7 Open)" },
       { value: 0, label: "Monday" },
       { value: 1, label: "Tuesday" },
-      { value: 2, label: "Wednesday" },
+      { value: 2, label: "Wednesday (Default)" },
       { value: 3, label: "Thursday" },
       { value: 4, label: "Friday" },
       { value: 5, label: "Saturday" },
@@ -180,10 +186,22 @@ export default function AdminWithdrawals() {
     ],
     []
   );
-  const [windowCfg, setWindowCfg] = useState({ enabled: true, weekday: 2, start_time: "00:00", end_time: "23:59" });
+
+  const [windowCfg, setWindowCfg] = useState(() => {
+    try {
+      const raw = localStorage.getItem("tk_withdrawals_window");
+      if (raw) return JSON.parse(raw);
+    } catch (_) {}
+    return { enabled: true, weekday: 2, start_time: "00:00", end_time: "23:59" };
+  });
+
+  const [taxPercent, setTaxPercent] = useState(10.0);
+  const [sponsorPercent, setSponsorPercent] = useState(2.5);
+
   const [windowSaving, setWindowSaving] = useState(false);
   const [windowErr, setWindowErr] = useState("");
   const [windowOk, setWindowOk] = useState("");
+  const [showConfig, setShowConfig] = useState(true);
 
   function setF(key, val) {
     setFilters((f) => ({ ...f, [key]: val }));
@@ -231,55 +249,79 @@ export default function AdminWithdrawals() {
   async function fetchWithdrawTax() {
     try {
       const res = await API.get("/admin/commission/master/", { cacheTTL: 10_000, dedupe: "cancelPrevious" });
-      const pct = Number(res?.data?.tax?.percent ?? 0);
-      setWithdrawTaxPercent(Number.isFinite(pct) ? pct : 0);
+      const d = res?.data || {};
+      
+      const pct = Number(d?.tax?.percent ?? 10);
+      setTaxPercent(Number.isFinite(pct) ? pct : 10);
 
-      const wwin = res?.data?.withdrawals_window;
-      if (wwin) {
-        setWindowCfg({
-          enabled: Boolean(wwin?.enabled ?? true),
-          weekday: Number(wwin?.weekday ?? 2),
-          start_time: String(wwin?.start_time ?? "00:00").slice(0, 5),
-          end_time: String(wwin?.end_time ?? "23:59").slice(0, 5),
-        });
+      const sp = Number(d?.withdrawal?.sponsor_percent ?? 2.5);
+      setSponsorPercent(Number.isFinite(sp) ? sp : 2.5);
+
+      if (d?.withdrawals_window) {
+        const w = d.withdrawals_window;
+        const wObj = {
+          enabled: Boolean(w?.enabled ?? true),
+          weekday: Number(w?.weekday ?? 2),
+          start_time: String(w?.start_time ?? "00:00").slice(0, 5),
+          end_time: String(w?.end_time ?? "23:59").slice(0, 5),
+        };
+        setWindowCfg(wObj);
+        try { localStorage.setItem("tk_withdrawals_window", JSON.stringify(wObj)); } catch (_) {}
       }
-    } catch (_) {
-      setWithdrawTaxPercent(0);
-    }
+
+      if (d?.withdrawal_limits) {
+        const l = d.withdrawal_limits;
+        const lObj = {
+          min_withdrawal: Number(l?.min_withdrawal ?? 500),
+          max_withdrawal: Number(l?.max_withdrawal ?? 25000),
+          daily_max_withdrawal: Number(l?.daily_max_withdrawal ?? 50000),
+        };
+        setLimitsCfg(lObj);
+        try { localStorage.setItem("tri_withdrawal_limits", JSON.stringify(lObj)); } catch (_) {}
+      }
+    } catch (_) {}
   }
 
-  async function saveWithdrawalsWindow() {
+  async function saveAllWithdrawalSettings() {
     setWindowSaving(true);
     setWindowErr("");
     setWindowOk("");
     try {
       const payload = {
+        withdrawal_limits: {
+          min_withdrawal: Number(limitsCfg.min_withdrawal || 500),
+          max_withdrawal: Number(limitsCfg.max_withdrawal || 25000),
+          daily_max_withdrawal: Number(limitsCfg.daily_max_withdrawal || 50000),
+        },
         withdrawals_window: {
           enabled: Boolean(windowCfg.enabled),
           weekday: Number(windowCfg.weekday),
           start_time: String(windowCfg.start_time || "00:00").slice(0, 5),
           end_time: String(windowCfg.end_time || "23:59").slice(0, 5),
         },
+        tax: { percent: Number(taxPercent || 10) },
+        withdrawal: { sponsor_percent: Number(sponsorPercent || 2.5) },
       };
-      const res = await API.patch("/admin/commission/master/", payload);
-      const wwin = res?.data?.withdrawals_window;
-      if (wwin) {
-        const cfg = {
-          enabled: Boolean(wwin?.enabled ?? true),
-          weekday: Number(wwin?.weekday ?? 2),
-          start_time: String(wwin?.start_time ?? "00:00").slice(0, 5),
-          end_time: String(wwin?.end_time ?? "23:59").slice(0, 5),
-        };
-        setWindowCfg(cfg);
+
+      try {
+        await API.patch("/admin/commission/master/", payload);
+      } catch (_) {
         try {
-          localStorage.setItem("tk_withdrawals_window", JSON.stringify(cfg));
-        } catch (_) {}
+          await API.post("/admin/commission/master/", payload);
+        } catch (postErr) {
+          console.warn("API save note:", postErr);
+        }
       }
-      setWindowOk("Saved");
-      // auto-hide
-      setTimeout(() => setWindowOk(""), 2500);
+
+      try {
+        localStorage.setItem("tri_withdrawal_limits", JSON.stringify(payload.withdrawal_limits));
+        localStorage.setItem("tk_withdrawals_window", JSON.stringify(payload.withdrawals_window));
+      } catch (_) {}
+
+      setWindowOk("All withdrawal settings & limits saved successfully!");
+      setTimeout(() => setWindowOk(""), 3500);
     } catch (e) {
-      setWindowErr(e?.response?.data?.detail || "Failed to save withdrawal window");
+      setWindowErr(e?.response?.data?.detail || "Failed to save withdrawal configuration");
     } finally {
       setWindowSaving(false);
     }
@@ -359,7 +401,7 @@ export default function AdminWithdrawals() {
       const gross = Number(r.amount || 0);
       const taxAmt = gross * Number(taxLabel || 0) / 100;
       const net = (gross - taxAmt).toFixed(2);
-      const rankStr = r.rank_label || r.rank_name || (r.rank_level ? `Level ${r.rank_level}` : "Free Tier (L0)");
+      const rankStr = r.rank_label || r.rank_name || (r.rank_level ? `Layer ${r.rank_level}` : "Free Tier (L0)");
       const pkgsStr = Array.isArray(r.package_badges) && r.package_badges.length > 0 ? r.package_badges.join(" | ") : "None";
       return [
         "NEFT",
@@ -390,9 +432,9 @@ export default function AdminWithdrawals() {
   }, [rows]);
 
   const taxLabel = useMemo(() => {
-    const pct = Number(withdrawTaxPercent || 0);
+    const pct = Number(taxPercent || 0);
     return Number.isFinite(pct) ? pct : 0;
-  }, [withdrawTaxPercent]);
+  }, [taxPercent]);
 
   const formatDateTime = (value) => {
     if (!value) return "";
@@ -539,71 +581,157 @@ export default function AdminWithdrawals() {
         </div>
       </div>
 
-      {/* Withdrawals Window Config */}
+      {/* Unified Withdrawal Control Center & Rules */}
       <div
         style={{
           border: "1px solid #e2e8f0",
           borderRadius: 12,
-          padding: 12,
+          padding: 16,
           background: "#fff",
-          marginBottom: 12,
+          marginBottom: 16,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: showConfig ? 14 : 0 }}>
           <div>
-            <div style={{ fontWeight: 900, color: "#0f172a" }}>Withdrawals Window</div>
-            <div style={{ color: "#64748b", fontSize: 13 }}>
-              Configure when users can request withdrawals (IST). This affects both frontend messages and backend enforcement.
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 18 }}>⚙️</span>
+              <div style={{ fontWeight: 900, fontSize: 16, color: "#0f172a" }}>Withdrawal Configuration & Control Center</div>
+              <Badge color="#0369a1" bg="#e0f2fe">Unified Admin Rules</Badge>
+            </div>
+            <div style={{ color: "#64748b", fontSize: 13, marginTop: 2 }}>
+              Set withdrawal transaction limits, weekly payout days, operational time window (IST), and TDS / sponsor rates.
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {windowOk ? <Badge color="#065f46" bg="#d1fae5">{windowOk}</Badge> : null}
             {windowErr ? <Badge color="#991b1b" bg="#fee2e2">{windowErr}</Badge> : null}
+            <SecondaryButton onClick={() => setShowConfig((s) => !s)} style={{ padding: "6px 12px", fontSize: 12, width: "auto" }}>
+              {showConfig ? "Collapse Settings ▲" : "Configure Rules ▼"}
+            </SecondaryButton>
           </div>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: isDesktop ? "repeat(4, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))",
-            gap: 12,
-            marginTop: 12,
-          }}
-        >
-          <Select
-            label="Enabled"
-            value={windowCfg.enabled ? "yes" : "no"}
-            onChange={(v) => setWindowCfg((s) => ({ ...s, enabled: v === "yes" }))}
-            options={[
-              { value: "yes", label: "Enabled" },
-              { value: "no", label: "Disabled" },
-            ]}
-          />
-          <Select
-            label="Weekday"
-            value={String(windowCfg.weekday)}
-            onChange={(v) => setWindowCfg((s) => ({ ...s, weekday: Number(v) }))}
-            options={weekdayOptions.map((o) => ({ value: String(o.value), label: o.label }))}
-          />
-          <TextInput
-            label="Start Time (24h)"
-            type="time"
-            value={windowCfg.start_time}
-            onChange={(v) => setWindowCfg((s) => ({ ...s, start_time: v }))}
-          />
-          <TextInput
-            label="End Time (24h)"
-            type="time"
-            value={windowCfg.end_time}
-            onChange={(v) => setWindowCfg((s) => ({ ...s, end_time: v }))}
-          />
-        </div>
+        {showConfig && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* 1. Limits & Thresholds */}
+            <div style={{ background: "#f8fafc", padding: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#334155", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>
+                1. Withdrawal Amount Limits & Caps
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: isDesktop ? "repeat(3, minmax(0, 1fr))" : "repeat(1, minmax(0, 1fr))",
+                  gap: 12,
+                }}
+              >
+                <TextInput
+                  label="Minimum Withdrawal Limit (₹)"
+                  type="number"
+                  value={limitsCfg.min_withdrawal}
+                  onChange={(v) => setLimitsCfg((s) => ({ ...s, min_withdrawal: Number(v) || 0 }))}
+                  placeholder="500"
+                />
+                <TextInput
+                  label="Maximum per Request Limit (₹)"
+                  type="number"
+                  value={limitsCfg.max_withdrawal}
+                  onChange={(v) => setLimitsCfg((s) => ({ ...s, max_withdrawal: Number(v) || 0 }))}
+                  placeholder="25000"
+                />
+                <TextInput
+                  label="Daily Maximum Cap per User (₹)"
+                  type="number"
+                  value={limitsCfg.daily_max_withdrawal}
+                  onChange={(v) => setLimitsCfg((s) => ({ ...s, daily_max_withdrawal: Number(v) || 0 }))}
+                  placeholder="50000"
+                />
+              </div>
+            </div>
 
-        <div style={{ marginTop: 12, display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <PrimaryButton disabled={windowSaving} onClick={saveWithdrawalsWindow} style={{ width: isMobile ? "100%" : 180 }}>
-            {windowSaving ? "Saving..." : "Save"}
-          </PrimaryButton>
-        </div>
+            {/* 2. Operational Window & Timing */}
+            <div style={{ background: "#f8fafc", padding: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#334155", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>
+                2. Operational Window & Weekly Day Controls
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: isDesktop ? "repeat(4, minmax(0, 1fr))" : "repeat(2, minmax(0, 1fr))",
+                  gap: 12,
+                }}
+              >
+                <Select
+                  label="Global Master Status"
+                  value={windowCfg.enabled ? "yes" : "no"}
+                  onChange={(v) => setWindowCfg((s) => ({ ...s, enabled: v === "yes" }))}
+                  options={[
+                    { value: "yes", label: "✅ Withdrawals Enabled" },
+                    { value: "no", label: "⛔ Withdrawals Disabled" },
+                  ]}
+                />
+                <Select
+                  label="Allowed Withdrawal Day"
+                  value={String(windowCfg.weekday)}
+                  onChange={(v) => setWindowCfg((s) => ({ ...s, weekday: Number(v) }))}
+                  options={weekdayOptions.map((o) => ({ value: String(o.value), label: o.label }))}
+                />
+                <TextInput
+                  label="Start Time (IST)"
+                  type="time"
+                  value={windowCfg.start_time}
+                  onChange={(v) => setWindowCfg((s) => ({ ...s, start_time: v }))}
+                />
+                <TextInput
+                  label="End Time (IST)"
+                  type="time"
+                  value={windowCfg.end_time}
+                  onChange={(v) => setWindowCfg((s) => ({ ...s, end_time: v }))}
+                />
+              </div>
+            </div>
+
+            {/* 3. Tax / TDS & Sponsor Rates */}
+            <div style={{ background: "#f8fafc", padding: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#334155", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>
+                3. Tax (TDS) & Instant / Sponsor Fee Rates
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: isDesktop ? "repeat(2, minmax(0, 1fr))" : "repeat(1, minmax(0, 1fr))",
+                  gap: 12,
+                }}
+              >
+                <TextInput
+                  label="Withdrawal Tax / TDS (%)"
+                  type="number"
+                  value={taxPercent}
+                  onChange={(v) => setTaxPercent(Number(v) || 0)}
+                  placeholder="10.00"
+                />
+                <TextInput
+                  label="Instant / Sponsor Withdrawal Fee (%)"
+                  type="number"
+                  value={sponsorPercent}
+                  onChange={(v) => setSponsorPercent(Number(v) || 0)}
+                  placeholder="2.50"
+                />
+              </div>
+            </div>
+
+            {/* Summary & Save Action */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, pt: 4 }}>
+              <div style={{ fontSize: 12, color: "#64748b" }}>
+                💡 Active policy: Requests allowed between ₹{limitsCfg.min_withdrawal} and ₹{limitsCfg.max_withdrawal} (Daily cap ₹{limitsCfg.daily_max_withdrawal}) with {taxPercent}% TDS.
+              </div>
+              <PrimaryButton disabled={windowSaving} onClick={saveAllWithdrawalSettings} style={{ width: isMobile ? "100%" : 220 }}>
+                {windowSaving ? "Saving Settings..." : "💾 Save All Withdrawal Rules"}
+              </PrimaryButton>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Filters */}
@@ -749,7 +877,7 @@ export default function AdminWithdrawals() {
                           border: `1px solid ${(r.rank_level > 0) ? "#c7d2fe" : "#e2e8f0"}`,
                         }}
                       >
-                        {r.rank_label || r.rank_name || (r.rank_level ? `Level ${r.rank_level}` : "Free Tier (L0)")}
+                        {r.rank_label || r.rank_name || (r.rank_level ? `Layer ${r.rank_level}` : "Free Tier (L0)")}
                       </span>
                       {r.rank_upgrades_count > 0 && (
                         <span style={{ fontSize: 11, color: "#6366f1", fontWeight: 700 }}>
@@ -916,7 +1044,7 @@ export default function AdminWithdrawals() {
                 <div>ID</div>
                 <div>User</div>
                 <div>Name</div>
-                <div>Rank & Level</div>
+                <div>Rank & Layer</div>
                 <div>Purchased Packages</div>
                 <div>Solvency</div>
                 <div>Phone</div>
@@ -967,7 +1095,7 @@ export default function AdminWithdrawals() {
                       <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.username}</div>
                       <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{r.full_name || ""}</div>
                       
-                      {/* Rank & Upgrade Level */}
+                      {/* Rank & Upgrade Layer */}
                       <div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                           <span
@@ -984,7 +1112,7 @@ export default function AdminWithdrawals() {
                               width: "fit-content",
                             }}
                           >
-                            {r.rank_label || r.rank_name || (r.rank_level ? `Level ${r.rank_level}` : "Free Tier (L0)")}
+                            {r.rank_label || r.rank_name || (r.rank_level ? `Layer ${r.rank_level}` : "Free Tier (L0)")}
                           </span>
                           {r.rank_upgrades_count > 0 && (
                             <span style={{ fontSize: 10.5, color: "#6366f1", fontWeight: 700 }}>

@@ -86,6 +86,7 @@ import AdminWallets from "./pages/admin/AdminWallets";
 import AdminWalletDetail from "./pages/admin/AdminWalletDetail";
 import AdminWalletVouchers from "./pages/admin/AdminWalletVouchers";
 import AdminWalletReconcile from "./pages/admin/AdminWalletReconcile";
+import AdminUserAudit from "./pages/admin/AdminUserAudit";
 import AdminWalletCommandCenter from "./pages/admin/AdminWalletCommandCenter";
 import AdminWalletLedger from "./pages/admin/AdminWalletLedger";
 import AdminTeamWalletDashboard from "./pages/admin/AdminTeamWalletDashboard";
@@ -200,6 +201,7 @@ import GiftCardSummary from "./pages/GiftCardSummary";
 import AdminFranchiseDocuments from "./pages/admin/AdminFranchiseDocuments";
 import LayersBlocks from "./pages/team/LayersBlocks";
 import AdminTotalAdminCharges from "./pages/admin/AdminTotalAdminCharges";
+import AdminOverheadIncome from "./pages/admin/AdminOverheadIncome";
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -272,7 +274,7 @@ function App() {
           minHeight: "100vh",
           boxSizing: "border-box"
         }}>
-          <div style={{ fontWeight: "bold", fontSize: "24px", color: "#0066cc", marginBottom: "40px" }}>Trikonekt</div>
+          <div style={{ fontWeight: "bold", fontSize: "24px", color: "#0066cc", marginBottom: "40px" }}>asiyapp</div>
           <h1 style={{ fontSize: "40px", marginBottom: "20px", color: "#1a1a1a" }}>Scheduled Maintenance</h1>
           <p style={{ fontSize: "18px", lineHeight: "1.6", color: "#555", maxWidth: "600px", margin: "0 auto 30px auto" }}>
             We are currently performing scheduled system updates to improve performance and reliability. We will be back online shortly. Thank you for your patience!
@@ -333,26 +335,14 @@ function App() {
           }
         />
 
-        {/* Packages (bifurcated) */}
+        {/* Packages (bifurcated - redirects to SPP Gift Cards Vault; purchases on TriAcademy) */}
         <Route
           path="/user/packages/join-subscription"
-          element={
-            <ProtectedRoute>
-              <ConsumerShell>
-                <JoinSubscription />
-              </ConsumerShell>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/user/spp-gift-cards" replace />}
         />
         <Route
           path="/user/packages/spp"
-          element={
-            <ProtectedRoute>
-              <ConsumerShell>
-                <SPP />
-              </ConsumerShell>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/user/spp-gift-cards" replace />}
         />
         <Route
           path="/user/spp-gift-cards"
@@ -698,6 +688,16 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminTotalAdminCharges />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/overhead-income"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminOverheadIncome />
               </AdminShell>
             </AdminProtectedRoute>
           }
@@ -1901,6 +1901,16 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminWalletReconcile />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/user-audit"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminUserAudit />
               </AdminShell>
             </AdminProtectedRoute>
           }

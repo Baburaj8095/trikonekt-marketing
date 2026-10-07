@@ -633,6 +633,16 @@ class Wallet(models.Model):
             except Exception:
                 pass
 
+            # Update balances to reflect 75/25 split
+            w.balance = (w.balance or D("0")) + amt
+            w.main_balance = (w.main_balance or D("0")) + income
+            if not inactive:
+                w.withdrawable_balance = (w.withdrawable_balance or D("0")) + income
+                w.self_account_balance = (w.self_account_balance or D("0")) + self_part
+            else:
+                w.self_account_balance = (w.self_account_balance or D("0")) + self_part
+            w.save(update_fields=['balance', 'main_balance', 'withdrawable_balance', 'self_account_balance', 'updated_at'])
+
             # Apply micro-packs (₹250) from self reserve for active users
             if not inactive:
                 try:
@@ -909,89 +919,21 @@ class Wallet(models.Model):
                     balance_after=w.balance,
                     type="SELF_ACCOUNT_DEBIT",
                     source_type="SELF_250_PACK",
-                    source_id="",
+                    source_id=str(pack_index) if pack_index is not None else "",
                     meta={
                         "source_type": "SELF_250_PACK",
-                        "breakdown": {"coupon": 150, "sponsor": 50, "company": 50},
-                        "coupon_code": None,
-                        "sponsor_user_id": getattr(sponsor, "id", None) if sponsor else getattr(company_user, "id", None),
-                        "company_user_id": getattr(company_user, "id", None),
                         "pack_index": pack_index,
+                        "description": f"Self Rebirth ID #{pack_index} (₹250)",
                     }
                 )
 
-                # Record prime purchase marker (₹150 used for Prime 150 activation)
+                # Trigger dedicated ₹250 Self Rebirth distribution engine (100% admin-controlled)
                 try:
-                    WalletTransaction.objects.create(
-                        user=self.user,
-                        amount=D("-150.00"),
-                        balance_after=w.balance,
-                        type="AUTO_PURCHASE_DEBIT",
-                        source_type="SELF_250_PACK",
-                        source_id=str(pack_index) if pack_index is not None else "",
-                        meta={"source_type": "SELF_250_PACK", "purchase": "PRIME_150", "pack_index": pack_index},
-                    )
-                except Exception:
-                    pass
-
-                # Trigger Prime 150 payout engine (idempotent by source_type + source_id)
-                try:
-                    from business.services.prime import distribute_prime_150_payouts
-                    distribute_prime_150_payouts(
-                        self.user,
-                        source={"type": "SELF_250_PACK", "id": str(pack_index) if pack_index is not None else ""}
-                    )
-                except Exception:
-                    # best-effort; do not roll back pack application
-                    pass
-
-                # Sponsor and company portions (₹50 each). If no sponsor, route sponsor portion to company.
-                sponsor_bonus = D("50.00")
-                company_share = D("50.00")
-                sponsor_recipient = sponsor if sponsor else company_user
-
-                # Credit sponsor/company wallets (no withholding)
-                if sponsor_recipient and sponsor_bonus > 0:
-                    try:
-                        sw = Wallet.get_or_create_for_user(sponsor_recipient)
-                        sw.credit(
-                            sponsor_bonus,
-                            tx_type="DIRECT_REF_BONUS",
-                            meta={"from_user_id": self.user.id, "from_user": getattr(self.user, "username", None), "auto_rule": "SELF_250_PACK"},
-                            source_type="SELF_250_PACK",
-                            source_id="",
-                        )
-                    except Exception:
-                        pass
-
-                if company_user and company_share > 0:
-                    try:
-                        cw = Wallet.get_or_create_for_user(company_user)
-                        cw.credit(
-                            company_share,
-                            tx_type="TAX_POOL_CREDIT",
-                            meta={"from_user_id": self.user.id, "from_user": getattr(self.user, "username", None), "no_withhold": True, "auto_rule": "SELF_250_PACK"},
-                            source_type="SELF_250_PACK",
-                            source_id="",
-                        )
-                    except Exception:
-                        pass
-
-                # Audit pack application
-                try:
-                    AuditTrail.objects.create(
-                        action="auto_250_self_pack_applied",
-                        actor=self.user,
-                        notes="Applied SELF_250_PACK",
-                        metadata={
-                            "prime_used": True,
-                            "pack_index": pack_index,
-                            "sponsor_id": getattr(sponsor_recipient, "id", None),
-                            "company_id": getattr(company_user, "id", None),
-                        },
-                    )
-                except Exception:
-                    pass
+                    from business.services.self_rebirth import distribute_self_rebirth_250
+                    distribute_self_rebirth_250(self.user, pack_index=pack_index)
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).exception("Failed to distribute self rebirth 250: %s", e)
         finally:
             w._applying_self_rule = False
             try:
@@ -1248,9 +1190,11 @@ class FinancialTransaction(models.Model):
         ("VOUCHER_CREATE", "Voucher Creation"),
         ("VOUCHER_REDEEM", "Voucher Redemption"),
         ("PACKAGE_PURCHASE", "Package Purchase"),
-        ("MLM_INCOME", "MLM Income"),
+        ("INCOME", "Income"),
+        ("MLM_INCOME", "Income"),
         ("SPONSOR_INCOME", "Sponsor Income"),
-        ("MATRIX_INCOME", "Matrix Earnings"),
+        ("BLOCK_INCOME", "Block Earnings"),
+        ("MATRIX_INCOME", "Block Earnings"),
         ("SELF_REBIRTH", "Self Rebirth"),
         ("SHOPPING_REWARD", "Shopping Rewards"),
         ("FRANCHISE_REWARD", "Franchise Rewards"),

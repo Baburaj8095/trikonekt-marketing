@@ -47,10 +47,14 @@ export default function ShellBase({
   rootPaths,
   isRoot,
   onBackFallbackPath,
+  showBottomNav,
   children,
 }) {
   const loc = useLocation();
   const navigate = useNavigate();
+
+  const isAdminArea = String(loc.pathname || "").startsWith("/admin") || title === "Admin";
+  const shouldShowBottomNav = showBottomNav !== undefined ? Boolean(showBottomNav) : !isAdminArea;
 
   const userInitials = useMemo(() => {
     try {
@@ -762,7 +766,7 @@ export default function ShellBase({
             flex: 1,
             minWidth: 0,
             padding: isMobile ? 10 : 16,
-            paddingBottom: isMobile ? "calc(74px + env(safe-area-inset-bottom))" : 16,
+            paddingBottom: (isMobile && shouldShowBottomNav) ? "calc(74px + env(safe-area-inset-bottom))" : 16,
             marginLeft: isMobile ? 0 : (sidebarWidth + sidebarGap),
             width: "100%",
           }}
@@ -835,7 +839,7 @@ export default function ShellBase({
       </div>
 
       {/* Mobile Bottom Navigation Dock */}
-      {isMobile ? (
+      {isMobile && shouldShowBottomNav ? (
         <nav
           aria-label="Mobile Bottom Navigation"
           style={{

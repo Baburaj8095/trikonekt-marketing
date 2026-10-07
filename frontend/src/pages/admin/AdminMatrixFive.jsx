@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import API from "../../api/api";
 
 function TextInput({ label, value, onChange, placeholder, type = "text", style }) {
@@ -85,12 +85,12 @@ export default function AdminMatrixFive() {
   const [treeLoading, setTreeLoading] = useState(false);
   const [treeErr, setTreeErr] = useState("");
 
-  // 5-Matrix commission table state
+  // 5-Block commission table state
   const [tx, setTx] = useState([]);
   const [txLoading, setTxLoading] = useState(false);
   const [txErr, setTxErr] = useState("");
 
-  // Matrix Accounts browser (FIVE_150) + Stats
+  // 5-Block Accounts browser (FIVE_150) + Stats
   const [accFilters, setAccFilters] = useState({ user: "", sourceId: "", pageSize: 25 });
   const [accRows, setAccRows] = useState([]);
   const [accLoading, setAccLoading] = useState(false);
@@ -198,8 +198,8 @@ export default function AdminMatrixFive() {
       { value: "updated_at", label: "Oldest updated" },
       { value: "-total_earned", label: "Earned desc" },
       { value: "total_earned", label: "Earned asc" },
-      { value: "-level_reached", label: "Level desc" },
-      { value: "level_reached", label: "Level asc" },
+      { value: "-level_reached", label: "Layer desc" },
+      { value: "level_reached", label: "Layer asc" },
     ],
     []
   );
@@ -207,9 +207,9 @@ export default function AdminMatrixFive() {
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <h2 style={{ margin: 0, color: "#0f172a" }}>5-Matrix (FIVE_150)</h2>
+        <h2 style={{ margin: 0, color: "#0f172a" }}>5-Block (FIVE_150)</h2>
         <div style={{ color: "#64748b", fontSize: 13 }}>
-          Browse progress and view sponsor hierarchy for 5-matrix.
+          Browse progress and view sponsor hierarchy for 5-block.
         </div>
       </div>
 
@@ -313,9 +313,9 @@ export default function AdminMatrixFive() {
           <div>Username</div>
           <div>Full Name</div>
           <div>Pool</div>
-          <div>Level</div>
-          <div>Per-Level Counts</div>
-          <div>Per-Level Earned</div>
+          <div>Layer</div>
+          <div>Per-Layer Counts</div>
+          <div>Per-Layer Earned</div>
           <div>Total Earned</div>
         </div>
         <div>
@@ -395,7 +395,7 @@ export default function AdminMatrixFive() {
         >
           {!tree ? (
             <div style={{ padding: 12, color: "#64748b" }}>
-              Enter an identifier and load to view the 5-matrix sponsor hierarchy.
+              Enter an identifier and load to view the 5-block sponsor hierarchy.
             </div>
           ) : (
             <div>
@@ -416,9 +416,9 @@ export default function AdminMatrixFive() {
         </div>
       </div>
 
-      {/* 5‑Matrix Commission Table */}
+      {/* 5‑Block Commission Table */}
       <div style={{ marginTop: 24 }}>
-        <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>5‑Matrix Commission</h3>
+        <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>5‑Block Commission</h3>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
           <button
             onClick={fetchFiveTx}
@@ -463,7 +463,7 @@ export default function AdminMatrixFive() {
             <div>Autopool-phase-1 Income</div>
             <div>Payable Amt</div>
             <div>Gen. Date</div>
-            <div>which level</div>
+            <div>which layer</div>
           </div>
           <div>
             {tx.map((row, idx) => (
@@ -497,7 +497,7 @@ export default function AdminMatrixFive() {
         </div>
       </div>
 
-      {/* Matrix Accounts (FIVE_150) */}
+      {/* 5-Block Accounts (FIVE_150) */}
       <div style={{ marginTop: 24 }}>
         <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>FIVE_150 Accounts</h3>
 
@@ -598,7 +598,7 @@ export default function AdminMatrixFive() {
             <div>ID</div>
             <div>Owner</div>
             <div>Parent Owner</div>
-            <div>Level</div>
+            <div>Layer</div>
             <div>Pos</div>
             <div>Source</div>
             <div>Source ID</div>
@@ -638,9 +638,9 @@ export default function AdminMatrixFive() {
         </div>
       </div>
 
-      {/* Level-wise Commission Stats (by Coupon ID) */}
+      {/* Layer-wise Commission Stats (by Coupon ID) */}
       <div style={{ marginTop: 24 }}>
-        <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>Level-wise Commission Stats</h3>
+        <h3 style={{ margin: "12px 0 8px 0", color: "#0f172a" }}>Layer-wise Commission Stats</h3>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
           <input
             value={statsSourceId}
@@ -703,7 +703,7 @@ export default function AdminMatrixFive() {
         >
           {!stats ? (
             <div style={{ padding: 12, color: "#64748b" }}>
-              Enter a coupon id and load to view level-wise and total commission credited from FIVE_150.
+              Enter a coupon id and load to view layer-wise and total commission credited from FIVE_150.
             </div>
           ) : (
             <div style={{ padding: 12 }}>

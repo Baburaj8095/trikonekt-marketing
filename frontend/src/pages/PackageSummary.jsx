@@ -239,8 +239,12 @@ export default function PackageSummary() {
             View purchased package history and payment mode.
           </Typography>
         </Box>
-        <Button variant="contained" onClick={() => navigate(activeDef.route)} sx={{ textTransform: "none", fontWeight: 800 }}>
-          {activeDef.cta}
+        <Button
+          variant="contained"
+          onClick={() => window.open("https://triacademy.trikonekt.com", "_blank")}
+          sx={{ textTransform: "none", fontWeight: 800 }}
+        >
+          Purchase on TriAcademy ↗
         </Button>
       </Stack>
 
@@ -268,11 +272,15 @@ export default function PackageSummary() {
         <Paper variant="outlined" sx={{ p: 2, borderRadius: 1 }}>
           <Typography fontWeight={800}>{activeDef.label}</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            No purchase history found for this package type.
+            No purchase history found for this package type. All packages and SPP boxes are purchased through TriAcademy.
           </Typography>
           <Divider sx={{ my: 1.5 }} />
-          <Button variant="outlined" onClick={() => navigate(activeDef.route)} sx={{ textTransform: "none" }}>
-            {activeDef.cta}
+          <Button
+            variant="outlined"
+            onClick={() => window.open("https://triacademy.trikonekt.com", "_blank")}
+            sx={{ textTransform: "none", fontWeight: 700 }}
+          >
+            Go to TriAcademy ↗
           </Button>
         </Paper>
       ) : (

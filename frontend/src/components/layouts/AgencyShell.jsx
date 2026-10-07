@@ -1,4 +1,4 @@
-﻿import React, { useMemo } from "react";
+import React, { useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import ShellBase from "./ShellBase";
 
@@ -79,86 +79,20 @@ export default function AgencyShell({ children }) {
     navigate("/", { replace: true });
   };
 
-  // Sidebar menu (parity with previous AgencyShell)
+  // Streamlined modern Franchise Portal Menu
   const menu = [
-    // { to: "/agency/dashboard", label: "Dashboard", icon: "dashboard" },
-    { to: "/agency/franchise-dashboard", label: "Franchise Dashboard", icon: "chart" },
-    // { to: "/agency/franchise-wallet", label: "Franchise Wallet", icon: "wallet" },
-    { to: "/agency/profile", label: "Profile", icon: "users" },
-
-    // Refer & Earn (as in sketch order)
+    { to: "/agency/franchise-dashboard", label: "Franchise Dashboard", icon: "dashboard" },
     { to: "/agency/refer-earn", label: "Refer & Earn", icon: "users" },
-
-    // Wallet and History
-    { to: "/agency/franchise-wallet", label: "Earning Wallet", icon: "wallet" },
-    
-    { to: "/agency/history", label: "History", icon: "orders" },
-    { to: "/agency/monthly-report", label: "Monthly Report", icon: "chart" },
-    // { to: "/agency/transactions", label: "Transactions", icon: "orders" },
-    { to: "/agency/withdrawals", label: "Withdrawals", icon: "orders" },
-
-    // Agency Prime Package
-    // { to: "/agency/prime-package", label: "Agency Prime Package", icon: "box" },
-
-    // Genealogy
-    // { to: "/agency/my-team", label: "Genealogy", icon: "tree" },
-
-    // Coupons (3 tabs inside: E‑coupon, Store, Cart)
-    // { to: "/agency/coupons", label: "Coupons", icon: "ticket" },
-
-    // Reports
-    { to: "/agency/daily-report", label: "Daily Employee Report", icon: "chart" },
-    { to: "/agency/education-pdfs", label: "Educating PDF Trikonekt", icon: "file" },
+    { to: "/agency/education-pdfs", label: "Educating PDF Asiyapp", icon: "file" },
     { to: "/agency/franchise-agreement", label: "Franchise Agreement Copy", icon: "file" },
-
-    // Trikonekt Products
-    // { to: "/agency/trikonekt-products", label: "Trikonekt Products", icon: "box" },
-
-    // Support
-    { to: "/agency/support", label: "Support", icon: "ticket" },
+    { to: "/agency/profile", label: "Franchise Profile", icon: "users" },
+    { to: "/agency/support", label: "Support & Helpdesk", icon: "ticket" },
   ];
 
-  // Active link matcher with support for lucky-coupons tabs and marketplace nested routes
+  // Active link matcher
   const isActive = (to, loc) => {
-    // Parse target
-    const [toPath, toQuery] = to.split("?");
-    const qTarget = new URLSearchParams(toQuery || "");
-
-    // Lucky coupons tab matching
-    if (toPath === "/agency/lucky-coupons") {
-      if (!loc.pathname.startsWith("/agency/lucky-coupons")) return false;
-      const q = new URLSearchParams(loc.search || "");
-      const targetTab = (qTarget.get("tab") || "").toLowerCase();
-      const currentTab = (q.get("tab") || "").toLowerCase();
-      // pending entry should be active when tab is empty or 'pending'
-      if (!targetTab) return currentTab === "" || currentTab === "pending";
-      return currentTab === targetTab;
-    }
-
-    // Agency Marketplace (including nested routes)
-    if (toPath === "/agency/marketplace") {
-      return loc.pathname === "/agency/marketplace" || loc.pathname.startsWith("/agency/marketplace/");
-    }
-
-    // Trikonekt Products (including nested routes)
-    if (toPath === "/agency/trikonekt-products") {
-      return loc.pathname === "/agency/trikonekt-products" || loc.pathname.startsWith("/agency/trikonekt-products/");
-    }
-
-    // Coupons page (ignore query params)
-    if (toPath === "/agency/coupons") {
-      return loc.pathname === "/agency/coupons";
-    }
-    // Prime Package page (ignore query params)
-    if (toPath === "/agency/prime-package") {
-      return (
-        loc.pathname === "/agency/prime-package" ||
-        loc.pathname === "/agency/prime-approval"
-      );
-    }
-
-    // Exact match including query for everything else
-    return `${loc.pathname}${loc.search}` === to;
+    const [toPath] = to.split("?");
+    return loc.pathname === toPath || loc.pathname === to;
   };
 
   return (
@@ -171,6 +105,7 @@ export default function AgencyShell({ children }) {
       rightHeaderContent={rightPill}
       rootPaths={["/agency/franchise-dashboard", "/agency/coupons"]}
       onBackFallbackPath="/agency/franchise-dashboard"
+      showBottomNav={false}
     >
       {children}
     </ShellBase>

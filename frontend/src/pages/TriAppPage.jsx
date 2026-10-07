@@ -27,7 +27,9 @@ import {
   getAddMoneyPocketBalance,
   getPackagePurchaseCouponBalance,
   getSelfPackageWalletBalance,
+  getMainWalletBalance,
 } from "../utils/walletBalances";
+
 
 function Price({ value, currency = "₹" }) {
   const n = Number(value || 0);
@@ -293,58 +295,70 @@ function PaymentSheet({ open, onClose, data, onSuccess }) {
 function PaymentMethodDialog({ open, onClose, intent, walletMe, walletHistory, busy, onPickManual, onPickWallet }) {
   if (!open || !intent) return null;
   const amount = Number(intent?.amount || 0);
-  const internalBal = getSelfPackageWalletBalance(walletMe);
-  const packageCouponBal = getPackagePurchaseCouponBalance(walletMe);
-  const addMoneyBal = getAddMoneyPocketBalance(walletMe, walletHistory);
-  const canWallet = internalBal >= amount && amount > 0;
-  const canPackageCoupon = packageCouponBal >= amount && amount > 0;
-  const canAddMoney = addMoneyBal >= amount && amount > 0;
+  const mainBal = getMainWalletBalance(walletMe);
+  const canMainWallet = mainBal >= amount && amount > 0;
   const money = (value) => Number(value || 0).toFixed(2);
-
-  const WalletButtonLabel = ({ title, balance }) => (
-    <Stack component="span" spacing={0.25} alignItems="center" sx={{ lineHeight: 1.15 }}>
-      <span>{title}</span>
-      <Typography component="span" sx={{ fontSize: 11, fontWeight: 800, color: "inherit", opacity: 0.86 }}>
-        Available Rs. {money(balance)}
-      </Typography>
-    </Stack>
-  );
 
   return (
     <Dialog open={open} onClose={busy ? undefined : onClose} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 4, overflow: "hidden" } }}>
       <DialogTitle sx={{ fontWeight: 900, color: "#0f172a", pb: 1 }}>Select Payment Method</DialogTitle>
-      <DialogContent dividers sx={{ pt: 1.5 }}>
-        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
-          Amount: <b>₹{money(amount)}</b>
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.7 }}>
-          Self Package Wallet Balance: <b>₹{money(internalBal)}</b>
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.7 }}>
-          Package Purchase Coupon Received (Buy Package) Balance: <b>₹{money(packageCouponBal)}</b>
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.7 }}>
-          Add Money Pocket Balance: <b>₹{money(addMoneyBal)}</b>
+      <DialogContent dividers sx={{ pt: 2, pb: 2.5 }}>
+        <Box sx={{ mb: 2, p: 2, bgcolor: "#f8fafc", borderRadius: 2, border: "1px solid #e2e8f0" }}>
+          <Typography variant="body2" color="text.secondary">Total Payable Amount</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 900, color: "#0f172a" }}>₹{money(amount)}</Typography>
+        </Box>
+        <Typography variant="body2" color="text.secondary" sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+          <span>Main Wallet Balance:</span>
+          <b style={{ color: canMainWallet ? "#16a34a" : "#dc2626" }}>₹{money(mainBal)}</b>
         </Typography>
       </DialogContent>
-      <DialogActions sx={{ p: 1.5, gap: 1, flexWrap: "wrap" }}>
-        <Button onClick={onClose} disabled={busy} sx={{ borderRadius: 3 }}>Cancel</Button>
-        <Button variant="outlined" onClick={onPickManual} disabled sx={{ borderRadius: 3, fontWeight: 900 }}>
-          Manual Payment
+      <DialogActions sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.25 }}>
+        <Button
+          variant="contained"
+          fullWidth
+          disabled={!canMainWallet || busy}
+          onClick={() => onPickWallet("main")}
+          sx={{
+            py: 1.25,
+            borderRadius: 3,
+            fontWeight: 800,
+            bgcolor: "#0284c7",
+            "&:hover": { bgcolor: "#0369a1" },
+            textTransform: "none",
+          }}
+        >
+          {canMainWallet ? `Pay from Main Wallet (₹${money(mainBal)})` : `Insufficient Main Wallet (Available: ₹${money(mainBal)})`}
         </Button>
-        <Button variant="contained" disabled={!canWallet || busy} onClick={() => onPickWallet("internal")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
-          <WalletButtonLabel title="Pay from Self Package" balance={internalBal} />
+        <Button
+          variant="outlined"
+          fullWidth
+          disabled={busy}
+          onClick={onPickManual}
+          sx={{
+            py: 1.25,
+            borderRadius: 3,
+            fontWeight: 800,
+            borderColor: "#0f172a",
+            color: "#0f172a",
+            "&:hover": { bgcolor: "#f1f5f9", borderColor: "#0f172a" },
+            textTransform: "none",
+          }}
+        >
+          Pay via Payment Gateway / Online
         </Button>
-        <Button variant="contained" disabled={!canPackageCoupon || busy} onClick={() => onPickWallet("package_coupon")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
-          <WalletButtonLabel title="Pay from Package Purchase Coupon Received" balance={packageCouponBal} />
-        </Button>
-        <Button variant="contained" disabled={!canAddMoney || busy} onClick={() => onPickWallet("package_upload")} sx={{ borderRadius: 3, fontWeight: 900, minHeight: 48 }}>
-          <WalletButtonLabel title="Pay from Add Money Pocket" balance={addMoneyBal} />
+        <Button
+          onClick={onClose}
+          disabled={busy}
+          fullWidth
+          sx={{ borderRadius: 3, textTransform: "none", color: "text.secondary" }}
+        >
+          Cancel
         </Button>
       </DialogActions>
     </Dialog>
   );
 }
+
 
 /* ======================================================================== */
 /* MAIN PAGE */
