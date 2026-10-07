@@ -465,27 +465,25 @@ export default function AdminCommissionDistribute() {
       const pools = monData.pools || {};
       const achievers = monData.achievers || {};
 
-      const franchisePot = Number(pools.daily_franchise_pool ?? biPools.daily_franchise_pool ?? 0);
-      const franchiseRecipients = Number(achievers.franchise_count ?? biPools.franchise_achievers_cnt ?? 0);
+      const franchisePot = Number(pools.daily_franchise_pool ?? 0);
+      const franchiseRecipients = Number(achievers.franchise_count ?? 0);
 
-      const districtPot = Number(pools.daily_district_pool ?? biPools.daily_district_pool ?? 0);
-      const districtRecipients = Number(achievers.district_count ?? biPools.district_coord_cnt ?? 0);
+      const districtPot = Number(pools.daily_district_pool ?? 0);
+      const districtRecipients = Number(achievers.district_count ?? 0);
 
-      const statePot = Number(pools.daily_state_pool ?? biPools.daily_state_pool ?? 0);
-      const stateRecipients = Number(achievers.state_count ?? biPools.state_coord_cnt ?? 0);
+      const statePot = Number(pools.daily_state_pool ?? 0);
+      const stateRecipients = Number(achievers.state_count ?? 0);
 
-      const dailyRoyaltyTotal = Number(pools.daily_royalty_pool ?? biPools.daily_royalty_pool ?? 0);
-      // Royalty T1 L1-L7 (₹20 share = 40%) & T2 L8-L10 (₹30 share = 60%)
-      const royaltyT1Pot = Number(pools.daily_royalty_t1_pool ?? (dailyRoyaltyTotal * 0.4));
-      const royaltyT2Pot = Number(pools.daily_royalty_t2_pool ?? (dailyRoyaltyTotal * 0.6));
-      const royaltyAchievers = Number(achievers.royalty_count ?? biPools.royalty_achievers_cnt ?? 0);
+      const royaltyT1Pot = Number(pools.daily_royalty_t1_pool ?? (Number(pools.daily_royalty_pool || 0) * 0.4));
+      const royaltyT2Pot = Number(pools.daily_royalty_t2_pool ?? (Number(pools.daily_royalty_pool || 0) * 0.6));
+      const royaltyAchievers = Number(achievers.royalty_count ?? 0);
       const royaltyT1Recipients = Number(achievers.royalty_t1_count ?? royaltyAchievers);
       const royaltyT2Recipients = Number(achievers.royalty_t2_count ?? royaltyAchievers);
 
-      const rebirthCount = Number(salesRow?.self_rebirth_count ?? monData?.self_rebirth_count ?? 0);
-      const rebirthTurnover = Number(salesRow?.self_rebirth_amount ?? monData?.self_rebirth_amount ?? (rebirthCount * 250));
+      const rebirthCount = Number(monData?.self_rebirth_count ?? 0);
+      const rebirthTurnover = Number(monData?.self_rebirth_amount ?? (rebirthCount * 250));
 
-      const isDistributed = Boolean(monData.is_today_distributed ?? biPools.is_today_distributed ?? false);
+      const isDistributed = Boolean(monData.is_today_distributed ?? false);
 
       const normalized = {
         ...monData,
@@ -5683,57 +5681,68 @@ right={
           </div>
 
           {/* 5 Live Pots Grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#2563eb" }}>🏢 FRANCHISE POOL (₹15)</div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
-                ₹{Number(proj.franchise_pot ?? mon.pools?.daily_franchise_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-                👥 Active Coordinators: <strong>{proj.franchise_recipients ?? mon.achievers?.franchise_count ?? 0}</strong>
-              </div>
-            </div>
+          {(() => {
+            const rebRates = mon.rebirth_rates || rankConfig?.rebirth_allocation || {};
+            const fRate = Number(rebRates.franchise ?? rebRates.franchise_pool ?? 15);
+            const dRate = Number(rebRates.district ?? rebRates.district_pool ?? 10);
+            const sRate = Number(rebRates.state ?? rebRates.state_pool ?? 15);
+            const t1Rate = Number(rebRates.royalty_t1 ?? rebRates.district_royalty_t1 ?? 20);
+            const t2Rate = Number(rebRates.royalty_t2 ?? rebRates.district_royalty_t2 ?? 30);
 
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#7c3aed" }}>🗺️ DISTRICT POOL (₹10)</div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
-                ₹{Number(proj.district_pot ?? mon.pools?.daily_district_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-                👥 Active Coordinators: <strong>{proj.district_recipients ?? mon.achievers?.district_count ?? 0}</strong>
-              </div>
-            </div>
+            return (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#2563eb" }}>🏢 FRANCHISE POOL (₹{fRate})</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+                    ₹{Number(proj.franchise_pot ?? mon.pools?.daily_franchise_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                    👥 Active Coordinators: <strong>{proj.franchise_recipients ?? mon.achievers?.franchise_count ?? 0}</strong>
+                  </div>
+                </div>
 
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#d97706" }}>🏛️ STATE POOL (₹10)</div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
-                ₹{Number(proj.state_pot ?? mon.pools?.daily_state_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-                👥 Active Coordinators: <strong>{proj.state_recipients ?? mon.achievers?.state_count ?? 0}</strong>
-              </div>
-            </div>
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#7c3aed" }}>🗺️ DISTRICT POOL (₹{dRate})</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+                    ₹{Number(proj.district_pot ?? mon.pools?.daily_district_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                    👥 Active Coordinators: <strong>{proj.district_recipients ?? mon.achievers?.district_count ?? 0}</strong>
+                  </div>
+                </div>
 
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#059669" }}>👑 ROYALTY T1 L1-L7 (₹20)</div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
-                ₹{Number(proj.royalty_t1_pot ?? ((Number(mon.pools?.daily_royalty_pool || 0) * 0.4))).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-              <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-                👥 L1-L7 Achievers: <strong>{proj.royalty_t1_recipients ?? mon.achievers?.royalty_count ?? 0}</strong>
-              </div>
-            </div>
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#d97706" }}>🏛️ STATE POOL (₹{sRate})</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+                    ₹{Number(proj.state_pot ?? mon.pools?.daily_state_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                    👥 Active Coordinators: <strong>{proj.state_recipients ?? mon.achievers?.state_count ?? 0}</strong>
+                  </div>
+                </div>
 
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#dc2626" }}>👑 ROYALTY T2 L8-L10 (₹30)</div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
-                ₹{Number(proj.royalty_t2_pot ?? ((Number(mon.pools?.daily_royalty_pool || 0) * 0.6))).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#059669" }}>👑 ROYALTY T1 L1-L7 (₹{t1Rate})</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+                    ₹{Number(proj.royalty_t1_pot ?? mon.pools?.daily_royalty_t1_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                    👥 L1-L7 Achievers: <strong>{proj.royalty_t1_recipients ?? mon.achievers?.royalty_count ?? 0}</strong>
+                  </div>
+                </div>
+
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#dc2626" }}>👑 ROYALTY T2 L8-L10 (₹{t2Rate})</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+                    ₹{Number(proj.royalty_t2_pot ?? mon.pools?.daily_royalty_t2_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                    👥 L8-L10 Leaders: <strong>{proj.royalty_t2_recipients ?? mon.achievers?.royalty_count ?? 0}</strong>
+                  </div>
+                </div>
               </div>
-              <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-                👥 L8-L10 Leaders: <strong>{proj.royalty_t2_recipients ?? mon.achievers?.royalty_count ?? 0}</strong>
-              </div>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* Execution Output Console */}
           {poolsTriggerOutput && (
