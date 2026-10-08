@@ -507,6 +507,19 @@ function SectionHeader({ title, total }) {
   );
 }
 
+const CAT_CHIP_LABELS = {
+  SELF_ACCOUNT: "Self blocks",
+  E_EDU: "E-Edu",
+  LAYER: "Layer & Blocks",
+  DIRECT: "Direct Bonus",
+  P2P: "P2P Transfer",
+  ROYALTY: "Royalty Bonus",
+  MERCHANT_CAPTAIN: "Merchant & Captain",
+  WITHDRAWAL: "Withdrawal",
+  REDEEM: "Redeemed / Pocket",
+  OTHER: "Wallet Flow",
+};
+
 function classifyTransaction(tx) {
   const type = String(tx?.type || "").toUpperCase();
   const meta = tx?.meta || {};
@@ -514,6 +527,7 @@ function classifyTransaction(tx) {
   const st = String(tx?.source_type || "").toUpperCase();
   const ot = String(meta.orig_type || "").toUpperCase();
   const trig = String(meta.trigger || "").toUpperCase();
+  const kind = String(meta.kind || "").toUpperCase();
 
   // 1. SELF ACCOUNT / REPURCHASE POCKET
   if (
@@ -525,12 +539,24 @@ function classifyTransaction(tx) {
     return "SELF_ACCOUNT";
   }
 
-  // 2. LAYER & AUTOPOOL
+  // 2. E-EDU / RANK UPGRADE (all E-Edu layer commissions and referral bonuses)
+  if (
+    st === "RANK_UPGRADE" ||
+    st.includes("E_EDU") ||
+    src.includes("E_EDU") ||
+    meta.source === "E_EDU" ||
+    kind.startsWith("RANK_UPGRADE") ||
+    ot.startsWith("RANK_UPGRADE") ||
+    type.includes("RANK_UPGRADE")
+  ) {
+    return "E_EDU";
+  }
+
+  // 3. LAYER & AUTOPOOL (5-Matrix & 3-Matrix)
   if (
     type === "LEVEL_BONUS" ||
     type === "AUTOPOOL_BONUS_FIVE" ||
     type === "AUTOPOOL_BONUS_THREE" ||
-    (st === "RANK_UPGRADE" && (ot.includes("LEVEL") || type.includes("LEVEL") || String(meta.kind || "").toUpperCase().includes("LEVEL"))) ||
     type === "PRIME_150_SELF" ||
     type === "PRIME_750_SELF" ||
     type === "PRIME_759_SELF" ||
@@ -548,7 +574,7 @@ function classifyTransaction(tx) {
     return "LAYER";
   }
 
-  // 3. DIRECT BONUS
+  // 4. DIRECT BONUS
   if (
     type === "DIRECT_REF_BONUS" ||
     type === "MONTHLY_759_DIRECT" ||
@@ -672,18 +698,6 @@ function HistoryRow({ tx, onClick }) {
     : `${describeSource(tx)}${Number.isFinite(levelVal) ? ` - Layer ${levelVal}` : ""}`;
 
   const cat = classifyTransaction(tx);
-  const catChipLabels = {
-    SELF_ACCOUNT: "Self blocks",
-    LAYER: "Layer & Blocks",
-    DIRECT: "Direct Bonus",
-    P2P: "P2P Transfer",
-    ROYALTY: "Royalty Bonus",
-    MERCHANT_CAPTAIN: "Merchant & Captain",
-    WITHDRAWAL: "Withdrawal",
-    REDEEM: "Redeemed / Pocket",
-    OTHER: "Wallet Flow",
-  };
-
   const isCredit = amount >= 0;
 
   return (
@@ -759,14 +773,15 @@ function HistoryRow({ tx, onClick }) {
             ) : cat && cat !== "OTHER" && (
               <Chip
                 size="small"
-                label={catChipLabels[cat] || cat}
+                label={CAT_CHIP_LABELS[cat] || cat}
                 sx={{
                   height: 18,
                   fontSize: 10,
                   fontWeight: 700,
                   borderRadius: 1,
-                  bgcolor: isCredit ? "#F0FDF4" : "#FEF2F2",
-                  color: isCredit ? "#166534" : "#991B1B",
+                  bgcolor: cat === "E_EDU" ? "#EDE9FE" : isCredit ? "#F0FDF4" : "#FEF2F2",
+                  color: cat === "E_EDU" ? "#6D28D9" : isCredit ? "#166534" : "#991B1B",
+                  border: cat === "E_EDU" ? "1px solid #DDD6FE" : undefined,
                 }}
               />
             )}
@@ -884,14 +899,15 @@ function TxDetailDrawer({ open, onClose, tx }) {
         </Typography>
         <Chip
           size="small"
-          label={cat.replace(/_/g, " ")}
+          label={CAT_CHIP_LABELS[cat] || cat.replace(/_/g, " ")}
           sx={{
             mt: 0.8,
             height: 20,
             fontSize: 10.5,
             fontWeight: 800,
-            bgcolor: isCredit ? "#DCFCE7" : "#FEE2E2",
-            color: isCredit ? "#166534" : "#991B1B",
+            bgcolor: cat === "E_EDU" ? "#EDE9FE" : isCredit ? "#DCFCE7" : "#FEE2E2",
+            color: cat === "E_EDU" ? "#6D28D9" : isCredit ? "#166534" : "#991B1B",
+            border: cat === "E_EDU" ? "1px solid #DDD6FE" : undefined,
           }}
         />
       </Paper>
@@ -1073,6 +1089,7 @@ function PhonePeFilterDrawer({
 
   const sourceOptions = [
     { label: "All Sources", value: "ALL" },
+    { label: "E-Edu", value: "E_EDU" },
     { label: "Self blocks", value: "SELF_ACCOUNT" },
     { label: "Layer & Blocks", value: "LAYER" },
     { label: "Direct Bonus", value: "DIRECT" },
@@ -1649,6 +1666,7 @@ export default function History() {
   const categoryCounts = useMemo(() => {
     const counts = {
       ALL: dateFilteredTransactions.length,
+      E_EDU: 0,
       SELF_ACCOUNT: 0,
       LAYER: 0,
       DIRECT: 0,
@@ -1768,6 +1786,7 @@ export default function History() {
   const sourceLabel = useMemo(() => {
     const map = {
       ALL: "All Sources",
+      E_EDU: "E-Edu",
       SELF_ACCOUNT: "Self blocks",
       LAYER: "Layer & Blocks",
       DIRECT: "Direct Bonus",
