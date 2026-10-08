@@ -6444,24 +6444,26 @@ class AdminDailyPoolMonitorView(APIView):
         from business.models import PromoPurchase, SubscriptionActivation, AutoPoolAccount, CommissionConfig
         from accounts.models import CustomUser, WalletTransaction
 
-        now = timezone.now()
+        try:
+            from zoneinfo import ZoneInfo
+            ist_tz = ZoneInfo("Asia/Kolkata")
+        except Exception:
+            import pytz
+            ist_tz = pytz.timezone("Asia/Kolkata")
+
+        now_ist = timezone.datetime.now(ist_tz)
         req_date = (request.query_params.get("date") or "").strip()
         if req_date:
             try:
                 target_dt = timezone.datetime.strptime(req_date, "%Y-%m-%d").date()
-                today_start = timezone.make_aware(timezone.datetime.combine(target_dt, timezone.datetime.min.time()))
-                today_end = timezone.make_aware(timezone.datetime.combine(target_dt, timezone.datetime.max.time()))
-                today_str = req_date
             except Exception:
-                target_dt = now.date()
-                today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                today_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
-                today_str = now.strftime("%Y-%m-%d")
+                target_dt = now_ist.date()
         else:
-            target_dt = now.date()
-            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            today_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
-            today_str = now.strftime("%Y-%m-%d")
+            target_dt = now_ist.date()
+
+        today_str = target_dt.strftime("%Y-%m-%d")
+        today_start = timezone.datetime.combine(target_dt, timezone.datetime.min.time(), tzinfo=ist_tz)
+        today_end = timezone.datetime.combine(target_dt, timezone.datetime.max.time(), tzinfo=ist_tz)
 
         month_start = today_start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         month_spp_volume = PromoPurchase.objects.filter(
