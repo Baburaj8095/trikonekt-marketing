@@ -522,7 +522,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           fiveMatrix += amt;
         } else if (src.includes("THREE") || ot === "AUTOPOOL_BONUS_THREE" || st.includes("THREE")) {
           threeMatrix += amt;
-        } else if (st === "RANK_UPGRADE" || kind.includes("LEVEL") || kind.includes("RANK")) {
+        } else if (st === "RANK_UPGRADE" || kind.startsWith("RANK_UPGRADE") || st.includes("E_EDU") || meta.source === "E_EDU") {
           eEduSlabs += amt;
         } else {
           otherLayers += amt;
@@ -545,7 +545,8 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
       layerBreakdown: {
         fiveMatrix: Number(fiveMatrix.toFixed(2)),
         threeMatrix: Number(threeMatrix.toFixed(2)),
-        eEduSlabs: Number((eEduSlabs + otherLayers).toFixed(2)),
+        eEduSlabs: Number(eEduSlabs.toFixed(2)),
+        sppLevel: Number(otherLayers.toFixed(2)),
       },
     };
   }, [walletHistory]);
@@ -1133,6 +1134,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
               <span>5 Blocks: ₹{fmt(layerBreakdown.fiveMatrix)}</span>
               <span>3 Blocks: ₹{fmt(layerBreakdown.threeMatrix)}</span>
               <span>e-Edu: ₹{fmt(layerBreakdown.eEduSlabs)}</span>
+              {layerBreakdown.sppLevel > 0 && <span>SPP: ₹{fmt(layerBreakdown.sppLevel)}</span>}
             </Box>
             <LinearProgress variant="determinate" value={layerMatrixPercent} sx={{ height: 6, borderRadius: 3, mb: 1 }} />
             <Divider sx={{ my: 1 }} />

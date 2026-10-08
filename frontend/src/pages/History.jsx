@@ -157,6 +157,12 @@ function describeSource(tx = {}) {
     }
   }
 
+  // Daily Royalty Payouts
+  if (type === "GLOBAL_ROYALTY" || ot === "GLOBAL_ROYALTY" || st === "DAILY_POOL_DISTRIBUTION") {
+    if (meta?.tier) return `Daily Royalty Tier ${meta.tier} Payout`;
+    return meta?.description || "Daily Royalty Payout";
+  }
+
   // Referral bonuses
   if (type === "DIRECT_REF_BONUS" || src === "JOIN_REFERRAL" || st === "JOIN_REFERRAL") {
     if (tier) return `Referral Bonus ${tier} Prime`;
@@ -609,7 +615,10 @@ function classifyTransaction(tx) {
     type === "GLOBAL_ROYALTY" ||
     type === "ROYALTY_BONUS" ||
     type === "GLOBAL_ACTIVATION_CREDIT" ||
+    st === "DAILY_POOL_DISTRIBUTION" ||
     src.includes("ROYALTY") ||
+    ot.includes("ROYALTY") ||
+    String(tx?.source_id || "").toUpperCase().startsWith("ROYALTY") ||
     meta.club
   ) {
     return "ROYALTY";
