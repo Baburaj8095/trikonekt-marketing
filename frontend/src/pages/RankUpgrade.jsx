@@ -362,7 +362,7 @@ function RankPaymentSheet({ open, onClose, data, onSuccess }) {
   );
 }
 
-export default function RankUpgrade({ defaultToRankId = null, teamSummary: propTeamSummary = null } = {}) {
+export default function RankUpgrade({ defaultToRankId = null, teamSummary: propTeamSummary = null, embedded = false } = {}) {
   const navigate = useNavigate();
 
   const [ranks, setRanks] = useState([]);
@@ -994,125 +994,130 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
         </Grid>
       </Paper>
 
-      {/* ── Total Earnings & Wallet Status (Dark Blue Banner) ── */}
-      <Card sx={{ bgcolor: "#1e1b4b", color: "#fff", borderRadius: 3, mb: 2, boxShadow: "0 14px 28px rgba(30,27,75,0.25)" }}>
-        <CardContent sx={{ p: 2.5 }}>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} sm={7}>
-              <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.8, opacity: 0.8, mb: 0.5 }}>
-                TOTAL EARNINGS ⓘ
-              </Typography>
-              <Typography variant="h3" sx={{ fontWeight: 900, mb: 1 }}>
-                ₹{fmt(totalEarnings)} <Typography component="span" sx={{ fontSize: 16, opacity: 0.7 }}>/ ₹{fmt(currentLimit)}</Typography>
-              </Typography>
-              <LinearProgress
-                variant="determinate"
-                value={percentUsed}
-                sx={{
-                  height: 8,
-                  borderRadius: 4,
-                  bgcolor: "rgba(255,255,255,0.2)",
-                  "& .MuiLinearProgress-bar": { bgcolor: isLimitReached ? "#ef4444" : "#f59e0b" },
-                }}
-              />
-              <Typography sx={{ fontSize: 12, mt: 0.8, opacity: 0.85 }}>
-                {!isLayerActive ? "Layer 1 Inactive (Activate to start income) ⓘ" : isLimitReached ? `Earning Limit Reached for Layer ${currentLevel} ⓘ` : `Earning Limit Progress (${percentUsed.toFixed(0)}%) ⓘ`}
-              </Typography>
+      {/* ── Total Earnings & Wallet Status (Dark Blue Banner) + Earning Limit Layer Cards ── */}
+      {!embedded && (
+        <>
+          {/* ── Total Earnings & Wallet Status (Dark Blue Banner) ── */}
+          <Card sx={{ bgcolor: "#1e1b4b", color: "#fff", borderRadius: 3, mb: 2, boxShadow: "0 14px 28px rgba(30,27,75,0.25)" }}>
+            <CardContent sx={{ p: 2.5 }}>
+              <Grid container spacing={2} alignItems="center">
+                <Grid item xs={12} sm={7}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.8, opacity: 0.8, mb: 0.5 }}>
+                    TOTAL EARNINGS ⓘ
+                  </Typography>
+                  <Typography variant="h3" sx={{ fontWeight: 900, mb: 1 }}>
+                    ₹{fmt(totalEarnings)} <Typography component="span" sx={{ fontSize: 16, opacity: 0.7 }}>/ ₹{fmt(currentLimit)}</Typography>
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={percentUsed}
+                    sx={{
+                      height: 8,
+                      borderRadius: 4,
+                      bgcolor: "rgba(255,255,255,0.2)",
+                      "& .MuiLinearProgress-bar": { bgcolor: isLimitReached ? "#ef4444" : "#f59e0b" },
+                    }}
+                  />
+                  <Typography sx={{ fontSize: 12, mt: 0.8, opacity: 0.85 }}>
+                    {!isLayerActive ? "Layer 1 Inactive (Activate to start income) ⓘ" : isLimitReached ? `Earning Limit Reached for Layer ${currentLevel} ⓘ` : `Earning Limit Progress (${percentUsed.toFixed(0)}%) ⓘ`}
+                  </Typography>
+                </Grid>
+
+                <Grid item xs={12} sm={5}>
+                  <Paper sx={{ p: 1.8, bgcolor: "rgba(255,255,255,0.1)", backdropFilter: "blur(6px)", borderRadius: 2.5, color: "#fff" }}>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                      <AccountBalanceWalletRoundedIcon sx={{ color: !isLayerActive ? "#94a3b8" : isLimitReached ? "#ef4444" : "#22c55e" }} />
+                      <Box>
+                        <Typography sx={{ fontSize: 10, opacity: 0.8, fontWeight: 700 }}>WALLET STATUS</Typography>
+                        <Typography sx={{ fontSize: 14, fontWeight: 900, color: !isLayerActive ? "#f87171" : isLimitReached ? "#ef4444" : "#22c55e" }}>
+                          {!isLayerActive ? "INACTIVE" : isLimitReached ? "INCOME STOPPED" : "ACTIVE"}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                    <Typography sx={{ fontSize: 11, opacity: 0.9, mb: 1.5 }}>
+                      {!isLayerActive
+                        ? "Layer 1 is inactive. Purchase the ₹2,000 package on trieducation.in or upgrade to Layer 1 to start receiving income."
+                        : isLimitReached
+                        ? `Limit reached for Layer ${currentLevel}. Upgrade or re-top up to continue income.`
+                        : currentLevel >= 10
+                        ? `Layer 10 unlocked. Max earning limit is ₹${fmt(currentLimit)}.`
+                        : `Layer ${currentLevel} earning limit is ₹${fmt(currentLimit)}.`}
+                    </Typography>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      disabled={isLayerActive && currentLevel >= 10 && !isLimitReached}
+                      sx={{
+                        bgcolor: isLayerActive && currentLevel >= 10 && !isLimitReached ? "#059669" : "#ffffff",
+                        color: isLayerActive && currentLevel >= 10 && !isLimitReached ? "#ffffff" : "#1e1b4b",
+                        fontWeight: 900,
+                        "&.Mui-disabled": { bgcolor: "#059669", color: "#ffffff", opacity: 0.95 },
+                        "&:hover": { bgcolor: "#f3f4f6" },
+                      }}
+                      onClick={() => handleUpgradeClick()}
+                    >
+                      {!isLayerActive
+                        ? "Activate Layer 1 (₹250)"
+                        : currentLevel >= 10 && !isLimitReached
+                        ? "✓ Fully Upgraded (Layer 10)"
+                        : "Upgrade Now"}
+                    </Button>
+                  </Paper>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+
+          {/* ── Earning Limit Layer Cards ── */}
+          <Grid container spacing={1.5} sx={{ mb: 2 }}>
+            <Grid item xs={12} sm={4}>
+              <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff" }}>
+                <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>
+                  {isLayerActive ? `EARNING LIMIT (LAYER ${currentLevel})` : "EARNING LIMIT (LAYER 1)"}
+                </Typography>
+                <Typography sx={{ fontSize: 20, fontWeight: 900, color: "#0f172a", my: 0.5 }}>₹{fmt(currentLimit)}</Typography>
+                {!isLayerActive ? (
+                  <Chip label="Not Active" size="small" sx={{ fontWeight: 800, bgcolor: "#fee2e2", color: "#dc2626" }} />
+                ) : isLimitReached ? (
+                  <Chip icon={<CheckCircleRoundedIcon />} label="Completed" color="success" size="small" sx={{ fontWeight: 800 }} />
+                ) : (
+                  <Chip label="In Progress" color="info" size="small" sx={{ fontWeight: 800 }} />
+                )}
+              </Paper>
             </Grid>
 
-            <Grid item xs={12} sm={5}>
-              <Paper sx={{ p: 1.8, bgcolor: "rgba(255,255,255,0.1)", backdropFilter: "blur(6px)", borderRadius: 2.5, color: "#fff" }}>
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                  <AccountBalanceWalletRoundedIcon sx={{ color: !isLayerActive ? "#94a3b8" : isLimitReached ? "#ef4444" : "#22c55e" }} />
-                  <Box>
-                    <Typography sx={{ fontSize: 10, opacity: 0.8, fontWeight: 700 }}>WALLET STATUS</Typography>
-                    <Typography sx={{ fontSize: 14, fontWeight: 900, color: !isLayerActive ? "#f87171" : isLimitReached ? "#ef4444" : "#22c55e" }}>
-                      {!isLayerActive ? "INACTIVE" : isLimitReached ? "INCOME STOPPED" : "ACTIVE"}
-                    </Typography>
-                  </Box>
-                </Stack>
-                <Typography sx={{ fontSize: 11, opacity: 0.9, mb: 1.5 }}>
-                  {!isLayerActive
-                    ? "Layer 1 is inactive. Purchase the ₹2,000 package on trieducation.in or upgrade to Layer 1 to start receiving income."
-                    : isLimitReached
-                    ? `Limit reached for Layer ${currentLevel}. Upgrade or re-top up to continue income.`
-                    : currentLevel >= 10
-                    ? `Layer 10 unlocked. Max earning limit is ₹${fmt(currentLimit)}.`
-                    : `Layer ${currentLevel} earning limit is ₹${fmt(currentLimit)}.`}
+            <Grid item xs={12} sm={4}>
+              <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff" }}>
+                <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>
+                  {!isLayerActive ? "FIRST TARGET (LAYER 1)" : currentLevel >= 10 ? "TOTAL LAYER CAPACITY" : `NEXT TARGET (LAYER ${nextLevel})`}
                 </Typography>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  disabled={isLayerActive && currentLevel >= 10 && !isLimitReached}
-                  sx={{
-                    bgcolor: isLayerActive && currentLevel >= 10 && !isLimitReached ? "#059669" : "#ffffff",
-                    color: isLayerActive && currentLevel >= 10 && !isLimitReached ? "#ffffff" : "#1e1b4b",
-                    fontWeight: 900,
-                    "&.Mui-disabled": { bgcolor: "#059669", color: "#ffffff", opacity: 0.95 },
-                    "&:hover": { bgcolor: "#f3f4f6" },
-                  }}
-                  onClick={() => handleUpgradeClick()}
-                >
-                  {!isLayerActive
-                    ? "Activate Layer 1 (₹250)"
-                    : currentLevel >= 10 && !isLimitReached
-                    ? "✓ Fully Upgraded (Layer 10)"
-                    : "Upgrade Now"}
-                </Button>
+                <Typography sx={{ fontSize: 20, fontWeight: 900, color: "#0f172a", my: 0.5 }}>
+                  ₹{fmt(!isLayerActive ? 1750 : currentLevel >= 10 ? 100000 : (RANK_TIERS.find((t) => t.level === nextLevel)?.limit || 0))}
+                </Typography>
+                {!isLayerActive ? (
+                  <Chip label="Activate Layer 1" color="warning" size="small" sx={{ fontWeight: 800 }} />
+                ) : currentLevel >= 10 ? (
+                  <Chip icon={<CheckCircleRoundedIcon />} label="All Layers Unlocked" color="success" size="small" sx={{ fontWeight: 800 }} />
+                ) : (
+                  <Chip label="Upcoming" color="default" size="small" sx={{ fontWeight: 800 }} />
+                )}
+              </Paper>
+            </Grid>
+
+            <Grid item xs={12} sm={4}>
+              <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff" }}>
+                <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>NEXT CYCLE</Typography>
+                <Typography sx={{ fontSize: 14, fontWeight: 900, color: !isLayerActive ? "#dc2626" : isLimitReached ? "#d97706" : "#15803d", my: 0.5 }}>
+                  {!isLayerActive ? "Activation Required" : isLimitReached ? "Re-Top Up Required" : "Active"}
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: "#94a3b8" }}>
+                  {!isLayerActive ? "(Unlock on Layer 1 Purchase)" : "(Same Benefits Continue)"}
+                </Typography>
               </Paper>
             </Grid>
           </Grid>
-        </CardContent>
-      </Card>
-
-      {/* ── Earning Limit Layer Cards ── */}
-      <Grid container spacing={1.5} sx={{ mb: 2 }}>
-        <Grid item xs={12} sm={4}>
-          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff" }}>
-            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>
-              {isLayerActive ? `EARNING LIMIT (LAYER ${currentLevel})` : "EARNING LIMIT (LAYER 1)"}
-            </Typography>
-            <Typography sx={{ fontSize: 20, fontWeight: 900, color: "#0f172a", my: 0.5 }}>₹{fmt(currentLimit)}</Typography>
-            {!isLayerActive ? (
-              <Chip label="Not Active" size="small" sx={{ fontWeight: 800, bgcolor: "#fee2e2", color: "#dc2626" }} />
-            ) : isLimitReached ? (
-              <Chip icon={<CheckCircleRoundedIcon />} label="Completed" color="success" size="small" sx={{ fontWeight: 800 }} />
-            ) : (
-              <Chip label="In Progress" color="info" size="small" sx={{ fontWeight: 800 }} />
-            )}
-          </Paper>
-        </Grid>
-
-        <Grid item xs={12} sm={4}>
-          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff" }}>
-            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>
-              {!isLayerActive ? "FIRST TARGET (LAYER 1)" : currentLevel >= 10 ? "TOTAL LAYER CAPACITY" : `NEXT TARGET (LAYER ${nextLevel})`}
-            </Typography>
-            <Typography sx={{ fontSize: 20, fontWeight: 900, color: "#0f172a", my: 0.5 }}>
-              ₹{fmt(!isLayerActive ? 1750 : currentLevel >= 10 ? 100000 : (RANK_TIERS.find((t) => t.level === nextLevel)?.limit || 0))}
-            </Typography>
-            {!isLayerActive ? (
-              <Chip label="Activate Layer 1" color="warning" size="small" sx={{ fontWeight: 800 }} />
-            ) : currentLevel >= 10 ? (
-              <Chip icon={<CheckCircleRoundedIcon />} label="All Layers Unlocked" color="success" size="small" sx={{ fontWeight: 800 }} />
-            ) : (
-              <Chip label="Upcoming" color="default" size="small" sx={{ fontWeight: 800 }} />
-            )}
-          </Paper>
-        </Grid>
-
-        <Grid item xs={12} sm={4}>
-          <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff" }}>
-            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>NEXT CYCLE</Typography>
-            <Typography sx={{ fontSize: 14, fontWeight: 900, color: !isLayerActive ? "#dc2626" : isLimitReached ? "#d97706" : "#15803d", my: 0.5 }}>
-              {!isLayerActive ? "Activation Required" : isLimitReached ? "Re-Top Up Required" : "Active"}
-            </Typography>
-            <Typography sx={{ fontSize: 11, color: "#94a3b8" }}>
-              {!isLayerActive ? "(Unlock on Layer 1 Purchase)" : "(Same Benefits Continue)"}
-            </Typography>
-          </Paper>
-        </Grid>
-      </Grid>
+        </>
+      )}
 
       {/* ── Royalty Income, Layer Blocks & Missing Income Grid ── */}
       <Grid container spacing={2} sx={{ mb: 2 }}>

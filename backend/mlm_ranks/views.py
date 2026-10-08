@@ -115,9 +115,11 @@ class UserUpgradeEligibilityView(APIView):
             t3_days = int(royalty_cfg.get("tier3_days", 30))
             t3_levels = str(royalty_cfg.get("tier3_levels", "Layer 1 to Layer 10"))
 
-            # Royalty earnings query
+            # Royalty earnings query (75% net income only, excluding 25% Self Account)
             q_royalty = Q(type="GLOBAL_ROYALTY") | Q(source_id__startswith="ROYALTY_") | Q(meta__orig_type="GLOBAL_ROYALTY")
-            user_royalty_txs = WalletTransaction.objects.filter(user=request.user).filter(q_royalty)
+            user_royalty_txs = WalletTransaction.objects.filter(user=request.user).filter(q_royalty).exclude(
+                Q(type="SELF_ACCOUNT_CREDIT") | Q(meta__ledger="SELF_ACCOUNT")
+            )
             total_royalty_earned = float(user_royalty_txs.aggregate(t=Sum("amount"))["t"] or Decimal("0.00"))
             t1_earned = float(user_royalty_txs.filter(Q(source_id__startswith="ROYALTY_T1_") | Q(meta__tier=1)).aggregate(t=Sum("amount"))["t"] or Decimal("0.00"))
             t2_earned = float(user_royalty_txs.filter(Q(source_id__startswith="ROYALTY_T2_") | Q(meta__tier=2)).aggregate(t=Sum("amount"))["t"] or Decimal("0.00"))
