@@ -934,8 +934,12 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
               <Chip label={`Eligible ₹${fmt(layerMatrixEligible)}`} color="primary" size="small" sx={{ fontWeight: 900, fontSize: 11 }} />
             </Stack>
             <Divider sx={{ my: 1 }} />
-            <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700, mb: 0.5 }}>FROM LAYER BLOCKS (All Slabs)</Typography>
-            <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#0f172a", mb: 0.5 }}>₹{fmt(layerMatrixEarned)}</Typography>
+            <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700, mb: 0.5 }}>TOTAL e-EDU LAYER INCOME</Typography>
+            <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#0f172a", mb: 0.5 }}>₹{fmt(eEduEarnings)}</Typography>
+            <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#64748b", mb: 0.5 }}>
+              <span>Direct Bonus: ₹{fmt(directEduEarned)}</span>
+              <span>Matrix Slabs: ₹{fmt(layerMatrixEarned)}</span>
+            </Box>
             <LinearProgress variant="determinate" value={layerMatrixPercent} sx={{ height: 6, borderRadius: 3, mb: 1 }} />
             <Divider sx={{ my: 1 }} />
             <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#0369a1" }}>
@@ -970,7 +974,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           variant="outlined"
           sx={{
             flex: "1 1 0",
-            minWidth: 100,
+            minWidth: 120,
             p: 1.5,
             textAlign: "center",
             borderRadius: 2.5,
@@ -979,10 +983,13 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           }}
         >
           <Typography sx={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.4, mb: 0.5, whiteSpace: "nowrap" }}>
-            Active Layers
+            My Unlocked Layers
           </Typography>
           <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#16a34a" }}>
-            {activeCommunityLayers}
+            {effectiveAchievedLevel >= 10 ? "Layer 10 (Max)" : `Layer ${effectiveAchievedLevel} / 10`}
+          </Typography>
+          <Typography sx={{ fontSize: 10, color: "#16a34a", fontWeight: 700 }}>
+            {effectiveAchievedLevel >= 10 ? "All Layers Unlocked" : `${effectiveAchievedLevel} Purchased`}
           </Typography>
         </Paper>
 
@@ -990,7 +997,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           variant="outlined"
           sx={{
             flex: "1 1 0",
-            minWidth: 100,
+            minWidth: 120,
             p: 1.5,
             textAlign: "center",
             borderRadius: 2.5,
@@ -999,10 +1006,13 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           }}
         >
           <Typography sx={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.4, mb: 0.5, whiteSpace: "nowrap" }}>
-            Layers Completed
+            Team Matrix Depth
           </Typography>
           <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#d97706" }}>
-            {completedCommunityLayers > 0 ? `L${completedCommunityLayers}` : "–"}
+            {activeCommunityLayers} {activeCommunityLayers === 1 ? "Layer" : "Layers"} Active
+          </Typography>
+          <Typography sx={{ fontSize: 10, color: "#b45309", fontWeight: 700 }}>
+            {completedCommunityLayers > 0 ? `L${completedCommunityLayers} Full (5/5)` : `${totalCommunityBlocks} Members`}
           </Typography>
         </Paper>
 
@@ -1023,6 +1033,9 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           </Typography>
           <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#7c3aed" }}>
             ₹{fmt(eEduEarnings)}
+          </Typography>
+          <Typography sx={{ fontSize: 10, color: "#6d28d9", fontWeight: 700 }}>
+            Direct + Matrix Slabs
           </Typography>
         </Paper>
       </Box>

@@ -439,6 +439,7 @@ export default function AdminCommissionDistribute() {
   const [poolsTriggering, setPoolsTriggering] = useState(false);
   const [poolsTriggerOutput, setPoolsTriggerOutput] = useState(null);
   const [rebirthSearchQuery, setRebirthSearchQuery] = useState("");
+  const [royaltyPayouts, setRoyaltyPayouts] = useState([]);
 
   const fetchPoolsMonitor = async () => {
     try {
@@ -449,11 +450,16 @@ export default function AdminCommissionDistribute() {
       const d = String(today.getDate()).padStart(2, "0");
       const todayStr = `${y}-${m}-${d}`;
 
-      // Parallel fetch from both pools monitor and sales analytics
-      const [poolRes, salesRes] = await Promise.allSettled([
+      // Parallel fetch from pools monitor, sales analytics, and royalty transactions
+      const [poolRes, salesRes, royaltyRes] = await Promise.allSettled([
         adminGetPoolsMonitor(),
         API.get("/admin/analytics/sales/", { params: { from: todayStr, to: todayStr } }),
+        API.get("/admin/autopool/transactions/?types=GLOBAL_ROYALTY&page_size=50"),
       ]);
+
+      if (royaltyRes.status === "fulfilled") {
+        setRoyaltyPayouts(royaltyRes.value?.data?.results || []);
+      }
 
       const monData = (poolRes.status === "fulfilled" ? (poolRes.value?.data || poolRes.value) : {}) || {};
       const salesPayload = (salesRes.status === "fulfilled" ? (salesRes.value?.data || salesRes.value) : {}) || {};
@@ -5916,15 +5922,14 @@ right={
 
         {/* 3. Recent Daily Pool Distribution Logs */}
         <Section
-          title="Recent Pool Distribution Audit History"
-          subtitle="Audit ledger of past automated and manual daily pool payouts"
+          title="Recent Pool Distribution & Royalty Payout Audit History"
+          subtitle="Audit ledger of past automated midnight (11:59 PM) and manual daily pool payouts, including individual recipient credits"
         >
-          {history.length === 0 ? (
-            <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13, fontWeight: 600 }}>
-              No distribution records found. Runs will appear here automatically after 11:59 PM execution.
-            </div>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
+          {history.length > 0 && (
+            <div style={{ overflowX: "auto", marginBottom: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#1e293b", marginBottom: 8 }}>
+                Aggregated Pool Runs
+              </div>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, textAlign: "left" }}>
                 <thead>
                   <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
@@ -5981,6 +5986,81 @@ right={
               </table>
             </div>
           )}
+
+          {/* Individual Recipient Royalty Payouts Table */}
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#1e293b" }}>
+                Individual Achiever Payout Receipts ({royaltyPayouts.length} record{royaltyPayouts.length === 1 ? "" : "s"})
+              </div>
+              <span style={{ fontSize: 11, color: "#64748b" }}>
+                Distributed to qualified members holding L7+ (Tier 1) & L10 (Tier 2)
+              </span>
+            </div>
+
+            {royaltyPayouts.length === 0 ? (
+              <div style={{ padding: 24, textAlign: "center", color: "#94a3b8", fontSize: 13, fontWeight: 600, background: "#f8fafc", borderRadius: 8, border: "1px dashed #cbd5e1" }}>
+                No individual royalty payouts recorded yet. The engine runs daily at 11:59 PM (23:59) or upon clicking "Trigger Payout Now".
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, textAlign: "left" }}>
+                  <thead>
+                    <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                      <th style={{ padding: "8px 12px", color: "#64748b", fontWeight: 800 }}>TR / Tx ID</th>
+                      <th style={{ padding: "8px 12px", color: "#64748b", fontWeight: 800 }}>Achiever (User)</th>
+                      <th style={{ padding: "8px 12px", color: "#64748b", fontWeight: 800 }}>Royalty Tier</th>
+                      <th style={{ padding: "8px 12px", color: "#64748b", fontWeight: 800 }}>Amount Credited</th>
+                      <th style={{ padding: "8px 12px", color: "#64748b", fontWeight: 800 }}>Wallet Credit</th>
+                      <th style={{ padding: "8px 12px", color: "#64748b", fontWeight: 800 }}>Date & Time</th>
+                      <th style={{ padding: "8px 12px", color: "#64748b", fontWeight: 800 }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {royaltyPayouts.map((tx, idx) => (
+                      <tr key={tx.tr || tx.id || idx} style={{ borderBottom: "1px solid #f1f5f9", background: idx % 2 === 0 ? "#ffffff" : "#fcfcfd" }}>
+                        <td style={{ padding: "8px 12px", fontWeight: 800, color: "#0f172a", fontFamily: "monospace" }}>
+                          #{tx.tr || tx.id}
+                        </td>
+                        <td style={{ padding: "8px 12px" }}>
+                          <div style={{ fontWeight: 800, color: "#0f172a" }}>{tx.username || tx.full_name || tx.user}</div>
+                          <div style={{ fontSize: 11, color: "#64748b" }}>📞 {tx.phone || tx.username || "–"}</div>
+                        </td>
+                        <td style={{ padding: "8px 12px" }}>
+                          <span
+                            style={{
+                              padding: "2px 8px",
+                              borderRadius: 4,
+                              fontSize: 11,
+                              fontWeight: 800,
+                              background: tx.meta?.tier === 2 || (tx.meta?.description || "").includes("Tier 2") ? "#fee2e2" : "#ecfdf5",
+                              color: tx.meta?.tier === 2 || (tx.meta?.description || "").includes("Tier 2") ? "#991b1b" : "#065f46",
+                            }}
+                          >
+                            {tx.meta?.tier === 2 || (tx.meta?.description || "").includes("Tier 2") ? "Tier 2 (L8-L10)" : "Tier 1 (L1-L7)"}
+                          </span>
+                        </td>
+                        <td style={{ padding: "8px 12px", fontWeight: 900, color: "#059669" }}>
+                          ₹{Number(tx.amount || 0).toFixed(2)}
+                        </td>
+                        <td style={{ padding: "8px 12px", color: "#1e40af", fontWeight: 700 }}>
+                          Main Wallet (₹{Number(tx.main_wallet || tx.amount || 0).toFixed(2)})
+                        </td>
+                        <td style={{ padding: "8px 12px", color: "#475569", whiteSpace: "nowrap" }}>
+                          {tx.date || tx.created_at || "-"}
+                        </td>
+                        <td style={{ padding: "8px 12px" }}>
+                          <span style={{ padding: "2px 8px", background: "#dcfce7", color: "#166534", borderRadius: 12, fontWeight: 800, fontSize: 11 }}>
+                            ✓ Credited
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </Section>
 
         {/* 4. Royalty Income Tiers (Shopping/Block Turnover) */}
