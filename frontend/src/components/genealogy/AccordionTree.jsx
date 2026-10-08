@@ -23,11 +23,14 @@ import {
   CircularProgress,
   Stack,
   Paper,
+  Button,
 } from "@mui/material";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import API from "../../api/api";
 import { getMyGenealogyTree5 } from "../../api/genealogy";
 
@@ -262,10 +265,25 @@ export default function AccordionTree({
     }
   }, [isAdmin, adminIdentifier, is3Block, useRankMatrix, rankRootUserId, useEntriesTree, entryRootId]);
 
+  // Base root information captured on initial load (or entryRootId change)
+  const [baseRootInfo, setBaseRootInfo] = useState(null);
+
   useEffect(() => {
     loadRoot(entryRootId, adminIdentifier);
     setTrail([]);
   }, [entryRootId, adminIdentifier, pool, loadRoot]);
+
+  useEffect(() => {
+    if (rootNode && trail.length === 0) {
+      setBaseRootInfo({
+        label: rootNode.username
+          ? `${rootNode.username}${rootNode.account_id ? ` (#${rootNode.account_id})` : ""}`
+          : `Entry #${rootNode.account_id || rootNode.id || "Root"}`,
+        entryId: rootNode.account_id || (useRankMatrix ? (rootNode.user_id || rootNode.id) : rootNode.id),
+        username: rootNode.username || rootNode.id,
+      });
+    }
+  }, [rootNode, trail.length, useRankMatrix]);
 
   // Drilldown to a specific node
   const handleDrilldown = (node) => {
@@ -275,35 +293,60 @@ export default function AccordionTree({
       ? (node.user_id || node.id)
       : (node.account_id || (useEntriesTree ? node.id : null));
 
-    setTrail((prev) => [
-      ...prev,
-      {
-        label: nextIdent
-          ? `${nextIdent}${!useRankMatrix && nextEntryId ? ` (#${nextEntryId})` : ""}`
-          : `Entry #${nextEntryId}`,
-        node,
-        entryId: nextEntryId,
-        username: nextIdent,
-      },
-    ]);
+    // Save current node as ancestor in the trail
+    const currentIdent = rootNode?.username || rootNode?.id;
+    const currentEntryId = useRankMatrix
+      ? (rootNode?.user_id || rootNode?.id)
+      : (rootNode?.account_id || rootNode?.id);
+
+    const ancestor = {
+      label: currentIdent
+        ? `${currentIdent}${!useRankMatrix && currentEntryId ? ` (#${currentEntryId})` : ""}`
+        : `Entry #${currentEntryId || "Root"}`,
+      node: rootNode,
+      entryId: currentEntryId,
+      username: currentIdent,
+    };
+
+    setTrail((prev) => [...prev, ancestor]);
 
     if (onNodeSelect) onNodeSelect(nextEntryId || node.id, node);
     loadRoot(nextEntryId, nextIdent);
   };
 
+  // Navigate back to root account
+  const handleResetToRoot = () => {
+    setTrail([]);
+    loadRoot(useRankMatrix ? null : entryRootId, useRankMatrix ? null : adminIdentifier);
+    if (onNodeSelect) onNodeSelect(useRankMatrix ? null : entryRootId, null);
+  };
+
+  // Navigate up exactly one level to immediate upline / parent
+  const handleGoBackOneLevel = () => {
+    if (trail.length === 0) return;
+    const parent = trail[trail.length - 1];
+    setTrail((prev) => prev.slice(0, prev.length - 1));
+    loadRoot(parent.entryId, parent.username);
+    if (onNodeSelect) onNodeSelect(parent.entryId || parent.node?.id, parent.node);
+  };
+
+  // Click on a breadcrumb item
   const handleCrumbClick = (idx) => {
     if (idx < 0) {
-      // Reset to root
-      setTrail([]);
-      loadRoot(useRankMatrix ? null : entryRootId, useRankMatrix ? null : adminIdentifier);
-      if (onNodeSelect) onNodeSelect(useRankMatrix ? null : entryRootId, null);
+      handleResetToRoot();
       return;
     }
     const target = trail[idx];
-    setTrail((prev) => prev.slice(0, idx + 1));
+    setTrail((prev) => prev.slice(0, idx));
     loadRoot(target.entryId, target.username);
     if (onNodeSelect) onNodeSelect(target.entryId || target.node?.id, target.node);
   };
+
+  // Immediate parent label for back button
+  const parentUplineLabel = useMemo(() => {
+    if (trail.length === 0) return "";
+    return trail[trail.length - 1]?.label || "Root Account";
+  }, [trail]);
 
   if (loading) {
     return (
@@ -352,7 +395,71 @@ export default function AccordionTree({
 
   return (
     <Box sx={{ width: "100%", maxWidth: 640, mx: "auto" }}>
-      {/* 1. HIERARCHY TRAIL (Breadcrumb Row matching Screen 4) */}
+      {/* 1. Upline Navigation Action Bar (Displayed whenever drilled down into downlines) */}
+      {trail.length > 0 && (
+        <Paper
+          elevation={0}
+          sx={{
+            p: { xs: 1.25, sm: 1.5 },
+            mb: 2,
+            borderRadius: "16px",
+            bgcolor: "#EEF2FF",
+            border: "1.5px solid #C7D2FE",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 1,
+            boxShadow: "0 2px 8px rgba(79, 70, 229, 0.08)",
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<ArrowBackRoundedIcon sx={{ fontSize: 18 }} />}
+              onClick={handleGoBackOneLevel}
+              sx={{
+                fontWeight: 800,
+                fontSize: 12.5,
+                borderRadius: "10px",
+                bgcolor: "#4F46E5",
+                color: "#FFFFFF",
+                textTransform: "none",
+                px: 1.75,
+                py: 0.6,
+                "&:hover": { bgcolor: "#4338CA" },
+                boxShadow: "0 2px 6px rgba(79, 70, 229, 0.3)",
+              }}
+            >
+              Back to Upline ({parentUplineLabel})
+            </Button>
+          </Stack>
+
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<HomeRoundedIcon sx={{ fontSize: 18 }} />}
+            onClick={handleResetToRoot}
+            sx={{
+              fontWeight: 800,
+              fontSize: 12,
+              borderRadius: "10px",
+              color: "#334155",
+              borderColor: "#CBD5E1",
+              bgcolor: "#FFFFFF",
+              textTransform: "none",
+              px: 1.5,
+              py: 0.5,
+              "&:hover": { bgcolor: "#F8FAFC", borderColor: "#94A3B8" },
+            }}
+          >
+            Reset to My Root
+          </Button>
+        </Paper>
+      )}
+
+      {/* 2. HIERARCHY TRAIL (Breadcrumb Row matching Screen 4) */}
       <Stack
         direction="row"
         alignItems="center"
@@ -369,9 +476,10 @@ export default function AccordionTree({
         </Typography>
 
         <Chip
-          label="Root"
+          icon={<HomeRoundedIcon sx={{ fontSize: "14px !important" }} />}
+          label={baseRootInfo?.label || "Root"}
           size="small"
-          onClick={() => handleCrumbClick(-1)}
+          onClick={handleResetToRoot}
           sx={{
             fontWeight: 800,
             fontSize: 11.5,
@@ -393,21 +501,38 @@ export default function AccordionTree({
               sx={{
                 fontWeight: 800,
                 fontSize: 11.5,
-                bgcolor: idx === trail.length - 1 ? TOKENS.primary : "#FFFFFF",
-                color: idx === trail.length - 1 ? "#FFFFFF" : TOKENS.text,
+                bgcolor: "#FFFFFF",
+                color: TOKENS.text,
                 border: "1px solid #CBD5E1",
                 cursor: "pointer",
-                "&:hover": { bgcolor: idx === trail.length - 1 ? TOKENS.primary : "#F1F5F9" },
+                "&:hover": { bgcolor: "#F1F5F9" },
               }}
             />
           </React.Fragment>
         ))}
+
+        {trail.length > 0 && rootNode && (
+          <>
+            <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#94A3B8" }}>→</Typography>
+            <Chip
+              label={rootNode.username ? `${rootNode.username}${rootNode.account_id ? ` (#${rootNode.account_id})` : ""}` : `Entry #${rootNode.account_id || rootNode.id}`}
+              size="small"
+              sx={{
+                fontWeight: 900,
+                fontSize: 11.5,
+                bgcolor: TOKENS.primary,
+                color: "#FFFFFF",
+                border: "1px solid #4338CA",
+              }}
+            />
+          </>
+        )}
       </Stack>
 
-      {/* 2. ROOT ACCORDION CONTAINER (Level 0 Root Card) */}
+      {/* 3. ROOT ACCORDION CONTAINER (Level Card) */}
       <AccordionBranchCard
         node={rootNode}
-        levelIndex={0}
+        levelIndex={trail.length}
         maxSlots={maxSlots}
         isRootNode={true}
         pool={pool}
@@ -415,6 +540,9 @@ export default function AccordionTree({
         isAdmin={isAdmin}
         useRankMatrix={useRankMatrix}
         onDrilldown={handleDrilldown}
+        trailLength={trail.length}
+        parentUplineLabel={parentUplineLabel}
+        onGoBackOneLevel={handleGoBackOneLevel}
       />
     </Box>
   );
@@ -434,6 +562,9 @@ function AccordionBranchCard({
   isAdmin,
   useRankMatrix,
   onDrilldown,
+  trailLength = 0,
+  parentUplineLabel = "",
+  onGoBackOneLevel = null,
 }) {
   const [expanded, setExpanded] = useState(true);
   const [children, setChildren] = useState(node?.children || []);
@@ -618,8 +749,37 @@ function AccordionBranchCard({
                   fontWeight: 700,
                 }}
               >
-                {isRootNode ? "Level 0 (Root)" : `Level ${levelIndex}`}
+                {isRootNode ? (trailLength > 0 ? `Level ${trailLength} (Downline)` : "Level 0 (Root)") : `Level ${levelIndex}`}
               </Box>
+
+              {/* Back to Upline Quick Action Badge on Card */}
+              {isRootNode && trailLength > 0 && (
+                <Box
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onGoBackOneLevel) onGoBackOneLevel();
+                  }}
+                  sx={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 0.4,
+                    px: 1,
+                    py: 0.25,
+                    borderRadius: "10px",
+                    bgcolor: "#EEF2FF",
+                    color: "#4338CA",
+                    border: "1px solid #C7D2FE",
+                    fontSize: 11,
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    transition: "all 140ms ease",
+                    "&:hover": { bgcolor: "#E0E7FF", borderColor: "#818CF8" },
+                  }}
+                >
+                  <ArrowBackRoundedIcon sx={{ fontSize: 13 }} />
+                  Upline: {parentUplineLabel}
+                </Box>
+              )}
 
               {/* Activated Layer Badge */}
               <Box

@@ -476,14 +476,11 @@ export default function ThreeMatrixTab({
 
       {hasPools ? (
         <AccordionTree
-          key={`THREE_150-${String(selectedThreeRoot)}`}
+          key={`THREE_150-${activeCategory}-${String(selectedThreeRoot)}`}
           entryRootId={selectedThreeRoot}
           useEntriesTree={!!selectedThreeRoot}
           pool="THREE_150"
           maxDepth={Number(levels?.three ?? 15)}
-          onNodeSelect={(nodeId) =>
-            setSelectedThreeRoot(nodeId ? Number(nodeId) : null)
-          }
         />
       ) : (
         <div

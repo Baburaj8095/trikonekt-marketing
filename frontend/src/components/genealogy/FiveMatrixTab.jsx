@@ -602,14 +602,11 @@ export default function FiveMatrixTab({
 
       {hasPools ? (
         <AccordionTree
-          key={`FIVE_150-${String(selectedRoot)}`}
+          key={`FIVE_150-${activeCategory}-${String(selectedRoot)}`}
           entryRootId={selectedRoot}
           useEntriesTree={!!selectedRoot}
           pool="FIVE_150"
           maxDepth={Number(levels?.five ?? 10)}
-          onNodeSelect={(nodeId) =>
-            setSelectedRoot(nodeId ? Number(nodeId) : null)
-          }
         />
       ) : (
         <div
