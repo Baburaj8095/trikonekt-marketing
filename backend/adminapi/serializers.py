@@ -1569,11 +1569,13 @@ class AdminAutopoolTxnSerializer(serializers.ModelSerializer):
             "sponsor_id",
             "type",
             "source_type",
+            "source_id",
             "amount",
             "net_amount",
             "main_balance",
             "withdrawable_balance",
             "level_index",
+            "meta",
             "created_at",
         ]
 

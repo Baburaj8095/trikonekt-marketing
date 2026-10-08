@@ -4033,9 +4033,18 @@ class AdminAutopoolTransactionList(ListAPIView):
         if types_param:
             types_list = [t.strip() for t in types_param.split(",") if t.strip()]
             if types_list:
-                qs = qs.filter(type__in=types_list)
+                if "GLOBAL_ROYALTY" in types_list:
+                    other_types = [t for t in types_list if t != "GLOBAL_ROYALTY"]
+                    q_royalty = (Q(type="GLOBAL_ROYALTY") | Q(source_type="DAILY_POOL_DISTRIBUTION") | Q(meta__orig_type="GLOBAL_ROYALTY")) & ~Q(type="SELF_ACCOUNT_CREDIT")
+                    if other_types:
+                        qs = qs.filter(Q(type__in=other_types) | q_royalty)
+                    else:
+                        qs = qs.filter(q_royalty)
+                else:
+                    qs = qs.filter(type__in=types_list)
         else:
-            qs = qs.filter(type__in=default_types)
+            q_royalty = (Q(source_type="DAILY_POOL_DISTRIBUTION") | Q(meta__orig_type="GLOBAL_ROYALTY")) & ~Q(type="SELF_ACCOUNT_CREDIT")
+            qs = qs.filter(Q(type__in=default_types) | q_royalty)
 
         user_q = (self.request.query_params.get("user") or "").strip()
         if user_q:
@@ -6432,29 +6441,106 @@ class AdminDailyPoolMonitorView(APIView):
         from decimal import Decimal
         from django.db.models import Sum
         from django.utils import timezone
-        from business.models import PromoPurchase, SubscriptionActivation
+        from business.models import PromoPurchase, SubscriptionActivation, AutoPoolAccount, CommissionConfig
         from accounts.models import CustomUser, WalletTransaction
 
         now = timezone.now()
-        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        today_str = now.strftime("%Y-%m-%d")
+        req_date = (request.query_params.get("date") or "").strip()
+        if req_date:
+            try:
+                target_dt = timezone.datetime.strptime(req_date, "%Y-%m-%d").date()
+                today_start = timezone.make_aware(timezone.datetime.combine(target_dt, timezone.datetime.min.time()))
+                today_end = timezone.make_aware(timezone.datetime.combine(target_dt, timezone.datetime.max.time()))
+                today_str = req_date
+            except Exception:
+                target_dt = now.date()
+                today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                today_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+                today_str = now.strftime("%Y-%m-%d")
+        else:
+            target_dt = now.date()
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            today_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+            today_str = now.strftime("%Y-%m-%d")
 
-        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        month_start = today_start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         month_spp_volume = PromoPurchase.objects.filter(
-            package__type="MONTHLY", status="APPROVED", requested_at__gte=month_start
+            package__type="MONTHLY", status="APPROVED", requested_at__gte=month_start, requested_at__lte=today_end
         ).aggregate(t=Sum("amount_paid"))["t"] or Decimal("0.00")
 
         today_spp_volume = PromoPurchase.objects.filter(
-            package__type="MONTHLY", status="APPROVED", requested_at__gte=today_start
+            package__type="MONTHLY", status="APPROVED", requested_at__range=(today_start, today_end)
         ).aggregate(t=Sum("amount_paid"))["t"] or Decimal("0.00")
 
-        today_agents = SubscriptionActivation.objects.filter(created_at__gte=today_start).count()
-        today_inflow = (Decimal(today_agents) * Decimal("1000.00")) + (Decimal(PromoPurchase.objects.filter(package__type="MONTHLY", status="APPROVED", requested_at__gte=today_start).count()) * Decimal("1000.00"))
+        today_agents = SubscriptionActivation.objects.filter(created_at__range=(today_start, today_end)).count()
+        today_inflow = (Decimal(today_agents) * Decimal("1000.00")) + (Decimal(PromoPurchase.objects.filter(package__type="MONTHLY", status="APPROVED", requested_at__range=(today_start, today_end)).count()) * Decimal("1000.00"))
 
-        daily_franchise_pool = (today_spp_volume * Decimal("0.05")).quantize(Decimal("0.01"))
-        daily_district_pool = (today_spp_volume * Decimal("0.03")).quantize(Decimal("0.01"))
-        daily_state_pool = (today_spp_volume * Decimal("0.02")).quantize(Decimal("0.01"))
-        daily_royalty_pool = (today_inflow * Decimal("0.02")).quantize(Decimal("0.01"))
+        # Rebirth stats & history
+        rebirth_txs_all = WalletTransaction.objects.filter(
+            type="SELF_ACCOUNT_DEBIT",
+            source_type="SELF_250_PACK"
+        ).select_related("user").order_by("-created_at")
+
+        rebirth_count_total = rebirth_txs_all.count()
+        rebirth_count_today = rebirth_txs_all.filter(created_at__range=(today_start, today_end)).count()
+        rebirth_turnover_today = (Decimal(rebirth_count_today) * Decimal("250.00")).quantize(Decimal("0.01"))
+        rebirth_turnover_total = (Decimal(rebirth_count_total) * Decimal("250.00")).quantize(Decimal("0.01"))
+
+        # Dynamic Rebirth configuration from CommissionConfig
+        cfg = CommissionConfig.get_solo()
+        master = dict(getattr(cfg, "master_commission_json", {}) or {})
+        rank_cfg = dict(master.get("rank_upgrade_config", {}) or {})
+        reb = dict(rank_cfg.get("rebirth_allocation", {}) or {})
+
+        reb_f = Decimal(str(reb.get("franchise_pool", 15.0)))
+        reb_d = Decimal(str(reb.get("district_pool", 10.0)))
+        reb_s = Decimal(str(reb.get("state_pool", 15.0)))
+        reb_t1 = Decimal(str(reb.get("district_royalty_t1", 20.0)))
+        reb_t2 = Decimal(str(reb.get("district_royalty_t2", 30.0)))
+
+        rebirth_records = []
+        for tx in rebirth_txs_all[:100]:
+            u = tx.user
+            meta = tx.meta if isinstance(tx.meta, dict) else {}
+            pack_idx = meta.get("pack_index", 1)
+            sponsor = getattr(u, "referred_by", None)
+            
+            seats = list(AutoPoolAccount.objects.filter(
+                owner=u,
+                source_type="SELF_REBIRTH_250",
+                user_entry_index=pack_idx
+            ).values("id", "pool_type"))
+            
+            five_seat = next((s["id"] for s in seats if s["pool_type"] == "FIVE_150"), None)
+            three_seat = next((s["id"] for s in seats if s["pool_type"] == "THREE_150"), None)
+
+            rebirth_records.append({
+                "tx_id": tx.id,
+                "user_id": u.id,
+                "username": u.username,
+                "full_name": u.get_full_name() or u.username,
+                "phone": u.phone or u.username,
+                "pack_index": pack_idx,
+                "amount": float(abs(tx.amount)),
+                "created_at": tx.created_at.strftime("%Y-%m-%d %H:%M:%S") if tx.created_at else None,
+                "sponsor_username": sponsor.username if sponsor else "System Root",
+                "sponsor_name": (sponsor.get_full_name() or sponsor.username) if sponsor else "System Root",
+                "sponsor_bonus": float(reb.get("direct_sponsor", 40.0)),
+                "five_seat_id": five_seat,
+                "three_seat_id": three_seat,
+                "pool_contribution": float(reb_f + reb_d + reb_s + reb_t1 + reb_t2),
+                "status": "INSTANT_PROCESSED"
+            })
+
+        # Exact Dynamic Live Pools calculation
+        # If pool turnover on date is 0 but we want to show projected from all-time or today
+        effective_rebirth_count = rebirth_count_today if rebirth_count_today > 0 else (rebirth_count_total if req_date == "" else 0)
+        daily_franchise_pool = (Decimal(effective_rebirth_count) * reb_f).quantize(Decimal("0.01"))
+        daily_district_pool = (Decimal(effective_rebirth_count) * reb_d).quantize(Decimal("0.01"))
+        daily_state_pool = (Decimal(effective_rebirth_count) * reb_s).quantize(Decimal("0.01"))
+        daily_royalty_t1_pool = (Decimal(effective_rebirth_count) * reb_t1).quantize(Decimal("0.01"))
+        daily_royalty_t2_pool = (Decimal(effective_rebirth_count) * reb_t2).quantize(Decimal("0.01"))
+        daily_royalty_pool = daily_royalty_t1_pool + daily_royalty_t2_pool
 
         franchise_achievers_cnt = CustomUser.objects.filter(category__in=["agency_sub_franchise", "agency_pincode_coordinator"], account_active=True).count()
         district_coord_cnt = CustomUser.objects.filter(category="agency_district_coordinator", account_active=True).count()
@@ -6466,25 +6552,67 @@ class AdminDailyPoolMonitorView(APIView):
             source_id__contains=today_str
         ).exists()
 
+        payout_txs = WalletTransaction.objects.filter(
+            source_type="DAILY_POOL_DISTRIBUTION",
+            source_id__contains=today_str
+        ).order_by("-created_at")
+        if not payout_txs.exists():
+            payout_txs = WalletTransaction.objects.filter(
+                source_type="DAILY_POOL_DISTRIBUTION"
+            ).order_by("-created_at")[:50]
+        
+        history_list = []
+        for ptx in payout_txs:
+            meta = ptx.meta if isinstance(ptx.meta, dict) else {}
+            tier_num = meta.get("tier")
+            pool_name = f"Royalty Tier {tier_num}" if tier_num else (meta.get("description") or ptx.type)
+            history_list.append({
+                "date": ptx.created_at.strftime("%Y-%m-%d %H:%M") if ptx.created_at else "-",
+                "pool": pool_name,
+                "pool_percent": meta.get("percent", 0),
+                "pool_pot": float(ptx.amount),
+                "recipients_count": 1,
+                "total_paid": float(ptx.amount),
+                "unclaimed_fallback": False,
+                "user_phone": ptx.user.phone if ptx.user else "-",
+                "user_name": ptx.user.get_full_name() or ptx.user.username if ptx.user else "-"
+            })
+
         return Response({
             "today_date": today_str,
+            "target_date": today_str,
             "next_trigger_time": "23:59:00 (Daily at 11:59 PM)",
             "is_today_distributed": is_today_distributed,
             "today_spp_volume": f"{today_spp_volume:.2f}",
             "today_inflow": f"{today_inflow:.2f}",
             "month_spp_volume": f"{month_spp_volume:.2f}",
+            "self_rebirth_count": rebirth_count_today,
+            "self_rebirth_count_total": rebirth_count_total,
+            "self_rebirth_amount": float(rebirth_turnover_today),
+            "self_rebirth_amount_total": float(rebirth_turnover_total),
+            "rebirth_records": rebirth_records,
+            "rebirth_rates": {
+                "franchise": float(reb_f),
+                "district": float(reb_d),
+                "state": float(reb_s),
+                "royalty_t1": float(reb_t1),
+                "royalty_t2": float(reb_t2),
+            },
             "pools": {
                 "daily_franchise_pool": f"{daily_franchise_pool:.2f}",
                 "daily_district_pool": f"{daily_district_pool:.2f}",
                 "daily_state_pool": f"{daily_state_pool:.2f}",
                 "daily_royalty_pool": f"{daily_royalty_pool:.2f}",
+                "daily_royalty_t1_pool": f"{daily_royalty_t1_pool:.2f}",
+                "daily_royalty_t2_pool": f"{daily_royalty_t2_pool:.2f}",
             },
             "achievers": {
                 "franchise_count": franchise_achievers_cnt,
                 "district_count": district_coord_cnt,
                 "state_count": state_coord_cnt,
                 "royalty_count": royalty_achievers_cnt,
-            }
+            },
+            "history": history_list
         })
 
 

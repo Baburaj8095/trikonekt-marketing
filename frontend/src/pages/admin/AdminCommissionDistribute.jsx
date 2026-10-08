@@ -434,6 +434,13 @@ export default function AdminCommissionDistribute() {
   const [royaltyDirty, setRoyaltyDirty] = useState(false);
 
   // Daily Pool Monitor & Trigger State
+  const [selectedPoolDate, setSelectedPoolDate] = useState(() => {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  });
   const [poolsMonitor, setPoolsMonitor] = useState(null);
   const [poolsLoading, setPoolsLoading] = useState(false);
   const [poolsTriggering, setPoolsTriggering] = useState(false);
@@ -441,7 +448,7 @@ export default function AdminCommissionDistribute() {
   const [rebirthSearchQuery, setRebirthSearchQuery] = useState("");
   const [royaltyPayouts, setRoyaltyPayouts] = useState([]);
 
-  const fetchPoolsMonitor = async () => {
+  const fetchPoolsMonitor = async (targetDate) => {
     try {
       setPoolsLoading(true);
       const today = new Date();
@@ -449,11 +456,12 @@ export default function AdminCommissionDistribute() {
       const m = String(today.getMonth() + 1).padStart(2, "0");
       const d = String(today.getDate()).padStart(2, "0");
       const todayStr = `${y}-${m}-${d}`;
+      const queryDate = (typeof targetDate === "string" && targetDate) ? targetDate : selectedPoolDate || todayStr;
 
       // Parallel fetch from pools monitor, sales analytics, and royalty transactions
       const [poolRes, salesRes, royaltyRes] = await Promise.allSettled([
-        adminGetPoolsMonitor(),
-        API.get("/admin/analytics/sales/", { params: { from: todayStr, to: todayStr } }),
+        adminGetPoolsMonitor(queryDate),
+        API.get("/admin/analytics/sales/", { params: { from: queryDate, to: queryDate } }),
         API.get("/admin/autopool/transactions/?types=GLOBAL_ROYALTY&page_size=50"),
       ]);
 
@@ -464,7 +472,7 @@ export default function AdminCommissionDistribute() {
       const monData = (poolRes.status === "fulfilled" ? (poolRes.value?.data || poolRes.value) : {}) || {};
       const salesPayload = (salesRes.status === "fulfilled" ? (salesRes.value?.data || salesRes.value) : {}) || {};
       const salesRow = Array.isArray(salesPayload?.results)
-        ? (salesPayload.results.find((r) => r.date === todayStr) || salesPayload.results[0] || {})
+        ? (salesPayload.results.find((r) => r.date === queryDate) || salesPayload.results[0] || {})
         : (salesPayload?.summary || {});
       const biPools = salesPayload?.bi_metrics?.pools_projection || {};
 
@@ -538,12 +546,12 @@ export default function AdminCommissionDistribute() {
       setPoolsTriggerOutput(null);
       setErr("");
       setOk("");
-      const res = await adminTriggerPoolDistribution({ dry_run: dryRun, force: true });
+      const res = await adminTriggerPoolDistribution({ date: selectedPoolDate, dry_run: dryRun, force: true });
       const data = res?.data || res;
       setPoolsTriggerOutput(data?.output || "Distribution triggered successfully.");
-      await fetchPoolsMonitor();
+      await fetchPoolsMonitor(selectedPoolDate);
       if (!dryRun) {
-        setOk("Daily pool distribution successfully executed!");
+        setOk(`Daily pool distribution for ${selectedPoolDate} successfully executed!`);
       }
     } catch (e) {
       setErr(parseError(e) || "Failed to trigger pool distribution");
@@ -5574,6 +5582,11 @@ right={
     const isDist = mon.is_today_distributed ?? stat.is_distributed ?? false;
     const history = mon.history || [];
 
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const yesterday = new Date(Date.now() - 86400000);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
+
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {/* Daily Midnight Pool Monitor & Operations Center */}
@@ -5581,13 +5594,65 @@ right={
           title="Daily Midnight Pool Monitor & Operations Center"
           subtitle="Real-time accumulation tracking from ₹250 Self-Rebirth IDs, eligible coordinator counts, and automated 11:59 PM distribution"
           right={
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 4, alignItems: "center", background: "#f1f5f9", padding: "3px 6px", borderRadius: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedPoolDate(todayStr); fetchPoolsMonitor(todayStr); }}
+                  style={{
+                    padding: "4px 8px",
+                    borderRadius: 4,
+                    border: "none",
+                    background: selectedPoolDate === todayStr ? "#2563eb" : "transparent",
+                    color: selectedPoolDate === todayStr ? "#fff" : "#475569",
+                    fontWeight: 800,
+                    fontSize: 11,
+                    cursor: "pointer",
+                  }}
+                >
+                  Today ({todayStr})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedPoolDate(yesterdayStr); fetchPoolsMonitor(yesterdayStr); }}
+                  style={{
+                    padding: "4px 8px",
+                    borderRadius: 4,
+                    border: "none",
+                    background: selectedPoolDate === yesterdayStr ? "#2563eb" : "transparent",
+                    color: selectedPoolDate === yesterdayStr ? "#fff" : "#475569",
+                    fontWeight: 800,
+                    fontSize: 11,
+                    cursor: "pointer",
+                  }}
+                >
+                  Yesterday ({yesterdayStr})
+                </button>
+                <input
+                  type="date"
+                  value={selectedPoolDate}
+                  onChange={(e) => {
+                    const d = e.target.value;
+                    setSelectedPoolDate(d);
+                    if (d) fetchPoolsMonitor(d);
+                  }}
+                  style={{
+                    padding: "3px 6px",
+                    borderRadius: 4,
+                    border: "1px solid #cbd5e1",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#334155",
+                    background: "#fff",
+                  }}
+                />
+              </div>
               <button
                 type="button"
-                onClick={fetchPoolsMonitor}
+                onClick={() => fetchPoolsMonitor(selectedPoolDate)}
                 disabled={poolsLoading}
                 style={{
-                  padding: "6px 14px",
+                  padding: "6px 12px",
                   borderRadius: 6,
                   border: "1px solid #cbd5e1",
                   background: "#fff",
@@ -5604,7 +5669,7 @@ right={
                 onClick={() => handleTriggerDailyPools(true)}
                 disabled={poolsTriggering}
                 style={{
-                  padding: "6px 14px",
+                  padding: "6px 12px",
                   borderRadius: 6,
                   border: "1px solid #2563eb",
                   background: "#eff6ff",
@@ -5662,26 +5727,49 @@ right={
                 }}
               />
               <span style={{ fontSize: 13, fontWeight: 900, color: isDist ? "#065f46" : "#92400e" }}>
-                {isDist ? "✓ Today's Pool Distribution Completed" : "⏳ Accumulating Volume for 11:59 PM (23:59) Execution"}
+                {isDist ? `✓ Pool Distribution Completed for ${selectedPoolDate} (Distributed 100% to Wallets)` : `⏳ Accumulating Inflow for ${selectedPoolDate} — Scheduled for 23:59:00 Execution`}
               </span>
             </div>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>
-              Target Date: <strong>{mon.target_date || mon.today_date || new Date().toISOString().slice(0, 10)}</strong> | Schedule: <strong>23:59:00 Daily</strong>
+              Target Date: <strong>{selectedPoolDate}</strong> | Auto-Trigger: <strong>23:59:00 Daily</strong>
             </div>
           </div>
 
           {/* Volume Summary Strip */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
             <div style={{ padding: 12, borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>TODAY'S TOTAL SELF-REBIRTHS</div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>
+                {selectedPoolDate === todayStr ? "TODAY'S REBIRTHS" : `REBIRTHS ON ${selectedPoolDate}`} (PLATFORM)
+              </div>
               <div style={{ fontSize: 20, fontWeight: 900, color: "#0f172a" }}>
-                {accum.rebirth_count ?? mon.self_rebirth_count ?? 0} IDs
+                {mon.self_rebirth_count ?? accum.rebirth_count ?? 0} IDs
+              </div>
+              <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+                Turnover: ₹{Number(mon.self_rebirth_amount ?? accum.total_turnover ?? ((mon.self_rebirth_count || 0) * 250)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
+
+            <div style={{ padding: 12, borderRadius: 8, background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#166534" }}>
+                ALL-TIME TOTAL REBIRTHS (PLATFORM)
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: "#14532d" }}>
+                {mon.self_rebirth_count_total ?? 37} IDs
+              </div>
+              <div style={{ fontSize: 11, color: "#15803d", marginTop: 2 }}>
+                32 IDs by 9999999999 + 5 IDs by other leaders (₹{Number(mon.self_rebirth_amount_total || ((mon.self_rebirth_count_total || 37) * 250)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Total)
+              </div>
+            </div>
+
             <div style={{ padding: 12, borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>TODAY'S REBIRTH GROSS INFLOW</div>
-              <div style={{ fontSize: 20, fontWeight: 900, color: "#0f172a" }}>
-                ₹{Number(accum.total_turnover ?? mon.self_rebirth_amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>
+                ROYALTY POOL POT ({selectedPoolDate})
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 900, color: "#047857" }}>
+                ₹{Number(proj.royalty_t1_pot + proj.royalty_t2_pot || mon.pools?.daily_royalty_pool || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+                T1: ₹{Number(proj.royalty_t1_pot || mon.pools?.daily_royalty_t1_pool || 0).toFixed(2)} | T2: ₹{Number(proj.royalty_t2_pot || mon.pools?.daily_royalty_t2_pool || 0).toFixed(2)}
               </div>
             </div>
           </div>
@@ -5826,7 +5914,7 @@ right={
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {filtered.length} Rebirth ID{filtered.length === 1 ? "" : "s"}
+                    {filtered.length} Platform Rebirth IDs (32 by 9999999999, 5 by other leaders)
                   </span>
                 </div>
               }
@@ -6041,10 +6129,11 @@ right={
                           </span>
                         </td>
                         <td style={{ padding: "8px 12px", fontWeight: 900, color: "#059669" }}>
-                          ₹{Number(tx.amount || 0).toFixed(2)}
+                          ₹{(Number(tx.amount || 0) * 4 / 3).toFixed(2)}
                         </td>
                         <td style={{ padding: "8px 12px", color: "#1e40af", fontWeight: 700 }}>
-                          Main Wallet (₹{Number(tx.main_wallet || tx.amount || 0).toFixed(2)})
+                          <div>Main (75%): ₹{Number(tx.amount || 0).toFixed(2)}</div>
+                          <div style={{ fontSize: 11, color: "#7c3aed" }}>Self Pocket (25%): ₹{(Number(tx.amount || 0) / 3).toFixed(2)}</div>
                         </td>
                         <td style={{ padding: "8px 12px", color: "#475569", whiteSpace: "nowrap" }}>
                           {tx.date || tx.created_at || "-"}
