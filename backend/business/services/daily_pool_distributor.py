@@ -9,8 +9,9 @@ from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
-from accounts.models import CustomUser, Wallet, WalletTransaction
+from accounts.models import CustomUser, Wallet, WalletTransaction, AgencyRegionAssignment
 from business.models import CommissionConfig, PromoPurchase
+from business.services.self_rebirth import get_rebirth_config
 from mlm_ranks.models import Rank, RankUpgrade
 
 logger = logging.getLogger(__name__)
@@ -68,10 +69,11 @@ def execute_daily_pool_distribution(
             "date": date_str,
         }
 
-    # Load Commission Config
+    # Load Commission Config & Rebirth Config
     cfg = CommissionConfig.get_solo()
     master = dict(getattr(cfg, "master_commission_json", {}) or {})
     royalty_cfg = dict(master.get("royalty_config", {}) or {})
+    reb_conf = get_rebirth_config()
 
     t1_pct = Decimal(str(royalty_cfg.get("tier1_percent", 4.0))) / Decimal("100.0")
     t2_pct = Decimal(str(royalty_cfg.get("tier2_percent", 6.0))) / Decimal("100.0")
@@ -79,49 +81,73 @@ def execute_daily_pool_distribution(
     t1_cap = _q2(royalty_cfg.get("tier1_cap", 10000.00))
     t2_cap = _q2(royalty_cfg.get("tier2_cap", 40000.00))
     t3_cap = _q2(royalty_cfg.get("tier3_cap", 10000.00))
-    t1_days = int(royalty_cfg.get("tier1_days", 40))
-    t2_days = int(royalty_cfg.get("tier2_days", 7))
-    t3_days = int(royalty_cfg.get("tier3_days", 30))
+
+    # Qualification limits matching handwritten spec
+    t1_days = int(royalty_cfg.get("tier1_days", 7))  # District Royalty L1-L7: 7 days
+    t2_days = int(royalty_cfg.get("tier2_days", 7))  # L8-L10: 7 days from L7
+    t3_days = int(royalty_cfg.get("tier3_days", 30)) # District Royalty L1-L10 recovery: 30 days
+
+    # Dynamic Rebirth Pool Rates
+    dist_roy_rate = _q2(reb_conf.get("district_royalty", 10.0))
+    state_roy_rate = _q2(reb_conf.get("state_royalty", 15.0))
+    l1_l7_rate = _q2(reb_conf.get("district_royalty_l1_l7", reb_conf.get("district_royalty_t1", 15.0)))
+    l1_l10_30d_rate = _q2(reb_conf.get("district_royalty_l1_l10_30d", 10.0))
+    dist_l8_l10_rate = _q2(reb_conf.get("districtwise_royalty_l8_l10", reb_conf.get("district_royalty_t2", 15.0)))
+    state_l8_l10_rate = _q2(reb_conf.get("statewise_royalty_l8_l10", 10.0))
+    dist_capt_rate = _q2(reb_conf.get("district_captain_royalty", 5.0))
+    state_capt_rate = _q2(reb_conf.get("state_captain_royalty", 5.0))
 
     # Calculate Total Inflow for target date
-    # 1. Promo Purchases (Starter, Prime, SPP)
     spp_inflow = PromoPurchase.objects.filter(
         status="APPROVED",
         approved_at__range=(start_dt, end_dt)
     ).aggregate(t=Sum("package__price"))["t"] or Decimal("0.00")
 
-    # 2. Rank Upgrades
     rank_inflow = RankUpgrade.objects.filter(
         payment_status=RankUpgrade.STATUS_SUCCESS,
         upgraded_at__range=(start_dt, end_dt)
     ).aggregate(t=Sum("net_amount"))["t"] or Decimal("0.00")
 
-    # 3. Rebirth Inflow (₹250 each)
-    rebirth_cnt = WalletTransaction.objects.filter(
+    rebirth_txs = list(WalletTransaction.objects.filter(
         type="SELF_ACCOUNT_DEBIT",
         source_type="SELF_250_PACK",
         created_at__range=(start_dt, end_dt)
-    ).count()
+    ).select_related("user", "user__state", "user__city"))
+    rebirth_cnt = len(rebirth_txs)
     rebirth_inflow = Decimal(rebirth_cnt) * Decimal("250.00")
 
     total_inflow = _q2(spp_inflow + rank_inflow + rebirth_inflow)
     if total_inflow <= 0 and force:
-        # If testing with 0 inflow, assume a baseline demonstration turnover
         total_inflow = Decimal("10000.00")
+        rebirth_cnt = max(1, rebirth_cnt)
 
-    # Pool amounts
-    t1_pool = _q2(total_inflow * t1_pct)
-    t2_pool = _q2(total_inflow * t2_pct)
-    t3_pool = _q2(total_inflow * t3_pct)
+    # Geographic grouping of today's rebirths
+    rebirths_by_district: Dict[str, int] = {}
+    rebirths_by_state: Dict[int, int] = {}
+
+    for rtx in rebirth_txs:
+        u = rtx.user
+        if not u:
+            continue
+        d_name = (getattr(u.city, "name", "") if u.city else "") or (getattr(u, "district", "") or "")
+        d_key = d_name.strip().lower() if d_name else "general"
+        rebirths_by_district[d_key] = rebirths_by_district.get(d_key, 0) + 1
+
+        if u.state_id:
+            rebirths_by_state[u.state_id] = rebirths_by_state.get(u.state_id, 0) + 1
+
+    # Pool amounts (combines percentage turnover and per-rebirth pool)
+    t1_pool = max(_q2(total_inflow * t1_pct), _q2(Decimal(rebirth_cnt) * l1_l7_rate))
+    t2_pool = max(_q2(total_inflow * t2_pct), _q2(Decimal(rebirth_cnt) * (dist_l8_l10_rate + state_l8_l10_rate)))
+    t3_pool = max(_q2(total_inflow * t3_pct), _q2(Decimal(rebirth_cnt) * l1_l10_30d_rate))
 
     # -------------------------------------------------------------
     # Identify Qualified Achievers
     # -------------------------------------------------------------
-    # Active consumers only (exclude staff / admin id 1)
     eligible_users = CustomUser.objects.filter(
         is_active=True,
         account_active=True
-    ).exclude(role="admin").exclude(is_superuser=True)
+    ).exclude(role="admin").exclude(is_superuser=True).select_related("state", "city")
 
     t1_achievers = []
     t2_achievers = []
@@ -130,14 +156,12 @@ def execute_daily_pool_distribution(
     q_royalty = Q(type="GLOBAL_ROYALTY") | Q(source_id__startswith="ROYALTY_") | Q(meta__orig_type="GLOBAL_ROYALTY")
 
     for u in eligible_users:
-        # Check total royalty already earned
         user_earned_royalty = _q2(
             WalletTransaction.objects.filter(
                 user=u
             ).filter(q_royalty).aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
         )
 
-        # Check Highest Rank achieved
         upgrades = list(RankUpgrade.objects.filter(
             user=u,
             payment_status=RankUpgrade.STATUS_SUCCESS
@@ -159,32 +183,34 @@ def execute_daily_pool_distribution(
         t1_qualified = False
         t2_qualified = False
 
-        # Tier 1 Qualification: L1 to L7 within t1_days (40 days) from activation_date
+        u_dist = ((getattr(u.city, "name", "") if u.city else "") or getattr(u, "district", "") or "general").strip().lower()
+        u_state_id = getattr(u, "state_id", None)
+
+        # Tier 1: L1 to L7 within 7 days
         if highest_lvl >= 7 and r7_upgrade and activation_date:
             days_to_l7 = max(0, (r7_upgrade.upgraded_at.date() - activation_date).days)
             if days_to_l7 <= t1_days or force or user_earned_royalty > 0:
                 t1_qualified = True
                 if user_earned_royalty < t1_cap:
                     rem_cap = _q2(t1_cap - user_earned_royalty)
-                    t1_achievers.append({"user": u, "days_taken": days_to_l7, "rem_cap": rem_cap})
+                    t1_achievers.append({"user": u, "days_taken": days_to_l7, "rem_cap": rem_cap, "district": u_dist, "state_id": u_state_id})
 
-        # Tier 2 Qualification: L8 to L10 within t2_days (7 days) from L7
+        # Tier 2: L8 to L10 within 7 days from L7
         if highest_lvl >= 10 and (t1_qualified or user_earned_royalty > 0) and r10_upgrade and r7_upgrade:
             days_l7_to_l10 = max(0, (r10_upgrade.upgraded_at.date() - r7_upgrade.upgraded_at.date()).days)
             if days_l7_to_l10 <= t2_days or force or user_earned_royalty > 0:
                 t2_qualified = True
                 if user_earned_royalty < (t1_cap + t2_cap):
                     rem_cap = _q2((t1_cap + t2_cap) - user_earned_royalty)
-                    t2_achievers.append({"user": u, "days_taken": days_l7_to_l10, "rem_cap": rem_cap})
+                    t2_achievers.append({"user": u, "days_taken": days_l7_to_l10, "rem_cap": rem_cap, "district": u_dist, "state_id": u_state_id})
 
-        # Tier 3 Qualification (Recovery / Grace window for L1 to L10):
-        # Applies if user missed Tier 1 or Tier 2, but reached Layer 10 within t3_days (30 days) from activation_date
+        # Tier 3: L1 to L10 recovery within 30 days
         if highest_lvl >= 10 and not (t1_qualified and t2_qualified) and r10_upgrade and activation_date:
             days_to_l10 = max(0, (r10_upgrade.upgraded_at.date() - activation_date).days)
             if days_to_l10 <= t3_days or force:
                 if user_earned_royalty < t3_cap:
                     rem_cap = _q2(t3_cap - user_earned_royalty)
-                    t3_achievers.append({"user": u, "days_taken": days_to_l10, "rem_cap": rem_cap})
+                    t3_achievers.append({"user": u, "days_taken": days_to_l10, "rem_cap": rem_cap, "district": u_dist, "state_id": u_state_id})
 
     # -------------------------------------------------------------
     # Execute Payouts
@@ -192,7 +218,7 @@ def execute_daily_pool_distribution(
     payout_logs = []
     total_distributed = Decimal("0.00")
 
-    # Tier 1 Distribution
+    # 1. District Royalty L1-L7 (7 days window)
     if t1_achievers and t1_pool > 0:
         per_user_t1 = _q2(t1_pool / Decimal(len(t1_achievers)))
         for ach in t1_achievers:
@@ -201,7 +227,7 @@ def execute_daily_pool_distribution(
                 payout_logs.append({
                     "user_id": ach["user"].id,
                     "phone": ach["user"].phone,
-                    "tier": "Tier 1 (L1-L7)",
+                    "tier": "District Royalty (L1-L7)",
                     "amount": float(pay_amt),
                 })
                 if not dry_run:
@@ -210,16 +236,16 @@ def execute_daily_pool_distribution(
                         pay_amt,
                         tx_type="GLOBAL_ROYALTY",
                         source_type="DAILY_POOL_DISTRIBUTION",
-                        source_id=f"ROYALTY_T1_{date_str}_{ach['user'].id}",
+                        source_id=f"ROYALTY_L1_L7_{date_str}_{ach['user'].id}",
                         meta={
-                            "tier": 1,
+                            "tier": "L1-L7",
                             "pool_date": date_str,
-                            "description": f"Daily Royalty Tier 1 Payout ({date_str})"
+                            "description": f"District Royalty L1-L7 Payout ({date_str})"
                         }
                     )
                 total_distributed += pay_amt
 
-    # Tier 2 Distribution
+    # 2. Districtwise & Statewise Royalty L8-L10
     if t2_achievers and t2_pool > 0:
         per_user_t2 = _q2(t2_pool / Decimal(len(t2_achievers)))
         for ach in t2_achievers:
@@ -228,7 +254,7 @@ def execute_daily_pool_distribution(
                 payout_logs.append({
                     "user_id": ach["user"].id,
                     "phone": ach["user"].phone,
-                    "tier": "Tier 2 (L8-L10)",
+                    "tier": "District/State Royalty (L8-L10)",
                     "amount": float(pay_amt),
                 })
                 if not dry_run:
@@ -237,16 +263,16 @@ def execute_daily_pool_distribution(
                         pay_amt,
                         tx_type="GLOBAL_ROYALTY",
                         source_type="DAILY_POOL_DISTRIBUTION",
-                        source_id=f"ROYALTY_T2_{date_str}_{ach['user'].id}",
+                        source_id=f"ROYALTY_L8_L10_{date_str}_{ach['user'].id}",
                         meta={
-                            "tier": 2,
+                            "tier": "L8-L10",
                             "pool_date": date_str,
-                            "description": f"Daily Royalty Tier 2 Payout ({date_str})"
+                            "description": f"Royalty L8-L10 Payout ({date_str})"
                         }
                     )
                 total_distributed += pay_amt
 
-    # Tier 3 Distribution (Recovery: L1-L10)
+    # 3. District Royalty L1-L10 (30 Days Recovery Window)
     if t3_achievers and t3_pool > 0:
         per_user_t3 = _q2(t3_pool / Decimal(len(t3_achievers)))
         for ach in t3_achievers:
@@ -255,7 +281,7 @@ def execute_daily_pool_distribution(
                 payout_logs.append({
                     "user_id": ach["user"].id,
                     "phone": ach["user"].phone,
-                    "tier": "Tier 3 Recovery (L1-L10)",
+                    "tier": "District Royalty Recovery (L1-L10 30d)",
                     "amount": float(pay_amt),
                 })
                 if not dry_run:
@@ -264,29 +290,95 @@ def execute_daily_pool_distribution(
                         pay_amt,
                         tx_type="GLOBAL_ROYALTY",
                         source_type="DAILY_POOL_DISTRIBUTION",
-                        source_id=f"ROYALTY_T3_{date_str}_{ach['user'].id}",
+                        source_id=f"ROYALTY_L1_L10_30D_{date_str}_{ach['user'].id}",
                         meta={
-                            "tier": 3,
+                            "tier": "L1-L10-30D",
                             "pool_date": date_str,
-                            "description": f"Daily Royalty Tier 3 Recovery Payout ({date_str})"
+                            "description": f"District Royalty Recovery L1-L10 Payout ({date_str})"
                         }
                     )
                 total_distributed += pay_amt
+
+    # 4. District Captain Royalty (Option A: category=agency_sub_franchise)
+    dist_captains = list(CustomUser.objects.filter(
+        category="agency_sub_franchise",
+        account_active=True,
+        is_active=True
+    ).select_related("city", "state"))
+
+    if dist_captains and dist_capt_rate > 0 and rebirth_cnt > 0:
+        tot_dist_capt_pot = _q2(Decimal(rebirth_cnt) * dist_capt_rate)
+        per_capt_amt = _q2(tot_dist_capt_pot / Decimal(len(dist_captains)))
+        if per_capt_amt > 0:
+            for capt in dist_captains:
+                payout_logs.append({
+                    "user_id": capt.id,
+                    "phone": capt.phone,
+                    "tier": "District Captain Royalty",
+                    "amount": float(per_capt_amt),
+                })
+                if not dry_run:
+                    cw = Wallet.get_or_create_for_user(capt)
+                    cw.credit(
+                        per_capt_amt,
+                        tx_type="CAPTAIN_INCOME",
+                        source_type="DAILY_POOL_DISTRIBUTION",
+                        source_id=f"CAPTAIN_DIST_{date_str}_{capt.id}",
+                        meta={
+                            "pool": "DISTRICT_CAPTAIN_ROYALTY",
+                            "pool_date": date_str,
+                            "rate": float(dist_capt_rate),
+                        }
+                    )
+                total_distributed += per_capt_amt
+
+    # 5. State Captain Royalty (Option A: category=agency_sub_franchise)
+    if dist_captains and state_capt_rate > 0 and rebirth_cnt > 0:
+        tot_state_capt_pot = _q2(Decimal(rebirth_cnt) * state_capt_rate)
+        per_state_capt_amt = _q2(tot_state_capt_pot / Decimal(len(dist_captains)))
+        if per_state_capt_amt > 0:
+            for capt in dist_captains:
+                payout_logs.append({
+                    "user_id": capt.id,
+                    "phone": capt.phone,
+                    "tier": "State Captain Royalty",
+                    "amount": float(per_state_capt_amt),
+                })
+                if not dry_run:
+                    cw = Wallet.get_or_create_for_user(capt)
+                    cw.credit(
+                        per_state_capt_amt,
+                        tx_type="CAPTAIN_INCOME",
+                        source_type="DAILY_POOL_DISTRIBUTION",
+                        source_id=f"CAPTAIN_STATE_{date_str}_{capt.id}",
+                        meta={
+                            "pool": "STATE_CAPTAIN_ROYALTY",
+                            "pool_date": date_str,
+                            "rate": float(state_capt_rate),
+                        }
+                    )
+                total_distributed += per_state_capt_amt
 
     return {
         "success": True,
         "date": date_str,
         "dry_run": dry_run,
         "total_inflow": float(total_inflow),
+        "rebirth_count": rebirth_cnt,
         "pools": {
-            "tier1_pool_4pct": float(t1_pool),
-            "tier2_pool_6pct": float(t2_pool),
-            "tier3_pool_4pct": float(t3_pool),
+            "tier1_pool": float(t1_pool),
+            "tier2_pool": float(t2_pool),
+            "tier3_pool": float(t3_pool),
+            "daily_district_pool": float(_q2(Decimal(rebirth_cnt) * dist_roy_rate)),
+            "daily_state_pool": float(_q2(Decimal(rebirth_cnt) * state_roy_rate)),
+            "daily_district_captain_pool": float(_q2(Decimal(rebirth_cnt) * dist_capt_rate)),
+            "daily_state_captain_pool": float(_q2(Decimal(rebirth_cnt) * state_capt_rate)),
         },
         "achievers": {
             "tier1_count": len(t1_achievers),
             "tier2_count": len(t2_achievers),
             "tier3_count": len(t3_achievers),
+            "captain_count": len(dist_captains),
         },
         "total_distributed": float(total_distributed),
         "payout_logs": payout_logs,

@@ -6520,11 +6520,20 @@ class AdminDailyPoolMonitorView(APIView):
         rank_cfg = dict(master.get("rank_upgrade_config", {}) or {})
         reb = dict(rank_cfg.get("rebirth_allocation", {}) or {})
 
-        reb_f = Decimal(str(reb.get("franchise_pool", 15.0)))
-        reb_d = Decimal(str(reb.get("district_pool", 10.0)))
-        reb_s = Decimal(str(reb.get("state_pool", 15.0)))
-        reb_t1 = Decimal(str(reb.get("district_royalty_t1", 20.0)))
-        reb_t2 = Decimal(str(reb.get("district_royalty_t2", 30.0)))
+        reb_pin = Decimal(str(reb.get("pincode_royalty", reb.get("franchise_pool", 15.0))))
+        reb_d = Decimal(str(reb.get("district_royalty", reb.get("district_pool", 10.0))))
+        reb_s = Decimal(str(reb.get("state_royalty", reb.get("state_pool", 15.0))))
+        reb_l1_l7 = Decimal(str(reb.get("district_royalty_l1_l7", reb.get("district_royalty_t1", 15.0))))
+        reb_l1_l10 = Decimal(str(reb.get("district_royalty_l1_l10_30d", 10.0)))
+        reb_dist_l8_l10 = Decimal(str(reb.get("districtwise_royalty_l8_l10", reb.get("district_royalty_t2", 15.0))))
+        reb_state_l8_l10 = Decimal(str(reb.get("statewise_royalty_l8_l10", 10.0)))
+        reb_dist_capt = Decimal(str(reb.get("district_captain_royalty", 5.0)))
+        reb_state_capt = Decimal(str(reb.get("state_captain_royalty", 5.0)))
+        reb_comp = Decimal(str(reb.get("company_admin", reb.get("company_gross", 10.0))))
+
+        reb_f = reb_pin
+        reb_t1 = reb_l1_l7
+        reb_t2 = reb_dist_l8_l10
 
         rebirth_records = []
         for tx in rebirth_txs_all[:100]:
@@ -6556,23 +6565,30 @@ class AdminDailyPoolMonitorView(APIView):
                 "sponsor_bonus": float(reb.get("direct_sponsor", 40.0)),
                 "five_seat_id": five_seat,
                 "three_seat_id": three_seat,
-                "pool_contribution": float(reb_f + reb_d + reb_s + reb_t1 + reb_t2),
+                "pool_contribution": float(reb_pin + reb_d + reb_s + reb_l1_l7 + reb_l1_l10 + reb_dist_l8_l10 + reb_state_l8_l10 + reb_dist_capt + reb_state_capt),
                 "status": "INSTANT_PROCESSED"
             })
 
         # Exact Dynamic Live Pools calculation
-        # If pool turnover on date is 0 but we want to show projected from all-time or today
         effective_rebirth_count = rebirth_count_today if rebirth_count_today > 0 else (rebirth_count_total if req_date == "" else 0)
-        daily_franchise_pool = (Decimal(effective_rebirth_count) * reb_f).quantize(Decimal("0.01"))
+        daily_pincode_pool = (Decimal(effective_rebirth_count) * reb_pin).quantize(Decimal("0.01"))
+        daily_franchise_pool = daily_pincode_pool
         daily_district_pool = (Decimal(effective_rebirth_count) * reb_d).quantize(Decimal("0.01"))
         daily_state_pool = (Decimal(effective_rebirth_count) * reb_s).quantize(Decimal("0.01"))
-        daily_royalty_t1_pool = (Decimal(effective_rebirth_count) * reb_t1).quantize(Decimal("0.01"))
-        daily_royalty_t2_pool = (Decimal(effective_rebirth_count) * reb_t2).quantize(Decimal("0.01"))
-        daily_royalty_pool = daily_royalty_t1_pool + daily_royalty_t2_pool
+        daily_royalty_l1_l7_pool = (Decimal(effective_rebirth_count) * reb_l1_l7).quantize(Decimal("0.01"))
+        daily_royalty_l1_l10_pool = (Decimal(effective_rebirth_count) * reb_l1_l10).quantize(Decimal("0.01"))
+        daily_royalty_dist_l8_l10_pool = (Decimal(effective_rebirth_count) * reb_dist_l8_l10).quantize(Decimal("0.01"))
+        daily_royalty_state_l8_l10_pool = (Decimal(effective_rebirth_count) * reb_state_l8_l10).quantize(Decimal("0.01"))
+        daily_district_captain_pool = (Decimal(effective_rebirth_count) * reb_dist_capt).quantize(Decimal("0.01"))
+        daily_state_captain_pool = (Decimal(effective_rebirth_count) * reb_state_capt).quantize(Decimal("0.01"))
+        daily_royalty_t1_pool = daily_royalty_l1_l7_pool
+        daily_royalty_t2_pool = daily_royalty_dist_l8_l10_pool + daily_royalty_state_l8_l10_pool
+        daily_royalty_pool = daily_royalty_l1_l7_pool + daily_royalty_l1_l10_pool + daily_royalty_dist_l8_l10_pool + daily_royalty_state_l8_l10_pool
 
-        franchise_achievers_cnt = CustomUser.objects.filter(category__in=["agency_sub_franchise", "agency_pincode_coordinator"], account_active=True).count()
-        district_coord_cnt = CustomUser.objects.filter(category="agency_district_coordinator", account_active=True).count()
-        state_coord_cnt = CustomUser.objects.filter(category="agency_state_coordinator", account_active=True).count()
+        franchise_achievers_cnt = CustomUser.objects.filter(category__in=["agency_pincode", "agency_pincode_coordinator", "agency_sub_franchise"], account_active=True).count()
+        district_coord_cnt = CustomUser.objects.filter(category__in=["agency_district", "agency_district_coordinator"], account_active=True).count()
+        state_coord_cnt = CustomUser.objects.filter(category__in=["agency_state", "agency_state_coordinator"], account_active=True).count()
+        captain_achievers_cnt = CustomUser.objects.filter(category="agency_sub_franchise", account_active=True).count()
         royalty_achievers_cnt = CustomUser.objects.filter(rank_upgrades__to_rank__level_number__gte=7, rank_upgrades__payment_status="SUCCESS", account_active=True).distinct().count()
 
         is_today_distributed = WalletTransaction.objects.filter(
@@ -6620,24 +6636,41 @@ class AdminDailyPoolMonitorView(APIView):
             "self_rebirth_amount_total": float(rebirth_turnover_total),
             "rebirth_records": rebirth_records,
             "rebirth_rates": {
-                "franchise": float(reb_f),
+                "pincode": float(reb_pin),
+                "franchise": float(reb_pin),
                 "district": float(reb_d),
                 "state": float(reb_s),
-                "royalty_t1": float(reb_t1),
-                "royalty_t2": float(reb_t2),
+                "royalty_l1_l7": float(reb_l1_l7),
+                "royalty_l1_l10_30d": float(reb_l1_l10),
+                "districtwise_l8_l10": float(reb_dist_l8_l10),
+                "statewise_l8_l10": float(reb_state_l8_l10),
+                "district_captain": float(reb_dist_capt),
+                "state_captain": float(reb_state_capt),
+                "company_admin": float(reb_comp),
+                "royalty_t1": float(reb_l1_l7),
+                "royalty_t2": float(reb_dist_l8_l10),
             },
             "pools": {
+                "daily_pincode_pool": f"{daily_pincode_pool:.2f}",
                 "daily_franchise_pool": f"{daily_franchise_pool:.2f}",
                 "daily_district_pool": f"{daily_district_pool:.2f}",
                 "daily_state_pool": f"{daily_state_pool:.2f}",
+                "daily_royalty_l1_l7_pool": f"{daily_royalty_l1_l7_pool:.2f}",
+                "daily_royalty_l1_l10_pool": f"{daily_royalty_l1_l10_pool:.2f}",
+                "daily_royalty_dist_l8_l10_pool": f"{daily_royalty_dist_l8_l10_pool:.2f}",
+                "daily_royalty_state_l8_l10_pool": f"{daily_royalty_state_l8_l10_pool:.2f}",
+                "daily_district_captain_pool": f"{daily_district_captain_pool:.2f}",
+                "daily_state_captain_pool": f"{daily_state_captain_pool:.2f}",
                 "daily_royalty_pool": f"{daily_royalty_pool:.2f}",
                 "daily_royalty_t1_pool": f"{daily_royalty_t1_pool:.2f}",
                 "daily_royalty_t2_pool": f"{daily_royalty_t2_pool:.2f}",
             },
             "achievers": {
+                "pincode_count": franchise_achievers_cnt,
                 "franchise_count": franchise_achievers_cnt,
                 "district_count": district_coord_cnt,
                 "state_count": state_coord_cnt,
+                "captain_count": captain_achievers_cnt,
                 "royalty_count": royalty_achievers_cnt,
             },
             "history": history_list

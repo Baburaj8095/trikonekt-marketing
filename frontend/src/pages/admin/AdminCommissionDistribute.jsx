@@ -4531,16 +4531,21 @@ right={
     const ds = Number(reb.direct_sponsor ?? 40);
     const m5 = Number(reb.matrix_5 ?? 80);
     const m3 = Number(reb.matrix_3 ?? 20);
-    const fp = Number(reb.franchise_pool ?? 15);
-    const dp = Number(reb.district_pool ?? 15);
-    const sp = Number(reb.state_pool ?? 15);
-    const drT1 = Number(reb.district_royalty_t1 ?? 20);
-    const drT2 = Number(reb.district_royalty_t2 ?? 30);
-    const cg = Number(reb.company_gross ?? 15);
-    const sumOut = ds + m5 + m3 + fp + dp + sp + drT1 + drT2 + cg;
+    const pinRoy = Number(reb.pincode_royalty ?? reb.franchise_pool ?? 15);
+    const distRoy = Number(reb.district_royalty ?? reb.district_pool ?? 10);
+    const stateRoy = Number(reb.state_royalty ?? reb.state_pool ?? 15);
+    const distRoyL1L7 = Number(reb.district_royalty_l1_l7 ?? reb.district_royalty_t1 ?? 15);
+    const distRoyL1L10 = Number(reb.district_royalty_l1_l10_30d ?? 10);
+    const distWiseL8L10 = Number(reb.districtwise_royalty_l8_l10 ?? reb.district_royalty_t2 ?? 15);
+    const stateWiseL8L10 = Number(reb.statewise_royalty_l8_l10 ?? 10);
+    const distCaptRoy = Number(reb.district_captain_royalty ?? 5);
+    const stateCaptRoy = Number(reb.state_captain_royalty ?? 5);
+    const compAdmin = Number(reb.company_admin ?? reb.company_gross ?? 10);
+
+    const sumOut = ds + m5 + m3 + pinRoy + distRoy + stateRoy + distRoyL1L7 + distRoyL1L10 + distWiseL8L10 + stateWiseL8L10 + distCaptRoy + stateCaptRoy + compAdmin;
     const isBalanced = totalIn === sumOut;
 
-    const fRoles = reb.franchise_roles_pct || { pincode: 20, pincode_coord: 10, district: 25, district_coord: 15, state: 20, state_coord: 10 };
+    const fRoles = reb.pincode_roles_pct || reb.franchise_roles_pct || { pincode: 45, pincode_coord: 15, district: 15, district_coord: 10, state: 10, state_coord: 5 };
     const dRoles = reb.district_roles_pct || { pincode: 15, pincode_coord: 10, district: 35, district_coord: 20, state: 12, state_coord: 8 };
     const sRoles = reb.state_roles_pct || { pincode: 10, pincode_coord: 5, district: 15, district_coord: 10, state: 40, state_coord: 20 };
 
@@ -4550,13 +4555,20 @@ right={
         const currentReb = prev.rebirth_allocation || {};
         const currentRoles = { ...(currentReb[poolKey] || {}) };
         currentRoles[roleKey] = numVal;
-        return {
+        const updated = {
           ...prev,
           rebirth_allocation: {
             ...currentReb,
             [poolKey]: currentRoles,
           },
         };
+        // keep aliases in sync
+        if (poolKey === "pincode_roles_pct") {
+          updated.rebirth_allocation.franchise_roles_pct = currentRoles;
+        } else if (poolKey === "franchise_roles_pct") {
+          updated.rebirth_allocation.pincode_roles_pct = currentRoles;
+        }
+        return updated;
       });
       setRankDirty(true);
     };
@@ -4566,7 +4578,7 @@ right={
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <Section
           title="Self Rebirth ID (₹250) Allocation & Company Side Capture"
-          subtitle="Configure how the ₹250 Rebirth ID entry amount is split across Direct Sponsor, Block Pools, Geo Pools, Royalty, and Company Gross Margin"
+          subtitle="Configure how the ₹250 Rebirth ID entry amount is split across Direct Sponsor, Matrix Blocks, Geo Royalties, Rank Royalties, Captains, and Company Admin"
           right={
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", padding: "6px 12px", borderRadius: 8, border: "1px solid #cbd5e1" }}>
               <span style={{ fontSize: 12, fontWeight: 800, color: "#1e293b" }}>Rebirth Tax:</span>
@@ -4638,82 +4650,144 @@ right={
               placeholder="20"
             />
             <Input
-              label="Franchise Pool (₹)"
+              label="Pincode Royalty (₹)"
               type="number"
-              value={fp}
+              value={pinRoy}
               onChange={(val) => {
+                const n = Number(val);
                 setRankConfig((prev) => ({
                   ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), franchise_pool: Number(val) },
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), pincode_royalty: n, franchise_pool: n },
                 }));
                 setRankDirty(true);
               }}
               placeholder="15"
             />
             <Input
-              label="District Pool Share (₹)"
+              label="District Royalty (₹)"
               type="number"
-              value={dp}
+              value={distRoy}
               onChange={(val) => {
+                const n = Number(val);
                 setRankConfig((prev) => ({
                   ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), district_pool: Number(val) },
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), district_royalty: n, district_pool: n },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="10"
+            />
+            <Input
+              label="State Royalty (₹)"
+              type="number"
+              value={stateRoy}
+              onChange={(val) => {
+                const n = Number(val);
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), state_royalty: n, state_pool: n },
                 }));
                 setRankDirty(true);
               }}
               placeholder="15"
             />
             <Input
-              label="State Pool Share (₹)"
+              label="District Royalty L1-L7 (₹) [7 Days]"
               type="number"
-              value={sp}
+              value={distRoyL1L7}
               onChange={(val) => {
+                const n = Number(val);
                 setRankConfig((prev) => ({
                   ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), state_pool: Number(val) },
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), district_royalty_l1_l7: n, district_royalty_t1: n },
                 }));
                 setRankDirty(true);
               }}
               placeholder="15"
             />
             <Input
-              label="District Royalty T1 L1-L7 (₹)"
+              label="District Royalty L1-L10 (₹) [30 Days]"
               type="number"
-              value={drT1}
+              value={distRoyL1L10}
               onChange={(val) => {
+                const n = Number(val);
                 setRankConfig((prev) => ({
                   ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), district_royalty_t1: Number(val) },
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), district_royalty_l1_l10_30d: n },
                 }));
                 setRankDirty(true);
               }}
-              placeholder="20"
+              placeholder="10"
             />
             <Input
-              label="District Royalty T2 L8-L10 (₹)"
+              label="Districtwise Royalty L8-L10 (₹) [7 Days]"
               type="number"
-              value={drT2}
+              value={distWiseL8L10}
               onChange={(val) => {
+                const n = Number(val);
                 setRankConfig((prev) => ({
                   ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), district_royalty_t2: Number(val) },
-                }));
-                setRankDirty(true);
-              }}
-              placeholder="30"
-            />
-            <Input
-              label="Company Gross Retention (₹)"
-              type="number"
-              value={cg}
-              onChange={(val) => {
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), company_gross: Number(val) },
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), districtwise_royalty_l8_l10: n, district_royalty_t2: n },
                 }));
                 setRankDirty(true);
               }}
               placeholder="15"
+            />
+            <Input
+              label="Statewise Royalty L8-L10 (₹) [7 Days]"
+              type="number"
+              value={stateWiseL8L10}
+              onChange={(val) => {
+                const n = Number(val);
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), statewise_royalty_l8_l10: n },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="10"
+            />
+            <Input
+              label="District Captain Royalty (₹)"
+              type="number"
+              value={distCaptRoy}
+              onChange={(val) => {
+                const n = Number(val);
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), district_captain_royalty: n },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="5"
+            />
+            <Input
+              label="State Captain Royalty (₹)"
+              type="number"
+              value={stateCaptRoy}
+              onChange={(val) => {
+                const n = Number(val);
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), state_captain_royalty: n },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="5"
+            />
+            <Input
+              label="Company Admin Retention (₹)"
+              type="number"
+              value={compAdmin}
+              onChange={(val) => {
+                const n = Number(val);
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), company_admin: n, company_gross: n },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="10"
             />
           </div>
 
@@ -4731,7 +4805,7 @@ right={
           >
             <span style={{ fontSize: 13, fontWeight: 800, color: isBalanced ? "#166534" : "#991b1b" }}>
               {isBalanced
-                ? `✓ Balanced Financial Accounting: Total Inflow ₹${totalIn} = Outflow (Sponsor ₹${ds} + 5-Block ₹${m5} + 3-Block ₹${m3} + Franchise ₹${fp} + District ₹${dp} + State ₹${sp} + Royalty T1 ₹${drT1} + Royalty T2 ₹${drT2}) + Company Gross Margin ₹${cg}`
+                ? `✓ Balanced Financial Accounting: Total Inflow ₹${totalIn} = Outflow (Sponsor ₹${ds} + 5-Block ₹${m5} + 3-Block ₹${m3} + Pincode ₹${pinRoy} + District ₹${distRoy} + State ₹${stateRoy} + L1-L7 ₹${distRoyL1L7} + L1-L10 ₹${distRoyL1L10} + Dist L8-L10 ₹${distWiseL8L10} + State L8-L10 ₹${stateWiseL8L10} + Dist Capt ₹${distCaptRoy} + State Capt ₹${stateCaptRoy}) + Company Admin ₹${compAdmin}`
                 : `⚠ Imbalance Alert: Total Inflow (₹${totalIn}) != Allocated Sum (₹${sumOut}). Difference: ₹${totalIn - sumOut}`}
             </span>
           </div>
@@ -4739,21 +4813,21 @@ right={
 
         {/* ── 6-Role Geo Distribution Percentage Cards ── */}
         <Section
-          title={`1. Franchise Pool: 6-Role Geo Distribution (Gross ₹${fp.toFixed(2)})`}
-          subtitle="Configure percentage split across Pincode, Pincode Coordinator, District, District Coordinator, State, and State Coordinator"
+          title={`1. Pincode Royalty: 6-Role Geo Upline Distribution (Gross ₹${pinRoy.toFixed(2)})`}
+          subtitle="Configure percentage split across Pincode, Pincode Coordinator, District, District Coordinator, State, and State Coordinator uplines of that Rebirth ID"
         >
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <Input label="Pincode (%)" type="number" value={fRoles.pincode ?? 20} onChange={(val) => updateRolePct("franchise_roles_pct", "pincode", val)} />
-            <Input label="Pincode Coordinator (%)" type="number" value={fRoles.pincode_coord ?? 10} onChange={(val) => updateRolePct("franchise_roles_pct", "pincode_coord", val)} />
-            <Input label="District (%)" type="number" value={fRoles.district ?? 25} onChange={(val) => updateRolePct("franchise_roles_pct", "district", val)} />
-            <Input label="District Coordinator (%)" type="number" value={fRoles.district_coord ?? 15} onChange={(val) => updateRolePct("franchise_roles_pct", "district_coord", val)} />
-            <Input label="State (%)" type="number" value={fRoles.state ?? 20} onChange={(val) => updateRolePct("franchise_roles_pct", "state", val)} />
-            <Input label="State Coordinator (%)" type="number" value={fRoles.state_coord ?? 10} onChange={(val) => updateRolePct("franchise_roles_pct", "state_coord", val)} />
+            <Input label="Pincode (%)" type="number" value={fRoles.pincode ?? 45} onChange={(val) => updateRolePct("pincode_roles_pct", "pincode", val)} />
+            <Input label="Pincode Coordinator (%)" type="number" value={fRoles.pincode_coord ?? 15} onChange={(val) => updateRolePct("pincode_roles_pct", "pincode_coord", val)} />
+            <Input label="District (%)" type="number" value={fRoles.district ?? 15} onChange={(val) => updateRolePct("pincode_roles_pct", "district", val)} />
+            <Input label="District Coordinator (%)" type="number" value={fRoles.district_coord ?? 10} onChange={(val) => updateRolePct("pincode_roles_pct", "district_coord", val)} />
+            <Input label="State (%)" type="number" value={fRoles.state ?? 10} onChange={(val) => updateRolePct("pincode_roles_pct", "state", val)} />
+            <Input label="State Coordinator (%)" type="number" value={fRoles.state_coord ?? 5} onChange={(val) => updateRolePct("pincode_roles_pct", "state_coord", val)} />
           </div>
         </Section>
 
         <Section
-          title={`2. District Pool: 6-Role Geo Distribution (Gross ₹${dp.toFixed(2)} - Midnight 12 AM Payout)`}
+          title={`2. District Royalty: 6-Role Geo Distribution (Gross ₹${distRoy.toFixed(2)} - Midnight 12 AM Payout)`}
           subtitle="Configure 12:00 AM Midnight batch distribution percentages for enrolled district franchise members"
         >
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
@@ -4767,7 +4841,7 @@ right={
         </Section>
 
         <Section
-          title={`3. State Pool: 6-Role Geo Distribution (Gross ₹${sp.toFixed(2)} - Midnight 12 AM Payout)`}
+          title={`3. State Royalty: 6-Role Geo Distribution (Gross ₹${stateRoy.toFixed(2)} - Midnight 12 AM Payout)`}
           subtitle="Configure 12:00 AM Midnight batch distribution percentages for enrolled state franchise members"
         >
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
@@ -5778,64 +5852,108 @@ right={
             </div>
           </div>
 
-          {/* 5 Live Pots Grid */}
+          {/* Dynamic Live Pots Grid */}
           {(() => {
             const rebRates = mon.rebirth_rates || rankConfig?.rebirth_allocation || {};
-            const fRate = Number(rebRates.franchise ?? rebRates.franchise_pool ?? 15);
-            const dRate = Number(rebRates.district ?? rebRates.district_pool ?? 10);
-            const sRate = Number(rebRates.state ?? rebRates.state_pool ?? 15);
-            const t1Rate = Number(rebRates.royalty_t1 ?? rebRates.district_royalty_t1 ?? 20);
-            const t2Rate = Number(rebRates.royalty_t2 ?? rebRates.district_royalty_t2 ?? 30);
+            const pinRate = Number(rebRates.pincode ?? rebRates.franchise ?? rebRates.pincode_royalty ?? rebRates.franchise_pool ?? 15);
+            const distRate = Number(rebRates.district ?? rebRates.district_royalty ?? rebRates.district_pool ?? 10);
+            const stateRate = Number(rebRates.state ?? rebRates.state_royalty ?? rebRates.state_pool ?? 15);
+            const l1l7Rate = Number(rebRates.royalty_l1_l7 ?? rebRates.royalty_t1 ?? rebRates.district_royalty_l1_l7 ?? 15);
+            const l1l10Rate = Number(rebRates.royalty_l1_l10_30d ?? rebRates.district_royalty_l1_l10_30d ?? 10);
+            const distWiseRate = Number(rebRates.districtwise_l8_l10 ?? rebRates.royalty_t2 ?? rebRates.districtwise_royalty_l8_l10 ?? 15);
+            const stateWiseRate = Number(rebRates.statewise_l8_l10 ?? rebRates.statewise_royalty_l8_l10 ?? 10);
+            const distCaptRate = Number(rebRates.district_captain ?? rebRates.district_captain_royalty ?? 5);
+            const stateCaptRate = Number(rebRates.state_captain ?? rebRates.state_captain_royalty ?? 5);
 
             return (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12 }}>
                 <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: "#2563eb" }}>🏢 FRANCHISE POOL (₹{fRate})</div>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#2563eb" }}>🏢 PINCODE ROYALTY (₹{pinRate})</div>
                   <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
-                    ₹{Number(proj.franchise_pot ?? mon.pools?.daily_franchise_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₹{Number(proj.franchise_pot ?? mon.pools?.daily_pincode_pool ?? mon.pools?.daily_franchise_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-                    👥 Active Coordinators: <strong>{proj.franchise_recipients ?? mon.achievers?.franchise_count ?? 0}</strong>
+                    👥 Pincode Assignees: <strong>{proj.franchise_recipients ?? mon.achievers?.pincode_count ?? mon.achievers?.franchise_count ?? 0}</strong>
                   </div>
                 </div>
 
                 <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: "#7c3aed" }}>🗺️ DISTRICT POOL (₹{dRate})</div>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#7c3aed" }}>🗺️ DISTRICT ROYALTY (₹{distRate})</div>
                   <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
                     ₹{Number(proj.district_pot ?? mon.pools?.daily_district_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-                    👥 Active Coordinators: <strong>{proj.district_recipients ?? mon.achievers?.district_count ?? 0}</strong>
+                    👥 District Assignees: <strong>{proj.district_recipients ?? mon.achievers?.district_count ?? 0}</strong>
                   </div>
                 </div>
 
                 <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: "#d97706" }}>🏛️ STATE POOL (₹{sRate})</div>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#d97706" }}>🏛️ STATE ROYALTY (₹{stateRate})</div>
                   <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
                     ₹{Number(proj.state_pot ?? mon.pools?.daily_state_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-                    👥 Active Coordinators: <strong>{proj.state_recipients ?? mon.achievers?.state_count ?? 0}</strong>
+                    👥 State Assignees: <strong>{proj.state_recipients ?? mon.achievers?.state_count ?? 0}</strong>
                   </div>
                 </div>
 
                 <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: "#059669" }}>👑 ROYALTY T1 L1-L7 (₹{t1Rate})</div>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#059669" }}>🏅 DISTRICT ROYALTY L1-L7 (₹{l1l7Rate})</div>
                   <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
-                    ₹{Number(proj.royalty_t1_pot ?? mon.pools?.daily_royalty_t1_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₹{Number(proj.royalty_t1_pot ?? mon.pools?.daily_royalty_l1_l7_pool ?? mon.pools?.daily_royalty_t1_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-                    👥 L1-L7 Achievers: <strong>{proj.royalty_t1_recipients ?? mon.achievers?.royalty_count ?? 0}</strong>
+                    👥 7d Achievers: <strong>{proj.royalty_t1_recipients ?? mon.achievers?.royalty_count ?? 0}</strong>
                   </div>
                 </div>
 
                 <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: "#dc2626" }}>👑 ROYALTY T2 L8-L10 (₹{t2Rate})</div>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#0284c7" }}>🌟 DISTRICT ROYALTY L1-L10 30d (₹{l1l10Rate})</div>
                   <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
-                    ₹{Number(proj.royalty_t2_pot ?? mon.pools?.daily_royalty_t2_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₹{Number(mon.pools?.daily_royalty_l1_l10_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-                    👥 L8-L10 Leaders: <strong>{proj.royalty_t2_recipients ?? mon.achievers?.royalty_count ?? 0}</strong>
+                    👥 30d Achievers: <strong>{mon.achievers?.tier3_count ?? 0}</strong>
+                  </div>
+                </div>
+
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#dc2626" }}>🏆 DISTRICTWISE L8-L10 (₹{distWiseRate})</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+                    ₹{Number(mon.pools?.daily_royalty_dist_l8_l10_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                    👥 District L8-10 Leaders: <strong>{mon.achievers?.tier2_count ?? 0}</strong>
+                  </div>
+                </div>
+
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#9333ea" }}>👑 STATEWISE L8-L10 (₹{stateWiseRate})</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+                    ₹{Number(mon.pools?.daily_royalty_state_l8_l10_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                    👥 State L8-10 Leaders: <strong>{mon.achievers?.tier2_count ?? 0}</strong>
+                  </div>
+                </div>
+
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#ea580c" }}>🎖️ DISTRICT CAPTAIN (₹{distCaptRate})</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+                    ₹{Number(mon.pools?.daily_district_captain_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                    👥 District Captains: <strong>{mon.achievers?.captain_count ?? 0}</strong>
+                  </div>
+                </div>
+
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#b45309" }}>🎖️ STATE CAPTAIN (₹{stateCaptRate})</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+                    ₹{Number(mon.pools?.daily_state_captain_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                    👥 State Captains: <strong>{mon.achievers?.captain_count ?? 0}</strong>
                   </div>
                 </div>
               </div>
