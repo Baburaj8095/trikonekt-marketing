@@ -640,6 +640,10 @@ class MyMatrix5EntriesTree(APIView):
                 "abs_level": int(getattr(acc, "level", 0) or 0),# absolute persisted level
                 "position": getattr(acc, "position", None),
                 "status": getattr(acc, "status", "ACTIVE"),
+                "source_type": getattr(acc, "source_type", None),
+                "current_rank": 0,
+                "rank_name": "",
+                "has_prime": True,
                 "team_count": 0,                                # annotated after BFS
                 "direct_count": 0,                              # annotated after BFS
                 "children": [],
@@ -747,6 +751,27 @@ class MyMatrix5EntriesTree(APIView):
                 n["team_count"] = int(total)
                 return total
             _annotate_team(root)
+
+        # Annotate user rank for all loaded nodes
+        try:
+            from django.db.models import Max
+            from mlm_ranks.models import RankUpgrade
+            owner_ids = [node["owner_id"] for node in nodes_by_account.values() if node.get("owner_id")]
+            if owner_ids:
+                max_ranks = dict(
+                    RankUpgrade.objects.filter(user_id__in=owner_ids, payment_status=RankUpgrade.STATUS_SUCCESS)
+                    .values_list("user_id")
+                    .annotate(m=Max("to_rank__level_number"))
+                )
+                for node in nodes_by_account.values():
+                    oid = node.get("owner_id")
+                    lvl = int(max_ranks.get(oid, 0) or 0)
+                    node["current_rank"] = lvl
+                    node["rank_level"] = lvl
+                    node["rank_name"] = f"Layer {lvl}" if lvl > 0 else ""
+                    node["has_prime"] = True
+        except Exception:
+            pass
 
         return Response(root, status=status.HTTP_200_OK)
 
