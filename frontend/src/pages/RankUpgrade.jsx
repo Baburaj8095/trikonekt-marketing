@@ -457,51 +457,26 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
   }, [currentLevel, walletHistory]);
 
   const layerMatrixEarned = useMemo(() => {
-    const fromApi = Number(
-      walletHistory?.layer_matrix_earned ||
-        walletHistory?.income?.matrixLevel ||
-        walletHistory?.income?.matrixFive ||
-        walletHistory?.top?.level_earnings_total ||
-        0
+    return Number(
+      walletHistory?.layer_matrix_earned ??
+      walletHistory?.income?.matrixLevel ??
+      0
     );
-    if (fromApi > 0) return fromApi;
-
-    // Fallback: scan walletHistory main_wallet and incoming for level and matrix bonuses
-    const allTx = [
-      ...(walletHistory?.main_wallet || []),
-      ...(walletHistory?.incoming || []),
-    ];
-    let sum = 0;
-    const seen = new Set();
-    for (const t of allTx) {
-      if (!t?.id || seen.has(t.id)) continue;
-      seen.add(t.id);
-      const isLevel =
-        t.type === "LEVEL_BONUS" ||
-        t.type === "AUTOPOOL_BONUS_FIVE" ||
-        t.type === "AUTOPOOL_BONUS_THREE" ||
-        t.meta?.orig_type === "AUTOPOOL_BONUS_FIVE" ||
-        t.meta?.orig_type === "AUTOPOOL_BONUS_THREE" ||
-        t.meta?.orig_type === "LEVEL_BONUS" ||
-        (t.meta?.source && String(t.meta.source).toLowerCase().includes("matrix"));
-      if (isLevel) {
-        sum += Math.abs(Number(t.amount || 0));
-      }
-    }
-    return sum;
   }, [walletHistory]);
 
+  const directEduEarned = useMemo(() => {
+    return Number(walletHistory?.direct_edu_earned ?? 0);
+  }, [walletHistory]);
+
+  const eEduEarnings = useMemo(() => {
+    const fromApi = Number(walletHistory?.e_edu_total_earned ?? 0);
+    if (fromApi > 0) return fromApi;
+    return layerMatrixEarned + directEduEarned;
+  }, [walletHistory, layerMatrixEarned, directEduEarned]);
+
   const totalEarnings = useMemo(() => {
-    const val = Number(
-      walletHistory?.top?.level_earnings_total ||
-        walletHistory?.totals?.levelEarnings ||
-        walletHistory?.totals?.level_earnings ||
-        walletHistory?.level_earnings ||
-        0
-    );
-    if (val > 0) return val;
     return layerMatrixEarned;
-  }, [walletHistory, layerMatrixEarned]);
+  }, [layerMatrixEarned]);
 
   const isLimitReached =
     walletHistory?.is_limit_reached ?? (totalEarnings >= currentLimit);
@@ -603,11 +578,11 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
     return Array.from({ length: 10 }, (_, i) => {
       const lvl = i + 1;
       const maxCap = Math.pow(5, lvl);
-      const fiveLvlCount = fiveCounts?.levels?.find((x) => Number(x.level) === lvl)?.team_count;
-      const eligLvlCount = elig?.level_team_counts?.[lvl] ?? elig?.team_counts_by_level?.[lvl] ?? elig?.levels?.[lvl]?.team_count;
-      const rankLvlCount = ranks?.find((r) => Number(r.level_number) === lvl)?.approved_team_count;
-      
-      const count = Number(eligLvlCount ?? fiveLvlCount ?? rankLvlCount ?? 0);
+      const count = Number(
+        elig?.level_team_counts?.[lvl] ??
+        elig?.team_counts_by_level?.[lvl] ??
+        0
+      );
       return {
         level: lvl,
         count,
@@ -616,7 +591,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
         hasMembers: count > 0,
       };
     });
-  }, [fiveCounts, elig, ranks]);
+  }, [elig]);
 
   const totalCommunityBlocks = useMemo(() => {
     return eEduCommunityGrid.reduce((sum, row) => sum + row.count, 0);
@@ -990,32 +965,12 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
       </Grid>
 
       {/* ── 5-Matrix Education Community Blocks KPI Grid ── */}
-      <Box sx={{ display: "flex", gap: 1, mb: 2, flexWrap: "wrap" }}>
+      <Box sx={{ display: "flex", gap: 1.5, mb: 2, flexWrap: "wrap" }}>
         <Paper
           variant="outlined"
           sx={{
             flex: "1 1 0",
-            minWidth: 75,
-            p: 1.5,
-            textAlign: "center",
-            borderRadius: 2.5,
-            borderColor: "#c7d2fe",
-            bgcolor: "#fff",
-          }}
-        >
-          <Typography sx={{ fontSize: 9.5, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.4, mb: 0.5, whiteSpace: "nowrap" }}>
-            Total Comm...
-          </Typography>
-          <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#4f46e5" }}>
-            {totalCommunityBlocks}
-          </Typography>
-        </Paper>
-
-        <Paper
-          variant="outlined"
-          sx={{
-            flex: "1 1 0",
-            minWidth: 75,
+            minWidth: 100,
             p: 1.5,
             textAlign: "center",
             borderRadius: 2.5,
@@ -1023,8 +978,8 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             bgcolor: "#fff",
           }}
         >
-          <Typography sx={{ fontSize: 9.5, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.4, mb: 0.5, whiteSpace: "nowrap" }}>
-            Active Layer...
+          <Typography sx={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.4, mb: 0.5, whiteSpace: "nowrap" }}>
+            Active Layers
           </Typography>
           <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#16a34a" }}>
             {activeCommunityLayers}
@@ -1035,7 +990,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           variant="outlined"
           sx={{
             flex: "1 1 0",
-            minWidth: 75,
+            minWidth: 100,
             p: 1.5,
             textAlign: "center",
             borderRadius: 2.5,
@@ -1043,8 +998,8 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             bgcolor: "#fff",
           }}
         >
-          <Typography sx={{ fontSize: 9.5, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.4, mb: 0.5, whiteSpace: "nowrap" }}>
-            Layers Comp...
+          <Typography sx={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.4, mb: 0.5, whiteSpace: "nowrap" }}>
+            Layers Completed
           </Typography>
           <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#d97706" }}>
             {completedCommunityLayers > 0 ? `L${completedCommunityLayers}` : "–"}
@@ -1055,7 +1010,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           variant="outlined"
           sx={{
             flex: "1 1 0",
-            minWidth: 75,
+            minWidth: 120,
             p: 1.5,
             textAlign: "center",
             borderRadius: 2.5,
@@ -1063,11 +1018,11 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             bgcolor: "#fff",
           }}
         >
-          <Typography sx={{ fontSize: 9.5, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.4, mb: 0.5, whiteSpace: "nowrap" }}>
-            e-Edu Ear...
+          <Typography sx={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.4, mb: 0.5, whiteSpace: "nowrap" }}>
+            e-Edu Total Earnings
           </Typography>
           <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#7c3aed" }}>
-            ₹{fmt(layerMatrixEarned || totalEarnings)}
+            ₹{fmt(eEduEarnings)}
           </Typography>
         </Paper>
       </Box>
@@ -1098,16 +1053,10 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                   const cfgLvl = savedRankConfig?.levels?.[idx];
                   const limitVal = cfgLvl?.earning_limit ? Number(cfgLvl.earning_limit) : (DEFAULT_LIMITS[idx] || (r.earning_limit ? Number(r.earning_limit) : 0));
                   
-                  // Compute exact real-time active community count for this layer
-                  const fiveLvlCount = fiveCounts?.levels?.find((x) => Number(x.level) === level)?.team_count;
-                  const eligLvlCount = elig?.level_team_counts?.[level] ?? elig?.team_counts_by_level?.[level] ?? elig?.levels?.[level]?.team_count;
-                  const rankLvlCount = ranks?.find((rr) => Number(rr.level_number) === level)?.approved_team_count;
-
+                  // Compute exact real-time active community count for this layer from e-Education downline
                   const userTeamCount = Number(
-                    eligLvlCount ??
-                    fiveLvlCount ??
-                    rankLvlCount ??
-                    r.current_team_count ??
+                    elig?.level_team_counts?.[level] ??
+                    elig?.team_counts_by_level?.[level] ??
                     0
                   );
 

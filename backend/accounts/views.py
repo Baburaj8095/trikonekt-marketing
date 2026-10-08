@@ -4091,6 +4091,39 @@ def wallet_me_history(request):
         level_earnings_total = "0.00"
 
     try:
+        from mlm_ranks.models import UpgradeCommission
+        # Genuine Layer Matrix Earnings (from downline upgrading slabs)
+        layer_matrix_earned_val = UpgradeCommission.objects.filter(
+            to_user=user, commission_type="LEVEL", status="CREDITED"
+        ).aggregate(total=Sum("commission_amount"))["total"] or D("0.00")
+
+        # Genuine Direct e-Edu Referral Bonus (from directs buying Rank 1 / e-Education upgrades)
+        direct_edu_earned_val = UpgradeCommission.objects.filter(
+            to_user=user, commission_type="DIRECT", status="CREDITED"
+        ).aggregate(total=Sum("commission_amount"))["total"] or D("0.00")
+
+        # Fallback to wallet transactions if UpgradeCommission was not logged
+        if layer_matrix_earned_val == 0:
+            wt_lvl = WalletTransaction.objects.filter(user=user, amount__gt=0, source_type="RANK_UPGRADE").filter(
+                Q(meta__kind="RANK_UPGRADE_LEVEL") | Q(meta__orig_type="LEVEL_BONUS")
+            ).aggregate(total=Sum("amount"))["total"] or D("0.00")
+            layer_matrix_earned_val = wt_lvl
+
+        if direct_edu_earned_val == 0:
+            wt_dir = WalletTransaction.objects.filter(user=user, amount__gt=0, source_type="RANK_UPGRADE").filter(
+                Q(meta__kind="RANK_UPGRADE_DIRECT") | Q(meta__orig_type="DIRECT_REF_BONUS")
+            ).aggregate(total=Sum("amount"))["total"] or D("0.00")
+            direct_edu_earned_val = wt_dir
+
+        layer_matrix_earned = str(layer_matrix_earned_val)
+        direct_edu_earned = str(direct_edu_earned_val)
+        e_edu_total_earned = str(layer_matrix_earned_val + direct_edu_earned_val)
+    except Exception:
+        layer_matrix_earned = "0.00"
+        direct_edu_earned = "0.00"
+        e_edu_total_earned = "0.00"
+
+    try:
         from zoneinfo import ZoneInfo
         import datetime
         from django.utils import timezone
@@ -4273,10 +4306,12 @@ def wallet_me_history(request):
         "all_transactions": all_list,
         "recent": [txmap(x) for x in WalletTransaction.objects.filter(user=user).order_by("-created_at")[:50]],
         "level_earnings": level_earnings_total,
-        "layer_matrix_earned": level_earnings_total,
+        "layer_matrix_earned": layer_matrix_earned,
+        "direct_edu_earned": direct_edu_earned,
+        "e_edu_total_earned": e_edu_total_earned,
         "income": {
-            "matrixLevel": level_earnings_total,
-            "matrixFive": level_earnings_total,
+            "matrixLevel": layer_matrix_earned,
+            "matrixFive": layer_matrix_earned,
             "globalTri": str(WalletTransaction.objects.filter(user=user, type="GLOBAL_ROYALTY").aggregate(total=Sum("amount"))["total"] or D("0.00")),
         }
     }

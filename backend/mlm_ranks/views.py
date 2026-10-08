@@ -77,6 +77,20 @@ class UserUpgradeEligibilityView(APIView):
         current_level = getattr(cur, "level_number", None)
         # Highest approved rank level (based solely on admin-approved upgrades)
         achieved_level = self._achieved_level(request.user)
+
+        # Count placed nodes by level_depth in the user's Rank-1 5-Matrix
+        from django.db.models import Count
+        from .models import RankMatrixNode
+        try:
+            level_counts = dict(
+                RankMatrixNode.objects.filter(root_user=request.user)
+                .values_list("level_depth")
+                .annotate(c=Count("id"))
+            )
+            level_team_counts = {lvl: level_counts.get(lvl, 0) for lvl in range(1, 11)}
+        except Exception:
+            level_team_counts = {lvl: 0 for lvl in range(1, 11)}
+
         # For frontend quick use:
         return Response(
             {
@@ -91,6 +105,8 @@ class UserUpgradeEligibilityView(APIView):
                 "current_rank": current_rank_name,
                 "current_level": current_level,
                 "achieved_level": achieved_level,
+                "level_team_counts": level_team_counts,
+                "team_counts_by_level": level_team_counts,
                 "reason": payload["reason"],
             }
         )
@@ -716,6 +732,19 @@ class RankMatrixSubtreeView(APIView):
                         "level": int(getattr(getattr(ur, "current_rank", None), "level_number", 0) or 0),
                         "name": getattr(getattr(ur, "current_rank", None), "rank_name", None),
                     }
+                # Fallback to RankUpgrade if UserRank is not yet populated
+                missing_cids = [cid for cid in child_ids if cid not in ranks_by_user]
+                if missing_cids:
+                    max_upgs = dict(
+                        RankUpgrade.objects.filter(user_id__in=missing_cids, payment_status=RankUpgrade.STATUS_SUCCESS)
+                        .values_list("user_id")
+                        .annotate(m=Max("to_rank__level_number"))
+                    )
+                    for cid, lvl in max_upgs.items():
+                        ranks_by_user[cid] = {
+                            "level": int(lvl or 0),
+                            "name": f"Layer {lvl}" if lvl else None,
+                        }
             except Exception:
                 ranks_by_user = {}
 
@@ -856,6 +885,9 @@ class RankMatrixBFSView(APIView):
                 "position":     int(getattr(rnode, "position", 0) or 0) if rnode else 0,
                 "approved_at":  getattr(rnode, "approved_at", None) if rnode else None,
                 "status":       "ACTIVE",
+                "current_rank": 0,
+                "rank_level":   0,
+                "rank_name":    "None",
                 "team_count":   0,
                 "direct_count": 0,
                 "children":     [],
@@ -937,9 +969,26 @@ class RankMatrixBFSView(APIView):
                 count_memo[nid] = total
                 return total
 
+            # Lookup highest approved rank for all users in BFS tree
+            user_ids = [u for u in nodes_by_uid.keys() if u]
+            max_ranks = dict(
+                RankUpgrade.objects.filter(user_id__in=user_ids, payment_status=RankUpgrade.STATUS_SUCCESS)
+                .values_list("user_id")
+                .annotate(max_lvl=Max("to_rank__level_number"))
+            )
+            ur_map = dict(
+                UserRank.objects.filter(user_id__in=user_ids)
+                .values_list("user_id", "current_rank__level_number")
+            )
+
             for uid, node in nodes_by_uid.items():
                 node["direct_count"] = len(parent_to_children.get(uid, []))
                 node["team_count"] = _count_all(uid)
+                lvl = int(max_ranks.get(uid) or ur_map.get(uid) or 0)
+                node["current_rank"] = lvl
+                node["rank_level"] = lvl
+                node["rank_name"] = f"Layer {lvl}" if lvl > 0 else "None"
+                node["account_active"] = lvl > 0
         except Exception:
             pass
 
