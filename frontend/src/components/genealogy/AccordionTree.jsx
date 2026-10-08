@@ -24,6 +24,7 @@ import {
   Stack,
   Paper,
   Button,
+  Collapse,
 } from "@mui/material";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
@@ -186,6 +187,7 @@ export default function AccordionTree({
   useRankMatrix = false,
   rankRootUserId = null,
   currentRankLevel = null,
+  defaultExpanded = false,
 }) {
   const is3Block = String(pool || "").toUpperCase().includes("THREE") || String(pool || "").includes("3");
   const maxSlots = is3Block ? 3 : 5;
@@ -543,6 +545,7 @@ export default function AccordionTree({
         trailLength={trail.length}
         parentUplineLabel={parentUplineLabel}
         onGoBackOneLevel={handleGoBackOneLevel}
+        defaultExpanded={defaultExpanded}
       />
     </Box>
   );
@@ -565,11 +568,18 @@ function AccordionBranchCard({
   trailLength = 0,
   parentUplineLabel = "",
   onGoBackOneLevel = null,
+  defaultExpanded = false,
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const [children, setChildren] = useState(node?.children || []);
   const [childrenLoaded, setChildrenLoaded] = useState(Array.isArray(node?.children) && node.children.length > 0);
   const [loadingKids, setLoadingKids] = useState(false);
+
+  useEffect(() => {
+    setChildren(node?.children || []);
+    setChildrenLoaded(Array.isArray(node?.children) && node.children.length > 0);
+    setExpanded(defaultExpanded);
+  }, [node, defaultExpanded]);
 
   // Lazy-load kids on expand if not already available
   const toggleExpand = async () => {
@@ -849,7 +859,7 @@ function AccordionBranchCard({
       </Paper>
 
       {/* Children Section (Screen 4 Layout) */}
-      {expanded && (
+      <Collapse in={expanded} timeout="auto" unmountOnExit>
         <Box sx={{ mt: 2, pl: { xs: 1.5, sm: 3 }, position: "relative" }}>
           {/* Vertical Dotted Connecting Line */}
           <Box
@@ -1134,7 +1144,7 @@ function AccordionBranchCard({
             })}
           </Stack>
         </Box>
-      )}
+      </Collapse>
     </Box>
   );
 }
