@@ -4093,25 +4093,38 @@ def wallet_me_history(request):
         # Pure Layer Matrix Earnings across all sources
         layer_matrix_earned_val = layer_income_all_sources_val
 
-        # Genuine Direct e-Edu Referral Bonus (from directs buying Rank 1 / e-Education upgrades)
-        direct_edu_earned_val = UpgradeCommission.objects.filter(
-            to_user=user, commission_type="DIRECT", status="CREDITED"
-        ).aggregate(total=Sum("commission_amount"))["total"] or D("0.00")
+        # Genuine Direct e-Edu Referral Bonus (credited 75% to main wallet)
+        wt_dir = WalletTransaction.objects.filter(user=user, amount__gt=0, source_type="RANK_UPGRADE").filter(
+            Q(meta__kind="RANK_UPGRADE_DIRECT") | Q(meta__orig_type="DIRECT_REF_BONUS")
+        ).exclude(
+            Q(type__startswith="SELF_ACCOUNT") | Q(meta__ledger="SELF_ACCOUNT")
+        ).aggregate(total=Sum("amount"))["total"] or D("0.00")
+        direct_edu_earned_val = wt_dir
 
-        # Fallback to wallet transactions if UpgradeCommission was not logged
         if direct_edu_earned_val == 0:
-            wt_dir = WalletTransaction.objects.filter(user=user, amount__gt=0, source_type="RANK_UPGRADE").filter(
-                Q(meta__kind="RANK_UPGRADE_DIRECT") | Q(meta__orig_type="DIRECT_REF_BONUS")
-            ).aggregate(total=Sum("amount"))["total"] or D("0.00")
-            direct_edu_earned_val = wt_dir
+            direct_edu_gross = UpgradeCommission.objects.filter(
+                to_user=user, commission_type="DIRECT", status="CREDITED"
+            ).aggregate(total=Sum("commission_amount"))["total"] or D("0.00")
+            direct_edu_earned_val = direct_edu_gross * D("0.75")
+
+        # Genuine Layer e-Edu Commission (level bonuses from rank upgrades)
+        layer_edu_earned_val = WalletTransaction.objects.filter(
+            user=user, amount__gt=0, source_type="RANK_UPGRADE"
+        ).filter(
+            Q(meta__kind="RANK_UPGRADE_LEVEL") | Q(meta__orig_type="LEVEL_BONUS")
+        ).exclude(
+            Q(type__startswith="SELF_ACCOUNT") | Q(meta__ledger="SELF_ACCOUNT")
+        ).aggregate(total=Sum("amount"))["total"] or D("0.00")
 
         layer_matrix_earned = str(layer_matrix_earned_val)
         direct_edu_earned = str(direct_edu_earned_val)
-        # In layer context, do NOT mix direct sponsor/referral bonus into layer earnings
-        e_edu_total_earned = str(layer_matrix_earned_val)
+        layer_edu_earned = str(layer_edu_earned_val)
+        # Total E-Edu Income: All E-Edu related money (Layer commissions + Direct referral bonus)
+        e_edu_total_earned = str(direct_edu_earned_val + layer_edu_earned_val)
     except Exception:
         layer_matrix_earned = "0.00"
         direct_edu_earned = "0.00"
+        layer_edu_earned = "0.00"
         e_edu_total_earned = "0.00"
 
     try:
@@ -4300,6 +4313,7 @@ def wallet_me_history(request):
         "layer_matrix_earned": layer_matrix_earned,
         "layer_income_all_sources": layer_matrix_earned,
         "direct_edu_earned": direct_edu_earned,
+        "layer_edu_earned": layer_edu_earned,
         "e_edu_total_earned": e_edu_total_earned,
         "income": {
             "matrixLevel": layer_matrix_earned,
