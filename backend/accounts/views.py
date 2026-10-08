@@ -4067,35 +4067,31 @@ def wallet_me_history(request):
 
     try:
         from django.db.models import Sum, Q
-        level_earn_types = [
-            "LEVEL_BONUS",
-            "AUTOPOOL_BONUS_FIVE",
-            "AUTOPOOL_BONUS_THREE",
-        ]
-        q_level = Q(type__in=level_earn_types) | (
-            Q(type="INCOME_CREDIT_75") & (
-                Q(meta__orig_type__in=level_earn_types) |
+        # Pure Layer Income from all sources (matches History.jsx classifyTransaction === "LAYER")
+        q_layer = (
+            Q(type__in=["LEVEL_BONUS", "AUTOPOOL_BONUS_FIVE", "AUTOPOOL_BONUS_THREE", "PRIME_150_SELF", "PRIME_750_SELF", "PRIME_759_SELF"]) |
+            Q(meta__source__startswith="THREE_MATRIX") |
+            Q(meta__source__startswith="FIVE_MATRIX") |
+            (Q(source_type="RANK_UPGRADE") & (Q(meta__orig_type__icontains="LEVEL") | Q(type__icontains="LEVEL") | Q(meta__kind__icontains="LEVEL"))) |
+            (Q(type="INCOME_CREDIT_75") & (
+                Q(meta__orig_type__icontains="LEVEL") |
+                Q(meta__orig_type__icontains="AUTOPOOL") |
                 Q(meta__source__icontains="MATRIX") |
-                Q(meta__trigger="PRIME_150")
-            )
+                Q(meta__trigger__in=["PRIME_150", "PRIME_750", "PRIME_759", "SELF_REBIRTH_250"])
+            ))
         )
-        level_tx_sum = WalletTransaction.objects.filter(user=user, amount__gt=0).filter(q_level).aggregate(total=Sum("amount"))["total"] or D("0.00")
-        try:
-            from mlm_ranks.models import UpgradeCommission
-            upg_level_sum = UpgradeCommission.objects.filter(to_user=user, commission_type="LEVEL").aggregate(total=Sum("commission_amount"))["total"] or D("0.00")
-        except Exception:
-            upg_level_sum = D("0.00")
-
-        level_earnings_total = str(level_tx_sum + upg_level_sum)
+        layer_income_all_sources_val = WalletTransaction.objects.filter(user=user, amount__gt=0).filter(q_layer).exclude(
+            Q(type__startswith="SELF_ACCOUNT") | Q(meta__ledger="SELF_ACCOUNT")
+        ).aggregate(total=Sum("amount"))["total"] or D("0.00")
+        level_earnings_total = str(layer_income_all_sources_val)
     except Exception:
         level_earnings_total = "0.00"
+        layer_income_all_sources_val = D("0.00")
 
     try:
         from mlm_ranks.models import UpgradeCommission
-        # Genuine Layer Matrix Earnings (from downline upgrading slabs)
-        layer_matrix_earned_val = UpgradeCommission.objects.filter(
-            to_user=user, commission_type="LEVEL", status="CREDITED"
-        ).aggregate(total=Sum("commission_amount"))["total"] or D("0.00")
+        # Pure Layer Matrix Earnings across all sources
+        layer_matrix_earned_val = layer_income_all_sources_val
 
         # Genuine Direct e-Edu Referral Bonus (from directs buying Rank 1 / e-Education upgrades)
         direct_edu_earned_val = UpgradeCommission.objects.filter(
@@ -4103,12 +4099,6 @@ def wallet_me_history(request):
         ).aggregate(total=Sum("commission_amount"))["total"] or D("0.00")
 
         # Fallback to wallet transactions if UpgradeCommission was not logged
-        if layer_matrix_earned_val == 0:
-            wt_lvl = WalletTransaction.objects.filter(user=user, amount__gt=0, source_type="RANK_UPGRADE").filter(
-                Q(meta__kind="RANK_UPGRADE_LEVEL") | Q(meta__orig_type="LEVEL_BONUS")
-            ).aggregate(total=Sum("amount"))["total"] or D("0.00")
-            layer_matrix_earned_val = wt_lvl
-
         if direct_edu_earned_val == 0:
             wt_dir = WalletTransaction.objects.filter(user=user, amount__gt=0, source_type="RANK_UPGRADE").filter(
                 Q(meta__kind="RANK_UPGRADE_DIRECT") | Q(meta__orig_type="DIRECT_REF_BONUS")
@@ -4117,7 +4107,8 @@ def wallet_me_history(request):
 
         layer_matrix_earned = str(layer_matrix_earned_val)
         direct_edu_earned = str(direct_edu_earned_val)
-        e_edu_total_earned = str(layer_matrix_earned_val + direct_edu_earned_val)
+        # In layer context, do NOT mix direct sponsor/referral bonus into layer earnings
+        e_edu_total_earned = str(layer_matrix_earned_val)
     except Exception:
         layer_matrix_earned = "0.00"
         direct_edu_earned = "0.00"
@@ -4307,6 +4298,7 @@ def wallet_me_history(request):
         "recent": [txmap(x) for x in WalletTransaction.objects.filter(user=user).order_by("-created_at")[:50]],
         "level_earnings": level_earnings_total,
         "layer_matrix_earned": layer_matrix_earned,
+        "layer_income_all_sources": layer_matrix_earned,
         "direct_edu_earned": direct_edu_earned,
         "e_edu_total_earned": e_edu_total_earned,
         "income": {

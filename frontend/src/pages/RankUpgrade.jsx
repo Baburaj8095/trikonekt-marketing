@@ -456,30 +456,109 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
     return Number(walletHistory?.current_limit || tier?.limit || 1750);
   }, [currentLevel, walletHistory]);
 
-  const layerMatrixEarned = useMemo(() => {
-    return Number(
-      walletHistory?.layer_matrix_earned ??
-      walletHistory?.income?.matrixLevel ??
-      0
-    );
+  // Pure Layer Income From All Sources (strictly matching History "Source: Layer & Blocks")
+  const { rawLayerIncome, layerBreakdown } = useMemo(() => {
+    const allTx = [
+      ...(walletHistory?.all_transactions || []),
+      ...(walletHistory?.main_wallet || []),
+    ];
+
+    let total = 0;
+    let fiveMatrix = 0;
+    let threeMatrix = 0;
+    let eEduSlabs = 0;
+    let otherLayers = 0;
+    const seen = new Set();
+
+    for (const tx of allTx) {
+      if (!tx?.id || seen.has(tx.id)) continue;
+      seen.add(tx.id);
+
+      const type = String(tx?.type || "").toUpperCase();
+      const meta = tx?.meta || {};
+      const src = String(meta.source || "").toUpperCase();
+      const st = String(tx?.source_type || "").toUpperCase();
+      const ot = String(meta.orig_type || "").toUpperCase();
+      const trig = String(meta.trigger || "").toUpperCase();
+      const kind = String(meta.kind || "").toUpperCase();
+      const amt = Number(tx?.amount || 0);
+
+      // Exclude self account and non-positive credits
+      if (
+        amt <= 0 ||
+        type.startsWith("SELF_ACCOUNT") ||
+        meta.ledger === "SELF_ACCOUNT" ||
+        type === "SELF_ACCOUNT_CREDIT" ||
+        type === "SELF_ACCOUNT_DEBIT"
+      ) {
+        continue;
+      }
+
+      // Pure Layer & Blocks classification (strictly matches History.jsx classifyTransaction === "LAYER")
+      const isLayer =
+        type === "LEVEL_BONUS" ||
+        type === "AUTOPOOL_BONUS_FIVE" ||
+        type === "AUTOPOOL_BONUS_THREE" ||
+        (st === "RANK_UPGRADE" && (ot.includes("LEVEL") || type.includes("LEVEL") || kind.includes("LEVEL"))) ||
+        type === "PRIME_150_SELF" ||
+        type === "PRIME_750_SELF" ||
+        type === "PRIME_759_SELF" ||
+        src.startsWith("THREE_MATRIX") ||
+        src.startsWith("FIVE_MATRIX") ||
+        (type === "INCOME_CREDIT_75" && (
+          ot.includes("LEVEL") ||
+          ot.includes("AUTOPOOL") ||
+          src.includes("MATRIX") ||
+          trig === "PRIME_150" ||
+          trig === "PRIME_750" ||
+          trig === "PRIME_759" ||
+          trig === "SELF_REBIRTH_250"
+        ));
+
+      if (isLayer) {
+        total += amt;
+        if (src.includes("FIVE") || ot === "AUTOPOOL_BONUS_FIVE" || st.includes("FIVE")) {
+          fiveMatrix += amt;
+        } else if (src.includes("THREE") || ot === "AUTOPOOL_BONUS_THREE" || st.includes("THREE")) {
+          threeMatrix += amt;
+        } else if (st === "RANK_UPGRADE" || kind.includes("LEVEL") || kind.includes("RANK")) {
+          eEduSlabs += amt;
+        } else {
+          otherLayers += amt;
+        }
+      }
+    }
+
+    if (total === 0) {
+      const fromApi = Number(
+        walletHistory?.layer_income_all_sources ||
+        walletHistory?.layer_matrix_earned ||
+        walletHistory?.level_earnings ||
+        0
+      );
+      if (fromApi > 0) total = fromApi;
+    }
+
+    return {
+      rawLayerIncome: Number(total.toFixed(2)),
+      layerBreakdown: {
+        fiveMatrix: Number(fiveMatrix.toFixed(2)),
+        threeMatrix: Number(threeMatrix.toFixed(2)),
+        eEduSlabs: Number((eEduSlabs + otherLayers).toFixed(2)),
+      },
+    };
   }, [walletHistory]);
 
-  const directEduEarned = useMemo(() => {
-    return Number(walletHistory?.direct_edu_earned ?? 0);
-  }, [walletHistory]);
-
-  const eEduEarnings = useMemo(() => {
-    const fromApi = Number(walletHistory?.e_edu_total_earned ?? 0);
-    if (fromApi > 0) return fromApi;
-    return layerMatrixEarned + directEduEarned;
-  }, [walletHistory, layerMatrixEarned, directEduEarned]);
-
+  // MUST NOT CROSS EARNING LIMIT: Capped at user's current earning limit
   const totalEarnings = useMemo(() => {
-    return layerMatrixEarned;
-  }, [layerMatrixEarned]);
+    if (currentLimit > 0) {
+      return Math.min(rawLayerIncome, currentLimit);
+    }
+    return rawLayerIncome;
+  }, [rawLayerIncome, currentLimit]);
 
   const isLimitReached =
-    walletHistory?.is_limit_reached ?? (totalEarnings >= currentLimit);
+    walletHistory?.is_limit_reached ?? (currentLimit > 0 && rawLayerIncome >= currentLimit);
 
   const percentUsed =
     currentLimit > 0
@@ -488,22 +567,24 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
 
   const layerMatrixEligible = useMemo(() => {
     return Number(
-      walletHistory?.layer_matrix_eligible || Math.max(100000, currentLevel * 10000)
+      walletHistory?.layer_matrix_eligible || Math.max(currentLimit, 100000)
     );
-  }, [walletHistory, currentLevel]);
+  }, [walletHistory, currentLimit]);
 
+  // Income generated after limit reached will be shown in Missing Blocks Income
   const missingIncome = useMemo(() => {
-    return Number(
-      walletHistory?.missing_income ||
-        (isLimitReached ? Math.max(0, totalEarnings - currentLimit) : 0)
-    );
-  }, [walletHistory, isLimitReached, totalEarnings, currentLimit]);
+    if (currentLimit > 0 && rawLayerIncome > currentLimit) {
+      return Number((rawLayerIncome - currentLimit).toFixed(2));
+    }
+    return Number(walletHistory?.missing_income || 0);
+  }, [rawLayerIncome, currentLimit, walletHistory]);
 
   const layerMatrixPercent = useMemo(() => {
-    return layerMatrixEligible > 0
-      ? Math.min(100, (layerMatrixEarned / layerMatrixEligible) * 100)
+    const denom = currentLimit > 0 ? currentLimit : layerMatrixEligible;
+    return denom > 0
+      ? Math.min(100, (totalEarnings / denom) * 100)
       : 0;
-  }, [layerMatrixEarned, layerMatrixEligible]);
+  }, [totalEarnings, currentLimit, layerMatrixEligible]);
 
   const savedRankConfig = useMemo(() => {
     try {
@@ -931,19 +1012,20 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                 <LayersRoundedIcon color="primary" sx={{ fontSize: 18 }} />
                 <Typography sx={{ fontWeight: 900, fontSize: 12, color: "#0369a1" }}>LAYER BLOCKS EARNINGS ⓘ</Typography>
               </Stack>
-              <Chip label={`Eligible ₹${fmt(layerMatrixEligible)}`} color="primary" size="small" sx={{ fontWeight: 900, fontSize: 11 }} />
+              <Chip label={`Eligible ₹${fmt(currentLimit)}`} color="primary" size="small" sx={{ fontWeight: 900, fontSize: 11 }} />
             </Stack>
             <Divider sx={{ my: 1 }} />
-            <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700, mb: 0.5 }}>TOTAL e-EDU LAYER INCOME</Typography>
-            <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#0f172a", mb: 0.5 }}>₹{fmt(eEduEarnings)}</Typography>
-            <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#64748b", mb: 0.5 }}>
-              <span>Direct Bonus: ₹{fmt(directEduEarned)}</span>
-              <span>Matrix Slabs: ₹{fmt(layerMatrixEarned)}</span>
+            <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700, mb: 0.5 }}>TOTAL LAYER INCOME (ALL SOURCES)</Typography>
+            <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#0f172a", mb: 0.5 }}>₹{fmt(totalEarnings)}</Typography>
+            <Box sx={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 0.5, fontSize: 10, color: "#64748b", mb: 0.5 }}>
+              <span>5 Blocks: ₹{fmt(layerBreakdown.fiveMatrix)}</span>
+              <span>3 Blocks: ₹{fmt(layerBreakdown.threeMatrix)}</span>
+              <span>e-Edu: ₹{fmt(layerBreakdown.eEduSlabs)}</span>
             </Box>
             <LinearProgress variant="determinate" value={layerMatrixPercent} sx={{ height: 6, borderRadius: 3, mb: 1 }} />
             <Divider sx={{ my: 1 }} />
             <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#0369a1" }}>
-              TOTAL ELIGIBLE LAYER INCOME ₹{fmt(layerMatrixEligible)}
+              TOTAL ELIGIBLE LAYER LIMIT ₹{fmt(currentLimit)}
             </Typography>
           </Paper>
         </Grid>
@@ -1029,13 +1111,13 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           }}
         >
           <Typography sx={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.4, mb: 0.5, whiteSpace: "nowrap" }}>
-            e-Edu Total Earnings
+            Layer Total Earnings
           </Typography>
           <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#7c3aed" }}>
-            ₹{fmt(eEduEarnings)}
+            ₹{fmt(totalEarnings)}
           </Typography>
           <Typography sx={{ fontSize: 10, color: "#6d28d9", fontWeight: 700 }}>
-            Direct + Matrix Slabs
+            All Layer Sources
           </Typography>
         </Paper>
       </Box>

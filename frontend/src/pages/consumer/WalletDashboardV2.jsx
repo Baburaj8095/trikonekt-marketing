@@ -152,9 +152,9 @@ export default function WalletDashboardV2({ showTable = true }) {
         walletHistory?.level_earnings ||
         0
     );
-    if (val > 0) return val;
-    return layerMatrixEarned;
-  }, [walletHistory, layerMatrixEarned]);
+    const raw = val > 0 ? val : layerMatrixEarned;
+    return currentLimit > 0 ? Math.min(raw, currentLimit) : raw;
+  }, [walletHistory, layerMatrixEarned, currentLimit]);
 
   const isLimitReached =
     walletHistory?.is_limit_reached ?? (totalEarnings >= currentLimit);
