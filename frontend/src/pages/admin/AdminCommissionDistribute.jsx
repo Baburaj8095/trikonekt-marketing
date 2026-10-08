@@ -6271,7 +6271,7 @@ right={
                   }}
                 />
                 <Input
-                  label="Qualification Window (Days from Joining)"
+                  label="Qualification Window (Days)"
                   type="number"
                   value={royaltyConfig.tier3_days ?? 30}
                   onChange={(val) => {

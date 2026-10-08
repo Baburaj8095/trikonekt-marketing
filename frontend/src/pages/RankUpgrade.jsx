@@ -1123,13 +1123,22 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                 <ShoppingBagRoundedIcon color="success" sx={{ fontSize: 18 }} />
                 <Typography sx={{ fontWeight: 900, fontSize: 12, color: "#15803d" }}>ROYALTY INCOME (SHOPPING) ⓘ</Typography>
               </Stack>
-              <Chip
-                label={`Earned: ₹${fmt(earnedRoyalty)} / ₹${fmt(totalEligibleRoyaltyCap)}`}
-                color={earnedRoyalty > 0 ? "success" : "default"}
-                size="small"
-                sx={{ fontWeight: 900, fontSize: 11 }}
-              />
+              <Chip label={`Eligible ₹${fmt(totalEligibleRoyaltyCap)}`} color="success" size="small" sx={{ fontWeight: 900, fontSize: 11 }} />
             </Stack>
+            <Divider sx={{ my: 1 }} />
+            <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700, mb: 0.5 }}>TOTAL ROYALTY EARNED (ALL TIERS)</Typography>
+            <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#0f172a", mb: 0.5 }}>₹{fmt(earnedRoyalty)}</Typography>
+            <Box sx={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 0.5, fontSize: 10, color: "#64748b", mb: 0.5 }}>
+              <span>L1 to L7: ₹{fmt(royaltyInfo?.tier1_earned ?? 0)}</span>
+              <span>L8 to L10: ₹{fmt(royaltyInfo?.tier2_earned ?? 0)}</span>
+              <span>Recovery: ₹{fmt(royaltyInfo?.tier3_earned ?? 0)}</span>
+            </Box>
+            <LinearProgress
+              variant="determinate"
+              value={totalEligibleRoyaltyCap > 0 ? Math.min(100, (earnedRoyalty / totalEligibleRoyaltyCap) * 100) : 0}
+              color="success"
+              sx={{ height: 6, borderRadius: 3, mb: 1 }}
+            />
             <Divider sx={{ my: 1 }} />
             <Stack spacing={1.2}>
               {/* Tier 1 */}
@@ -1143,6 +1152,9 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                     <span style={{ fontSize: 10, color: "#64748b", fontWeight: 500, marginLeft: 4 }}>
                       ({royaltyConfig?.tier1_days ?? 40}d window)
                     </span>
+                  </Typography>
+                  <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#059669" }}>
+                    Earned: ₹{fmt(royaltyInfo?.tier1_earned ?? 0)}
                   </Typography>
                 </Box>
                 {renderTierBadge(royaltyInfo?.tier1, currentLevel >= 7)}
@@ -1160,6 +1172,9 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                       ({royaltyConfig?.tier2_days ?? 7}d from L7)
                     </span>
                   </Typography>
+                  <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#059669" }}>
+                    Earned: ₹{fmt(royaltyInfo?.tier2_earned ?? 0)}
+                  </Typography>
                 </Box>
                 {renderTierBadge(royaltyInfo?.tier2, currentLevel >= 10)}
               </Stack>
@@ -1173,28 +1188,20 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                   <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#15803d" }}>
                     {royaltyConfig?.tier3_percent ?? 4}% ₹{fmt(royaltyConfig?.tier3_cap ?? 10000)}
                     <span style={{ fontSize: 10, color: "#64748b", fontWeight: 500, marginLeft: 4 }}>
-                      ({royaltyConfig?.tier3_days ?? 30}d from join)
+                      ({royaltyConfig?.tier3_days ?? 30}d window)
                     </span>
+                  </Typography>
+                  <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#059669" }}>
+                    Earned: ₹{fmt(royaltyInfo?.tier3_earned ?? 0)}
                   </Typography>
                 </Box>
                 {renderTierBadge(royaltyInfo?.tier3, currentLevel >= 10)}
               </Stack>
             </Stack>
             <Divider sx={{ my: 1 }} />
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
-              <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#15803d" }}>
-                TOTAL ELIGIBLE ROYALTY INCOME ₹{fmt(totalEligibleRoyaltyCap)}
-              </Typography>
-              <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>
-                {totalEligibleRoyaltyCap > 0 ? `${Math.min(100, Math.round((earnedRoyalty / totalEligibleRoyaltyCap) * 100))}%` : "0%"}
-              </Typography>
-            </Box>
-            <LinearProgress
-              variant="determinate"
-              value={totalEligibleRoyaltyCap > 0 ? Math.min(100, (earnedRoyalty / totalEligibleRoyaltyCap) * 100) : 0}
-              color="success"
-              sx={{ height: 6, borderRadius: 3 }}
-            />
+            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#15803d" }}>
+              TOTAL ELIGIBLE ROYALTY LIMIT ₹{fmt(totalEligibleRoyaltyCap)}
+            </Typography>
           </Paper>
         </Grid>
 
