@@ -421,6 +421,10 @@ export default function AdminCommissionDistribute() {
       tier2_cap: 40000,
       tier2_days: 7,
       tier2_levels: "Layer 8 to Layer 10",
+      tier3_percent: 4,
+      tier3_cap: 10000,
+      tier3_days: 30,
+      tier3_levels: "Layer 1 to Layer 10",
       // Daily Midnight 11:59 PM Pool Distribution Settings
       daily_franchise_percent: 5.0,
       daily_district_percent: 3.0,
@@ -6157,7 +6161,7 @@ right={
           title="Shopping & Block Royalty Income Tiers"
           subtitle="Configure shopping & general network turnover pools, share percentages, and achievement threshold caps for Royalty Tiers"
         >
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
             {/* Tier 1 Card */}
             <div style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: 16, background: "#f8fafc" }}>
               <div style={{ fontSize: 16, fontWeight: 900, color: "#1e293b", marginBottom: 4 }}>
@@ -6171,7 +6175,7 @@ right={
                 <Input
                   label="Pool Share Percentage (%)"
                   type="number"
-                  value={royaltyConfig.tier1_percent ?? 3}
+                  value={royaltyConfig.tier1_percent ?? 4}
                   onChange={(val) => {
                     setRoyaltyConfig((prev) => ({ ...prev, tier1_percent: Number(val) }));
                     setRoyaltyDirty(true);
@@ -6201,17 +6205,17 @@ right={
             {/* Tier 2 Card */}
             <div style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: 16, background: "#f8fafc" }}>
               <div style={{ fontSize: 16, fontWeight: 900, color: "#1e293b", marginBottom: 4 }}>
-                👑 Royalty Tier 2 (Layer 10)
+                👑 Royalty Tier 2 (Layer 8 to Layer 10)
               </div>
               <div style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>
-                Applies to top tier leaders reaching Layer 10
+                Applies to top tier leaders reaching Layer 10 within 7 days of L7
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <Input
                   label="Pool Share Percentage (%)"
                   type="number"
-                  value={royaltyConfig.tier2_percent ?? 7}
+                  value={royaltyConfig.tier2_percent ?? 6}
                   onChange={(val) => {
                     setRoyaltyConfig((prev) => ({ ...prev, tier2_percent: Number(val) }));
                     setRoyaltyDirty(true);
@@ -6227,11 +6231,51 @@ right={
                   }}
                 />
                 <Input
-                  label="Qualification Window (Days)"
+                  label="Qualification Window (Days from L7)"
                   type="number"
                   value={royaltyConfig.tier2_days ?? 7}
                   onChange={(val) => {
                     setRoyaltyConfig((prev) => ({ ...prev, tier2_days: Number(val) }));
+                    setRoyaltyDirty(true);
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Tier 3 Card: Recovery Window */}
+            <div style={{ border: "1px solid #fed7aa", borderRadius: 10, padding: 16, background: "#fffaf5" }}>
+              <div style={{ fontSize: 16, fontWeight: 900, color: "#9a3412", marginBottom: 4 }}>
+                👑 Royalty Tier 3 (Recovery: Layer 1 to Layer 10)
+              </div>
+              <div style={{ fontSize: 12, color: "#7c2d12", marginBottom: 12 }}>
+                For members who missed Tier 1 or 2, completing L1-L10 within grace window
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <Input
+                  label="Pool Share Percentage (%)"
+                  type="number"
+                  value={royaltyConfig.tier3_percent ?? 4}
+                  onChange={(val) => {
+                    setRoyaltyConfig((prev) => ({ ...prev, tier3_percent: Number(val) }));
+                    setRoyaltyDirty(true);
+                  }}
+                />
+                <Input
+                  label="Earning Cap / Threshold Amount (₹)"
+                  type="number"
+                  value={royaltyConfig.tier3_cap ?? 10000}
+                  onChange={(val) => {
+                    setRoyaltyConfig((prev) => ({ ...prev, tier3_cap: Number(val) }));
+                    setRoyaltyDirty(true);
+                  }}
+                />
+                <Input
+                  label="Qualification Window (Days from Joining)"
+                  type="number"
+                  value={royaltyConfig.tier3_days ?? 30}
+                  onChange={(val) => {
+                    setRoyaltyConfig((prev) => ({ ...prev, tier3_days: Number(val) }));
                     setRoyaltyDirty(true);
                   }}
                 />

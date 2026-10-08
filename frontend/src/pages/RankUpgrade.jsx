@@ -694,6 +694,10 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
       tier2_cap: 40000,
       tier2_days: 7,
       tier2_levels: "Layer 8 to Layer 10",
+      tier3_percent: 4,
+      tier3_cap: 10000,
+      tier3_days: 30,
+      tier3_levels: "Layer 1 to Layer 10",
     };
   });
 
@@ -713,7 +717,25 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
     return () => { alive = false; };
   }, []);
 
+  // Synchronize dynamic royalty config from backend API when available
+  useEffect(() => {
+    if (elig?.royalty_info?.config && typeof elig.royalty_info.config === "object") {
+      setRoyaltyConfig((prev) => ({ ...prev, ...elig.royalty_info.config }));
+    }
+  }, [elig]);
+
   const savedRoyaltyConfig = royaltyConfig;
+
+  const royaltyInfo = elig?.royalty_info;
+  const earnedRoyalty = Number(royaltyInfo?.total_earned ?? 0);
+  const totalEligibleRoyaltyCap = useMemo(() => {
+    if (royaltyInfo?.total_cap !== undefined && Number(royaltyInfo.total_cap) > 0) {
+      return Number(royaltyInfo.total_cap);
+    }
+    const t1 = Number(royaltyConfig?.tier1_cap ?? 10000);
+    const t2 = Number(royaltyConfig?.tier2_cap ?? 40000);
+    return t1 + t2;
+  }, [royaltyInfo, royaltyConfig]);
 
   const royaltyShopping = useMemo(() => {
     let total = 0;
@@ -727,6 +749,31 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
     }
     return total;
   }, [currentLevel, royaltyConfig]);
+
+  const renderTierBadge = (tierData, isCompletedFallback) => {
+    if (!tierData) {
+      return isCompletedFallback ? (
+        <Chip icon={<CheckCircleRoundedIcon />} label="Completed" color="success" variant="outlined" size="small" sx={{ fontWeight: 800 }} />
+      ) : (
+        <Chip label="Pending" color="default" variant="outlined" size="small" />
+      );
+    }
+    const status = tierData.status;
+    if (status === "COMPLETED") {
+      return <Chip icon={<CheckCircleRoundedIcon />} label="Completed" color="success" size="small" sx={{ fontWeight: 800 }} />;
+    }
+    if (status === "IN_PROGRESS") {
+      const left = tierData.days_remaining ?? 0;
+      return <Chip label={`${left}d left`} color="warning" variant="outlined" size="small" sx={{ fontWeight: 800 }} />;
+    }
+    if (status === "MISSED") {
+      return <Chip label="Missed" color="error" variant="outlined" size="small" sx={{ fontWeight: 800 }} />;
+    }
+    if (status === "NOT_APPLICABLE") {
+      return <Chip label="N/A" color="default" variant="outlined" size="small" />;
+    }
+    return <Chip label="Locked" color="default" variant="outlined" size="small" />;
+  };
 
   // ── 5-Matrix Education Rank Tree Community Blocks Data ──
   const [communityExpanded, setCommunityExpanded] = useState(false);
@@ -1076,10 +1123,16 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                 <ShoppingBagRoundedIcon color="success" sx={{ fontSize: 18 }} />
                 <Typography sx={{ fontWeight: 900, fontSize: 12, color: "#15803d" }}>ROYALTY INCOME (SHOPPING) ⓘ</Typography>
               </Stack>
-              <Chip label={`₹${fmt((Number(royaltyConfig?.tier1_cap ?? 10000) + Number(royaltyConfig?.tier2_cap ?? 40000)))}`} color="success" size="small" sx={{ fontWeight: 900, fontSize: 11 }} />
+              <Chip
+                label={`Earned: ₹${fmt(earnedRoyalty)} / ₹${fmt(totalEligibleRoyaltyCap)}`}
+                color={earnedRoyalty > 0 ? "success" : "default"}
+                size="small"
+                sx={{ fontWeight: 900, fontSize: 11 }}
+              />
             </Stack>
             <Divider sx={{ my: 1 }} />
-            <Stack spacing={1}>
+            <Stack spacing={1.2}>
+              {/* Tier 1 */}
               <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Box>
                   <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>
@@ -1087,14 +1140,15 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                   </Typography>
                   <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#15803d" }}>
                     {royaltyConfig?.tier1_percent ?? 4}% ₹{fmt(royaltyConfig?.tier1_cap ?? 10000)}
+                    <span style={{ fontSize: 10, color: "#64748b", fontWeight: 500, marginLeft: 4 }}>
+                      ({royaltyConfig?.tier1_days ?? 40}d window)
+                    </span>
                   </Typography>
                 </Box>
-                {currentLevel >= 7 ? (
-                  <Chip icon={<CheckCircleRoundedIcon />} label="Completed" color="success" variant="outlined" size="small" />
-                ) : (
-                  <Chip label="Pending" color="default" variant="outlined" size="small" />
-                )}
+                {renderTierBadge(royaltyInfo?.tier1, currentLevel >= 7)}
               </Stack>
+
+              {/* Tier 2 */}
               <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Box>
                   <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>
@@ -1102,19 +1156,45 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                   </Typography>
                   <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#15803d" }}>
                     {royaltyConfig?.tier2_percent ?? 6}% ₹{fmt(royaltyConfig?.tier2_cap ?? 40000)}
+                    <span style={{ fontSize: 10, color: "#64748b", fontWeight: 500, marginLeft: 4 }}>
+                      ({royaltyConfig?.tier2_days ?? 7}d from L7)
+                    </span>
                   </Typography>
                 </Box>
-                {currentLevel >= 10 ? (
-                  <Chip icon={<CheckCircleRoundedIcon />} label="Completed" color="success" variant="outlined" size="small" />
-                ) : (
-                  <Chip label="Pending" color="default" variant="outlined" size="small" />
-                )}
+                {renderTierBadge(royaltyInfo?.tier2, currentLevel >= 10)}
+              </Stack>
+
+              {/* Tier 3: Recovery Window */}
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Box>
+                  <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>
+                    {royaltyConfig?.tier3_levels ? String(royaltyConfig.tier3_levels).replace(/Level/gi, "LAYER") : "LAYER 1 TO LAYER 10 (RECOVERY)"}
+                  </Typography>
+                  <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#15803d" }}>
+                    {royaltyConfig?.tier3_percent ?? 4}% ₹{fmt(royaltyConfig?.tier3_cap ?? 10000)}
+                    <span style={{ fontSize: 10, color: "#64748b", fontWeight: 500, marginLeft: 4 }}>
+                      ({royaltyConfig?.tier3_days ?? 30}d from join)
+                    </span>
+                  </Typography>
+                </Box>
+                {renderTierBadge(royaltyInfo?.tier3, currentLevel >= 10)}
               </Stack>
             </Stack>
             <Divider sx={{ my: 1 }} />
-            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#15803d" }}>
-              TOTAL ELIGIBLE ROYALTY INCOME (SHOPPING) ₹{fmt((Number(royaltyConfig?.tier1_cap ?? 10000) + Number(royaltyConfig?.tier2_cap ?? 40000)))}
-            </Typography>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.5 }}>
+              <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#15803d" }}>
+                TOTAL ELIGIBLE ROYALTY INCOME ₹{fmt(totalEligibleRoyaltyCap)}
+              </Typography>
+              <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>
+                {totalEligibleRoyaltyCap > 0 ? `${Math.min(100, Math.round((earnedRoyalty / totalEligibleRoyaltyCap) * 100))}%` : "0%"}
+              </Typography>
+            </Box>
+            <LinearProgress
+              variant="determinate"
+              value={totalEligibleRoyaltyCap > 0 ? Math.min(100, (earnedRoyalty / totalEligibleRoyaltyCap) * 100) : 0}
+              color="success"
+              sx={{ height: 6, borderRadius: 3 }}
+            />
           </Paper>
         </Grid>
 

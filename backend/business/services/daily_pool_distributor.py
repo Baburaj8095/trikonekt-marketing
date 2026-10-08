@@ -75,10 +75,13 @@ def execute_daily_pool_distribution(
 
     t1_pct = Decimal(str(royalty_cfg.get("tier1_percent", 4.0))) / Decimal("100.0")
     t2_pct = Decimal(str(royalty_cfg.get("tier2_percent", 6.0))) / Decimal("100.0")
+    t3_pct = Decimal(str(royalty_cfg.get("tier3_percent", 4.0))) / Decimal("100.0")
     t1_cap = _q2(royalty_cfg.get("tier1_cap", 10000.00))
     t2_cap = _q2(royalty_cfg.get("tier2_cap", 40000.00))
+    t3_cap = _q2(royalty_cfg.get("tier3_cap", 10000.00))
     t1_days = int(royalty_cfg.get("tier1_days", 40))
     t2_days = int(royalty_cfg.get("tier2_days", 7))
+    t3_days = int(royalty_cfg.get("tier3_days", 30))
 
     # Calculate Total Inflow for target date
     # 1. Promo Purchases (Starter, Prime, SPP)
@@ -109,6 +112,7 @@ def execute_daily_pool_distribution(
     # Pool amounts
     t1_pool = _q2(total_inflow * t1_pct)
     t2_pool = _q2(total_inflow * t2_pct)
+    t3_pool = _q2(total_inflow * t3_pct)
 
     # -------------------------------------------------------------
     # Identify Qualified Achievers
@@ -121,44 +125,59 @@ def execute_daily_pool_distribution(
 
     t1_achievers = []
     t2_achievers = []
+    t3_achievers = []
+
+    q_royalty = Q(type="GLOBAL_ROYALTY") | Q(source_id__startswith="ROYALTY_") | Q(meta__orig_type="GLOBAL_ROYALTY")
 
     for u in eligible_users:
         # Check total royalty already earned
         user_earned_royalty = _q2(
             WalletTransaction.objects.filter(
-                user=u,
-                type="GLOBAL_ROYALTY"
-            ).aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
+                user=u
+            ).filter(q_royalty).aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
         )
 
         # Check Highest Rank achieved
-        upgrades = RankUpgrade.objects.filter(
+        upgrades = list(RankUpgrade.objects.filter(
             user=u,
             payment_status=RankUpgrade.STATUS_SUCCESS
-        ).select_related("to_rank").order_by("to_rank__level_number")
+        ).select_related("to_rank").order_by("to_rank__level_number"))
 
         unlocked_ranks = [ru.to_rank.level_number for ru in upgrades if ru.to_rank]
         highest_lvl = max(unlocked_ranks) if unlocked_ranks else 0
 
-        # Tier 1 Qualification: L1 to L7 within t1_days (40 days)
-        if highest_lvl >= 7 and user_earned_royalty < t1_cap:
-            r7_upgrade = next((ru for ru in upgrades if ru.to_rank and ru.to_rank.level_number >= 7), None)
-            if r7_upgrade and u.date_joined:
-                # Calculate days taken to reach L7
-                days_taken = (r7_upgrade.upgraded_at.date() - u.date_joined.date()).days
-                if days_taken <= t1_days or force:
-                    rem_cap = _q2(t1_cap - user_earned_royalty)
-                    t1_achievers.append({"user": u, "days_taken": days_taken, "rem_cap": rem_cap})
+        r7_upgrade = next((ru for ru in upgrades if ru.to_rank and ru.to_rank.level_number >= 7), None)
+        r10_upgrade = next((ru for ru in upgrades if ru.to_rank and ru.to_rank.level_number >= 10), None)
 
-        # Tier 2 Qualification: L8 to L10 within t2_days (7 days)
-        if highest_lvl >= 10 and user_earned_royalty < (t1_cap + t2_cap):
-            r10_upgrade = next((ru for ru in upgrades if ru.to_rank and ru.to_rank.level_number >= 10), None)
-            r7_upgrade = next((ru for ru in upgrades if ru.to_rank and ru.to_rank.level_number >= 7), None)
-            if r10_upgrade and r7_upgrade:
-                days_taken = (r10_upgrade.upgraded_at.date() - r7_upgrade.upgraded_at.date()).days
-                if days_taken <= t2_days or force:
-                    rem_cap = _q2(t2_cap - max(Decimal("0.00"), user_earned_royalty - t1_cap))
-                    t2_achievers.append({"user": u, "days_taken": days_taken, "rem_cap": rem_cap})
+        t1_qualified = False
+        t2_qualified = False
+
+        # Tier 1 Qualification: L1 to L7 within t1_days (40 days)
+        if highest_lvl >= 7 and r7_upgrade and u.date_joined:
+            days_to_l7 = (r7_upgrade.upgraded_at.date() - u.date_joined.date()).days
+            if days_to_l7 <= t1_days or force:
+                t1_qualified = True
+                if user_earned_royalty < t1_cap:
+                    rem_cap = _q2(t1_cap - user_earned_royalty)
+                    t1_achievers.append({"user": u, "days_taken": days_to_l7, "rem_cap": rem_cap})
+
+        # Tier 2 Qualification: L8 to L10 within t2_days (7 days) from L7
+        if highest_lvl >= 10 and t1_qualified and r10_upgrade and r7_upgrade:
+            days_l7_to_l10 = (r10_upgrade.upgraded_at.date() - r7_upgrade.upgraded_at.date()).days
+            if days_l7_to_l10 <= t2_days or force:
+                t2_qualified = True
+                if user_earned_royalty < (t1_cap + t2_cap):
+                    rem_cap = _q2((t1_cap + t2_cap) - user_earned_royalty)
+                    t2_achievers.append({"user": u, "days_taken": days_l7_to_l10, "rem_cap": rem_cap})
+
+        # Tier 3 Qualification (Recovery / Grace window for L1 to L10):
+        # Applies if user missed Tier 1 or Tier 2, but reached Layer 10 within t3_days (30 days) from date_joined
+        if highest_lvl >= 10 and not (t1_qualified and t2_qualified) and r10_upgrade and u.date_joined:
+            days_to_l10 = (r10_upgrade.upgraded_at.date() - u.date_joined.date()).days
+            if days_to_l10 <= t3_days or force:
+                if user_earned_royalty < t3_cap:
+                    rem_cap = _q2(t3_cap - user_earned_royalty)
+                    t3_achievers.append({"user": u, "days_taken": days_to_l10, "rem_cap": rem_cap})
 
     # -------------------------------------------------------------
     # Execute Payouts
@@ -220,6 +239,33 @@ def execute_daily_pool_distribution(
                     )
                 total_distributed += pay_amt
 
+    # Tier 3 Distribution (Recovery: L1-L10)
+    if t3_achievers and t3_pool > 0:
+        per_user_t3 = _q2(t3_pool / Decimal(len(t3_achievers)))
+        for ach in t3_achievers:
+            pay_amt = min(per_user_t3, ach["rem_cap"])
+            if pay_amt > 0:
+                payout_logs.append({
+                    "user_id": ach["user"].id,
+                    "phone": ach["user"].phone,
+                    "tier": "Tier 3 Recovery (L1-L10)",
+                    "amount": float(pay_amt),
+                })
+                if not dry_run:
+                    w = Wallet.get_or_create_for_user(ach["user"])
+                    w.credit(
+                        pay_amt,
+                        tx_type="GLOBAL_ROYALTY",
+                        source_type="DAILY_POOL_DISTRIBUTION",
+                        source_id=f"ROYALTY_T3_{date_str}_{ach['user'].id}",
+                        meta={
+                            "tier": 3,
+                            "pool_date": date_str,
+                            "description": f"Daily Royalty Tier 3 Recovery Payout ({date_str})"
+                        }
+                    )
+                total_distributed += pay_amt
+
     return {
         "success": True,
         "date": date_str,
@@ -228,10 +274,12 @@ def execute_daily_pool_distribution(
         "pools": {
             "tier1_pool_4pct": float(t1_pool),
             "tier2_pool_6pct": float(t2_pool),
+            "tier3_pool_4pct": float(t3_pool),
         },
         "achievers": {
             "tier1_count": len(t1_achievers),
             "tier2_count": len(t2_achievers),
+            "tier3_count": len(t3_achievers),
         },
         "total_distributed": float(total_distributed),
         "payout_logs": payout_logs,

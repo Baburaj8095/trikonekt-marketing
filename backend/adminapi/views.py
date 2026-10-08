@@ -4807,6 +4807,28 @@ class AdminMasterCommissionConfig(APIView):
                 payload["spp_1000_config"] = master2.get("spp_1000_config")
             if "custom_module_tax" in master2:
                 payload["custom_module_tax"] = master2.get("custom_module_tax")
+            # Dynamic Royalty & Daily Pool Configuration
+            royalty_cfg = dict(master2.get("royalty_config", {}) or {})
+            payload["royalty_config"] = {
+                "tier1_percent": float(royalty_cfg.get("tier1_percent", 4.0)),
+                "tier1_cap": float(royalty_cfg.get("tier1_cap", 10000.0)),
+                "tier1_days": int(royalty_cfg.get("tier1_days", 40)),
+                "tier1_levels": str(royalty_cfg.get("tier1_levels", "Layer 1 to Layer 7")),
+                "tier2_percent": float(royalty_cfg.get("tier2_percent", 6.0)),
+                "tier2_cap": float(royalty_cfg.get("tier2_cap", 40000.0)),
+                "tier2_days": int(royalty_cfg.get("tier2_days", 7)),
+                "tier2_levels": str(royalty_cfg.get("tier2_levels", "Layer 8 to Layer 10")),
+                "tier3_percent": float(royalty_cfg.get("tier3_percent", 4.0)),
+                "tier3_cap": float(royalty_cfg.get("tier3_cap", 10000.0)),
+                "tier3_days": int(royalty_cfg.get("tier3_days", 30)),
+                "tier3_levels": str(royalty_cfg.get("tier3_levels", "Layer 1 to Layer 10")),
+                "daily_franchise_percent": float(royalty_cfg.get("daily_franchise_percent", 5.0)),
+                "daily_district_percent": float(royalty_cfg.get("daily_district_percent", 3.0)),
+                "daily_state_percent": float(royalty_cfg.get("daily_state_percent", 2.0)),
+                "daily_royalty_percent": float(royalty_cfg.get("daily_royalty_percent", 2.0)),
+                "daily_auto_distribute_enabled": bool(royalty_cfg.get("daily_auto_distribute_enabled", True)),
+                "daily_trigger_time": str(royalty_cfg.get("daily_trigger_time", "23:59:00")),
+            }
         except Exception:
             pass
         return Response(payload, status=200)
@@ -5331,6 +5353,10 @@ class AdminMasterCommissionConfig(APIView):
         # Persist custom_module_tax
         if "custom_module_tax" in data:
             master["custom_module_tax"] = data.get("custom_module_tax")
+
+        # Persist royalty_config
+        if "royalty_config" in data:
+            master["royalty_config"] = data.get("royalty_config")
 
         # keep commissions in sync with master keys
         try:

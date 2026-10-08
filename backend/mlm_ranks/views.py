@@ -91,6 +91,197 @@ class UserUpgradeEligibilityView(APIView):
         except Exception:
             level_team_counts = {lvl: 0 for lvl in range(1, 11)}
 
+        # Dynamic Royalty & Qualification Evaluation
+        from accounts.models import WalletTransaction
+        from business.models import CommissionConfig
+        from django.db.models import Q
+        try:
+            cfg = CommissionConfig.get_solo()
+            master = dict(getattr(cfg, "master_commission_json", {}) or {})
+            royalty_cfg = dict(master.get("royalty_config", {}) or {})
+
+            t1_pct = float(royalty_cfg.get("tier1_percent", 4.0))
+            t1_cap = float(royalty_cfg.get("tier1_cap", 10000.0))
+            t1_days = int(royalty_cfg.get("tier1_days", 40))
+            t1_levels = str(royalty_cfg.get("tier1_levels", "Layer 1 to Layer 7"))
+
+            t2_pct = float(royalty_cfg.get("tier2_percent", 6.0))
+            t2_cap = float(royalty_cfg.get("tier2_cap", 40000.0))
+            t2_days = int(royalty_cfg.get("tier2_days", 7))
+            t2_levels = str(royalty_cfg.get("tier2_levels", "Layer 8 to Layer 10"))
+
+            t3_pct = float(royalty_cfg.get("tier3_percent", 4.0))
+            t3_cap = float(royalty_cfg.get("tier3_cap", 10000.0))
+            t3_days = int(royalty_cfg.get("tier3_days", 30))
+            t3_levels = str(royalty_cfg.get("tier3_levels", "Layer 1 to Layer 10"))
+
+            # Royalty earnings query
+            q_royalty = Q(type="GLOBAL_ROYALTY") | Q(source_id__startswith="ROYALTY_") | Q(meta__orig_type="GLOBAL_ROYALTY")
+            user_royalty_txs = WalletTransaction.objects.filter(user=request.user).filter(q_royalty)
+            total_royalty_earned = float(user_royalty_txs.aggregate(t=Sum("amount"))["t"] or Decimal("0.00"))
+            t1_earned = float(user_royalty_txs.filter(Q(source_id__startswith="ROYALTY_T1_") | Q(meta__tier=1)).aggregate(t=Sum("amount"))["t"] or Decimal("0.00"))
+            t2_earned = float(user_royalty_txs.filter(Q(source_id__startswith="ROYALTY_T2_") | Q(meta__tier=2)).aggregate(t=Sum("amount"))["t"] or Decimal("0.00"))
+            t3_earned = float(user_royalty_txs.filter(Q(source_id__startswith="ROYALTY_T3_") | Q(meta__tier=3)).aggregate(t=Sum("amount"))["t"] or Decimal("0.00"))
+
+            # Upgrade timeline
+            upgrades = list(RankUpgrade.objects.filter(
+                user=request.user,
+                payment_status=RankUpgrade.STATUS_SUCCESS
+            ).select_related("to_rank").order_by("to_rank__level_number"))
+
+            joined_date = request.user.date_joined.date() if request.user.date_joined else timezone.now().date()
+            today_date = timezone.now().date()
+            days_since_joined = (today_date - joined_date).days
+
+            r7_up = next((ru for ru in upgrades if ru.to_rank and ru.to_rank.level_number >= 7), None)
+            r7_date = r7_up.upgraded_at.date() if r7_up and r7_up.upgraded_at else None
+
+            r10_up = next((ru for ru in upgrades if ru.to_rank and ru.to_rank.level_number >= 10), None)
+            r10_date = r10_up.upgraded_at.date() if r10_up and r10_up.upgraded_at else None
+
+            # 1. Tier 1 Evaluation
+            t1_qualified = False
+            t1_days_taken = None
+            if r7_date:
+                t1_days_taken = (r7_date - joined_date).days
+                if t1_days_taken <= t1_days:
+                    t1_qualified = True
+                    t1_status = "COMPLETED"
+                else:
+                    t1_status = "MISSED"
+            else:
+                if days_since_joined <= t1_days:
+                    t1_status = "IN_PROGRESS"
+                else:
+                    t1_status = "MISSED"
+
+            # 2. Tier 2 Evaluation
+            t2_qualified = False
+            t2_days_taken = None
+            if t1_qualified and r7_date:
+                if r10_date:
+                    t2_days_taken = (r10_date - r7_date).days
+                    if t2_days_taken <= t2_days:
+                        t2_qualified = True
+                        t2_status = "COMPLETED"
+                    else:
+                        t2_status = "MISSED"
+                else:
+                    days_since_r7 = (today_date - r7_date).days
+                    if days_since_r7 <= t2_days:
+                        t2_status = "IN_PROGRESS"
+                    else:
+                        t2_status = "MISSED"
+            else:
+                if r10_date:
+                    t2_status = "MISSED"
+                else:
+                    t2_status = "LOCKED"
+
+            # 3. Tier 3 Evaluation (Recovery: L1-L10 within t3_days from registration)
+            t3_qualified = False
+            t3_days_taken = None
+            if r10_date:
+                t3_days_taken = (r10_date - joined_date).days
+                if not (t1_qualified and t2_qualified):
+                    if t3_days_taken <= t3_days:
+                        t3_qualified = True
+                        t3_status = "COMPLETED"
+                    else:
+                        t3_status = "MISSED"
+                else:
+                    t3_status = "NOT_APPLICABLE"
+            else:
+                if not (t1_qualified and t2_qualified):
+                    if days_since_joined <= t3_days:
+                        t3_status = "IN_PROGRESS"
+                    else:
+                        t3_status = "MISSED"
+                else:
+                    t3_status = "NOT_APPLICABLE"
+
+            # Effective eligible cap
+            if t1_qualified and t2_qualified:
+                total_cap = t1_cap + t2_cap
+            elif t1_qualified and not t2_qualified:
+                total_cap = t1_cap
+            elif t3_qualified:
+                total_cap = t3_cap
+            else:
+                if t1_status == "IN_PROGRESS" or t2_status == "IN_PROGRESS":
+                    total_cap = t1_cap + t2_cap
+                elif t3_status == "IN_PROGRESS":
+                    total_cap = t3_cap
+                else:
+                    total_cap = 0.0
+
+            royalty_info = {
+                "config": {
+                    "tier1_percent": t1_pct,
+                    "tier1_cap": t1_cap,
+                    "tier1_days": t1_days,
+                    "tier1_levels": t1_levels,
+                    "tier2_percent": t2_pct,
+                    "tier2_cap": t2_cap,
+                    "tier2_days": t2_days,
+                    "tier2_levels": t2_levels,
+                    "tier3_percent": t3_pct,
+                    "tier3_cap": t3_cap,
+                    "tier3_days": t3_days,
+                    "tier3_levels": t3_levels,
+                },
+                "total_earned": round(total_royalty_earned, 2),
+                "tier1_earned": round(t1_earned, 2),
+                "tier2_earned": round(t2_earned, 2),
+                "tier3_earned": round(t3_earned, 2),
+                "total_cap": round(total_cap, 2),
+                "max_possible_cap": round(t1_cap + t2_cap, 2),
+                "tier1": {
+                    "qualified": t1_qualified,
+                    "status": t1_status,
+                    "cap": t1_cap,
+                    "percent": t1_pct,
+                    "days_allowed": t1_days,
+                    "days_taken": t1_days_taken,
+                    "days_remaining": max(0, t1_days - days_since_joined) if t1_status == "IN_PROGRESS" else 0,
+                },
+                "tier2": {
+                    "qualified": t2_qualified,
+                    "status": t2_status,
+                    "cap": t2_cap,
+                    "percent": t2_pct,
+                    "days_allowed": t2_days,
+                    "days_taken": t2_days_taken,
+                    "days_remaining": max(0, t2_days - ((today_date - r7_date).days if r7_date else 0)) if t2_status == "IN_PROGRESS" else 0,
+                },
+                "tier3": {
+                    "qualified": t3_qualified,
+                    "status": t3_status,
+                    "cap": t3_cap,
+                    "percent": t3_pct,
+                    "days_allowed": t3_days,
+                    "days_taken": t3_days_taken,
+                    "days_remaining": max(0, t3_days - days_since_joined) if t3_status == "IN_PROGRESS" else 0,
+                },
+            }
+        except Exception:
+            royalty_info = {
+                "config": {
+                    "tier1_percent": 4.0, "tier1_cap": 10000.0, "tier1_days": 40, "tier1_levels": "Layer 1 to Layer 7",
+                    "tier2_percent": 6.0, "tier2_cap": 40000.0, "tier2_days": 7, "tier2_levels": "Layer 8 to Layer 10",
+                    "tier3_percent": 4.0, "tier3_cap": 10000.0, "tier3_days": 30, "tier3_levels": "Layer 1 to Layer 10",
+                },
+                "total_earned": 0.0,
+                "tier1_earned": 0.0,
+                "tier2_earned": 0.0,
+                "tier3_earned": 0.0,
+                "total_cap": 50000.0,
+                "max_possible_cap": 50000.0,
+                "tier1": {"qualified": False, "status": "IN_PROGRESS", "cap": 10000.0, "percent": 4.0, "days_allowed": 40, "days_remaining": 40},
+                "tier2": {"qualified": False, "status": "LOCKED", "cap": 40000.0, "percent": 6.0, "days_allowed": 7, "days_remaining": 0},
+                "tier3": {"qualified": False, "status": "IN_PROGRESS", "cap": 10000.0, "percent": 4.0, "days_allowed": 30, "days_remaining": 30},
+            }
+
         # For frontend quick use:
         return Response(
             {
@@ -108,6 +299,7 @@ class UserUpgradeEligibilityView(APIView):
                 "level_team_counts": level_team_counts,
                 "team_counts_by_level": level_team_counts,
                 "reason": payload["reason"],
+                "royalty_info": royalty_info,
             }
         )
 
