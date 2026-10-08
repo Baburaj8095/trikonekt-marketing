@@ -448,11 +448,12 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
 
   const effectiveAchievedLevel = achievedLevel;
 
-  const currentLevel = Math.max(1, achievedLevel);
-  const nextLevel = currentLevel < 10 ? currentLevel + 1 : 10;
+  const currentLevel = effectiveAchievedLevel;
+  const isLayerActive = effectiveAchievedLevel > 0;
+  const nextLevel = !isLayerActive ? 1 : (currentLevel < 10 ? currentLevel + 1 : 10);
 
   const currentLimit = useMemo(() => {
-    const tier = RANK_TIERS.find((t) => t.level === currentLevel);
+    const tier = RANK_TIERS.find((t) => t.level === Math.max(1, currentLevel));
     return Number(walletHistory?.current_limit || tier?.limit || 1750);
   }, [currentLevel, walletHistory]);
 
@@ -788,7 +789,26 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
               <Box>
                 <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Current Layer</Typography>
                 <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#1e1b4b" }}>
-                  Layer {currentLevel} <Chip label={currentLevel >= 10 ? "Max Layer" : "Eligible"} size="small" color={currentLevel >= 10 ? "success" : "primary"} sx={{ height: 18, fontSize: 10, fontWeight: 800 }} />
+                  {isLayerActive ? (
+                    <>
+                      Layer {currentLevel}{" "}
+                      <Chip
+                        label={currentLevel >= 10 ? "Max Layer" : "Active"}
+                        size="small"
+                        color={currentLevel >= 10 ? "success" : "primary"}
+                        sx={{ height: 18, fontSize: 10, fontWeight: 800 }}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      Not Active{" "}
+                      <Chip
+                        label="Inactive"
+                        size="small"
+                        sx={{ height: 18, fontSize: 10, fontWeight: 800, bgcolor: "#fee2e2", color: "#dc2626" }}
+                      />
+                    </>
+                  )}
                 </Typography>
               </Box>
             </Stack>
@@ -796,13 +816,13 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
 
           <Grid item xs={4}>
             <Stack direction="row" spacing={1} alignItems="center">
-              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: currentLevel >= 10 ? "#f0fdf4" : "#fff7ed", color: currentLevel >= 10 ? "#16a34a" : "#d97706", display: "grid", placeItems: "center" }}>
+              <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: isLayerActive && currentLevel >= 10 ? "#f0fdf4" : "#fff7ed", color: isLayerActive && currentLevel >= 10 ? "#16a34a" : "#d97706", display: "grid", placeItems: "center" }}>
                 <AccessTimeRoundedIcon sx={{ fontSize: 22 }} />
               </Box>
               <Box>
                 <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Upgrade Window ({upgradeWindowInfo.levelRange})</Typography>
-                <Typography sx={{ fontSize: 13, fontWeight: 900, color: currentLevel >= 10 ? "#16a34a" : upgradeWindowInfo.started ? "#d97706" : "#2563eb" }}>
-                  {currentLevel >= 10 ? (
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: isLayerActive && currentLevel >= 10 ? "#16a34a" : upgradeWindowInfo.started ? "#d97706" : "#2563eb" }}>
+                  {isLayerActive && currentLevel >= 10 ? (
                     "All Layers Completed"
                   ) : upgradeWindowInfo.started ? (
                     <>
@@ -832,7 +852,11 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
               <Box>
                 <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Next Layer</Typography>
                 <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#15803d" }}>
-                  {currentLevel >= 10 ? (
+                  {!isLayerActive ? (
+                    <>
+                      Layer 1 <Typography component="span" sx={{ fontSize: 10, color: "#166534" }}>(Purchase to Activate)</Typography>
+                    </>
+                  ) : currentLevel >= 10 ? (
                     <>
                       Max Layer <Chip label="Completed" size="small" color="success" sx={{ height: 18, fontSize: 10, fontWeight: 800, ml: 0.5 }} />
                     </>
@@ -870,23 +894,25 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                 }}
               />
               <Typography sx={{ fontSize: 12, mt: 0.8, opacity: 0.85 }}>
-                {isLimitReached ? `Earning Limit Reached for Layer ${currentLevel} ⓘ` : `Earning Limit Progress (${percentUsed.toFixed(0)}%) ⓘ`}
+                {!isLayerActive ? "Layer 1 Inactive (Activate to start income) ⓘ" : isLimitReached ? `Earning Limit Reached for Layer ${currentLevel} ⓘ` : `Earning Limit Progress (${percentUsed.toFixed(0)}%) ⓘ`}
               </Typography>
             </Grid>
 
             <Grid item xs={12} sm={5}>
               <Paper sx={{ p: 1.8, bgcolor: "rgba(255,255,255,0.1)", backdropFilter: "blur(6px)", borderRadius: 2.5, color: "#fff" }}>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                  <AccountBalanceWalletRoundedIcon sx={{ color: isLimitReached ? "#ef4444" : "#22c55e" }} />
+                  <AccountBalanceWalletRoundedIcon sx={{ color: !isLayerActive ? "#94a3b8" : isLimitReached ? "#ef4444" : "#22c55e" }} />
                   <Box>
                     <Typography sx={{ fontSize: 10, opacity: 0.8, fontWeight: 700 }}>WALLET STATUS</Typography>
-                    <Typography sx={{ fontSize: 14, fontWeight: 900, color: isLimitReached ? "#ef4444" : "#22c55e" }}>
-                      {isLimitReached ? "INCOME STOPPED" : "ACTIVE"}
+                    <Typography sx={{ fontSize: 14, fontWeight: 900, color: !isLayerActive ? "#f87171" : isLimitReached ? "#ef4444" : "#22c55e" }}>
+                      {!isLayerActive ? "INACTIVE" : isLimitReached ? "INCOME STOPPED" : "ACTIVE"}
                     </Typography>
                   </Box>
                 </Stack>
                 <Typography sx={{ fontSize: 11, opacity: 0.9, mb: 1.5 }}>
-                  {isLimitReached
+                  {!isLayerActive
+                    ? "Layer 1 is inactive. Purchase the ₹2,000 package on trieducation.in or upgrade to Layer 1 to start receiving income."
+                    : isLimitReached
                     ? `Limit reached for Layer ${currentLevel}. Upgrade or re-top up to continue income.`
                     : currentLevel >= 10
                     ? `Layer 10 unlocked. Max earning limit is ₹${fmt(currentLimit)}.`
@@ -895,17 +921,21 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                 <Button
                   fullWidth
                   variant="contained"
-                  disabled={currentLevel >= 10 && !isLimitReached}
+                  disabled={isLayerActive && currentLevel >= 10 && !isLimitReached}
                   sx={{
-                    bgcolor: currentLevel >= 10 && !isLimitReached ? "#059669" : "#ffffff",
-                    color: currentLevel >= 10 && !isLimitReached ? "#ffffff" : "#1e1b4b",
+                    bgcolor: isLayerActive && currentLevel >= 10 && !isLimitReached ? "#059669" : "#ffffff",
+                    color: isLayerActive && currentLevel >= 10 && !isLimitReached ? "#ffffff" : "#1e1b4b",
                     fontWeight: 900,
                     "&.Mui-disabled": { bgcolor: "#059669", color: "#ffffff", opacity: 0.95 },
                     "&:hover": { bgcolor: "#f3f4f6" },
                   }}
                   onClick={() => handleUpgradeClick()}
                 >
-                  {currentLevel >= 10 && !isLimitReached ? "✓ Fully Upgraded (Layer 10)" : "Upgrade Now"}
+                  {!isLayerActive
+                    ? "Activate Layer 1 (₹250)"
+                    : currentLevel >= 10 && !isLimitReached
+                    ? "✓ Fully Upgraded (Layer 10)"
+                    : "Upgrade Now"}
                 </Button>
               </Paper>
             </Grid>
@@ -917,9 +947,13 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
       <Grid container spacing={1.5} sx={{ mb: 2 }}>
         <Grid item xs={12} sm={4}>
           <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff" }}>
-            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>EARNING LIMIT (LAYER {currentLevel})</Typography>
+            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>
+              {isLayerActive ? `EARNING LIMIT (LAYER ${currentLevel})` : "EARNING LIMIT (LAYER 1)"}
+            </Typography>
             <Typography sx={{ fontSize: 20, fontWeight: 900, color: "#0f172a", my: 0.5 }}>₹{fmt(currentLimit)}</Typography>
-            {isLimitReached ? (
+            {!isLayerActive ? (
+              <Chip label="Not Active" size="small" sx={{ fontWeight: 800, bgcolor: "#fee2e2", color: "#dc2626" }} />
+            ) : isLimitReached ? (
               <Chip icon={<CheckCircleRoundedIcon />} label="Completed" color="success" size="small" sx={{ fontWeight: 800 }} />
             ) : (
               <Chip label="In Progress" color="info" size="small" sx={{ fontWeight: 800 }} />
@@ -930,12 +964,14 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
         <Grid item xs={12} sm={4}>
           <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff" }}>
             <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>
-              {currentLevel >= 10 ? "TOTAL LAYER CAPACITY" : `NEXT TARGET (LAYER ${nextLevel})`}
+              {!isLayerActive ? "FIRST TARGET (LAYER 1)" : currentLevel >= 10 ? "TOTAL LAYER CAPACITY" : `NEXT TARGET (LAYER ${nextLevel})`}
             </Typography>
             <Typography sx={{ fontSize: 20, fontWeight: 900, color: "#0f172a", my: 0.5 }}>
-              ₹{fmt(currentLevel >= 10 ? 100000 : (RANK_TIERS.find((t) => t.level === nextLevel)?.limit || 0))}
+              ₹{fmt(!isLayerActive ? 1750 : currentLevel >= 10 ? 100000 : (RANK_TIERS.find((t) => t.level === nextLevel)?.limit || 0))}
             </Typography>
-            {currentLevel >= 10 ? (
+            {!isLayerActive ? (
+              <Chip label="Activate Layer 1" color="warning" size="small" sx={{ fontWeight: 800 }} />
+            ) : currentLevel >= 10 ? (
               <Chip icon={<CheckCircleRoundedIcon />} label="All Layers Unlocked" color="success" size="small" sx={{ fontWeight: 800 }} />
             ) : (
               <Chip label="Upcoming" color="default" size="small" sx={{ fontWeight: 800 }} />
@@ -946,10 +982,12 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
         <Grid item xs={12} sm={4}>
           <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff" }}>
             <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>NEXT CYCLE</Typography>
-            <Typography sx={{ fontSize: 14, fontWeight: 900, color: isLimitReached ? "#d97706" : "#15803d", my: 0.5 }}>
-              {isLimitReached ? "Re-Top Up Required" : "Active"}
+            <Typography sx={{ fontSize: 14, fontWeight: 900, color: !isLayerActive ? "#dc2626" : isLimitReached ? "#d97706" : "#15803d", my: 0.5 }}>
+              {!isLayerActive ? "Activation Required" : isLimitReached ? "Re-Top Up Required" : "Active"}
             </Typography>
-            <Typography sx={{ fontSize: 11, color: "#94a3b8" }}>(Same Benefits Continue)</Typography>
+            <Typography sx={{ fontSize: 11, color: "#94a3b8" }}>
+              {!isLayerActive ? "(Unlock on Layer 1 Purchase)" : "(Same Benefits Continue)"}
+            </Typography>
           </Paper>
         </Grid>
       </Grid>
