@@ -770,7 +770,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
       return <Chip label="Missed" color="error" variant="outlined" size="small" sx={{ fontWeight: 800 }} />;
     }
     if (status === "NOT_APPLICABLE") {
-      return <Chip label="N/A" color="default" variant="outlined" size="small" />;
+      return <Chip icon={<CheckCircleRoundedIcon />} label="Full Tiers Met" color="success" variant="outlined" size="small" sx={{ fontWeight: 800 }} />;
     }
     return <Chip label="Locked" color="default" variant="outlined" size="small" />;
   };

@@ -123,15 +123,22 @@ class UserUpgradeEligibilityView(APIView):
             t2_earned = float(user_royalty_txs.filter(Q(source_id__startswith="ROYALTY_T2_") | Q(meta__tier=2)).aggregate(t=Sum("amount"))["t"] or Decimal("0.00"))
             t3_earned = float(user_royalty_txs.filter(Q(source_id__startswith="ROYALTY_T3_") | Q(meta__tier=3)).aggregate(t=Sum("amount"))["t"] or Decimal("0.00"))
 
-            # Upgrade timeline
+            # Upgrade timeline & active onboarding baseline date
             upgrades = list(RankUpgrade.objects.filter(
                 user=request.user,
                 payment_status=RankUpgrade.STATUS_SUCCESS
             ).select_related("to_rank").order_by("to_rank__level_number"))
 
-            joined_date = request.user.date_joined.date() if request.user.date_joined else timezone.now().date()
+            from business.models import PromoPurchase
+            promo_dt = PromoPurchase.objects.filter(
+                user=request.user, status="APPROVED"
+            ).order_by("approved_at").values_list("approved_at", flat=True).first()
+            r1_dt = next((ru.upgraded_at for ru in upgrades if ru.to_rank and ru.to_rank.level_number == 1), None)
+            cands = [dt.date() for dt in (promo_dt, r1_dt) if dt is not None]
+            activation_date = min(cands) if cands else (request.user.date_joined.date() if request.user.date_joined else timezone.now().date())
+
             today_date = timezone.now().date()
-            days_since_joined = (today_date - joined_date).days
+            days_since_active = (today_date - activation_date).days
 
             r7_up = next((ru for ru in upgrades if ru.to_rank and ru.to_rank.level_number >= 7), None)
             r7_date = r7_up.upgraded_at.date() if r7_up and r7_up.upgraded_at else None
@@ -143,14 +150,17 @@ class UserUpgradeEligibilityView(APIView):
             t1_qualified = False
             t1_days_taken = None
             if r7_date:
-                t1_days_taken = (r7_date - joined_date).days
-                if t1_days_taken <= t1_days:
+                t1_days_taken = max(0, (r7_date - activation_date).days)
+                if t1_days_taken <= t1_days or t1_earned > 0:
                     t1_qualified = True
                     t1_status = "COMPLETED"
                 else:
                     t1_status = "MISSED"
             else:
-                if days_since_joined <= t1_days:
+                if t1_earned > 0:
+                    t1_qualified = True
+                    t1_status = "COMPLETED"
+                elif days_since_active <= t1_days:
                     t1_status = "IN_PROGRESS"
                 else:
                     t1_status = "MISSED"
@@ -160,8 +170,8 @@ class UserUpgradeEligibilityView(APIView):
             t2_days_taken = None
             if t1_qualified and r7_date:
                 if r10_date:
-                    t2_days_taken = (r10_date - r7_date).days
-                    if t2_days_taken <= t2_days:
+                    t2_days_taken = max(0, (r10_date - r7_date).days)
+                    if t2_days_taken <= t2_days or t2_earned > 0:
                         t2_qualified = True
                         t2_status = "COMPLETED"
                     else:
@@ -173,32 +183,31 @@ class UserUpgradeEligibilityView(APIView):
                     else:
                         t2_status = "MISSED"
             else:
-                if r10_date:
+                if t2_earned > 0:
+                    t2_qualified = True
+                    t2_status = "COMPLETED"
+                elif r10_date:
                     t2_status = "MISSED"
                 else:
                     t2_status = "LOCKED"
 
-            # 3. Tier 3 Evaluation (Recovery: L1-L10 within t3_days from registration)
+            # 3. Tier 3 Evaluation (Recovery: L1-L10 within t3_days from activation)
             t3_qualified = False
             t3_days_taken = None
-            if r10_date:
-                t3_days_taken = (r10_date - joined_date).days
-                if not (t1_qualified and t2_qualified):
-                    if t3_days_taken <= t3_days:
-                        t3_qualified = True
-                        t3_status = "COMPLETED"
-                    else:
-                        t3_status = "MISSED"
+            if t1_qualified and t2_qualified:
+                t3_status = "NOT_APPLICABLE"
+            elif r10_date:
+                t3_days_taken = max(0, (r10_date - activation_date).days)
+                if t3_days_taken <= t3_days or t3_earned > 0:
+                    t3_qualified = True
+                    t3_status = "COMPLETED"
                 else:
-                    t3_status = "NOT_APPLICABLE"
+                    t3_status = "MISSED"
             else:
-                if not (t1_qualified and t2_qualified):
-                    if days_since_joined <= t3_days:
-                        t3_status = "IN_PROGRESS"
-                    else:
-                        t3_status = "MISSED"
+                if days_since_active <= t3_days:
+                    t3_status = "IN_PROGRESS"
                 else:
-                    t3_status = "NOT_APPLICABLE"
+                    t3_status = "MISSED"
 
             # Effective eligible cap
             if t1_qualified and t2_qualified:
@@ -243,7 +252,7 @@ class UserUpgradeEligibilityView(APIView):
                     "percent": t1_pct,
                     "days_allowed": t1_days,
                     "days_taken": t1_days_taken,
-                    "days_remaining": max(0, t1_days - days_since_joined) if t1_status == "IN_PROGRESS" else 0,
+                    "days_remaining": max(0, t1_days - days_since_active) if t1_status == "IN_PROGRESS" else 0,
                 },
                 "tier2": {
                     "qualified": t2_qualified,
@@ -261,7 +270,7 @@ class UserUpgradeEligibilityView(APIView):
                     "percent": t3_pct,
                     "days_allowed": t3_days,
                     "days_taken": t3_days_taken,
-                    "days_remaining": max(0, t3_days - days_since_joined) if t3_status == "IN_PROGRESS" else 0,
+                    "days_remaining": max(0, t3_days - days_since_active) if t3_status == "IN_PROGRESS" else 0,
                 },
             }
         except Exception:

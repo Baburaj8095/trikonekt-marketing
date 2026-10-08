@@ -149,31 +149,38 @@ def execute_daily_pool_distribution(
         r7_upgrade = next((ru for ru in upgrades if ru.to_rank and ru.to_rank.level_number >= 7), None)
         r10_upgrade = next((ru for ru in upgrades if ru.to_rank and ru.to_rank.level_number >= 10), None)
 
+        promo_dt = PromoPurchase.objects.filter(
+            user=u, status="APPROVED"
+        ).order_by("approved_at").values_list("approved_at", flat=True).first()
+        r1_dt = next((ru.upgraded_at for ru in upgrades if ru.to_rank and ru.to_rank.level_number == 1), None)
+        cands = [dt.date() for dt in (promo_dt, r1_dt) if dt is not None]
+        activation_date = min(cands) if cands else (u.date_joined.date() if u.date_joined else None)
+
         t1_qualified = False
         t2_qualified = False
 
-        # Tier 1 Qualification: L1 to L7 within t1_days (40 days)
-        if highest_lvl >= 7 and r7_upgrade and u.date_joined:
-            days_to_l7 = (r7_upgrade.upgraded_at.date() - u.date_joined.date()).days
-            if days_to_l7 <= t1_days or force:
+        # Tier 1 Qualification: L1 to L7 within t1_days (40 days) from activation_date
+        if highest_lvl >= 7 and r7_upgrade and activation_date:
+            days_to_l7 = max(0, (r7_upgrade.upgraded_at.date() - activation_date).days)
+            if days_to_l7 <= t1_days or force or user_earned_royalty > 0:
                 t1_qualified = True
                 if user_earned_royalty < t1_cap:
                     rem_cap = _q2(t1_cap - user_earned_royalty)
                     t1_achievers.append({"user": u, "days_taken": days_to_l7, "rem_cap": rem_cap})
 
         # Tier 2 Qualification: L8 to L10 within t2_days (7 days) from L7
-        if highest_lvl >= 10 and t1_qualified and r10_upgrade and r7_upgrade:
-            days_l7_to_l10 = (r10_upgrade.upgraded_at.date() - r7_upgrade.upgraded_at.date()).days
-            if days_l7_to_l10 <= t2_days or force:
+        if highest_lvl >= 10 and (t1_qualified or user_earned_royalty > 0) and r10_upgrade and r7_upgrade:
+            days_l7_to_l10 = max(0, (r10_upgrade.upgraded_at.date() - r7_upgrade.upgraded_at.date()).days)
+            if days_l7_to_l10 <= t2_days or force or user_earned_royalty > 0:
                 t2_qualified = True
                 if user_earned_royalty < (t1_cap + t2_cap):
                     rem_cap = _q2((t1_cap + t2_cap) - user_earned_royalty)
                     t2_achievers.append({"user": u, "days_taken": days_l7_to_l10, "rem_cap": rem_cap})
 
         # Tier 3 Qualification (Recovery / Grace window for L1 to L10):
-        # Applies if user missed Tier 1 or Tier 2, but reached Layer 10 within t3_days (30 days) from date_joined
-        if highest_lvl >= 10 and not (t1_qualified and t2_qualified) and r10_upgrade and u.date_joined:
-            days_to_l10 = (r10_upgrade.upgraded_at.date() - u.date_joined.date()).days
+        # Applies if user missed Tier 1 or Tier 2, but reached Layer 10 within t3_days (30 days) from activation_date
+        if highest_lvl >= 10 and not (t1_qualified and t2_qualified) and r10_upgrade and activation_date:
+            days_to_l10 = max(0, (r10_upgrade.upgraded_at.date() - activation_date).days)
             if days_to_l10 <= t3_days or force:
                 if user_earned_royalty < t3_cap:
                     rem_cap = _q2(t3_cap - user_earned_royalty)
