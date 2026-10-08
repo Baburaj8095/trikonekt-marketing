@@ -3889,6 +3889,9 @@ class SPPGiftCardListView(APIView):
         from business.serializers import SPPGiftCardSerializer
         from business.services.spp_service import SPPService
 
+        # Auto-sync missing gift cards for approved purchases
+        SPPService.sync_gift_cards_for_user(user=request.user)
+
         # Evaluate live time-based statuses
         SPPService.evaluate_gift_card_statuses(user=request.user)
 
@@ -3976,6 +3979,7 @@ class SPPCadenceMeView(APIView):
         except Exception:
             season_num = 1
 
+        SPPService.sync_gift_cards_for_user(user=request.user)
         cadence = SPPService.get_user_renewal_cadence(user=request.user, season_number=season_num)
         return Response(cadence, status=status.HTTP_200_OK)
 

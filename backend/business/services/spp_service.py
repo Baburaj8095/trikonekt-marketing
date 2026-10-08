@@ -21,22 +21,71 @@ logger = logging.getLogger(__name__)
 
 class SPPService:
     @staticmethod
-    def generate_unique_coupon_code(user: CustomUser) -> str:
+    def generate_unique_coupon_code(user: CustomUser, box_number: int = 1) -> str:
         """
-        Generate alphanumeric voucher code containing the user's phone number or username:
-        e.g., SPP-9876543210-AB12CD
+        Generate standardized SPP voucher code matching tri-academy / trieducation:
+        e.g., TK-SPP-M1-9999-1000
         """
-        raw_phone = str(getattr(user, "phone", "") or getattr(user, "phone_number", "") or "").strip()
-        # Keep alphanumeric / digits only
+        raw_phone = str(getattr(user, "phone", "") or getattr(user, "username", "") or "").strip()
         clean_phone = "".join(ch for ch in raw_phone if ch.isalnum())
-        if not clean_phone:
-            clean_phone = str(getattr(user, "username", "USER")).strip().upper()[:10]
+        uname_suffix = clean_phone[-4:] if len(clean_phone) >= 4 else "1000"
+        candidate = f"TK-SPP-M{box_number}-{uname_suffix}-1000"
+        if not SPPGiftCard.objects.filter(coupon_code=candidate).exists():
+            return candidate
 
         while True:
-            suffix = uuid.uuid4().hex[:6].upper()
-            code = f"SPP-{clean_phone}-{suffix}"
+            suffix = uuid.uuid4().hex[:4].upper()
+            code = f"TK-SPP-M{box_number}-{uname_suffix}-{suffix}"
             if not SPPGiftCard.objects.filter(coupon_code=code).exists():
                 return code
+
+    @classmethod
+    def sync_gift_cards_for_user(cls, user: CustomUser) -> List[SPPGiftCard]:
+        """
+        Idempotently synchronizes and generates SPPGiftCards and PromoMonthlyBoxes
+        for any approved monthly box PromoPurchases (from tri-academy, API, or wallet checkout).
+        """
+        from business.models import PromoPurchase, PromoMonthlyBox
+
+        purchases = list(PromoPurchase.objects.filter(
+            user=user,
+            status="APPROVED",
+        ).select_related("package"))
+
+        created = []
+        for p in purchases:
+            pkg_type = str(getattr(p.package, "type", "") or "").upper()
+            pkg_code = str(getattr(p.package, "code", "") or "").upper()
+            if pkg_type == "MONTHLY" or pkg_code in ("MONTHLY759", "SPP1000", "PRIME1000"):
+                boxes = list(getattr(p, "boxes_json", []) or [])
+                if not boxes:
+                    boxes = [1]
+                season = int(getattr(p, "package_number", 1) or 1)
+
+                # Ensure PromoMonthlyBox records exist
+                for b in boxes:
+                    try:
+                        bn = int(b)
+                        PromoMonthlyBox.objects.get_or_create(
+                            user=user,
+                            package=p.package,
+                            package_number=season,
+                            box_number=bn,
+                            defaults={"purchase": p},
+                        )
+                    except Exception:
+                        pass
+
+                # Generate cards for any missing boxes
+                cards = cls.generate_gift_cards_for_boxes(
+                    user=user,
+                    purchase=p,
+                    season_number=season,
+                    boxes=boxes,
+                )
+                created.extend(cards)
+
+        return created
 
     @classmethod
     def generate_gift_cards_for_boxes(
@@ -49,17 +98,16 @@ class SPPService:
         """
         Create an SPPGiftCard for each monthly box purchased.
         - ₹1,000 face value
-        - Lock for 60 days
-        - Valid / Redeemable for 30 days after unlock (Total 90-day window)
-        - Generates QR code payload with alphanumeric code containing phone
+        - Immediately ACTIVE for 90 days (100% usable for Kirana/grocery rebate or Tri Holidays)
+        - Generates QR code payload with standard coupon code
         """
         created_cards = []
         now = timezone.now()
         base_time = getattr(purchase, "requested_at", None) or now
 
-        # 60 days lock, 30 days active validity (total 90 days)
-        unlock_at = base_time + timedelta(days=60)
-        expires_at = unlock_at + timedelta(days=30)
+        # Active immediately for 90 days
+        unlock_at = base_time
+        expires_at = base_time + timedelta(days=90)
 
         with transaction.atomic():
             for b in boxes:
@@ -68,19 +116,18 @@ class SPPService:
                 except Exception:
                     continue
 
-                # Check if card already exists for this purchase and box
+                # Check if card already exists for this user, season and box
                 existing = SPPGiftCard.objects.filter(
                     user=user,
                     season_number=season_number,
                     box_number=box_num,
-                    purchase=purchase,
                 ).first()
 
                 if existing:
                     created_cards.append(existing)
                     continue
 
-                code = cls.generate_unique_coupon_code(user)
+                code = cls.generate_unique_coupon_code(user, box_number=box_num)
                 qr_payload = json.dumps({
                     "brand": "TRIKONEKT",
                     "type": "SPP_GIFT_CARD",
@@ -101,7 +148,7 @@ class SPPService:
                     amount=Decimal("1000.00"),
                     coupon_code=code,
                     qr_code_data=qr_payload,
-                    status="LOCKED",
+                    status="ACTIVE",
                     unlock_at=unlock_at,
                     expires_at=expires_at,
                 )

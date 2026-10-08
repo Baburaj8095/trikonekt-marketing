@@ -2756,3 +2756,14 @@ def activate_agency_on_any_payment(sender, instance: AgencyPackagePayment, creat
         # best-effort; do not block payment save
         pass
 
+
+@receiver(post_save, sender=PromoPurchase)
+def auto_sync_spp_gift_cards_on_approval(sender, instance: PromoPurchase, **kwargs):
+    if getattr(instance, "status", "") == "APPROVED" and getattr(instance, "user", None):
+        try:
+            from business.services.spp_service import SPPService
+            SPPService.sync_gift_cards_for_user(instance.user)
+        except Exception:
+            pass
+
+

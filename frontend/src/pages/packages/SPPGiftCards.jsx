@@ -726,11 +726,11 @@ export default function SPPGiftCards() {
             No SPP Gift Cards in this category
           </Typography>
           <Typography variant="body2" sx={{ color: "#64748b", mb: 2.5, maxWidth: 440, mx: "auto", fontSize: "13px" }}>
-            SPP monthly subscriptions and package purchases are managed directly on TriAcademy.
+            SPP monthly subscriptions and Kirana vouchers are available directly on Trikonekt Education.
           </Typography>
           <Button
             variant="outlined"
-            onClick={() => window.open("https://triacademy.trikonekt.com/spp", "_blank")}
+            onClick={() => window.open("https://trieducation.in/vouchers", "_blank")}
             sx={{
               borderColor: "#2563eb",
               color: "#2563eb",
@@ -740,7 +740,7 @@ export default function SPPGiftCards() {
               px: 3,
             }}
           >
-            Visit TriAcademy Store ↗
+            Visit trieducation.in Vouchers ↗
           </Button>
         </Card>
       ) : (
@@ -895,7 +895,7 @@ export default function SPPGiftCards() {
                       <Stack direction="row" alignItems="center" spacing={0.75} sx={{ color: "#6ee7b7", mb: 0.5 }}>
                         <UnlockIcon sx={{ fontSize: 14 }} />
                         <Typography sx={{ fontSize: 11.5, fontWeight: 700 }}>
-                          Active for Tri Holidays ({card.days_until_expiry}d left • Expires {dayjs(card.expires_at).format("DD MMM YYYY")})
+                          Active (100% Usable • {card.days_until_expiry}d left • Valid until {dayjs(card.expires_at).format("DD MMM YYYY")})
                         </Typography>
                       </Stack>
                     )}
