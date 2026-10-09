@@ -25,8 +25,8 @@ const tabDefs = [
   },
   {
     key: "spp",
-    label: "SPP",
-    cta: "Buy SPP",
+    label: "SSV (Smart Shopping Voucher)",
+    cta: "Buy SSV",
     route: "/user/packages/spp",
   },
   {

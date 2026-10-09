@@ -45,6 +45,8 @@ import QrCode2RoundedIcon from "@mui/icons-material/QrCode2Rounded";
 import ShoppingCartRoundedIcon from "@mui/icons-material/ShoppingCartRounded";
 import WorkspacePremiumRoundedIcon from "@mui/icons-material/WorkspacePremiumRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import LayersRoundedIcon from "@mui/icons-material/LayersRounded";
+import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
 import PremiumScreenHeader from "../components/common/PremiumScreenHeader";
 import BottomNav from "../components/common/BottomNav";
 
@@ -134,7 +136,7 @@ function describeSource(tx = {}) {
   // Reward points
   if (type === "RP_EARN") {
     if (st === "MONTHLY_759" || src === "MONTHLY_759" || tier === 759) {
-      return "SPP 1000 - Reward Points";
+      return "SSV 1000 - Reward Points";
     }
     return "Reward Points Earned";
   }
@@ -185,15 +187,15 @@ function describeSource(tx = {}) {
     return "5 Blocks";
   }
 
-  // Monthly 759 / SPP 1000 flows
+  // Monthly 759 / SSV 1000 flows (Smart Subscription Voucher)
   const isSpp = st === "MONTHLY_759" || src === "MONTHLY_759" || src.includes("759") || st.startsWith("MONTHLY_FIRST_SEASON") || ot.includes("MONTHLY_759");
   if (isSpp) {
     if (ot === "MONTHLY_759_DIRECT" || type === "MONTHLY_759_DIRECT") {
-      return "SPP Direct Referral Bonus";
+      return "SSV Direct Referral Bonus";
     }
     if (ot === "MONTHLY_759_LEVEL" || type === "MONTHLY_759_LEVEL") {
       const lvl = Number(meta.level_index ?? meta.level);
-      return Number.isFinite(lvl) && lvl > 0 ? `SPP Layer ${lvl} Bonus` : "SPP Layer Bonus";
+      return Number.isFinite(lvl) && lvl > 0 ? `SSV Layer ${lvl} Bonus` : "SSV Layer Bonus";
     }
     if (ot === "AUTOPOOL_BONUS_FIVE" || src.startsWith("FIVE_MATRIX")) {
       const lvl = Number(meta.level_index ?? meta.level);
@@ -204,10 +206,42 @@ function describeSource(tx = {}) {
       return Number.isFinite(lvl) && lvl > 0 ? `3 Blocks Matrix - Layer ${lvl}` : "3 Blocks Matrix";
     }
     if (ot === "MONTHLY_759_SELF") {
-      return "SPP Personal Cashback";
+      return "SSV Personal Cashback";
     }
-    return "SPP Referral Commission";
+    return "SSV Referral Commission";
   }
+}
+
+function isSsvLayerTx(tx) {
+  const meta = tx?.meta || {};
+  const ot = String(meta.orig_type || "").toUpperCase();
+  const type = String(tx?.type || "").toUpperCase();
+  const src = String(meta.source || "").toUpperCase();
+  const st = String(tx?.source_type || "").toUpperCase();
+  const trig = String(meta.trigger || "").toUpperCase();
+
+  return (
+    ot === "MONTHLY_759_LEVEL" ||
+    type === "MONTHLY_759_LEVEL" ||
+    ((st.includes("MONTHLY") || src === "MONTHLY_759" || trig === "MONTHLY_759") &&
+      (meta.level_index !== undefined || meta.level !== undefined || ot.includes("LEVEL")))
+  );
+}
+
+function isSsvBonusTx(tx) {
+  const meta = tx?.meta || {};
+  const ot = String(meta.orig_type || "").toUpperCase();
+  const type = String(tx?.type || "").toUpperCase();
+  const src = String(meta.source || "").toUpperCase();
+  const st = String(tx?.source_type || "").toUpperCase();
+  const trig = String(meta.trigger || "").toUpperCase();
+
+  return (
+    ot === "MONTHLY_759_DIRECT" ||
+    type === "MONTHLY_759_DIRECT" ||
+    ((st.includes("MONTHLY") || src === "MONTHLY_759" || trig === "MONTHLY_759") &&
+      (ot.includes("DIRECT") || type.includes("DIRECT")))
+  );
 
   // Main Wallet Specific Transactions
   if (type === "P2P_PACKAGE_COUPON_SEND") {
@@ -1134,12 +1168,16 @@ function PhonePeFilterDrawer({
 
   const sourceOptions = [
     { label: "All Sources", value: "ALL" },
-    { label: "E-Edu", value: "E_EDU" },
-    { label: "Self blocks", value: "SELF_ACCOUNT" },
+    { label: "E-Edu Agent", value: "E_EDU" },
+    { label: "Self Account / Self Block (25%)", value: "SAVE" },
+    { label: "SSV Layer", value: "SSV_LAYER" },
+    { label: "SSV Bonus", value: "SSV_BONUS" },
+    { label: "QR Scanner", value: "QR_SCANNER" },
+    { label: "Trizone Shopping", value: "TRIZONE" },
+    { label: "Royalty Bonus", value: "ROYALTY" },
     { label: "Layer & Blocks", value: "LAYER" },
     { label: "Direct Bonus", value: "DIRECT" },
     { label: "P2P Transfer", value: "P2P" },
-    { label: "Royalty Bonus", value: "ROYALTY" },
     { label: "Merchant & Captain", value: "MERCHANT_CAPTAIN" },
     { label: "Withdrawals", value: "WITHDRAWAL" },
   ];
@@ -1760,8 +1798,12 @@ export default function History() {
       // Source filter
       if (sourceFilter !== "ALL") {
         const cat = classifyTransaction(tx);
-        if (sourceFilter === "SAVE") {
+        if (sourceFilter === "SAVE" || sourceFilter === "SELF_ACCOUNT") {
           if (cat !== "SELF_ACCOUNT" && cat !== "SAVE") return false;
+        } else if (sourceFilter === "SSV_LAYER") {
+          if (!isSsvLayerTx(tx)) return false;
+        } else if (sourceFilter === "SSV_BONUS") {
+          if (!isSsvBonusTx(tx)) return false;
         } else if (sourceFilter === "QR_SCANNER") {
           if (cat !== "QR_SCANNER" && cat !== "MERCHANT_CAPTAIN") return false;
         } else if (sourceFilter === "TRIZONE") {
@@ -1865,6 +1907,8 @@ export default function History() {
       ALL: { count: 0, total: 0 },
       E_EDU: { count: 0, total: 0 },
       SAVE: { count: 0, total: 0 },
+      SSV_LAYER: { count: 0, total: 0 },
+      SSV_BONUS: { count: 0, total: 0 },
       QR_SCANNER: { count: 0, total: 0 },
       TRIZONE: { count: 0, total: 0 },
       ROYALTY: { count: 0, total: 0 },
@@ -1876,6 +1920,8 @@ export default function History() {
       const isP2pReceive = tx?.type === "P2P_PACKAGE_COUPON_RECEIVE";
       const amt = isP2pReceive && raw === 0 ? Number(meta.net_amount ?? meta.gross_amount ?? 0) : raw;
       const cat = classifyTransaction(tx);
+      const type = String(tx?.type || "");
+      const isSelf = type === "SELF_ACCOUNT_CREDIT" || type === "SELF_ACCOUNT_DEBIT" || meta?.ledger === "SELF_ACCOUNT";
 
       stats.ALL.count += 1;
       if (amt > 0) stats.ALL.total += amt;
@@ -1895,6 +1941,16 @@ export default function History() {
       } else if (cat === "ROYALTY") {
         stats.ROYALTY.count += 1;
         if (amt > 0) stats.ROYALTY.total += amt;
+      }
+
+      // SSV Layer & SSV Bonus (Main Wallet income)
+      if (isSsvLayerTx(tx) && !isSelf) {
+        stats.SSV_LAYER.count += 1;
+        if (amt > 0) stats.SSV_LAYER.total += amt;
+      }
+      if (isSsvBonusTx(tx) && !isSelf) {
+        stats.SSV_BONUS.count += 1;
+        if (amt > 0) stats.SSV_BONUS.total += amt;
       }
     });
 
@@ -1925,12 +1981,17 @@ export default function History() {
   const sourceLabel = useMemo(() => {
     const map = {
       ALL: "All Sources",
-      E_EDU: "E-Edu",
-      SELF_ACCOUNT: "Self blocks",
+      E_EDU: "E-Edu Agent",
+      SELF_ACCOUNT: "Self Account / Self Block (25%)",
+      SAVE: "Self Account / Self Block (25%)",
+      SSV_LAYER: "SSV Layer",
+      SSV_BONUS: "SSV Bonus",
+      QR_SCANNER: "QR Scanner",
+      TRIZONE: "Trizone Shopping",
+      ROYALTY: "Royalty Bonus",
       LAYER: "Layer & Blocks",
       DIRECT: "Direct Bonus",
       P2P: "P2P Transfer",
-      ROYALTY: "Royalty Bonus",
       MERCHANT_CAPTAIN: "Merchant & Captain",
       WITHDRAWAL: "Withdrawals",
     };
@@ -2857,26 +2918,64 @@ export default function History() {
             }}
           />
 
-          {/* Chip 3: Save */}
+          {/* Chip 3: Self Account / Self Block (25%) */}
           <Chip
-            icon={<SavingsIcon sx={{ fontSize: "16px !important", color: sourceFilter === "SAVE" ? "#FFFFFF !important" : "#D97706 !important" }} />}
-            label={`Save (${categoryStats.SAVE.count}) ₹${fmtAmount(categoryStats.SAVE.total)}`}
+            icon={<SavingsIcon sx={{ fontSize: "16px !important", color: (sourceFilter === "SAVE" || sourceFilter === "SELF_ACCOUNT") ? "#FFFFFF !important" : "#D97706 !important" }} />}
+            label={`Self Account / Self Block (25%) (${categoryStats.SAVE.count}) ₹${fmtAmount(categoryStats.SAVE.total)}`}
             onClick={() => setSourceFilter("SAVE")}
             sx={{
               fontWeight: 800,
               fontSize: 11.5,
               height: 32,
               borderRadius: "999px",
-              bgcolor: sourceFilter === "SAVE" ? "#D97706" : "#FFFFFF",
-              color: sourceFilter === "SAVE" ? "#FFFFFF" : "#92400E",
+              bgcolor: (sourceFilter === "SAVE" || sourceFilter === "SELF_ACCOUNT") ? "#D97706" : "#FFFFFF",
+              color: (sourceFilter === "SAVE" || sourceFilter === "SELF_ACCOUNT") ? "#FFFFFF" : "#92400E",
               border: "1.5px solid",
-              borderColor: sourceFilter === "SAVE" ? "#D97706" : "#FDE68A",
+              borderColor: (sourceFilter === "SAVE" || sourceFilter === "SELF_ACCOUNT") ? "#D97706" : "#FDE68A",
               cursor: "pointer",
               transition: "all 0.15s ease",
             }}
           />
 
-          {/* Chip 4: QR Scanner */}
+          {/* Chip 4: SSV Layer */}
+          <Chip
+            icon={<LayersRoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "SSV_LAYER" ? "#FFFFFF !important" : "#7C3AED !important" }} />}
+            label={`SSV Layer (${categoryStats.SSV_LAYER.count}) ₹${fmtAmount(categoryStats.SSV_LAYER.total)}`}
+            onClick={() => setSourceFilter("SSV_LAYER")}
+            sx={{
+              fontWeight: 800,
+              fontSize: 11.5,
+              height: 32,
+              borderRadius: "999px",
+              bgcolor: sourceFilter === "SSV_LAYER" ? "#7C3AED" : "#FFFFFF",
+              color: sourceFilter === "SSV_LAYER" ? "#FFFFFF" : "#5B21B6",
+              border: "1.5px solid",
+              borderColor: sourceFilter === "SSV_LAYER" ? "#7C3AED" : "#DDD6FE",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          />
+
+          {/* Chip 5: SSV Bonus */}
+          <Chip
+            icon={<StarsRoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "SSV_BONUS" ? "#FFFFFF !important" : "#EA580C !important" }} />}
+            label={`SSV Bonus (${categoryStats.SSV_BONUS.count}) ₹${fmtAmount(categoryStats.SSV_BONUS.total)}`}
+            onClick={() => setSourceFilter("SSV_BONUS")}
+            sx={{
+              fontWeight: 800,
+              fontSize: 11.5,
+              height: 32,
+              borderRadius: "999px",
+              bgcolor: sourceFilter === "SSV_BONUS" ? "#EA580C" : "#FFFFFF",
+              color: sourceFilter === "SSV_BONUS" ? "#FFFFFF" : "#9A3412",
+              border: "1.5px solid",
+              borderColor: sourceFilter === "SSV_BONUS" ? "#EA580C" : "#FFEDD5",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          />
+
+          {/* Chip 6: QR Scanner */}
           <Chip
             icon={<QrCode2RoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "QR_SCANNER" ? "#FFFFFF !important" : "#059669 !important" }} />}
             label={`QR Scanner (${categoryStats.QR_SCANNER.count}) ₹${fmtAmount(categoryStats.QR_SCANNER.total)}`}
@@ -2895,7 +2994,7 @@ export default function History() {
             }}
           />
 
-          {/* Chip 5: Trizone Shopping */}
+          {/* Chip 7: Trizone Shopping */}
           <Chip
             icon={<ShoppingCartRoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "TRIZONE" ? "#FFFFFF !important" : "#0284C7 !important" }} />}
             label={`Trizone Shopping (${categoryStats.TRIZONE.count}) ₹${fmtAmount(categoryStats.TRIZONE.total)}`}
@@ -2914,7 +3013,7 @@ export default function History() {
             }}
           />
 
-          {/* Chip 6: Royalty */}
+          {/* Chip 8: Royalty */}
           <Chip
             icon={<WorkspacePremiumRoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "ROYALTY" ? "#FFFFFF !important" : "#9333EA !important" }} />}
             label={`Royalty (${categoryStats.ROYALTY.count}) ₹${fmtAmount(categoryStats.ROYALTY.total)}`}
@@ -2956,7 +3055,7 @@ export default function History() {
           </Paper>
         )}
 
-        {sourceFilter === "SAVE" && (
+        {(sourceFilter === "SAVE" || sourceFilter === "SELF_ACCOUNT") && (
           <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#FFFBEB", border: "1px solid #FDE68A" }}>
             <Stack direction="row" spacing={1.5} alignItems="center">
               <Avatar sx={{ bgcolor: "#FEF3C7", color: "#B45309", width: 38, height: 38 }}>
@@ -2964,13 +3063,55 @@ export default function History() {
               </Avatar>
               <Box sx={{ flex: 1 }}>
                 <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#92400E" }}>
-                  Self Block Repurchase Pocket (25%)
+                  Self Account / Self Block Repurchase Pocket (25%)
                 </Typography>
                 <Typography sx={{ fontSize: 11.5, color: "#B45309", fontWeight: 700 }}>
                   Total Transactions: {categoryStats.SAVE.count} • Total Amount Saved: ₹ {fmtAmount(categoryStats.SAVE.total)}
                 </Typography>
                 <Typography sx={{ fontSize: 11, color: "#92400E", opacity: 0.85, mt: 0.2 }}>
                   Automatic 25% allocation reserved for the ₹250 Self-Rebirth loop and shopping vouchers.
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        )}
+
+        {sourceFilter === "SSV_LAYER" && (
+          <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#F5F3FF", border: "1px solid #DDD6FE" }}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar sx={{ bgcolor: "#EDE9FE", color: "#7C3AED", width: 38, height: 38 }}>
+                <LayersRoundedIcon sx={{ fontSize: 20 }} />
+              </Avatar>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#5B21B6" }}>
+                  SSV Layer Commissions
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#7C3AED", fontWeight: 700 }}>
+                  Total Transactions: {categoryStats.SSV_LAYER.count} • Total Amount Received: ₹ {fmtAmount(categoryStats.SSV_LAYER.total)}
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: "#6D28D9", opacity: 0.85, mt: 0.2 }}>
+                  Unilevel matrix layer commissions distributed from SSV (Smart Subscription Voucher) purchases.
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        )}
+
+        {sourceFilter === "SSV_BONUS" && (
+          <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#FFF7ED", border: "1px solid #FFEDD5" }}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar sx={{ bgcolor: "#FFEDD5", color: "#EA580C", width: 38, height: 38 }}>
+                <StarsRoundedIcon sx={{ fontSize: 20 }} />
+              </Avatar>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#9A3412" }}>
+                  SSV Direct Referral Bonus
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#EA580C", fontWeight: 700 }}>
+                  Total Transactions: {categoryStats.SSV_BONUS.count} • Total Amount Received: ₹ {fmtAmount(categoryStats.SSV_BONUS.total)}
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: "#C2410C", opacity: 0.85, mt: 0.2 }}>
+                  Direct sponsorship bonus earned from SSV (Smart Subscription Voucher) direct package activations.
                 </Typography>
               </Box>
             </Stack>
