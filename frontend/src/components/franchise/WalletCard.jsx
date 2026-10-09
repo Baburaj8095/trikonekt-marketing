@@ -9,7 +9,7 @@ import { AGENCY_TOKENS } from "./AgencyTokens";
  */
 export default function WalletCard({
   balance = "0.00",
-  monthlyGrowth = "+₹1,240.00",
+  monthlyGrowth = "+₹0.00",
   onViewHistory,
 }) {
   return (

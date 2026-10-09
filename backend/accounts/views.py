@@ -4164,6 +4164,53 @@ def wallet_me_history(request):
         today_bonus_100 = D("0.00")
         yesterday_bonus_100 = D("0.00")
 
+    # Lifetime aggregation across all user transactions
+    try:
+        from django.db.models import Count
+        all_tx_base = WalletTransaction.objects.filter(user=user).exclude(source_type="ADMIN_SERVICE_CHARGE")
+
+        total_debits_agg = all_tx_base.filter(amount__lt=0).aggregate(
+            total=Sum("amount"), count=Count("id")
+        )
+        total_credits_agg = all_tx_base.filter(amount__gt=0).aggregate(
+            total=Sum("amount"), count=Count("id")
+        )
+        self_debits_agg = all_tx_base.filter(type="SELF_ACCOUNT_DEBIT").aggregate(
+            total=Sum("amount"), count=Count("id")
+        )
+        self_credits_agg = all_tx_base.filter(type="SELF_ACCOUNT_CREDIT").aggregate(
+            total=Sum("amount"), count=Count("id")
+        )
+        self_total_count = all_tx_base.filter(type__in=["SELF_ACCOUNT_CREDIT", "SELF_ACCOUNT_DEBIT"]).count()
+        lifetime_total_count = all_tx_base.count()
+
+        lifetime_credits_total = str(total_credits_agg["total"] or D("0.00"))
+        lifetime_credits_count = total_credits_agg["count"] or 0
+        lifetime_debits_total = str(abs(total_debits_agg["total"] or D("0.00")))
+        lifetime_debits_count = total_debits_agg["count"] or 0
+        lifetime_self_debits_total = str(abs(self_debits_agg["total"] or D("0.00")))
+        lifetime_self_debits_count = self_debits_agg["count"] or 0
+        lifetime_self_credits_total = str(self_credits_agg["total"] or D("0.00"))
+        lifetime_self_credits_count = self_credits_agg["count"] or 0
+    except Exception:
+        lifetime_credits_total = "0.00"
+        lifetime_credits_count = 0
+        lifetime_debits_total = "0.00"
+        lifetime_debits_count = 0
+        lifetime_self_debits_total = "0.00"
+        lifetime_self_debits_count = 0
+        lifetime_self_credits_total = "0.00"
+        lifetime_self_credits_count = 0
+        self_total_count = 0
+        lifetime_total_count = 0
+
+    # Dynamic limit requested by client (default 2000, max 5000)
+    try:
+        req_limit = int(request.GET.get("limit", 2000))
+    except Exception:
+        req_limit = 2000
+    req_limit = max(100, min(req_limit, 5000))
+
     # Top summary
     top = {
         "main_income_balance": str(getattr(w, "main_balance", 0) or 0),
@@ -4179,6 +4226,16 @@ def wallet_me_history(request):
         "yesterday_main_75": str(yesterday_main_75),
         "today_self_25": str(today_self_25),
         "yesterday_self_25": str(yesterday_self_25),
+        "lifetime_credits_total": lifetime_credits_total,
+        "lifetime_credits_count": lifetime_credits_count,
+        "lifetime_debits_total": lifetime_debits_total,
+        "lifetime_debits_count": lifetime_debits_count,
+        "lifetime_self_debits_total": lifetime_self_debits_total,
+        "lifetime_self_debits_count": lifetime_self_debits_count,
+        "lifetime_self_credits_total": lifetime_self_credits_total,
+        "lifetime_self_credits_count": lifetime_self_credits_count,
+        "lifetime_self_count": self_total_count,
+        "lifetime_transactions_count": lifetime_total_count,
     }
 
     # Buckets
@@ -4196,8 +4253,8 @@ def wallet_me_history(request):
         "MONTHLY_759_DIRECT",
         "MONTHLY_759_SELF",
     ]
-    incoming_qs = WalletTransaction.objects.filter(user=user, type__in=incoming_types, amount__gt=0).order_by("-created_at")[:500]
-    self_qs = WalletTransaction.objects.filter(user=user, type__in=["SELF_ACCOUNT_CREDIT", "SELF_ACCOUNT_DEBIT"]).order_by("-created_at")[:50]
+    incoming_qs = WalletTransaction.objects.filter(user=user, type__in=incoming_types, amount__gt=0).order_by("-created_at")[:req_limit]
+    self_qs = WalletTransaction.objects.filter(user=user, type__in=["SELF_ACCOUNT_CREDIT", "SELF_ACCOUNT_DEBIT"]).order_by("-created_at")[:req_limit]
     redeem_types = [
         "AUTO_ECOUPON_ISSUED",
         "AUTO_PURCHASE_DEBIT",
@@ -4208,14 +4265,14 @@ def wallet_me_history(request):
         "PRODUCT_PURCHASE_DEBIT",
         "ADJUSTMENT_DEBIT",
     ]
-    redeem_qs = WalletTransaction.objects.filter(user=user, type__in=redeem_types).order_by("-created_at")[:50]
+    redeem_qs = WalletTransaction.objects.filter(user=user, type__in=redeem_types).order_by("-created_at")[:req_limit]
 
     # Reward points
     cashback = []
     redeem_points = []
     try:
         from .models import RewardPointsTransaction
-        rtx = RewardPointsTransaction.objects.filter(user=user).order_by("-created_at")[:50]
+        rtx = RewardPointsTransaction.objects.filter(user=user).order_by("-created_at")[:req_limit]
         for x in rtx:
             xtype = (x.type or "").upper()
             row = {
@@ -4290,14 +4347,14 @@ def wallet_me_history(request):
         type__in=main_types
     ).exclude(
         source_type="ADMIN_SERVICE_CHARGE"
-    ).order_by("-created_at")[:500]
+    ).order_by("-created_at")[:req_limit]
     main_list = [txmap(x) for x in main_qs]
 
     all_qs = WalletTransaction.objects.filter(
         user=user
     ).exclude(
         source_type="ADMIN_SERVICE_CHARGE"
-    ).order_by("-created_at")[:500]
+    ).order_by("-created_at")[:req_limit]
     all_list = [txmap(x) for x in all_qs]
 
     data = {

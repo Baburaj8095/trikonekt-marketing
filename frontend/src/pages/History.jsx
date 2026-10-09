@@ -1460,7 +1460,7 @@ export default function History() {
   const fetchHistory = async () => {
     try {
       setErr("");
-      const res = await API.get("/accounts/wallet/me/history/");
+      const res = await API.get("/accounts/wallet/me/history/?limit=2000");
       const data = res?.data || {};
 
       setTop({
@@ -1476,6 +1476,15 @@ export default function History() {
         yesterday_main_75: data?.top?.yesterday_main_75,
         today_self_25: data?.top?.today_self_25,
         yesterday_self_25: data?.top?.yesterday_self_25,
+        lifetime_credits_total: data?.top?.lifetime_credits_total,
+        lifetime_credits_count: data?.top?.lifetime_credits_count,
+        lifetime_debits_total: data?.top?.lifetime_debits_total,
+        lifetime_debits_count: data?.top?.lifetime_debits_count,
+        lifetime_self_count: data?.top?.lifetime_self_count,
+        lifetime_self_debits_count: data?.top?.lifetime_self_debits_count,
+        lifetime_self_debits_total: data?.top?.lifetime_self_debits_total,
+        lifetime_self_credits_total: data?.top?.lifetime_self_credits_total,
+        lifetime_self_credits_count: data?.top?.lifetime_self_credits_count,
       });
 
       setAllTransactions(Array.isArray(data?.all_transactions) ? data.all_transactions : []);
@@ -1828,11 +1837,14 @@ export default function History() {
       }
     });
 
-    const totalCredits = mainCredits + selfCredits;
-    const finalCreditCount = creditCount;
-    const totalDebits = selfDebits + otherDebits;
-    const finalDebitCount = debitCount;
-    const selfBalance = Number(top.self_account_balance || (selfCredits - selfDebits));
+    const totalCredits = top?.lifetime_credits_total != null ? Number(top.lifetime_credits_total) : (mainCredits + selfCredits);
+    const finalCreditCount = top?.lifetime_credits_count != null ? Number(top.lifetime_credits_count) : creditCount;
+    const totalDebits = top?.lifetime_debits_total != null ? Number(top.lifetime_debits_total) : (selfDebits + otherDebits);
+    const finalDebitCount = top?.lifetime_debits_count != null ? Number(top.lifetime_debits_count) : debitCount;
+    const selfBalance = Number(top?.self_account_balance || (selfCredits - selfDebits));
+    const finalSelfCount = top?.lifetime_self_count != null ? Number(top.lifetime_self_count) : selfCount;
+    const finalSelfDebits = top?.lifetime_self_debits_total != null ? Number(top.lifetime_self_debits_total) : selfDebits;
+    const finalSelfCredits = top?.lifetime_self_credits_total != null ? Number(top.lifetime_self_credits_total) : selfCredits;
 
     return {
       totalCredits,
@@ -1841,12 +1853,12 @@ export default function History() {
       debitCount: finalDebitCount,
       mainCredits,
       mainCount,
-      selfCredits,
-      selfDebits,
+      selfCredits: finalSelfCredits,
+      selfDebits: finalSelfDebits,
       totalSelf: selfBalance,
-      selfCount,
+      selfCount: finalSelfCount,
     };
-  }, [allTransactions, top.self_account_balance]);
+  }, [allTransactions, top]);
 
   const categoryStats = useMemo(() => {
     const stats = {

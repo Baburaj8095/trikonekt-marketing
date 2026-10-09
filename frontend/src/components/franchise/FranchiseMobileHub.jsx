@@ -75,6 +75,13 @@ import PhoneRoundedIcon from "@mui/icons-material/PhoneRounded";
 import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
 import DomainRoundedIcon from "@mui/icons-material/DomainRounded";
 import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
+import ArrowDownwardRoundedIcon from "@mui/icons-material/ArrowDownwardRounded";
+import QrCode2RoundedIcon from "@mui/icons-material/QrCode2Rounded";
+import ShoppingCartRoundedIcon from "@mui/icons-material/ShoppingCartRounded";
+import WorkspacePremiumRoundedIcon from "@mui/icons-material/WorkspacePremiumRounded";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 
 import AgencyLayout from "./AgencyLayout";
 import RoleSelector from "./RoleSelector";
@@ -143,13 +150,29 @@ function describeSource(tx = {}) {
   const type = String(tx?.type || "").toUpperCase();
   const meta = tx?.meta || {};
   const src = String(meta.source || "").toUpperCase();
-  if (type === "FRANCHISE_INCOME" || src.includes("FRANCHISE")) {
-    const gross = Number(meta.gross || 0);
-    const trigger = String(meta.trigger || "").toUpperCase();
-    if (trigger.includes("750") || gross === 750 || src.includes("750")) {
+  const trigger = String(meta.trigger || "").toUpperCase();
+  const pkg = String(meta.package || "").toUpperCase();
+  const st = String(tx?.source_type || "").toUpperCase();
+  const ot = String(meta.orig_type || "").toUpperCase();
+
+  if (type === "SELF_ACCOUNT_CREDIT") {
+    if (trigger.includes("750") || pkg.includes("750") || st.includes("750")) {
+      return "₹750 Prime Geo Share (25% Self)";
+    }
+    if (trigger.includes("SPP") || trigger.includes("759") || trigger.includes("1000") || pkg.includes("759") || pkg.includes("1000") || st.includes("MONTHLY")) {
+      return "₹1,000 SPP Monthly Box Geo Share (25% Self)";
+    }
+    if (trigger.includes("REBIRTH") || src.includes("REBIRTH")) {
+      return "₹250 Self-Rebirth Override (25% Self)";
+    }
+    return "Self Rebirth Reserve Credit (25%)";
+  }
+
+  if (type === "INCOME_CREDIT_75" || type === "FRANCHISE_INCOME" || src.includes("FRANCHISE") || src.includes("AUTO_POOL_GEO")) {
+    if (trigger.includes("750") || pkg.includes("750") || st.includes("750")) {
       return "₹750 Prime Geo Share";
     }
-    if (trigger.includes("SPP") || trigger.includes("759") || trigger.includes("1000") || src.includes("SPP")) {
+    if (trigger.includes("SPP") || trigger.includes("759") || trigger.includes("1000") || pkg.includes("759") || pkg.includes("1000") || st.includes("MONTHLY")) {
       return "₹1,000 SPP Monthly Box Geo Share";
     }
     if (trigger.includes("RANK") || trigger.includes("EDU") || src.includes("RANK") || src.includes("EDU")) {
@@ -160,14 +183,16 @@ function describeSource(tx = {}) {
     }
     return meta.description || "Franchise Regional Commission";
   }
-  if (type === "SELF_ACCOUNT_CREDIT") return "Self Rebirth Reserve Credit (25%)";
+
+  if (type === "PINCODE_ROYALTY") return "Pincode Daily Royalty Share";
   if (type === "SELF_ACCOUNT_DEBIT") return "Self Rebirth Allocation (₹250 Node)";
+  if (type === "WITHDRAWAL_DEBIT") return "Withdrawal Payout";
   return meta.description || type.replace(/_/g, " ");
 }
 
 function counterpartyLabel(tx = {}) {
   const meta = tx?.meta || {};
-  const trig = meta.trigger_user || meta.from_user || meta.username || meta.tr_username;
+  const trig = meta.payer || meta.trigger_user || meta.from_user || meta.username || meta.tr_username;
   const trigId = meta.trigger_user_id || meta.from_user_id;
   const pincode = meta.pincode || meta.territory;
   const u = trig ? maskUsernameMid(trig) : "";
@@ -176,6 +201,33 @@ function counterpartyLabel(tx = {}) {
   else if (trigId) out = `From ID ${trigId}`;
   if (pincode) out += (out ? ` • PIN ${pincode}` : `PIN ${pincode}`);
   return out || "Regional Consumer";
+}
+
+function classifyFranchiseTransaction(tx = {}) {
+  const type = String(tx?.type || "").toUpperCase();
+  const meta = tx?.meta || {};
+  const src = String(meta.source || "").toUpperCase();
+  const trigger = String(meta.trigger || "").toUpperCase();
+
+  if (type === "SELF_ACCOUNT_CREDIT" || type === "SELF_ACCOUNT_DEBIT" || meta?.ledger === "SELF_ACCOUNT") {
+    return "SELF_ACCOUNT";
+  }
+  if (type === "PINCODE_ROYALTY" || trigger.includes("ROYALTY") || src.includes("ROYALTY")) {
+    return "ROYALTY";
+  }
+  if (type.includes("QR") || src.includes("QR") || src.includes("MERCHANT") || src.includes("CAPTAIN")) {
+    return "QR_SCANNER";
+  }
+  if (type.includes("TRIZONE") || src.includes("TRIZONE") || src.includes("COMMERCE") || src.includes("RETAIL")) {
+    return "TRIZONE";
+  }
+  if (type === "INCOME_CREDIT_75" || type === "FRANCHISE_INCOME" || src.includes("AUTO_POOL_GEO") || src.includes("FRANCHISE") || trigger.includes("PRIME") || trigger.includes("MONTHLY")) {
+    return "FRANCHISE_GEO";
+  }
+  if (type.includes("WITHDRAWAL")) {
+    return "WITHDRAWAL";
+  }
+  return "OTHER";
 }
 
 function ymd(d) {
@@ -198,23 +250,32 @@ function formatHeaderDate(d) {
   }
 }
 
-function groupByDay(items) {
-  const now = new Date();
-  const todayKey = ymd(now);
-  const yest = new Date(now);
-  yest.setDate(now.getDate() - 1);
-  const yestKey = ymd(yest);
-
+function groupByMonth(items) {
   const map = new Map();
   const order = [];
 
   (items || []).forEach((it) => {
-    const k = it?.created_at ? ymd(it.created_at) : "unknown";
-    if (!map.has(k)) {
-      map.set(k, []);
-      order.push(k);
+    let key = "unknown";
+    let monthLabel = "Recent Activity";
+    if (it?.created_at) {
+      const d = new Date(it.created_at);
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        key = `${year}-${month}`;
+        monthLabel = d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+      }
     }
-    map.get(k).push(it);
+    if (!map.has(key)) {
+      map.set(key, { label: monthLabel, rows: [], total: 0 });
+      order.push(key);
+    }
+    const entry = map.get(key);
+    entry.rows.push(it);
+    const amt = Number(it?.amount || 0);
+    if (amt > 0) {
+      entry.total += amt;
+    }
   });
 
   order.sort((a, b) => {
@@ -225,25 +286,21 @@ function groupByDay(items) {
   });
 
   return order.map((k) => {
-    let title = "";
-    if (k === todayKey) title = "Today";
-    else if (k === yestKey) title = "Yesterday";
-    else if (k === "unknown") title = "Recent Activity";
-    else {
-      const [Y, M, D] = k.split("-").map((x) => parseInt(x, 10));
-      title = formatHeaderDate(new Date(Y, (M || 1) - 1, D || 1));
-    }
-
-    const rows = (map.get(k) || []).slice().sort((a, b) => {
+    const entry = map.get(k);
+    const rows = (entry.rows || []).slice().sort((a, b) => {
       const da = a?.created_at ? new Date(a.created_at).getTime() : 0;
       const db = b?.created_at ? new Date(b.created_at).getTime() : 0;
       return db - da;
     });
-
-    const total = rows.reduce((acc, r) => acc + (Number(r.amount) || 0), 0);
-    return { title, rows, total };
+    return {
+      key: k,
+      title: entry.label,
+      rows,
+      total: entry.total,
+    };
   });
 }
+
 
 /**
  * EXACT 6 AGENCY TIERS AND GEOGRAPHIC SCOPES
@@ -903,37 +960,6 @@ const SEED_MERCHANTS = [
   },
 ];
 
-// Seed Franchise Rebirth Nodes in 5-Matrix & 3-Matrix
-const SEED_REBIRTH_NODES = [
-  {
-    id: "RB-FRAN-572106-001",
-    date: "06 Oct 2026, 04:30 PM",
-    status: "Active in 5-Matrix & 3-Matrix",
-    matrix5Level: 3,
-    matrix3Queue: 42,
-    earnedAmount: "₹2,450.00",
-    source: "Auto Rebirth (25% Self Block Threshold)",
-  },
-  {
-    id: "RB-FRAN-572106-002",
-    date: "02 Oct 2026, 11:15 AM",
-    status: "Active in 5-Matrix & 3-Matrix",
-    matrix5Level: 2,
-    matrix3Queue: 88,
-    earnedAmount: "₹1,850.00",
-    source: "Auto Rebirth (25% Self Block Threshold)",
-  },
-  {
-    id: "RB-FRAN-572106-003",
-    date: "25 Sep 2026, 08:20 PM",
-    status: "Active in 5-Matrix & 3-Matrix",
-    matrix5Level: 2,
-    matrix3Queue: 115,
-    earnedAmount: "₹950.00",
-    source: "Auto Rebirth (25% Self Block Threshold)",
-  },
-];
-
 export default function FranchiseMobileHub({
   initialRole = "agency_pincode",
   user = null,
@@ -967,37 +993,156 @@ export default function FranchiseMobileHub({
 
   // Active Mobile View (Single Unified History & Wallet Screen)
   const [activeScreen, setActiveScreen] = useState(initialScreen);
-  const [historyTab, setHistoryTab] = useState(0); // 0: All, 1: Franchise Income, 2: Self Blocks, 3: Withdrawals
   const [historySearch, setHistorySearch] = useState("");
   const [selectedTxDetail, setSelectedTxDetail] = useState(null);
+  const [sourceFilter, setSourceFilter] = useState("ALL"); // ALL, FRANCHISE_GEO, SELF_ACCOUNT, QR_SCANNER, TRIZONE, ROYALTY
+  const [flowFilter, setFlowFilter] = useState("ALL"); // ALL, CREDIT, DEBIT
+  const [datePreset, setDatePreset] = useState("all");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
+
+  const categoryStats = useMemo(() => {
+    const stats = {
+      ALL: { count: 0, total: 0 },
+      FRANCHISE_GEO: { count: 0, total: 0 },
+      SELF_ACCOUNT: { count: 0, total: 0 },
+      QR_SCANNER: { count: 0, total: 0 },
+      TRIZONE: { count: 0, total: 0 },
+      ROYALTY: { count: 0, total: 0 },
+    };
+
+    (liveTransactions || []).forEach((tx) => {
+      const amt = Number(tx?.amount || 0);
+      const cat = classifyFranchiseTransaction(tx);
+
+      stats.ALL.count += 1;
+      if (amt > 0) stats.ALL.total += amt;
+
+      if (cat === "FRANCHISE_GEO") {
+        stats.FRANCHISE_GEO.count += 1;
+        if (amt > 0) stats.FRANCHISE_GEO.total += amt;
+      } else if (cat === "SELF_ACCOUNT") {
+        stats.SELF_ACCOUNT.count += 1;
+        if (amt > 0) stats.SELF_ACCOUNT.total += amt;
+      } else if (cat === "QR_SCANNER") {
+        stats.QR_SCANNER.count += 1;
+        if (amt > 0) stats.QR_SCANNER.total += amt;
+      } else if (cat === "TRIZONE") {
+        stats.TRIZONE.count += 1;
+        if (amt > 0) stats.TRIZONE.total += amt;
+      } else if (cat === "ROYALTY") {
+        stats.ROYALTY.count += 1;
+        if (amt > 0) stats.ROYALTY.total += amt;
+      }
+    });
+
+    return stats;
+  }, [liveTransactions]);
+
+  const thisMonthEarnings = useMemo(() => {
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth();
+    return (liveTransactions || []).reduce((acc, tx) => {
+      const amt = Number(tx?.amount || 0);
+      if (amt <= 0) return acc;
+      const d = new Date(tx?.created_at || tx?.timestamp || tx?.date || Date.now());
+      if (isNaN(d.getTime())) return acc + amt;
+      if (d.getFullYear() === curYear && d.getMonth() === curMonth) {
+        return acc + amt;
+      }
+      return acc;
+    }, 0);
+  }, [liveTransactions]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (datePreset !== "all") count += 1;
+    if (flowFilter !== "ALL") count += 1;
+    if (sourceFilter !== "ALL") count += 1;
+    return count;
+  }, [datePreset, flowFilter, sourceFilter]);
 
   const filteredHistory = useMemo(() => {
     let rows = Array.isArray(liveTransactions) ? liveTransactions : [];
-    if (historyTab === 1) {
-      // Franchise Income
-      rows = rows.filter((r) => r.type === "FRANCHISE_INCOME" || String(r.type || "").includes("FRANCHISE"));
-    } else if (historyTab === 2) {
-      // Self blocks
-      rows = rows.filter((r) => r.type === "SELF_ACCOUNT_CREDIT" || r.type === "SELF_ACCOUNT_DEBIT");
-    } else if (historyTab === 3) {
-      // Withdrawals
-      rows = rows.filter((r) => String(r.type || "").includes("WITHDRAWAL"));
+
+    // 1. Source filter
+    if (sourceFilter !== "ALL") {
+      rows = rows.filter((r) => classifyFranchiseTransaction(r) === sourceFilter);
     }
 
+    // 2. Flow filter
+    if (flowFilter === "CREDIT") {
+      rows = rows.filter((r) => {
+        const amt = Number(r.amount || 0);
+        const type = String(r.type || "").toUpperCase();
+        return amt > 0 && type !== "SELF_ACCOUNT_CREDIT" && type !== "SELF_ACCOUNT_DEBIT";
+      });
+    } else if (flowFilter === "DEBIT") {
+      rows = rows.filter((r) => {
+        const type = String(r.type || "").toUpperCase();
+        return type === "SELF_ACCOUNT_CREDIT" || type === "SELF_ACCOUNT_DEBIT" || r.meta?.ledger === "SELF_ACCOUNT";
+      });
+    }
+
+    // 3. Date range filter
+    if (datePreset !== "all") {
+      const now = new Date();
+      if (datePreset === "today") {
+        const todayStr = ymd(now);
+        rows = rows.filter((r) => r.created_at && ymd(r.created_at) === todayStr);
+      } else if (datePreset === "this_month") {
+        const curYear = now.getFullYear();
+        const curMonth = now.getMonth();
+        rows = rows.filter((r) => {
+          if (!r.created_at) return false;
+          const d = new Date(r.created_at);
+          return d.getFullYear() === curYear && d.getMonth() === curMonth;
+        });
+      } else if (datePreset === "last_month") {
+        const lmDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lmYear = lmDate.getFullYear();
+        const lmMonth = lmDate.getMonth();
+        rows = rows.filter((r) => {
+          if (!r.created_at) return false;
+          const d = new Date(r.created_at);
+          return d.getFullYear() === lmYear && d.getMonth() === lmMonth;
+        });
+      } else if (datePreset === "30_days") {
+        const past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        rows = rows.filter((r) => r.created_at && new Date(r.created_at) >= past30);
+      } else if (datePreset === "custom") {
+        if (customStartDate) {
+          const start = new Date(customStartDate);
+          start.setHours(0, 0, 0, 0);
+          rows = rows.filter((r) => r.created_at && new Date(r.created_at) >= start);
+        }
+        if (customEndDate) {
+          const end = new Date(customEndDate);
+          end.setHours(23, 59, 59, 999);
+          rows = rows.filter((r) => r.created_at && new Date(r.created_at) <= end);
+        }
+      }
+    }
+
+    // 4. Text Search
     if (historySearch.trim()) {
       const q = historySearch.toLowerCase();
       rows = rows.filter(
         (r) =>
           describeSource(r).toLowerCase().includes(q) ||
           counterpartyLabel(r).toLowerCase().includes(q) ||
-          String(r.amount || "").includes(q)
+          String(r.amount || "").includes(q) ||
+          String(r.id || "").includes(q)
       );
     }
 
     return rows;
-  }, [liveTransactions, historyTab, historySearch]);
+  }, [liveTransactions, sourceFilter, flowFilter, datePreset, customStartDate, customEndDate, historySearch]);
 
-  const historySections = useMemo(() => groupByDay(filteredHistory), [filteredHistory]);
+  const historySections = useMemo(() => groupByMonth(filteredHistory), [filteredHistory]);
+
 
   // Jurisdiction selection inside the tier
   const [selectedSubZone, setSelectedSubZone] = useState("all");
@@ -1117,11 +1262,57 @@ export default function FranchiseMobileHub({
       const raw = localStorage.getItem("agency_rebirth_nodes_store");
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch (_) {}
-    return SEED_REBIRTH_NODES;
+    return [];
   });
+
+  const [liveAdminMasterConfig, setLiveAdminMasterConfig] = useState(() => {
+    try {
+      const raw = localStorage.getItem("tri_master_commission_config");
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return null;
+  });
+
+  const adminRebirthConfig = useMemo(() => {
+    let cfg = liveAdminMasterConfig?.rank_upgrade_config?.rebirth_allocation || {};
+    if (!cfg || Object.keys(cfg).length === 0) {
+      try {
+        const raw = localStorage.getItem("tri_rank_upgrade_config");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.rebirth_allocation) cfg = parsed.rebirth_allocation;
+        }
+      } catch {}
+    }
+    return {
+      total_amount: Number(cfg.total_amount ?? 250),
+      direct_sponsor: Number(cfg.direct_sponsor ?? 40),
+      matrix_5: Number(cfg.matrix_5 ?? 80),
+      matrix_3: Number(cfg.matrix_3 ?? 20),
+      pincode_royalty: Number(cfg.pincode_royalty ?? cfg.franchise_pool ?? 15),
+      district_royalty: Number(cfg.district_royalty ?? cfg.district_pool ?? 10),
+      state_royalty: Number(cfg.state_royalty ?? cfg.state_pool ?? 15),
+      district_royalty_l1_l7: Number(cfg.district_royalty_l1_l7 ?? cfg.district_royalty_t1 ?? 15),
+      district_royalty_l1_l10_30d: Number(cfg.district_royalty_l1_l10_30d ?? 10),
+      districtwise_royalty_l8_l10: Number(cfg.districtwise_royalty_l8_l10 ?? cfg.district_royalty_t2 ?? 15),
+      statewise_royalty_l8_l10: Number(cfg.statewise_royalty_l8_l10 ?? 10),
+      district_captain_royalty: Number(cfg.district_captain_royalty ?? 5),
+      state_captain_royalty: Number(cfg.state_captain_royalty ?? 5),
+      company_admin: Number(cfg.company_admin ?? cfg.company_gross ?? 10),
+      tax_rebirth: Number(liveAdminMasterConfig?.custom_module_tax?.tax_rebirth ?? 18),
+      pincode_roles_pct: cfg.pincode_roles_pct || {
+        pincode: 20,
+        pincode_coord: 10,
+        district: 20,
+        district_coord: 10,
+        state: 20,
+        state_coord: 20,
+      },
+    };
+  }, [liveAdminMasterConfig]);
 
   // Rebirth Sub Tab: 'matrix5' | 'matrix3' | 'history' | 'config'
   const [rebirthSubTab, setRebirthSubTab] = useState("matrix5");
@@ -1146,22 +1337,63 @@ export default function FranchiseMobileHub({
     async function loadLiveAgencyData() {
       try {
         const wRes = await API.get("/accounts/wallet/me/history/");
-        if (isMounted && wRes.data?.top) {
-          const top = wRes.data.top;
+        if (isMounted && wRes.data) {
+          const top = wRes.data.top || {};
           setWalletState((prev) => ({
             ...prev,
             mainWallet: Number(top.main_income_balance || 0),
             selfWallet: Number(top.self_account_balance || 0),
-            totalEarned: Number(top.all_earnings_total || 0),
+            totalEarned: Number(top.all_earnings_total || (Number(top.main_income_balance || 0) + Number(top.self_account_balance || 0))),
             rebirthCount: Math.floor(Number(top.self_account_balance || 0) / 250),
           }));
-          if (Array.isArray(wRes.data.incoming)) {
-            setLiveTransactions(wRes.data.incoming);
-          }
+
+          const allTx = Array.isArray(wRes.data.all_transactions) && wRes.data.all_transactions.length > 0
+            ? wRes.data.all_transactions
+            : [
+                ...(Array.isArray(wRes.data.incoming) ? wRes.data.incoming : []),
+                ...(Array.isArray(wRes.data.self_account) ? wRes.data.self_account : []),
+                ...(Array.isArray(wRes.data.outgoing) ? wRes.data.outgoing : []),
+              ];
+
+          allTx.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+          setLiveTransactions(allTx);
         }
+
       } catch (e) {
         console.warn("Wallet history load err:", e);
       }
+
+      try {
+        const mCommissionRes = await API.get("/admin/commission/master/");
+        if (isMounted && mCommissionRes.data) {
+          setLiveAdminMasterConfig(mCommissionRes.data);
+          try {
+            localStorage.setItem("tri_master_commission_config", JSON.stringify(mCommissionRes.data));
+          } catch (_) {}
+        }
+      } catch (_) {}
+
+      try {
+        const rootsRes = await API.get("/accounts/genealogy/roots/breakdown/");
+        if (isMounted && rootsRes.data) {
+          const rRoots = Array.isArray(rootsRes.data?.roots)
+            ? rootsRes.data.roots.filter((r) => String(r.source || "").includes("REBIRTH") || String(r.category || "").includes("REBIRTH"))
+            : [];
+          if (rRoots.length > 0) {
+            setRebirthList(
+              rRoots.map((r, idx) => ({
+                id: r.account_id || r.id || `RB-FRAN-${idx + 1}`,
+                date: r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "Active",
+                status: "Active in 5-Matrix & 3-Matrix",
+                matrix5Level: r.matrix5Level || r.level || 1,
+                matrix3Queue: r.matrix3Queue || idx + 1,
+                earnedAmount: `₹${Number(r.total_earned || r.earned || 0).toFixed(2)}`,
+                source: r.source || "Self Rebirth Node",
+              }))
+            );
+          }
+        }
+      } catch (_) {}
 
       try {
         const mRes = await API.get("/business/franchise/dashboard-metrics/");
@@ -3257,7 +3489,7 @@ export default function FranchiseMobileHub({
             {/* Total Cumulative Earnings Hero Card */}
             <WalletCard
               balance={(walletState.mainWallet + walletState.selfWallet).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              monthlyGrowth="+₹1,240.00 • Instant Daily Payouts"
+              monthlyGrowth={`+₹${thisMonthEarnings.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} • Instant Daily Payouts`}
             />
 
             {/* 4 Circular Quick Action Buttons (Fintech UI) */}
@@ -3439,90 +3671,431 @@ export default function FranchiseMobileHub({
               </Grid>
             </Paper>
 
-            {/* ── UNIFIED LIVE TRANSACTION HISTORY LEDGER ── */}
+            {/* ── CONSUMER-MATCHED UNIFIED TRANSACTION HISTORY STREAM ── */}
+            <Stack spacing={1.5} sx={{ mb: 2 }}>
+              {/* 1. SEARCH BAR & FILTERS BUTTON */}
+              <Stack direction="row" spacing={1} alignItems="center">
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Search by package, consumer, PIN, amount..."
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchRoundedIcon sx={{ color: "#065F46", fontSize: 20 }} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: historySearch ? (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setHistorySearch("")} sx={{ p: 0.5 }}>
+                          <CloseRoundedIcon sx={{ fontSize: 16 }} />
+                        </IconButton>
+                      </InputAdornment>
+                    ) : null,
+                    sx: {
+                      borderRadius: "24px",
+                      bgcolor: "#FFFFFF",
+                      fontSize: 13,
+                      boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
+                      "& fieldset": { borderColor: "#E2E8F0" },
+                      "&:hover fieldset": { borderColor: "#CBD5E1" },
+                      "&.Mui-focused fieldset": { borderColor: "#059669" },
+                    },
+                  }}
+                />
+
+                <Button
+                  variant="outlined"
+                  onClick={() => setFilterDrawerOpen(true)}
+                  startIcon={
+                    <Badge
+                      badgeContent={activeFilterCount}
+                      color="error"
+                      sx={{
+                        "& .MuiBadge-badge": {
+                          fontSize: 10,
+                          height: 16,
+                          minWidth: 16,
+                          top: -2,
+                          right: -2,
+                        },
+                      }}
+                    >
+                      <TuneRoundedIcon sx={{ fontSize: 18, color: activeFilterCount > 0 ? "#059669" : "#475569" }} />
+                    </Badge>
+                  }
+                  sx={{
+                    height: 40,
+                    minWidth: 96,
+                    borderRadius: "24px",
+                    textTransform: "none",
+                    fontWeight: 800,
+                    fontSize: 12.5,
+                    bgcolor: activeFilterCount > 0 ? "#ECFDF5" : "#FFFFFF",
+                    borderColor: activeFilterCount > 0 ? "#059669" : "#E2E8F0",
+                    color: activeFilterCount > 0 ? "#059669" : "#334155",
+                    boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
+                    flexShrink: 0,
+                    "&:hover": { borderColor: "#059669", bgcolor: "#ECFDF5" },
+                  }}
+                >
+                  Filters
+                </Button>
+              </Stack>
+
+              {/* 2. HORIZONTAL CATEGORY CHIPS BAR */}
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  overflowX: "auto",
+                  pb: 0.6,
+                  "&::-webkit-scrollbar": { display: "none" },
+                  scrollbarWidth: "none",
+                }}
+              >
+                {/* Chip 1: All */}
+                <Chip
+                  label={`All (${categoryStats.ALL.count}) ₹${categoryStats.ALL.total.toFixed(2)}`}
+                  onClick={() => setSourceFilter("ALL")}
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: 11.5,
+                    height: 32,
+                    borderRadius: "999px",
+                    bgcolor: sourceFilter === "ALL" ? "#0F172A" : "#FFFFFF",
+                    color: sourceFilter === "ALL" ? "#FFFFFF" : "#475569",
+                    border: "1.5px solid",
+                    borderColor: sourceFilter === "ALL" ? "#0F172A" : "#E2E8F0",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                />
+
+                {/* Chip 2: Franchise Geo */}
+                <Chip
+                  icon={<StoreRoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "FRANCHISE_GEO" ? "#FFFFFF !important" : "#2563EB !important" }} />}
+                  label={`Franchise Geo (${categoryStats.FRANCHISE_GEO.count}) ₹${categoryStats.FRANCHISE_GEO.total.toFixed(2)}`}
+                  onClick={() => setSourceFilter("FRANCHISE_GEO")}
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: 11.5,
+                    height: 32,
+                    borderRadius: "999px",
+                    bgcolor: sourceFilter === "FRANCHISE_GEO" ? "#2563EB" : "#FFFFFF",
+                    color: sourceFilter === "FRANCHISE_GEO" ? "#FFFFFF" : "#1E40AF",
+                    border: "1.5px solid",
+                    borderColor: sourceFilter === "FRANCHISE_GEO" ? "#2563EB" : "#BFDBFE",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                />
+
+                {/* Chip 3: Self Block (25%) */}
+                <Chip
+                  icon={<SavingsIcon sx={{ fontSize: "16px !important", color: sourceFilter === "SELF_ACCOUNT" ? "#FFFFFF !important" : "#D97706 !important" }} />}
+                  label={`Self Blocks (${categoryStats.SELF_ACCOUNT.count}) ₹${categoryStats.SELF_ACCOUNT.total.toFixed(2)}`}
+                  onClick={() => setSourceFilter("SELF_ACCOUNT")}
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: 11.5,
+                    height: 32,
+                    borderRadius: "999px",
+                    bgcolor: sourceFilter === "SELF_ACCOUNT" ? "#D97706" : "#FFFFFF",
+                    color: sourceFilter === "SELF_ACCOUNT" ? "#FFFFFF" : "#92400E",
+                    border: "1.5px solid",
+                    borderColor: sourceFilter === "SELF_ACCOUNT" ? "#D97706" : "#FDE68A",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                />
+
+                {/* Chip 4: QR Scanner */}
+                <Chip
+                  icon={<QrCode2RoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "QR_SCANNER" ? "#FFFFFF !important" : "#059669 !important" }} />}
+                  label={`QR Scanner (${categoryStats.QR_SCANNER.count}) ₹${categoryStats.QR_SCANNER.total.toFixed(2)}`}
+                  onClick={() => setSourceFilter("QR_SCANNER")}
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: 11.5,
+                    height: 32,
+                    borderRadius: "999px",
+                    bgcolor: sourceFilter === "QR_SCANNER" ? "#059669" : "#FFFFFF",
+                    color: sourceFilter === "QR_SCANNER" ? "#FFFFFF" : "#065F46",
+                    border: "1.5px solid",
+                    borderColor: sourceFilter === "QR_SCANNER" ? "#059669" : "#A7F3D0",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                />
+
+                {/* Chip 5: Trizone Shopping */}
+                <Chip
+                  icon={<ShoppingCartRoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "TRIZONE" ? "#FFFFFF !important" : "#0284C7 !important" }} />}
+                  label={`TriZone (${categoryStats.TRIZONE.count}) ₹${categoryStats.TRIZONE.total.toFixed(2)}`}
+                  onClick={() => setSourceFilter("TRIZONE")}
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: 11.5,
+                    height: 32,
+                    borderRadius: "999px",
+                    bgcolor: sourceFilter === "TRIZONE" ? "#0284C7" : "#FFFFFF",
+                    color: sourceFilter === "TRIZONE" ? "#FFFFFF" : "#075985",
+                    border: "1.5px solid",
+                    borderColor: sourceFilter === "TRIZONE" ? "#0284C7" : "#BAE6FD",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                />
+
+                {/* Chip 6: Royalty */}
+                <Chip
+                  icon={<WorkspacePremiumRoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "ROYALTY" ? "#FFFFFF !important" : "#9333EA !important" }} />}
+                  label={`Royalty (${categoryStats.ROYALTY.count}) ₹${categoryStats.ROYALTY.total.toFixed(2)}`}
+                  onClick={() => setSourceFilter("ROYALTY")}
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: 11.5,
+                    height: 32,
+                    borderRadius: "999px",
+                    bgcolor: sourceFilter === "ROYALTY" ? "#9333EA" : "#FFFFFF",
+                    color: sourceFilter === "ROYALTY" ? "#FFFFFF" : "#7E22CE",
+                    border: "1.5px solid",
+                    borderColor: sourceFilter === "ROYALTY" ? "#9333EA" : "#E9D5FF",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                />
+              </Box>
+
+              {/* 3. DYNAMIC CATEGORY SUMMARY BANNER */}
+              {sourceFilter === "ALL" && (
+                <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#F0FDF4", border: "1px solid #BBF7D0" }}>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Avatar sx={{ bgcolor: "#DCFCE7", color: "#166534", width: 38, height: 38 }}>
+                      <CheckCircleRoundedIcon sx={{ fontSize: 20 }} />
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#166534" }}>
+                        All Transactions Ledger
+                      </Typography>
+                      <Typography sx={{ fontSize: 11.5, color: "#15803D", fontWeight: 700 }}>
+                        Total Transactions: {categoryStats.ALL.count} • Total Amount Received: ₹ {categoryStats.ALL.total.toFixed(2)}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#166534", opacity: 0.85, mt: 0.2 }}>
+                        Live synchronized statement showing 75% Main Wallet and 25% Self Block payouts.
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Paper>
+              )}
+
+              {sourceFilter === "FRANCHISE_GEO" && (
+                <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#EFF6FF", border: "1px solid #BFDBFE" }}>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Avatar sx={{ bgcolor: "#DBEAFE", color: "#1D4ED8", width: 38, height: 38 }}>
+                      <StoreRoundedIcon sx={{ fontSize: 20 }} />
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#1E3A8A" }}>
+                        Franchise Geo Commissions
+                      </Typography>
+                      <Typography sx={{ fontSize: 11.5, color: "#1D4ED8", fontWeight: 700 }}>
+                        Total Transactions: {categoryStats.FRANCHISE_GEO.count} • Total Amount Received: ₹ {categoryStats.FRANCHISE_GEO.total.toFixed(2)}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#1E40AF", opacity: 0.85, mt: 0.2 }}>
+                        Commissions from ₹750 Prime activations, ₹1,000 SPP Monthly Boxes, and regional enrollments.
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Paper>
+              )}
+
+              {sourceFilter === "SELF_ACCOUNT" && (
+                <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#FFFBEB", border: "1px solid #FDE68A" }}>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Avatar sx={{ bgcolor: "#FEF3C7", color: "#B45309", width: 38, height: 38 }}>
+                      <SavingsIcon sx={{ fontSize: 20 }} />
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#92400E" }}>
+                        Self Block Repurchase Pocket (25%)
+                      </Typography>
+                      <Typography sx={{ fontSize: 11.5, color: "#B45309", fontWeight: 700 }}>
+                        Total Transactions: {categoryStats.SELF_ACCOUNT.count} • Total Amount Saved: ₹ {categoryStats.SELF_ACCOUNT.total.toFixed(2)}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#92400E", opacity: 0.85, mt: 0.2 }}>
+                        Automatic 25% allocation reserved for the ₹250 Self-Rebirth loop.
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Paper>
+              )}
+
+              {sourceFilter === "QR_SCANNER" && (
+                <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#ECFDF5", border: "1px solid #A7F3D0" }}>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Avatar sx={{ bgcolor: "#D1FAE5", color: "#065F46", width: 38, height: 38 }}>
+                      <QrCode2RoundedIcon sx={{ fontSize: 20 }} />
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#065F46" }}>
+                        QR Scanner & Merchant Overrides
+                      </Typography>
+                      <Typography sx={{ fontSize: 11.5, color: "#047857", fontWeight: 700 }}>
+                        Total Transactions: {categoryStats.QR_SCANNER.count} • Total Amount: ₹ {categoryStats.QR_SCANNER.total.toFixed(2)}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#065F46", opacity: 0.85, mt: 0.2 }}>
+                        Instant earnings from merchant QR scans and retail checkout transactions.
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Paper>
+              )}
+
+              {sourceFilter === "TRIZONE" && (
+                <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#F0F9FF", border: "1px solid #BAE6FD" }}>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Avatar sx={{ bgcolor: "#E0F2FE", color: "#0369A1", width: 38, height: 38 }}>
+                      <ShoppingCartRoundedIcon sx={{ fontSize: 20 }} />
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0C4A6E" }}>
+                        TriZone Local Commerce
+                      </Typography>
+                      <Typography sx={{ fontSize: 11.5, color: "#0284C7", fontWeight: 700 }}>
+                        Total Transactions: {categoryStats.TRIZONE.count} • Total Amount: ₹ {categoryStats.TRIZONE.total.toFixed(2)}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#0369A1", opacity: 0.85, mt: 0.2 }}>
+                        Regional turnover commissions from 18 TriZone commerce categories.
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Paper>
+              )}
+
+              {sourceFilter === "ROYALTY" && (
+                <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#FAF5FF", border: "1px solid #E9D5FF" }}>
+                  <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Avatar sx={{ bgcolor: "#F3E8FF", color: "#7E22CE", width: 38, height: 38 }}>
+                      <WorkspacePremiumRoundedIcon sx={{ fontSize: 20 }} />
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#581C87" }}>
+                        Territory Royalty
+                      </Typography>
+                      <Typography sx={{ fontSize: 11.5, color: "#7E22CE", fontWeight: 700 }}>
+                        Total Transactions: {categoryStats.ROYALTY.count} • Total Amount: ₹ {categoryStats.ROYALTY.total.toFixed(2)}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#6B21A8", opacity: 0.85, mt: 0.2 }}>
+                        Daily midnight distributions from territorial turnover pools.
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Paper>
+              )}
+
+              {/* 4. SEGMENTED 3-TAB BUTTONS */}
+              <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                <Button
+                  size="small"
+                  onClick={() => setFlowFilter("ALL")}
+                  sx={{
+                    flex: 1,
+                    py: 0.7,
+                    borderRadius: "20px",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    textTransform: "none",
+                    bgcolor: flowFilter === "ALL" ? "#0F172A" : "#FFFFFF",
+                    color: flowFilter === "ALL" ? "#FFFFFF" : "#64748B",
+                    border: "1px solid",
+                    borderColor: flowFilter === "ALL" ? "#0F172A" : "#E2E8F0",
+                    "&:hover": { bgcolor: flowFilter === "ALL" ? "#1E293B" : "#F8FAFC" },
+                  }}
+                >
+                  All ({liveTransactions.length})
+                </Button>
+
+                <Button
+                  size="small"
+                  onClick={() => setFlowFilter("CREDIT")}
+                  sx={{
+                    flex: 1,
+                    py: 0.7,
+                    borderRadius: "20px",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    textTransform: "none",
+                    bgcolor: flowFilter === "CREDIT" ? "#059669" : "#FFFFFF",
+                    color: flowFilter === "CREDIT" ? "#FFFFFF" : "#64748B",
+                    border: "1px solid",
+                    borderColor: flowFilter === "CREDIT" ? "#059669" : "#E2E8F0",
+                    "&:hover": { bgcolor: flowFilter === "CREDIT" ? "#047857" : "#F8FAFC" },
+                  }}
+                >
+                  Main Wallet ({liveTransactions.filter(r => String(r.type || '') === 'INCOME_CREDIT_75' || r.meta?.ledger === 'MAIN' || (Number(r.amount || 0) > 0 && String(r.type || '') !== 'SELF_ACCOUNT_CREDIT')).length})
+                </Button>
+
+                <Button
+                  size="small"
+                  onClick={() => setFlowFilter("DEBIT")}
+                  sx={{
+                    flex: 1,
+                    py: 0.7,
+                    borderRadius: "20px",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    textTransform: "none",
+                    bgcolor: flowFilter === "DEBIT" ? "#D97706" : "#FFFFFF",
+                    color: flowFilter === "DEBIT" ? "#FFFFFF" : "#64748B",
+                    border: "1px solid",
+                    borderColor: flowFilter === "DEBIT" ? "#D97706" : "#E2E8F0",
+                    "&:hover": { bgcolor: flowFilter === "DEBIT" ? "#B45309" : "#F8FAFC" },
+                  }}
+                >
+                  Self Account ({categoryStats.SELF_ACCOUNT.count})
+                </Button>
+              </Stack>
+            </Stack>
+
+            {/* 5. MONTHLY TRANSACTION GROUPING STREAM */}
             <Paper
               elevation={0}
               sx={{
-                p: 2,
                 borderRadius: "20px",
-                bgcolor: "#FFFFFF",
                 border: "1px solid #EEF2F6",
-                boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
+                bgcolor: "#FFFFFF",
+                p: { xs: 1.5, sm: 2 },
                 mb: 2,
+                overflow: "hidden",
+                boxShadow: "0 2px 12px rgba(15, 23, 42, 0.04)",
               }}
             >
-              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                <Box>
-                  <Typography sx={{ fontSize: 14, fontWeight: 950, color: "#0F172A" }}>
-                    Commission Ledger & History
-                  </Typography>
-                  <Typography sx={{ fontSize: 11, color: "#64748B" }}>
-                    All territory transactions & instant 75/25 split records
-                  </Typography>
-                </Box>
-                <Chip
-                  label={`${filteredHistory.length} Recorded`}
-                  size="small"
-                  sx={{ bgcolor: "#EFF6FF", color: "#2563EB", fontWeight: 800, fontSize: 11 }}
-                />
-              </Stack>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5, px: 0.5 }}>
+                <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A" }}>
+                  Transactions ({filteredHistory.length})
+                </Typography>
+                {activeFilterCount > 0 && (
+                  <Chip
+                    size="small"
+                    label="Reset Filters"
+                    onClick={() => {
+                      setSourceFilter("ALL");
+                      setFlowFilter("ALL");
+                      setDatePreset("all");
+                      setCustomStartDate("");
+                      setCustomEndDate("");
+                      setHistorySearch("");
+                    }}
+                    sx={{ height: 20, fontSize: 10.5, fontWeight: 700, cursor: "pointer", bgcolor: "#F1F5F9" }}
+                  />
+                )}
+              </Box>
 
-              {/* Filter Tabs */}
-              <Tabs
-                value={historyTab}
-                onChange={(_, nv) => setHistoryTab(nv)}
-                variant="scrollable"
-                scrollButtons="auto"
-                sx={{
-                  mb: 1.5,
-                  minHeight: 34,
-                  "& .MuiTab-root": {
-                    minHeight: 34,
-                    py: 0.4,
-                    px: 1.4,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    textTransform: "none",
-                    borderRadius: "10px",
-                  },
-                  "& .Mui-selected": {
-                    bgcolor: "#EFF6FF",
-                    color: "#2563EB",
-                  },
-                  "& .MuiTabs-indicator": { display: "none" },
-                }}
-              >
-                <Tab label={`All (${liveTransactions.length})`} />
-                <Tab label="Franchise Income" />
-                <Tab label="Self Blocks (25%)" />
-                <Tab label="Withdrawals" />
-              </Tabs>
-
-              {/* Search Bar */}
-              <TextField
-                fullWidth
-                size="small"
-                value={historySearch}
-                onChange={(e) => setHistorySearch(e.target.value)}
-                placeholder="Search by package, consumer, PIN, amount..."
-                sx={{
-                  mb: 2,
-                  "& .MuiOutlinedInput-root": {
-                    borderRadius: "12px",
-                    bgcolor: "#F8FAFC",
-                    fontSize: 12.5,
-                  },
-                }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchRoundedIcon sx={{ fontSize: 18, color: "#94A3B8" }} />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-
-              {/* Day-Grouped Ledger */}
               {historySections.length === 0 ? (
                 <Box sx={{ py: 4, textAlign: "center" }}>
                   <AssessmentRoundedIcon sx={{ fontSize: 44, color: "#CBD5E1", mb: 1 }} />
@@ -3534,62 +4107,166 @@ export default function FranchiseMobileHub({
                   </Typography>
                 </Box>
               ) : (
-                historySections.map((sec) => (
-                  <Box key={sec.title} sx={{ mb: 2 }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1, px: 0.5 }}>
-                      <Typography sx={{ fontSize: 11.5, fontWeight: 900, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                        {sec.title}
-                      </Typography>
-                      <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: sec.total >= 0 ? "#059669" : "#DC2626" }}>
-                        {sec.total >= 0 ? "+" : "-"}₹ {Math.abs(sec.total).toFixed(2)}
-                      </Typography>
-                    </Stack>
-                    <Stack spacing={1}>
-                      {sec.rows.map((tx, idx) => {
-                        const amt = Number(tx.amount || 0);
-                        const isCredit = amt >= 0;
-                        const timeStr = tx.created_at ? new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(tx.created_at)) : "";
-                        return (
-                          <Paper
-                            key={tx.id || idx}
-                            elevation={0}
-                            onClick={() => setSelectedTxDetail(tx)}
-                            sx={{
-                              p: 1.4,
-                              borderRadius: "14px",
-                              bgcolor: "#F8FAFC",
-                              border: "1px solid #EEF2F6",
-                              cursor: "pointer",
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              transition: "all 0.15s ease",
-                              "&:hover": { bgcolor: "#F1F5F9", borderColor: "#CBD5E1" },
-                            }}
-                          >
-                            <Box sx={{ minWidth: 0, flex: 1, pr: 1 }}>
-                              <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A", lineHeight: 1.3 }}>
-                                {describeSource(tx)}
-                              </Typography>
-                              <Typography sx={{ fontSize: 11, color: "#64748B", mt: 0.3 }}>
-                                {counterpartyLabel(tx)}{timeStr ? ` • ${timeStr}` : ""}
-                              </Typography>
-                              <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#2563EB", mt: 0.3 }}>
-                                75% Main: ₹{(amt * 0.75).toFixed(2)} | 25% Self: ₹{(amt * 0.25).toFixed(2)}
-                              </Typography>
-                            </Box>
-                            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
-                              <Typography sx={{ fontSize: 14.5, fontWeight: 950, color: isCredit ? "#059669" : "#DC2626" }}>
-                                {isCredit ? "+" : "-"}₹ {Math.abs(amt).toFixed(2)}
-                              </Typography>
-                              <ChevronRightRoundedIcon sx={{ fontSize: 18, color: "#94A3B8" }} />
-                            </Stack>
-                          </Paper>
-                        );
-                      })}
-                    </Stack>
-                  </Box>
-                ))
+                <Stack spacing={2}>
+                  {historySections.map((sec) => (
+                    <Box key={sec.key || sec.title}>
+                      {/* Month Header Banner */}
+                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.2, px: 0.5 }}>
+                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#334155", letterSpacing: "-0.01em" }}>
+                          {sec.title}
+                        </Typography>
+                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: sec.total >= 0 ? "#059669" : "#DC2626" }}>
+                          ₹ {Math.abs(sec.total).toFixed(2)}
+                        </Typography>
+                      </Stack>
+
+                      {/* Transaction Cards List */}
+                      <Stack spacing={1}>
+                        {sec.rows.map((tx, idx) => {
+                          const amt = Number(tx.amount || 0);
+                          const isCredit = amt >= 0;
+                          const isSelf = String(tx.type || "") === "SELF_ACCOUNT_CREDIT" || tx.meta?.ledger === "SELF_ACCOUNT";
+                          const isMain = String(tx.type || "") === "INCOME_CREDIT_75" || tx.meta?.ledger === "MAIN";
+
+                          const dateObj = tx.created_at ? new Date(tx.created_at) : null;
+                          const dateFormatted = dateObj
+                            ? dateObj.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" })
+                            : "Recent";
+                          const timeFormatted = dateObj
+                            ? dateObj.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })
+                            : "";
+
+                          return (
+                            <Paper
+                              key={tx.id || idx}
+                              elevation={0}
+                              onClick={() => setSelectedTxDetail(tx)}
+                              sx={{
+                                p: 1.4,
+                                borderRadius: 2.5,
+                                border: "1px solid",
+                                borderColor: isSelf ? "#FDE68A" : "#EEF2F6",
+                                bgcolor: isSelf ? "#FFFDF5" : "#FFFFFF",
+                                cursor: "pointer",
+                                transition: "all 180ms cubic-bezier(0.4, 0, 0.2, 1)",
+                                boxShadow: "0 1px 3px rgba(15, 23, 42, 0.02)",
+                                "&:hover": {
+                                  borderColor: isSelf ? "#F59E0B" : "#CBD5E1",
+                                  boxShadow: "0 4px 14px rgba(12, 45, 72, 0.06)",
+                                  transform: "translateY(-1px)",
+                                },
+                                "&:active": { transform: "scale(0.99)" },
+                              }}
+                            >
+                              <Stack direction="row" spacing={1.2} alignItems="center">
+                                {/* Circular Icon Avatar */}
+                                <Box
+                                  sx={{
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: "50%",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    flexShrink: 0,
+                                    bgcolor: isSelf ? "#FEF3C7" : isCredit ? "#DCFCE7" : "#FEE2E2",
+                                    color: isSelf ? "#B45309" : isCredit ? "#166534" : "#DC2626",
+                                    border: `1px solid ${isSelf ? "#FDE68A" : isCredit ? "#BBF7D0" : "#FECACA"}`,
+                                  }}
+                                >
+                                  {isSelf ? (
+                                    <SavingsIcon sx={{ fontSize: 18 }} />
+                                  ) : isCredit ? (
+                                    <ArrowUpwardRoundedIcon sx={{ fontSize: 18 }} />
+                                  ) : (
+                                    <ArrowDownwardRoundedIcon sx={{ fontSize: 18 }} />
+                                  )}
+                                </Box>
+
+                                {/* Center Metadata */}
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, flexWrap: "wrap" }}>
+                                    <Typography
+                                      sx={{
+                                        fontWeight: 900,
+                                        fontSize: 13,
+                                        lineHeight: 1.25,
+                                        color: "#0F172A",
+                                      }}
+                                    >
+                                      {describeSource(tx)}
+                                    </Typography>
+
+                                    {/* Dedicated Badge */}
+                                    {isSelf ? (
+                                      <Chip
+                                        size="small"
+                                        label="Self Account Credit"
+                                        sx={{
+                                          height: 18,
+                                          fontSize: 10,
+                                          fontWeight: 800,
+                                          borderRadius: 1,
+                                          bgcolor: "#FEF3C7",
+                                          color: "#92400E",
+                                          border: "1px solid #FCD34D",
+                                        }}
+                                      />
+                                    ) : isMain || isCredit ? (
+                                      <Chip
+                                        size="small"
+                                        label="Main Wallet Credit"
+                                        sx={{
+                                          height: 18,
+                                          fontSize: 10,
+                                          fontWeight: 800,
+                                          borderRadius: 1,
+                                          bgcolor: "#DCFCE7",
+                                          color: "#166534",
+                                          border: "1px solid #86EFAC",
+                                        }}
+                                      />
+                                    ) : null}
+                                  </Box>
+
+                                  <Typography
+                                    sx={{
+                                      fontSize: 11.5,
+                                      color: isSelf ? "#B45309" : "#047857",
+                                      fontWeight: 700,
+                                      mt: 0.2,
+                                    }}
+                                  >
+                                    {isSelf ? "25% Repurchase Self Account" : "75% Withdrawable Main Wallet"}
+                                    {counterpartyLabel(tx) ? ` • ${counterpartyLabel(tx)}` : ""}
+                                  </Typography>
+
+                                  <Typography sx={{ fontSize: 11, color: "#94A3B8", mt: 0.2 }}>
+                                    {dateFormatted} {timeFormatted ? `• ${timeFormatted}` : ""}
+                                  </Typography>
+                                </Box>
+
+                                {/* Right Amount & Chevron */}
+                                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
+                                  <Typography
+                                    sx={{
+                                      fontSize: 14.5,
+                                      fontWeight: 950,
+                                      color: isCredit ? "#059669" : "#DC2626",
+                                    }}
+                                  >
+                                    {isCredit ? "+" : "-"}₹ {Math.abs(amt).toFixed(2)}
+                                  </Typography>
+                                  <ChevronRightRoundedIcon sx={{ fontSize: 18, color: "#CBD5E1" }} />
+                                </Stack>
+                              </Stack>
+                            </Paper>
+                          );
+                        })}
+                      </Stack>
+                    </Box>
+                  ))}
+                </Stack>
               )}
             </Paper>
 
@@ -3602,16 +4279,19 @@ export default function FranchiseMobileHub({
                 sx: {
                   borderTopLeftRadius: "24px",
                   borderTopRightRadius: "24px",
-                  p: 2.5,
-                  maxWidth: 600,
+                  p: { xs: 2, sm: 2.5 },
+                  pb: { xs: 4, sm: 3.5 },
+                  maxWidth: 560,
                   mx: "auto",
+                  bgcolor: "#FFFFFF",
+                  boxShadow: "0 -12px 40px rgba(15,23,42,0.18)",
                 },
               }}
             >
               <Box sx={{ width: 40, height: 4, bgcolor: "#CBD5E1", borderRadius: 2, mx: "auto", mb: 2 }} />
               <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#0F172A" }}>
-                  Transaction Breakdown
+                <Typography sx={{ fontSize: 16.5, fontWeight: 900, color: "#0F172A" }}>
+                  Transaction Details
                 </Typography>
                 <IconButton size="small" onClick={() => setSelectedTxDetail(null)}>
                   <CloseRoundedIcon />
@@ -3621,75 +4301,109 @@ export default function FranchiseMobileHub({
               {selectedTxDetail && (() => {
                 const amt = Number(selectedTxDetail.amount || 0);
                 const isCredit = amt >= 0;
-                const dateStr = selectedTxDetail.created_at ? new Intl.DateTimeFormat(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(selectedTxDetail.created_at)) : "Today";
+                const isSelf = String(selectedTxDetail.type || "") === "SELF_ACCOUNT_CREDIT" || selectedTxDetail.meta?.ledger === "SELF_ACCOUNT";
+                const dateStr = selectedTxDetail.created_at
+                  ? new Intl.DateTimeFormat(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(selectedTxDetail.created_at))
+                  : "Today";
                 const meta = selectedTxDetail.meta || {};
+                const grossAmount = meta.gross ? Number(meta.gross) : isSelf ? (amt / 0.25) : (amt / 0.75);
+
                 return (
                   <Box>
                     <Paper
                       elevation={0}
                       sx={{
                         p: 2,
-                        mb: 2.5,
-                        borderRadius: 3,
-                        bgcolor: isCredit ? "#F0FDF4" : "#FEF2F2",
-                        border: `1.5px solid ${isCredit ? "#BBF7D0" : "#FECACA"}`,
+                        borderRadius: 2.5,
+                        bgcolor: isSelf ? "#FFFDF5" : isCredit ? "#F0FDF4" : "#FEF2F2",
+                        border: "1px solid",
+                        borderColor: isSelf ? "#FDE68A" : isCredit ? "#BBF7D0" : "#FECACA",
                         textAlign: "center",
+                        mb: 2,
                       }}
                     >
-                      <Typography sx={{ fontSize: 12, fontWeight: 700, color: isCredit ? "#166534" : "#991B1B" }}>
-                        Franchise Payout Settled
-                      </Typography>
-                      <Typography sx={{ fontSize: 28, fontWeight: 950, color: isCredit ? "#059669" : "#DC2626", my: 0.5 }}>
-                        {isCredit ? "+" : "-"}₹ {Math.abs(amt).toFixed(2)}
-                      </Typography>
-                      <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>
+                      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: isSelf ? "#92400E" : isCredit ? "#166534" : "#991B1B", mb: 0.3 }}>
                         {describeSource(selectedTxDetail)}
                       </Typography>
+                      <Typography sx={{ fontSize: 26, fontWeight: 900, color: isCredit ? "#059669" : "#DC2626" }}>
+                        {isCredit ? "+" : "-"}₹ {Math.abs(amt).toFixed(2)}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label={isSelf ? "Self Account Credit (25%)" : "Main Wallet Credit (75%)"}
+                        sx={{
+                          mt: 0.8,
+                          height: 20,
+                          fontSize: 10.5,
+                          fontWeight: 800,
+                          bgcolor: isSelf ? "#FEF3C7" : isCredit ? "#DCFCE7" : "#FEE2E2",
+                          color: isSelf ? "#92400E" : isCredit ? "#166534" : "#991B1B",
+                          border: `1px solid ${isSelf ? "#FCD34D" : isCredit ? "#86EFAC" : "#FECACA"}`,
+                        }}
+                      />
                     </Paper>
 
-                    <Stack spacing={1.5} sx={{ mb: 3 }}>
-                      <Stack direction="row" justifyContent="space-between">
-                        <Typography sx={{ fontSize: 13, color: "#64748B", fontWeight: 600 }}>Status</Typography>
-                        <Chip size="small" label="Settled 100% Instantly" sx={{ bgcolor: "#DCFCE7", color: "#166534", fontWeight: 800, fontSize: 11 }} />
-                      </Stack>
+                    <Stack spacing={1.2} sx={{ bgcolor: "#F8FAFC", p: 1.8, borderRadius: 2, border: "1px solid #E2E8F0", mb: 2 }}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                        <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Status</Typography>
+                        <Chip size="small" label="Settled 100% Instantly" sx={{ bgcolor: "#DCFCE7", color: "#166534", fontWeight: 800, fontSize: 10.5 }} />
+                      </Box>
+                      <Divider />
 
-                      <Stack direction="row" justifyContent="space-between">
-                        <Typography sx={{ fontSize: 13, color: "#64748B", fontWeight: 600 }}>Date & Time</Typography>
-                        <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{dateStr}</Typography>
-                      </Stack>
+                      <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                        <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Timestamp</Typography>
+                        <Typography sx={{ fontSize: 12, color: "#0F172A", fontWeight: 700 }}>{dateStr}</Typography>
+                      </Box>
+                      <Divider />
 
-                      <Stack direction="row" justifyContent="space-between">
-                        <Typography sx={{ fontSize: 13, color: "#64748B", fontWeight: 600 }}>Trigger Consumer</Typography>
-                        <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>
-                          {meta.trigger_user || meta.from_user || "9700000001"}
+                      <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                        <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Payer / Consumer</Typography>
+                        <Typography sx={{ fontSize: 12, color: "#2563EB", fontWeight: 800 }}>
+                          {counterpartyLabel(selectedTxDetail)}
                         </Typography>
-                      </Stack>
+                      </Box>
+                      <Divider />
 
-                      <Stack direction="row" justifyContent="space-between">
-                        <Typography sx={{ fontSize: 13, color: "#64748B", fontWeight: 600 }}>Territory / Pincode</Typography>
-                        <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                        <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Territory / Pincode</Typography>
+                        <Typography sx={{ fontSize: 12, color: "#0F172A", fontWeight: 700 }}>
                           PIN {meta.pincode || "572106 (Turuvekere)"}
                         </Typography>
-                      </Stack>
+                      </Box>
+                      <Divider />
 
-                      <Divider sx={{ my: 1 }} />
+                      {meta.gross && (
+                        <>
+                          <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                            <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Gross Pool Value</Typography>
+                            <Typography sx={{ fontSize: 12, color: "#0F172A", fontWeight: 800 }}>₹ {Number(meta.gross).toFixed(2)}</Typography>
+                          </Box>
+                          <Divider />
+                        </>
+                      )}
 
-                      <Stack direction="row" justifyContent="space-between">
-                        <Typography sx={{ fontSize: 13, color: "#166534", fontWeight: 800 }}>Withdrawable Main Wallet (75%)</Typography>
-                        <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#166534" }}>+₹ {(amt * 0.75).toFixed(2)}</Typography>
-                      </Stack>
+                      <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                        <Typography sx={{ fontSize: 12, color: "#166534", fontWeight: 700 }}>75% Main Wallet Split</Typography>
+                        <Typography sx={{ fontSize: 12, color: "#166534", fontWeight: 800 }}>
+                          ₹ {meta.income_75 ? Number(meta.income_75).toFixed(2) : (grossAmount * 0.75).toFixed(2)}
+                        </Typography>
+                      </Box>
+                      <Divider />
 
-                      <Stack direction="row" justifyContent="space-between">
-                        <Typography sx={{ fontSize: 13, color: "#D97706", fontWeight: 800 }}>Self Rebirth Pocket (25%)</Typography>
-                        <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#D97706" }}>+₹ {(amt * 0.25).toFixed(2)}</Typography>
-                      </Stack>
+                      <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                        <Typography sx={{ fontSize: 12, color: "#D97706", fontWeight: 700 }}>25% Self Rebirth Split</Typography>
+                        <Typography sx={{ fontSize: 12, color: "#D97706", fontWeight: 800 }}>
+                          ₹ {meta.self_25 ? Number(meta.self_25).toFixed(2) : (grossAmount * 0.25).toFixed(2)}
+                        </Typography>
+                      </Box>
+                      <Divider />
 
-                      <Stack direction="row" justifyContent="space-between">
-                        <Typography sx={{ fontSize: 12, color: "#94A3B8" }}>Transaction ID</Typography>
-                        <Typography sx={{ fontSize: 12, color: "#94A3B8", fontFamily: "monospace" }}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                        <Typography sx={{ fontSize: 11.5, color: "#94A3B8" }}>Transaction ID</Typography>
+                        <Typography sx={{ fontSize: 11.5, color: "#94A3B8", fontFamily: "monospace" }}>
                           {selectedTxDetail.id ? `TX-FR-${selectedTxDetail.id}` : `TX-${Date.now().toString().slice(-6)}`}
                         </Typography>
-                      </Stack>
+                      </Box>
                     </Stack>
 
                     <Button
@@ -3697,21 +4411,192 @@ export default function FranchiseMobileHub({
                       variant="contained"
                       onClick={() => setSelectedTxDetail(null)}
                       sx={{
-                        height: 44,
-                        borderRadius: "12px",
-                        bgcolor: "#2563EB",
-                        textTransform: "none",
+                        py: 1.1,
+                        borderRadius: 2,
                         fontWeight: 800,
-                        fontSize: 14,
-                        "&:hover": { bgcolor: "#1D4ED8" },
+                        textTransform: "none",
+                        bgcolor: "#0F172A",
+                        "&:hover": { bgcolor: "#1E293B" },
                       }}
                     >
-                      Done
+                      Close Details
                     </Button>
                   </Box>
                 );
               })()}
             </Drawer>
+
+            {/* ── PHONEPE FILTER BOTTOM SHEET DRAWER ── */}
+            <Drawer
+              anchor="bottom"
+              open={filterDrawerOpen}
+              onClose={() => setFilterDrawerOpen(false)}
+              PaperProps={{
+                sx: {
+                  borderTopLeftRadius: 24,
+                  borderTopRightRadius: 24,
+                  p: { xs: 2, sm: 2.5 },
+                  pb: { xs: 4, sm: 3.5 },
+                  maxWidth: 560,
+                  mx: "auto",
+                  bgcolor: "#FFFFFF",
+                  boxShadow: "0 -12px 40px rgba(15,23,42,0.18)",
+                  maxHeight: "85vh",
+                  overflowY: "auto",
+                },
+              }}
+            >
+              <Box sx={{ width: 40, height: 4, bgcolor: "#CBD5E1", borderRadius: 2, mx: "auto", mb: 2 }} />
+
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                <Box>
+                  <Typography sx={{ fontSize: 17, fontWeight: 900, color: "#0F172A" }}>
+                    Filter Franchise Ledger
+                  </Typography>
+                  <Typography sx={{ fontSize: 12, color: "#64748B" }}>
+                    Filter by date presets, payment flows, and channels
+                  </Typography>
+                </Box>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      setSourceFilter("ALL");
+                      setFlowFilter("ALL");
+                      setDatePreset("all");
+                      setCustomStartDate("");
+                      setCustomEndDate("");
+                    }}
+                    sx={{ textTransform: "none", fontSize: 12, fontWeight: 700, color: "#DC2626" }}
+                  >
+                    Reset
+                  </Button>
+                  <IconButton size="small" onClick={() => setFilterDrawerOpen(false)}>
+                    <CloseRoundedIcon />
+                  </IconButton>
+                </Stack>
+              </Box>
+
+              {/* Date Presets */}
+              <Box sx={{ mb: 2.5 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#1E293B", mb: 1 }}>
+                  📅 Date Range
+                </Typography>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.8, mb: 1.2 }}>
+                  {[
+                    { label: "All Time", value: "all" },
+                    { label: "Today", value: "today" },
+                    { label: "This Month", value: "this_month" },
+                    { label: "Last Month", value: "last_month" },
+                    { label: "Last 30 Days", value: "30_days" },
+                    { label: "Custom Range", value: "custom" },
+                  ].map((p) => {
+                    const isSelected = datePreset === p.value;
+                    return (
+                      <Chip
+                        key={p.value}
+                        label={p.label}
+                        onClick={() => setDatePreset(p.value)}
+                        sx={{
+                          fontWeight: 800,
+                          fontSize: 12,
+                          borderRadius: 999,
+                          bgcolor: isSelected ? "#2563EB" : "#F1F5F9",
+                          color: isSelected ? "#FFFFFF" : "#475569",
+                          border: "1px solid",
+                          borderColor: isSelected ? "#2563EB" : "#E2E8F0",
+                          cursor: "pointer",
+                        }}
+                      />
+                    );
+                  })}
+                </Box>
+
+                {datePreset === "custom" && (
+                  <Paper elevation={0} sx={{ p: 1.5, bgcolor: "#F8FAFC", borderRadius: 2, border: "1px solid #E2E8F0", mt: 1 }}>
+                    <Typography sx={{ fontSize: 11.5, color: "#64748B", fontWeight: 700, mb: 1 }}>
+                      Pick Start Date and End Date
+                    </Typography>
+                    <Stack direction="row" spacing={1.2}>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="date"
+                        label="From Date"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                        sx={{ bgcolor: "#fff" }}
+                      />
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="date"
+                        label="To Date"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                        sx={{ bgcolor: "#fff" }}
+                      />
+                    </Stack>
+                  </Paper>
+                )}
+              </Box>
+
+              {/* Source Channel Options */}
+              <Box sx={{ mb: 2.5 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#1E293B", mb: 1 }}>
+                  🏷️ Source Channel
+                </Typography>
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.8 }}>
+                  {[
+                    { label: "All Sources", value: "ALL" },
+                    { label: "Franchise Geo", value: "FRANCHISE_GEO" },
+                    { label: "Self Blocks (25%)", value: "SELF_ACCOUNT" },
+                    { label: "QR Scanner", value: "QR_SCANNER" },
+                    { label: "TriZone Commerce", value: "TRIZONE" },
+                    { label: "Royalty Pool", value: "ROYALTY" },
+                  ].map((s) => {
+                    const isSelected = sourceFilter === s.value;
+                    return (
+                      <Chip
+                        key={s.value}
+                        label={s.label}
+                        onClick={() => setSourceFilter(s.value)}
+                        sx={{
+                          fontWeight: 800,
+                          fontSize: 12,
+                          borderRadius: 999,
+                          bgcolor: isSelected ? "#059669" : "#F1F5F9",
+                          color: isSelected ? "#FFFFFF" : "#475569",
+                          border: "1px solid",
+                          borderColor: isSelected ? "#059669" : "#E2E8F0",
+                          cursor: "pointer",
+                        }}
+                      />
+                    );
+                  })}
+                </Box>
+              </Box>
+
+              <Button
+                fullWidth
+                variant="contained"
+                onClick={() => setFilterDrawerOpen(false)}
+                sx={{
+                  mt: 1,
+                  py: 1.1,
+                  borderRadius: 2,
+                  fontWeight: 800,
+                  textTransform: "none",
+                  bgcolor: "#0F172A",
+                  "&:hover": { bgcolor: "#1E293B" },
+                }}
+              >
+                Apply Filters
+              </Button>
+            </Drawer>
+
 
           </Box>
         )}
@@ -3741,7 +4626,7 @@ export default function FranchiseMobileHub({
                   sx={{ bgcolor: "rgba(253,230,138,0.2)", color: "#FDE68A", fontWeight: 900, fontSize: 11 }}
                 />
                 <Chip
-                  label={`${walletState.rebirthCount} Active Nodes`}
+                  label={`${rebirthList.length} Active Nodes`}
                   size="small"
                   sx={{ bgcolor: "rgba(255,255,255,0.15)", color: "#FFFFFF", fontWeight: 800, fontSize: 10.5 }}
                 />
@@ -3755,29 +4640,29 @@ export default function FranchiseMobileHub({
                   ₹ {walletState.selfWallet.toFixed(2)}
                 </Typography>
                 <Typography sx={{ fontSize: 14, fontWeight: 800, color: "#CBD5E1" }}>
-                  / ₹ 250.00
+                  / ₹ {adminRebirthConfig.total_amount.toFixed(2)}
                 </Typography>
               </Stack>
 
-              {/* Progress bar towards 250 threshold */}
+              {/* Progress bar towards threshold */}
               <Box sx={{ mb: 1.5 }}>
                 <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
                   <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#CBD5E1" }}>
                     Cycle Progress to Next Rebirth
                   </Typography>
                   <Typography sx={{ fontSize: 11, fontWeight: 900, color: "#FDE68A" }}>
-                    {Math.min(100, Math.round((walletState.selfWallet / 250) * 100))}%
+                    {Math.min(100, Math.round((walletState.selfWallet / (adminRebirthConfig.total_amount || 250)) * 100))}%
                   </Typography>
                 </Stack>
                 <LinearProgress
                   variant="determinate"
-                  value={Math.min(100, (walletState.selfWallet / 250) * 100)}
+                  value={Math.min(100, (walletState.selfWallet / (adminRebirthConfig.total_amount || 250)) * 100)}
                   sx={{
                     height: 9,
                     borderRadius: 4,
                     bgcolor: "rgba(255,255,255,0.15)",
                     "& .MuiLinearProgress-bar": {
-                      bgcolor: walletState.selfWallet >= 250 ? "#10B981" : "#F59E0B",
+                      bgcolor: walletState.selfWallet >= adminRebirthConfig.total_amount ? "#10B981" : "#F59E0B",
                       borderRadius: 4,
                     },
                   }}
@@ -3785,32 +4670,33 @@ export default function FranchiseMobileHub({
               </Box>
 
               <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.75)", mb: 1.8, lineHeight: 1.4 }}>
-                Accumulates 25% of all regional commissions. When this pocket hits ₹250.00, it automatically spawns a new Franchise Rebirth node into both 5-Matrix and 3-Matrix trees.
+                Accumulates 25% of all regional commissions. When this pocket hits ₹{adminRebirthConfig.total_amount.toFixed(2)}, it automatically spawns a new Franchise Rebirth node into both 5-Matrix and 3-Matrix trees.
               </Typography>
 
               <Button
                 fullWidth
                 variant="contained"
                 onClick={handleManualRebirthSpawn}
+                disabled={walletState.selfWallet < adminRebirthConfig.total_amount}
                 startIcon={<FlashOnRoundedIcon />}
                 sx={{
                   py: 1,
                   borderRadius: "14px",
                   fontWeight: 900,
                   fontSize: 12.5,
-                  bgcolor: "#F59E0B",
-                  color: "#0F172A",
-                  boxShadow: "0 4px 14px rgba(245, 158, 11, 0.4)",
-                  "&:hover": { bgcolor: "#D97706" },
+                  bgcolor: walletState.selfWallet >= adminRebirthConfig.total_amount ? "#F59E0B" : "rgba(255,255,255,0.15)",
+                  color: walletState.selfWallet >= adminRebirthConfig.total_amount ? "#0F172A" : "#94A3B8",
+                  boxShadow: walletState.selfWallet >= adminRebirthConfig.total_amount ? "0 4px 14px rgba(245, 158, 11, 0.4)" : "none",
+                  "&:hover": { bgcolor: walletState.selfWallet >= adminRebirthConfig.total_amount ? "#D97706" : "rgba(255,255,255,0.2)" },
                 }}
               >
-                {walletState.selfWallet >= 250
-                  ? "⚡ Auto-Spawn Ready: Claim Rebirth ID (₹250)"
-                  : "⚡ Trigger Instant Rebirth Node (Simulate Loop)"}
+                {walletState.selfWallet >= adminRebirthConfig.total_amount
+                  ? `⚡ Auto-Spawn Ready: Claim Rebirth ID (₹${adminRebirthConfig.total_amount.toFixed(2)})`
+                  : `⚡ Pocket Accumulating (₹${walletState.selfWallet.toFixed(2)} / ₹${adminRebirthConfig.total_amount.toFixed(2)})`}
               </Button>
             </Paper>
 
-            {/* Sub Tabs: 5-Matrix Placements | 3-Matrix Autopool | Rebirth History | Config Breakdown */}
+            {/* Sub Tabs: 5-Matrix Placements | 3-Matrix Autopool | Node History | Admin Rates */}
             <Paper elevation={0} sx={{ p: 0.8, borderRadius: "16px", bgcolor: "#F1F5F9", mb: 2 }}>
               <Grid container spacing={0.5}>
                 {[
@@ -3857,41 +4743,53 @@ export default function FranchiseMobileHub({
                     Every Rebirth ID is permanently placed as an earning node in your regional 5-Matrix tree (5 x 5 x 5 x 5 x 5).
                   </Typography>
 
-                  <Stack spacing={1.2}>
-                    {rebirthList.map((node, i) => (
-                      <Paper key={node.id} elevation={0} sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#F8FAFC", border: "1px solid #E2E8F0" }}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center">
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Avatar sx={{ width: 32, height: 32, bgcolor: "#EFF6FF", color: "#2563EB", fontSize: 12, fontWeight: 900 }}>
-                              #{i + 1}
-                            </Avatar>
-                            <Box>
-                              <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#0F172A" }}>
-                                {node.id}
-                              </Typography>
-                              <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>
-                                Matrix Level: {node.matrix5Level || 2} • Placed {node.date}
-                              </Typography>
-                            </Box>
+                  {rebirthList.length > 0 ? (
+                    <Stack spacing={1.2}>
+                      {rebirthList.map((node, i) => (
+                        <Paper key={node.id} elevation={0} sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Stack direction="row" spacing={1} alignItems="center">
+                              <Avatar sx={{ width: 32, height: 32, bgcolor: "#EFF6FF", color: "#2563EB", fontSize: 12, fontWeight: 900 }}>
+                                #{i + 1}
+                              </Avatar>
+                              <Box>
+                                <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#0F172A" }}>
+                                  {node.id}
+                                </Typography>
+                                <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>
+                                  Matrix Level: {node.matrix5Level || 2} • Placed {node.date}
+                                </Typography>
+                              </Box>
+                            </Stack>
+                            <Chip
+                              label="EARNING"
+                              size="small"
+                              sx={{ height: 20, bgcolor: "#ECFDF5", color: "#059669", fontWeight: 900, fontSize: 10 }}
+                            />
                           </Stack>
-                          <Chip
-                            label="EARNING"
-                            size="small"
-                            sx={{ height: 20, bgcolor: "#ECFDF5", color: "#059669", fontWeight: 900, fontSize: 10 }}
-                          />
-                        </Stack>
-                        <Divider sx={{ my: 1 }} />
-                        <Stack direction="row" justifyContent="space-between" alignItems="center">
-                          <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>
-                            Cumulative Matrix Yield:
-                          </Typography>
-                          <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#059669" }}>
-                            {node.earnedAmount}
-                          </Typography>
-                        </Stack>
-                      </Paper>
-                    ))}
-                  </Stack>
+                          <Divider sx={{ my: 1 }} />
+                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>
+                              Cumulative Matrix Yield:
+                            </Typography>
+                            <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#059669" }}>
+                              {node.earnedAmount}
+                            </Typography>
+                          </Stack>
+                        </Paper>
+                      ))}
+                    </Stack>
+                  ) : (
+                    <Paper elevation={0} sx={{ p: 3, textAlign: "center", borderRadius: "14px", bgcolor: "#F8FAFC", border: "1px dashed #CBD5E1" }}>
+                      <AccountTreeRoundedIcon sx={{ fontSize: 36, color: "#94A3B8", mb: 1 }} />
+                      <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#334155" }}>
+                        No Rebirth Nodes Spawned Yet
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#64748B", mt: 0.5, maxWidth: 320, mx: "auto" }}>
+                        Your Self Block Pocket currently has ₹{walletState.selfWallet.toFixed(2)}. When it reaches ₹{adminRebirthConfig.total_amount.toFixed(2)}, your first Rebirth ID will be automatically placed in the 5-Matrix tree.
+                      </Typography>
+                    </Paper>
+                  )}
                 </Paper>
               </Stack>
             )}
@@ -3910,32 +4808,44 @@ export default function FranchiseMobileHub({
                     High-speed 3-Matrix queue filling globally left-to-right, top-to-bottom automatically.
                   </Typography>
 
-                  <Stack spacing={1.2}>
-                    {rebirthList.map((node, i) => (
-                      <Paper key={node.id} elevation={0} sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#FAF5FF", border: "1px solid #F3E8FF" }}>
-                        <Stack direction="row" justifyContent="space-between" alignItems="center">
-                          <Box>
-                            <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#6B21A8" }}>
-                              {node.id}
-                            </Typography>
-                            <Typography sx={{ fontSize: 10.5, color: "#7E22CE" }}>
-                              Queue Position: #{node.matrix3Queue || 42} in Global 3-Matrix
-                            </Typography>
-                          </Box>
-                          <Chip
-                            label="IN QUEUE"
-                            size="small"
-                            sx={{ height: 20, bgcolor: "#F3E8FF", color: "#7E22CE", fontWeight: 900, fontSize: 10 }}
-                          />
-                        </Stack>
-                        <Divider sx={{ my: 1, borderColor: "#E9D5FF" }} />
-                        <Stack direction="row" justifyContent="space-between">
-                          <Typography sx={{ fontSize: 10.5, color: "#6B21A8" }}>Cycle Payout Target:</Typography>
-                          <Typography sx={{ fontSize: 11.5, fontWeight: 900, color: "#7E22CE" }}>₹3,000.00 / Cycle</Typography>
-                        </Stack>
-                      </Paper>
-                    ))}
-                  </Stack>
+                  {rebirthList.length > 0 ? (
+                    <Stack spacing={1.2}>
+                      {rebirthList.map((node, i) => (
+                        <Paper key={node.id} elevation={0} sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#FAF5FF", border: "1px solid #F3E8FF" }}>
+                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Box>
+                              <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#6B21A8" }}>
+                                {node.id}
+                              </Typography>
+                              <Typography sx={{ fontSize: 10.5, color: "#7E22CE" }}>
+                                Queue Position: #{node.matrix3Queue || 42} in Global 3-Matrix
+                              </Typography>
+                            </Box>
+                            <Chip
+                              label="IN QUEUE"
+                              size="small"
+                              sx={{ height: 20, bgcolor: "#F3E8FF", color: "#7E22CE", fontWeight: 900, fontSize: 10 }}
+                            />
+                          </Stack>
+                          <Divider sx={{ my: 1, borderColor: "#E9D5FF" }} />
+                          <Stack direction="row" justifyContent="space-between">
+                            <Typography sx={{ fontSize: 10.5, color: "#6B21A8" }}>Cycle Payout Target:</Typography>
+                            <Typography sx={{ fontSize: 11.5, fontWeight: 900, color: "#7E22CE" }}>₹3,000.00 / Cycle</Typography>
+                          </Stack>
+                        </Paper>
+                      ))}
+                    </Stack>
+                  ) : (
+                    <Paper elevation={0} sx={{ p: 3, textAlign: "center", borderRadius: "14px", bgcolor: "#FAF5FF", border: "1px dashed #D8B4FE" }}>
+                      <AutorenewRoundedIcon sx={{ fontSize: 36, color: "#A855F7", mb: 1 }} />
+                      <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#581C87" }}>
+                        No 3-Matrix Queue Positions Yet
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#7E22CE", mt: 0.5, maxWidth: 320, mx: "auto" }}>
+                        High-speed 3-Matrix queue positions activate automatically each time ₹{adminRebirthConfig.total_amount.toFixed(2)} accumulates in your 25% Self Block pocket.
+                      </Typography>
+                    </Paper>
+                  )}
                 </Paper>
               </Stack>
             )}
@@ -3943,58 +4853,107 @@ export default function FranchiseMobileHub({
             {/* TAB 3: Node History */}
             {rebirthSubTab === "history" && (
               <Stack spacing={1.2}>
-                {rebirthList.map((node) => (
-                  <Paper key={node.id} elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6" }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                      <Box>
-                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#0F172A" }}>
-                          {node.id}
+                {(() => {
+                  const selfTx = (liveTransactions || []).filter((tx) => classifyFranchiseTransaction(tx) === "SELF_ACCOUNT" || tx.type === "SELF_ACCOUNT_CREDIT" || tx.type === "SELF_ACCOUNT_DEBIT" || tx.meta?.ledger === "SELF_ACCOUNT");
+                  if (selfTx.length === 0) {
+                    return (
+                      <Paper elevation={0} sx={{ p: 3, textAlign: "center", borderRadius: "16px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6" }}>
+                        <SavingsIcon sx={{ fontSize: 36, color: "#D97706", mb: 1 }} />
+                        <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#334155" }}>
+                          No Self Account Transactions Recorded
                         </Typography>
-                        <Typography sx={{ fontSize: 11, color: "#64748B", mt: 0.2 }}>
-                          {node.date}
+                        <Typography sx={{ fontSize: 11, color: "#64748B", mt: 0.5 }}>
+                          25% allocations from Prime and SPP commissions will appear here.
                         </Typography>
-                        <Typography sx={{ fontSize: 10.5, color: "#2563EB", mt: 0.4, fontWeight: 700 }}>
-                          {node.source}
+                      </Paper>
+                    );
+                  }
+                  return selfTx.map((tx, idx) => (
+                    <Paper key={tx.id || idx} elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6" }}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                        <Box>
+                          <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#0F172A" }}>
+                            {formatTxTitle(tx)}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11, color: "#64748B", mt: 0.2 }}>
+                            {counterpartyLabel(tx)} • {tx.created_at ? new Date(tx.created_at).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" }) : "Recent"}
+                          </Typography>
+                          <Typography sx={{ fontSize: 10.5, color: "#D97706", mt: 0.4, fontWeight: 700 }}>
+                            25% Self Block Allocation
+                          </Typography>
+                        </Box>
+                        <Typography sx={{ fontSize: 13.5, fontWeight: 950, color: Number(tx.amount || 0) >= 0 ? "#D97706" : "#DC2626" }}>
+                          {Number(tx.amount || 0) >= 0 ? `+₹${Number(tx.amount || 0).toFixed(2)}` : `-₹${Math.abs(Number(tx.amount || 0)).toFixed(2)}`}
                         </Typography>
-                      </Box>
-                      <Chip
-                        label="Active"
-                        size="small"
-                        sx={{ bgcolor: "#ECFDF5", color: "#059669", fontWeight: 900, fontSize: 10.5 }}
-                      />
-                    </Stack>
-                  </Paper>
-                ))}
+                      </Stack>
+                    </Paper>
+                  ));
+                })()}
               </Stack>
             )}
 
             {/* TAB 4: Admin Rates & Zero Hardcoding Guarantee */}
             {rebirthSubTab === "config" && (
               <Paper elevation={0} sx={{ p: 2, borderRadius: "20px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6" }}>
-                <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A", mb: 1 }}>
-                  Admin-Configured Commission Engine
-                </Typography>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                  <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A" }}>
+                    Admin-Configured Self Rebirth Engine
+                  </Typography>
+                  <Chip
+                    label={`Rebirth Tax: ${adminRebirthConfig.tax_rebirth}%`}
+                    size="small"
+                    sx={{ bgcolor: "#EFF6FF", color: "#1D4ED8", fontWeight: 850, fontSize: 10.5 }}
+                  />
+                </Stack>
                 <Typography sx={{ fontSize: 11.5, color: "#64748B", mb: 1.5 }}>
-                  All commission rates are dynamically fetched from the live Admin Configuration (<code style={{ color: "#2563EB" }}>CommissionConfig</code>) without hardcoded values.
+                  Configured authoritatively in Admin Commission Distribution (<code style={{ color: "#2563EB" }}>CommissionConfig</code>).
                 </Typography>
 
-                <Stack spacing={1.2}>
+                <Stack spacing={1}>
                   {[
-                    { label: "₹750 Prime Joining Geo Allocation", val: `₹${(DYNAMIC_COMMISSION_ENGINE.prime750[currentTierKey] || 6).toFixed(2)}` },
-                    { label: "₹1,000 SPP Monthly Product Box Geo Allocation", val: `₹${(DYNAMIC_COMMISSION_ENGINE.spp1000[currentTierKey] || 6).toFixed(2)}` },
-                    { label: "₹250 Self-Rebirth Override Allocation", val: `₹${(DYNAMIC_COMMISSION_ENGINE.rebirth250[currentTierKey] || 3).toFixed(2)}` },
-                    { label: "Merchant QR Payment Commission Rate", val: `${(DYNAMIC_COMMISSION_ENGINE.qrScannerPercent * 100).toFixed(2)}%` },
-                    { label: "TriZone Store Platform Override", val: `${(DYNAMIC_COMMISSION_ENGINE.trizonePercent * 100).toFixed(2)}%` },
-                    { label: "Main Wallet Instant Credit Ratio", val: "75.00% (Instant, No Hold)" },
-                    { label: "Self Block Pocket Accumulation Ratio", val: "25.00% (Rebirth Threshold: ₹250)" },
-                    { label: "Midnight Royalty Engine Distribution", val: "Daily at 11:59 PM to ₹50k Promoters" },
+                    { label: "Rebirth ID Entry Amount (Inflow)", val: `₹${adminRebirthConfig.total_amount.toFixed(2)}` },
+                    { label: "Direct Sponsor Bonus", val: `₹${adminRebirthConfig.direct_sponsor.toFixed(2)}` },
+                    { label: "5-Block Pool Share (10 Layers)", val: `₹${adminRebirthConfig.matrix_5.toFixed(2)}` },
+                    { label: "3-Block Pool Share (15 Layers)", val: `₹${adminRebirthConfig.matrix_3.toFixed(2)}` },
+                    { label: "Pincode Royalty (6-Role Geo Upline)", val: `₹${adminRebirthConfig.pincode_royalty.toFixed(2)}` },
+                    { label: "District Royalty", val: `₹${adminRebirthConfig.district_royalty.toFixed(2)}` },
+                    { label: "State Royalty", val: `₹${adminRebirthConfig.state_royalty.toFixed(2)}` },
+                    { label: "District Royalty L1-L7 (7 Days)", val: `₹${adminRebirthConfig.district_royalty_l1_l7.toFixed(2)}` },
+                    { label: "District Royalty L1-L10 (30 Days)", val: `₹${adminRebirthConfig.district_royalty_l1_l10_30d.toFixed(2)}` },
+                    { label: "Districtwise Royalty L8-L10 (7 Days)", val: `₹${adminRebirthConfig.districtwise_royalty_l8_l10.toFixed(2)}` },
+                    { label: "Statewise Royalty L8-L10 (7 Days)", val: `₹${adminRebirthConfig.statewise_royalty_l8_l10.toFixed(2)}` },
+                    { label: "District Captain Royalty", val: `₹${adminRebirthConfig.district_captain_royalty.toFixed(2)}` },
+                    { label: "State Captain Royalty", val: `₹${adminRebirthConfig.state_captain_royalty.toFixed(2)}` },
+                    { label: "Company Admin Retention", val: `₹${adminRebirthConfig.company_admin.toFixed(2)}` },
                   ].map((row, i) => (
-                    <Box key={i} sx={{ p: 1.2, borderRadius: "12px", bgcolor: "#F8FAFC", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Box key={i} sx={{ p: 1.1, borderRadius: "10px", bgcolor: "#F8FAFC", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#334155" }}>{row.label}</Typography>
                       <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#059669" }}>{row.val}</Typography>
                     </Box>
                   ))}
                 </Stack>
+
+                {/* 6-Role Geo Upline Percentages */}
+                <Box sx={{ mt: 2, p: 1.4, borderRadius: "14px", bgcolor: "#EFF6FF", border: "1px solid #BFDBFE" }}>
+                  <Typography sx={{ fontSize: 11.5, fontWeight: 900, color: "#1E40AF", mb: 0.8 }}>
+                    6-Role Geo Upline Distribution (Gross ₹{adminRebirthConfig.pincode_royalty.toFixed(2)})
+                  </Typography>
+                  <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0.8 }}>
+                    {[
+                      { role: "Pincode", pct: adminRebirthConfig.pincode_roles_pct.pincode },
+                      { role: "Pincode Coord", pct: adminRebirthConfig.pincode_roles_pct.pincode_coord },
+                      { role: "District", pct: adminRebirthConfig.pincode_roles_pct.district },
+                      { role: "District Coord", pct: adminRebirthConfig.pincode_roles_pct.district_coord },
+                      { role: "State", pct: adminRebirthConfig.pincode_roles_pct.state },
+                      { role: "State Coord", pct: adminRebirthConfig.pincode_roles_pct.state_coord },
+                    ].map((g, gi) => (
+                      <Box key={gi} sx={{ p: 0.8, borderRadius: "8px", bgcolor: "#FFFFFF", textAlign: "center", border: "1px solid #DBEAFE" }}>
+                        <Typography sx={{ fontSize: 10, color: "#64748B", fontWeight: 700 }}>{g.role}</Typography>
+                        <Typography sx={{ fontSize: 11.5, fontWeight: 950, color: "#1E40AF" }}>{g.pct}%</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
               </Paper>
             )}
           </Box>
