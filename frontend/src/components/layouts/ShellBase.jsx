@@ -48,6 +48,7 @@ export default function ShellBase({
   isRoot,
   onBackFallbackPath,
   showBottomNav,
+  showMobileHeader = true,
   children,
 }) {
   const loc = useLocation();
@@ -395,7 +396,7 @@ export default function ShellBase({
   return (
     <div className="role-shell-scope" style={{ minHeight: "100vh", background: shellTokens.bg }}>
       {/* Top bar: shown only on mobile */}
-      {isMobile ? (
+      {isMobile && showMobileHeader ? (
         <div
   className="native-glass"
   style={{
@@ -765,8 +766,8 @@ export default function ShellBase({
           style={{
             flex: 1,
             minWidth: 0,
-            padding: isMobile ? 10 : 16,
-            paddingBottom: (isMobile && shouldShowBottomNav) ? "calc(74px + env(safe-area-inset-bottom))" : 16,
+            padding: isMobile ? (showMobileHeader ? 10 : 0) : 16,
+            paddingBottom: (isMobile && shouldShowBottomNav) ? "calc(74px + env(safe-area-inset-bottom))" : (showMobileHeader ? 16 : 0),
             marginLeft: isMobile ? 0 : (sidebarWidth + sidebarGap),
             width: "100%",
           }}

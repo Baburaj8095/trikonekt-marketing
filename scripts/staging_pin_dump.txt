@@ -1,0 +1,14 @@
+Consumers with PIN 572106: 1
+{'id': 1066, 'username': '9700000001', 'phone': '9700000001', 'full_name': 'Test Consumer 572106', 'pincode': '572106', 'date_joined': datetime.datetime(2026, 10, 9, 4, 31, 59, 317210, tzinfo=datetime.timezone.utc), 'account_active': True}
+Total Consumers in DB: 989
+Total Agencies in DB: 6
+{'id': 1062, 'username': 'agency_district_tumakuru', 'phone': '9800000003', 'full_name': 'Mahesh Patil', 'category': 'agency_district', 'pincode': '572101', 'account_active': True}
+{'id': 1063, 'username': 'agency_district_coord', 'phone': '9800000004', 'full_name': 'Anand Shettar', 'category': 'agency_district_coordinator', 'pincode': '572101', 'account_active': True}
+{'id': 1060, 'username': 'agency_pincode_572106', 'phone': '9800000001', 'full_name': 'Savitri Biradar', 'category': 'agency_pincode', 'pincode': '572106', 'account_active': True}
+{'id': 1061, 'username': 'agency_pincode_coord', 'phone': '9800000002', 'full_name': 'Rajesh Hegde', 'category': 'agency_pincode_coordinator', 'pincode': '572106', 'account_active': True}
+{'id': 1064, 'username': 'agency_state_karnataka', 'phone': '9800000005', 'full_name': 'Kavitha Gowda', 'category': 'agency_state', 'pincode': '560001', 'account_active': True}
+{'id': 1065, 'username': 'agency_state_coord', 'phone': '9800000006', 'full_name': 'Siddharth Varma', 'category': 'agency_state_coordinator', 'pincode': '560001', 'account_active': True}
+
+ERR:
+/srv/trikonekt/staging/backend/.venv/lib/python3.14/site-packages/django/db/backends/utils.py:98: RuntimeWarning: Accessing the database during app initialization is discouraged. To fix this warning, avoid executing queries in AppConfig.ready() or when your app modules are imported.
+  warnings.warn(self.APPS_NOT_READY_WARNING_MSG, category=RuntimeWarning)

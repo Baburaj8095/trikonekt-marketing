@@ -44,6 +44,52 @@ export default function AdminFranchiseUsers() {
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
 
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const [registerSubmitting, setRegisterSubmitting] = useState(false);
+  const [registerForm, setRegisterForm] = useState({
+    full_name: "",
+    phone: "",
+    password: "Trikonekt@2026!",
+    email: "",
+    category: "agency_pincode",
+    state: "1",
+    district: "Tumakuru",
+    pincode: "572106",
+    pincodes_cluster: "572106, 572101, 572102, 572103",
+  });
+
+  const saveRegister = useCallback(async () => {
+    if (!registerForm.full_name || !registerForm.phone) {
+      window.alert("Please provide Full Name and 10-digit Phone Number.");
+      return;
+    }
+    setRegisterSubmitting(true);
+    try {
+      const payload = {
+        role: "agency",
+        category: registerForm.category,
+        full_name: registerForm.full_name,
+        username: registerForm.phone,
+        phone: registerForm.phone,
+        password: registerForm.password || "Trikonekt@2026!",
+        email: registerForm.email || `${registerForm.phone}@trikonekt.in`,
+        state: registerForm.state || 1,
+        pincode: registerForm.pincode || "572106",
+      };
+      if (registerForm.category === "agency_pincode_coordinator") {
+        payload.pincodes = registerForm.pincodes_cluster.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+      await API.post("/accounts/register/", payload);
+      window.alert(`Successfully registered ${registerForm.full_name} (${labelFor(registerForm.category)})!`);
+      setRegisterOpen(false);
+      setRefreshKey((k) => k + 1);
+    } catch (e) {
+      window.alert(e?.response?.data?.detail || e?.response?.data?.message || e?.message || "Failed to register agency.");
+    } finally {
+      setRegisterSubmitting(false);
+    }
+  }, [registerForm]);
+
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search || "");
     setCategory(searchParams.get("category") || "");
@@ -286,6 +332,9 @@ export default function AdminFranchiseUsers() {
       <TextField size="small" label="State ID" value={state} onChange={(e) => setState(e.target.value)} sx={{ minWidth: 130 }} />
       <TextField size="small" label="Pincode" value={pincode} onChange={(e) => setPincode(e.target.value)} sx={{ minWidth: 130 }} />
       <Button variant="contained" onClick={() => setRefreshKey((k) => k + 1)}>Apply</Button>
+      <Button variant="contained" color="primary" onClick={() => setRegisterOpen(true)} sx={{ fontWeight: 800, textTransform: "none", bgcolor: "#2563eb" }}>
+        + Register Agency Partner
+      </Button>
       <Button component={Link} to="/admin/franchise/dashboard" variant="outlined">Dashboard</Button>
     </Stack>
   );
@@ -367,6 +416,108 @@ export default function AdminFranchiseUsers() {
         <DialogActions>
           <Button onClick={() => setEditOpen(false)} disabled={saving}>Cancel</Button>
           <Button variant="contained" onClick={saveEdit} disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={registerOpen} onClose={() => !registerSubmitting && setRegisterOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 900, color: "#0F172A" }}>Register New Franchise / Agency Partner</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <TextField
+              size="small"
+              label="Full Name *"
+              value={registerForm.full_name}
+              onChange={(e) => setRegisterForm((f) => ({ ...f, full_name: e.target.value }))}
+              placeholder="e.g. Ramesh Patil"
+              required
+            />
+            <TextField
+              size="small"
+              label="Phone / Mobile Number (10 digits) *"
+              value={registerForm.phone}
+              onChange={(e) => setRegisterForm((f) => ({ ...f, phone: e.target.value.replace(/\D/g, "").slice(0, 10) }))}
+              placeholder="e.g. 9845012345"
+              required
+              helperText="This mobile number serves as the username and login identifier."
+            />
+            <TextField
+              size="small"
+              label="Email Address"
+              value={registerForm.email}
+              onChange={(e) => setRegisterForm((f) => ({ ...f, email: e.target.value }))}
+              placeholder="e.g. partner@trikonekt.in"
+            />
+            <TextField
+              size="small"
+              label="Initial Password"
+              type="password"
+              value={registerForm.password}
+              onChange={(e) => setRegisterForm((f) => ({ ...f, password: e.target.value }))}
+            />
+            <TextField
+              select
+              size="small"
+              label="Franchise Tier / Category *"
+              value={registerForm.category}
+              onChange={(e) => setRegisterForm((f) => ({ ...f, category: e.target.value }))}
+            >
+              {CATEGORY_OPTIONS.filter((o) => o.value).map((o) => (
+                <MenuItem key={o.value} value={o.value}>
+                  {o.label}
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              size="small"
+              label="State ID / Name"
+              value={registerForm.state}
+              onChange={(e) => setRegisterForm((f) => ({ ...f, state: e.target.value }))}
+              helperText="1 = Karnataka, 4009 = Goa, etc."
+            />
+            <TextField
+              size="small"
+              label="District Name"
+              value={registerForm.district}
+              onChange={(e) => setRegisterForm((f) => ({ ...f, district: e.target.value }))}
+              placeholder="e.g. Tumakuru"
+            />
+
+            {registerForm.category === "agency_pincode" && (
+              <TextField
+                size="small"
+                label="Assigned Pincode (1 Pincode) *"
+                value={registerForm.pincode}
+                onChange={(e) => setRegisterForm((f) => ({ ...f, pincode: e.target.value }))}
+                placeholder="572106"
+                helperText="Pincode Franchise has strictly 1 pincode jurisdiction."
+              />
+            )}
+
+            {registerForm.category === "agency_pincode_coordinator" && (
+              <TextField
+                size="small"
+                label="Assigned Cluster Pincodes (4 Pincodes) *"
+                value={registerForm.pincodes_cluster}
+                onChange={(e) => setRegisterForm((f) => ({ ...f, pincodes_cluster: e.target.value }))}
+                placeholder="572106, 572101, 572102, 572103"
+                helperText="Enter up to 4 comma-separated pincodes for coordinator cluster."
+              />
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setRegisterOpen(false)} disabled={registerSubmitting}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={saveRegister}
+            disabled={registerSubmitting}
+            sx={{ bgcolor: "#2563EB", fontWeight: 800, textTransform: "none" }}
+          >
+            {registerSubmitting ? "Registering..." : "Complete Registration"}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

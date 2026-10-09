@@ -726,11 +726,11 @@ export default function SPPGiftCards() {
             No SPP Gift Cards in this category
           </Typography>
           <Typography variant="body2" sx={{ color: "#64748b", mb: 2.5, maxWidth: 440, mx: "auto", fontSize: "13px" }}>
-            SPP monthly subscriptions and Kirana vouchers are available directly on Trikonekt Education.
+            SPP monthly subscriptions and shopping vouchers are available directly on asiyapp.com.
           </Typography>
           <Button
             variant="outlined"
-            onClick={() => window.open("https://trieducation.in/vouchers", "_blank")}
+            onClick={() => navigate("/user/rank-upgrade")}
             sx={{
               borderColor: "#2563eb",
               color: "#2563eb",
@@ -740,7 +740,7 @@ export default function SPPGiftCards() {
               px: 3,
             }}
           >
-            Visit trieducation.in Vouchers ↗
+            Explore Packages on asiyapp.com ↗
           </Button>
         </Card>
       ) : (

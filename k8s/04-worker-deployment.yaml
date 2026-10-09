@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trikonekt-worker-deployment
+  namespace: trikonekt-prod
+  labels:
+    app: trikonekt-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trikonekt-worker
+  template:
+    metadata:
+      labels:
+        app: trikonekt-worker
+    spec:
+      containers:
+      - name: worker
+        image: 65.0.40.184:5000/trikonekt-backend:latest
+        imagePullPolicy: Always
+        command: ["python", "manage.py", "process_tasks", "--max-runtime-seconds=50", "--max-iterations=100", "--sleep=0.5", "--reap-on-start", "--reap-stuck-seconds=120"]
+        envFrom:
+        - configMapRef:
+            name: trikonekt-config
+        - secretRef:
+            name: trikonekt-secrets
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"

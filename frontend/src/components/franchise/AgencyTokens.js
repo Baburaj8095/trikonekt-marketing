@@ -1,0 +1,58 @@
+/**
+ * Trikonekt Agency Design System Tokens
+ * Strict adherence to Phase 3 Design System
+ */
+export const AGENCY_TOKENS = {
+  colors: {
+    primary: "#2563EB",
+    primaryDark: "#1D4ED8",
+    primaryLight: "#EFF6FF",
+    primaryBorder: "#BFDBFE",
+    mainText: "#111827",
+    secondaryText: "#64748B",
+    background: "#F8FAFC",
+    cardBg: "#FFFFFF",
+    border: "#E2E8F0",
+    success: "#059669",
+    successBg: "#ECFDF5",
+    successBorder: "#A7F3D0",
+    warning: "#D97706",
+    warningBg: "#FFFBEB",
+    warningBorder: "#FDE68A",
+    error: "#DC2626",
+    errorBg: "#FEF2F2",
+    errorBorder: "#FECACA",
+    purple: "#7C3AED",
+    purpleBg: "#FAF5FF",
+    purpleGradient: "linear-gradient(135deg, #6D28D9 0%, #7C3AED 50%, #8B5CF6 100%)",
+    navy: "#0F172A",
+    surfaceMuted: "#F1F5F9",
+  },
+  typography: {
+    pageTitle: { fontSize: "20px", fontWeight: 700, lineHeight: 1.25, color: "#111827" },
+    sectionHeading: { fontSize: "16px", fontWeight: 700, lineHeight: 1.3, color: "#111827" },
+    cardTitle: { fontSize: "14.5px", fontWeight: 600, lineHeight: 1.35, color: "#111827" },
+    bodyText: { fontSize: "13.5px", fontWeight: 400, lineHeight: 1.4, color: "#111827" },
+    bodyMedium: { fontSize: "13.5px", fontWeight: 500, lineHeight: 1.4, color: "#111827" },
+    secondaryMetadata: { fontSize: "12px", fontWeight: 500, lineHeight: 1.35, color: "#64748B" },
+    kpiValue: { fontSize: "24px", fontWeight: 700, lineHeight: 1.15, color: "#111827" },
+    buttonText: { fontSize: "13px", fontWeight: 600, lineHeight: 1.2 },
+  },
+  geometry: {
+    pagePaddingX: 16,
+    cardPadding: 16,
+    cardRadius: 16,
+    controlRadius: 12,
+    pillRadius: 9999,
+    gapSm: 8,
+    gapMd: 12,
+    gapLg: 16,
+    bottomNavHeight: 64,
+    headerHeight: 52,
+  },
+  shadows: {
+    card: "0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02)",
+    cardElevated: "0 4px 12px rgba(15,23,42,0.05)",
+    walletCard: "0 8px 24px -4px rgba(109, 40, 217, 0.35)",
+  },
+};

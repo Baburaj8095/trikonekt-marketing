@@ -5903,7 +5903,7 @@ right={
                     ₹{Number(proj.royalty_t1_pot ?? mon.pools?.daily_royalty_l1_l7_pool ?? mon.pools?.daily_royalty_t1_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-                    👥 7d Achievers: <strong>{proj.royalty_t1_recipients ?? mon.achievers?.royalty_count ?? 0}</strong>
+                    👥 7d Achievers: <strong>{proj.royalty_t1_recipients ?? mon.achievers?.tier1_count ?? mon.achievers?.royalty_count ?? 0}</strong>
                   </div>
                 </div>
 
@@ -5913,7 +5913,7 @@ right={
                     ₹{Number(mon.pools?.daily_royalty_l1_l10_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-                    👥 30d Achievers: <strong>{mon.achievers?.tier3_count ?? 0}</strong>
+                    👥 30d Achievers: <strong>{proj.royalty_t3_recipients ?? mon.achievers?.tier3_count ?? 0}</strong>
                   </div>
                 </div>
 
@@ -5923,7 +5923,7 @@ right={
                     ₹{Number(mon.pools?.daily_royalty_dist_l8_l10_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-                    👥 District L8-10 Leaders: <strong>{mon.achievers?.tier2_count ?? 0}</strong>
+                    👥 District L8-10 Leaders: <strong>{proj.royalty_t2_recipients ?? mon.achievers?.tier2_count ?? mon.achievers?.district_l8_l10_count ?? 0}</strong>
                   </div>
                 </div>
 
@@ -5933,9 +5933,10 @@ right={
                     ₹{Number(mon.pools?.daily_royalty_state_l8_l10_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-                    👥 State L8-10 Leaders: <strong>{mon.achievers?.tier2_count ?? 0}</strong>
+                    👥 State L8-10 Leaders: <strong>{proj.royalty_t2_recipients ?? mon.achievers?.tier2_count ?? mon.achievers?.state_l8_l10_count ?? 0}</strong>
                   </div>
                 </div>
+
 
                 <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
                   <div style={{ fontSize: 11, fontWeight: 800, color: "#ea580c" }}>🎖️ DISTRICT CAPTAIN (₹{distCaptRate})</div>

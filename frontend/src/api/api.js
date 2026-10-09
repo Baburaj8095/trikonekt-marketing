@@ -89,6 +89,7 @@ function currentNamespace() {
 
     // Treat admin-prefixed routes as admin
     if (p.startsWith("/admin")) return "admin";
+    if (p.startsWith("/franchise")) return "agency";
     if (p.startsWith("/agency")) return "agency";
     if (p.startsWith("/employee")) return "employee";
     if (p.startsWith("/business")) return "business";

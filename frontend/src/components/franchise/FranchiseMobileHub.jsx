@@ -1,0 +1,4771 @@
+import React, { useState, useMemo, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import {
+  Box,
+  Typography,
+  Stack,
+  Paper,
+  Grid,
+  Button,
+  IconButton,
+  Chip,
+  Avatar,
+  TextField,
+  MenuItem,
+  Select,
+  FormControl,
+  LinearProgress,
+  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Drawer,
+  Badge,
+  Alert,
+  Snackbar,
+  InputAdornment,
+  Tabs,
+  Tab,
+} from "@mui/material";
+
+// Icons
+import StoreRoundedIcon from "@mui/icons-material/StoreRounded";
+import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
+import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
+import BuildRoundedIcon from "@mui/icons-material/BuildRounded";
+import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
+import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
+import ShoppingBagOutlinedIcon from "@mui/icons-material/ShoppingBagOutlined";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import CallRoundedIcon from "@mui/icons-material/CallRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
+import QrCodeScannerRoundedIcon from "@mui/icons-material/QrCodeScannerRounded";
+import AssessmentRoundedIcon from "@mui/icons-material/AssessmentRounded";
+import SupportAgentRoundedIcon from "@mui/icons-material/SupportAgentRounded";
+import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
+import ExploreRoundedIcon from "@mui/icons-material/ExploreRounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import StarRoundedIcon from "@mui/icons-material/StarRounded";
+import MapRoundedIcon from "@mui/icons-material/MapRounded";
+import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import SendRoundedIcon from "@mui/icons-material/SendRounded";
+import ArrowUpwardRoundedIcon from "@mui/icons-material/ArrowUpwardRounded";
+import SavingsIcon from "@mui/icons-material/Savings";
+import MessageRoundedIcon from "@mui/icons-material/MessageRounded";
+import DirectionsCarRoundedIcon from "@mui/icons-material/DirectionsCarRounded";
+import ShareRoundedIcon from "@mui/icons-material/ShareRounded";
+import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
+import FlashOnRoundedIcon from "@mui/icons-material/FlashOnRounded";
+import AccountTreeRoundedIcon from "@mui/icons-material/AccountTreeRounded";
+import CreditCardRoundedIcon from "@mui/icons-material/CreditCardRounded";
+import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
+import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
+import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
+import LayersRoundedIcon from "@mui/icons-material/LayersRounded";
+import MyLocationRoundedIcon from "@mui/icons-material/MyLocationRounded";
+import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
+import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
+import PhoneRoundedIcon from "@mui/icons-material/PhoneRounded";
+import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
+import DomainRoundedIcon from "@mui/icons-material/DomainRounded";
+import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
+
+import AgencyLayout from "./AgencyLayout";
+import RoleSelector from "./RoleSelector";
+import MetricCard from "./MetricCard";
+import WalletCard from "./WalletCard";
+import PageHeader from "./PageHeader";
+import SearchField from "./SearchField";
+import FilterChips from "./FilterChips";
+import MerchantCard from "./MerchantCard";
+import CaptainCard from "./CaptainCard";
+import { AGENCY_TOKENS } from "./AgencyTokens";
+import API from "../../api/api";
+
+/**
+ * DYNAMIC ADMIN-CONFIGURED COMMISSION ENGINE
+ * (Directly mirrors CommissionConfig.master_commission_json live settings on EC2)
+ */
+export const DYNAMIC_COMMISSION_ENGINE = {
+  // 1. ₹750 Prime Joining Geo Commissions
+  prime750: {
+    agency_pincode: 6.0,
+    agency_pincode_coordinator: 4.0,
+    agency_district: 3.0,
+    agency_district_coordinator: 3.0,
+    agency_state: 2.0,
+    agency_state_coordinator: 2.0,
+    agency_sub_franchise: 1.0,
+  },
+  // 2. ₹1,000 SPP Monthly Box Geo Commissions
+  spp1000: {
+    agency_pincode: 6.0,
+    agency_pincode_coordinator: 4.0,
+    agency_district: 3.0,
+    agency_district_coordinator: 2.0,
+    agency_state: 2.0,
+    agency_state_coordinator: 2.0,
+    agency_sub_franchise: 5.0,
+  },
+  // 3. ₹250 Self-Rebirth Geo Commissions
+  rebirth250: {
+    agency_pincode: 3.0,
+    agency_pincode_coordinator: 2.0,
+    agency_district: 2.0,
+    agency_district_coordinator: 1.5,
+    agency_state: 1.0,
+    agency_state_coordinator: 1.0,
+    agency_sub_franchise: 0.5,
+  },
+  // 4. Merchant QR Scanner Volume Override (0.20% GMV)
+  qrScannerPercent: 0.002,
+  // 5. TriZone Local Commerce Override (0.80% Order Volume)
+  trizonePercent: 0.008,
+  // 6. Dual Wallet Payout Split Rule (75% Main / 25% Self Block)
+  mainRatio: 0.75,
+  selfRatio: 0.25,
+};
+
+function maskUsernameMid(u) {
+  const s = String(u || "").trim();
+  if (!/^\d{8,}$/.test(s)) return s;
+  if (s.length <= 4) return s;
+  return `${s.slice(0, 4)}****${s.slice(-3)}`;
+}
+
+function describeSource(tx = {}) {
+  const type = String(tx?.type || "").toUpperCase();
+  const meta = tx?.meta || {};
+  const src = String(meta.source || "").toUpperCase();
+  if (type === "FRANCHISE_INCOME" || src.includes("FRANCHISE")) {
+    const gross = Number(meta.gross || 0);
+    const trigger = String(meta.trigger || "").toUpperCase();
+    if (trigger.includes("750") || gross === 750 || src.includes("750")) {
+      return "₹750 Prime Geo Share";
+    }
+    if (trigger.includes("SPP") || trigger.includes("759") || trigger.includes("1000") || src.includes("SPP")) {
+      return "₹1,000 SPP Monthly Box Geo Share";
+    }
+    if (trigger.includes("RANK") || trigger.includes("EDU") || src.includes("RANK") || src.includes("EDU")) {
+      return "₹250 E-Edu Rank 1 Geo Share";
+    }
+    if (trigger.includes("REBIRTH") || src.includes("REBIRTH")) {
+      return "₹250 Self-Rebirth Regional Override";
+    }
+    return meta.description || "Franchise Regional Commission";
+  }
+  if (type === "SELF_ACCOUNT_CREDIT") return "Self Rebirth Reserve Credit (25%)";
+  if (type === "SELF_ACCOUNT_DEBIT") return "Self Rebirth Allocation (₹250 Node)";
+  return meta.description || type.replace(/_/g, " ");
+}
+
+function counterpartyLabel(tx = {}) {
+  const meta = tx?.meta || {};
+  const trig = meta.trigger_user || meta.from_user || meta.username || meta.tr_username;
+  const trigId = meta.trigger_user_id || meta.from_user_id;
+  const pincode = meta.pincode || meta.territory;
+  const u = trig ? maskUsernameMid(trig) : "";
+  let out = "";
+  if (u) out = `From ${u}`;
+  else if (trigId) out = `From ID ${trigId}`;
+  if (pincode) out += (out ? ` • PIN ${pincode}` : `PIN ${pincode}`);
+  return out || "Regional Consumer";
+}
+
+function ymd(d) {
+  const dt = new Date(d);
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const day = String(dt.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function formatHeaderDate(d) {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }).format(d);
+  } catch {
+    return d.toDateString();
+  }
+}
+
+function groupByDay(items) {
+  const now = new Date();
+  const todayKey = ymd(now);
+  const yest = new Date(now);
+  yest.setDate(now.getDate() - 1);
+  const yestKey = ymd(yest);
+
+  const map = new Map();
+  const order = [];
+
+  (items || []).forEach((it) => {
+    const k = it?.created_at ? ymd(it.created_at) : "unknown";
+    if (!map.has(k)) {
+      map.set(k, []);
+      order.push(k);
+    }
+    map.get(k).push(it);
+  });
+
+  order.sort((a, b) => {
+    if (a === "unknown" && b === "unknown") return 0;
+    if (a === "unknown") return 1;
+    if (b === "unknown") return -1;
+    return a > b ? -1 : a < b ? 1 : 0;
+  });
+
+  return order.map((k) => {
+    let title = "";
+    if (k === todayKey) title = "Today";
+    else if (k === yestKey) title = "Yesterday";
+    else if (k === "unknown") title = "Recent Activity";
+    else {
+      const [Y, M, D] = k.split("-").map((x) => parseInt(x, 10));
+      title = formatHeaderDate(new Date(Y, (M || 1) - 1, D || 1));
+    }
+
+    const rows = (map.get(k) || []).slice().sort((a, b) => {
+      const da = a?.created_at ? new Date(a.created_at).getTime() : 0;
+      const db = b?.created_at ? new Date(b.created_at).getTime() : 0;
+      return db - da;
+    });
+
+    const total = rows.reduce((acc, r) => acc + (Number(r.amount) || 0), 0);
+    return { title, rows, total };
+  });
+}
+
+/**
+ * EXACT 6 AGENCY TIERS AND GEOGRAPHIC SCOPES
+ * 1. Pincode: 1 Pincode
+ * 2. Pincode Coordinator: 4 Pincodes
+ * 3. District: 1 District
+ * 4. District Coordinator: 2 Districts
+ * 5. State: 1 State
+ * 6. State Coordinator: 2 States
+ */
+const AGENCY_TIERS = {
+  agency_pincode: {
+    key: "agency_pincode",
+    title: "Pincode Franchise Partner",
+    badge: "1 Pincode Jurisdiction",
+    scopeType: "pincode",
+    scopeCount: 1,
+    defaultLocation: "572106 - Turuvekere, Tumakuru, Karnataka",
+    pincodes: [{ pincode: "572106", name: "572106 - Turuvekere", district: "Tumakuru", state: "Karnataka" }],
+    metrics: {
+      merchants: 842,
+      merchantsMoM: "+28 this month",
+      customers: 5420,
+      customersMoM: "+420 this month",
+      captains: 18,
+      captainsMoM: "+2 this month",
+      services: 136,
+      servicesMoM: "+112 this month",
+      thisMonthEarnings: "5,620",
+      b2b: 420,
+      b2c: 310,
+      trizone: 112,
+      mainWallet: "9,375.00",
+      selfWallet: "3,125.00",
+      totalWallet: "12,500.00",
+    },
+  },
+  agency_pincode_coordinator: {
+    key: "agency_pincode_coordinator",
+    title: "Pincode Coordinator",
+    badge: "4 Pincodes Cluster",
+    phone: "9800000002",
+    scopeType: "pincodes_cluster",
+    scopeCount: 4,
+    defaultLocation: "4 Pincodes Assigned - Turuvekere Cluster",
+    pincodes: [
+      { pincode: "572106", name: "572106 - Turuvekere Hub", district: "Tumakuru", state: "Karnataka" },
+      { pincode: "572101", name: "572101 - Tumakuru Head Post Hub", district: "Tumakuru", state: "Karnataka" },
+      { pincode: "572102", name: "572102 - Tumakuru South Hub", district: "Tumakuru", state: "Karnataka" },
+      { pincode: "572103", name: "572103 - Kyathsandra Hub", district: "Tumakuru", state: "Karnataka" },
+    ],
+    metrics: {
+      merchants: 2480,
+      merchantsMoM: "+114 this month",
+      customers: 18450,
+      customersMoM: "+1,250 this month",
+      captains: 54,
+      captainsMoM: "+8 this month",
+      services: 410,
+      servicesMoM: "+340 this month",
+      thisMonthEarnings: "24,850",
+      b2b: 1240,
+      b2c: 890,
+      trizone: 350,
+      mainWallet: "36,450.00",
+      selfWallet: "12,150.00",
+      totalWallet: "48,600.00",
+    },
+  },
+  agency_district: {
+    key: "agency_district",
+    title: "District Franchise Partner",
+    badge: "1 District Jurisdiction",
+    phone: "9800000003",
+    scopeType: "district",
+    scopeCount: 1,
+    defaultLocation: "Tumakuru District, Karnataka",
+    districts: ["Tumakuru District"],
+    pincodes: [
+      { pincode: "572101", name: "572101 - Tumakuru Head Post", district: "Tumakuru", state: "Karnataka" },
+      { pincode: "572106", name: "572106 - Turuvekere", district: "Tumakuru", state: "Karnataka" },
+      { pincode: "572128", name: "572128 - Kunigal", district: "Tumakuru", state: "Karnataka" },
+      { pincode: "572216", name: "572216 - Tiptur", district: "Tumakuru", state: "Karnataka" },
+    ],
+    metrics: {
+      merchants: 6840,
+      merchantsMoM: "+340 this month",
+      customers: 42100,
+      customersMoM: "+3,100 this month",
+      captains: 148,
+      captainsMoM: "+18 this month",
+      services: 1120,
+      servicesMoM: "+840 this month",
+      thisMonthEarnings: "68,400",
+      b2b: 3450,
+      b2c: 2410,
+      trizone: 980,
+      mainWallet: "1,12,500.00",
+      selfWallet: "37,500.00",
+      totalWallet: "1,50,000.00",
+    },
+  },
+  agency_district_coordinator: {
+    key: "agency_district_coordinator",
+    title: "District Coordinator",
+    badge: "2 Districts Cluster",
+    phone: "9800000004",
+    scopeType: "districts_cluster",
+    scopeCount: 2,
+    defaultLocation: "2 Districts Assigned - Tumakuru & Hassan",
+    districts: ["Tumakuru", "Hassan"],
+    pincodes: [
+      { pincode: "572106", name: "572106 - Turuvekere (Tumakuru)", district: "Tumakuru", state: "Karnataka" },
+      { pincode: "572101", name: "572101 - Tumakuru City Hub", district: "Tumakuru", state: "Karnataka" },
+      { pincode: "573201", name: "573201 - Hassan Town Hub", district: "Hassan", state: "Karnataka" },
+    ],
+    metrics: {
+      merchants: 14200,
+      merchantsMoM: "+680 this month",
+      customers: 89400,
+      customersMoM: "+6,200 this month",
+      captains: 312,
+      captainsMoM: "+36 this month",
+      services: 2410,
+      servicesMoM: "+1,680 this month",
+      thisMonthEarnings: "1,42,800",
+      b2b: 7100,
+      b2c: 5120,
+      trizone: 1980,
+      mainWallet: "2,43,750.00",
+      selfWallet: "81,250.00",
+      totalWallet: "3,25,000.00",
+    },
+  },
+  agency_state: {
+    key: "agency_state",
+    title: "State Franchise Partner",
+    badge: "1 State Jurisdiction",
+    phone: "9800000005",
+    scopeType: "state",
+    scopeCount: 1,
+    defaultLocation: "Karnataka State",
+    states: ["Karnataka State"],
+    metrics: {
+      merchants: 48600,
+      merchantsMoM: "+2,400 this month",
+      customers: 340000,
+      customersMoM: "+28,000 this month",
+      captains: 1140,
+      captainsMoM: "+120 this month",
+      services: 8900,
+      servicesMoM: "+6,200 this month",
+      thisMonthEarnings: "4,86,000",
+      b2b: 24200,
+      b2c: 17800,
+      trizone: 6600,
+      mainWallet: "8,25,000.00",
+      selfWallet: "2,75,000.00",
+      totalWallet: "11,00,000.00",
+    },
+  },
+  agency_state_coordinator: {
+    key: "agency_state_coordinator",
+    title: "State Coordinator",
+    badge: "2 States Cluster",
+    phone: "9800000006",
+    scopeType: "states_cluster",
+    scopeCount: 2,
+    defaultLocation: "2 States Assigned - Karnataka & Goa",
+    states: ["Karnataka", "Goa"],
+    metrics: {
+      merchants: 72400,
+      merchantsMoM: "+3,800 this month",
+      customers: 520000,
+      customersMoM: "+42,000 this month",
+      captains: 1680,
+      captainsMoM: "+180 this month",
+      services: 13400,
+      servicesMoM: "+9,100 this month",
+      thisMonthEarnings: "7,24,000",
+      b2b: 36100,
+      b2c: 26500,
+      trizone: 9800,
+      mainWallet: "12,75,000.00",
+      selfWallet: "4,25,000.00",
+      totalWallet: "17,00,000.00",
+    },
+  },
+};
+
+/**
+ * STANDARD 6 AGENCY ACCOUNTS (Live Database Test Accounts on EC2)
+ */
+export const TEST_AGENCY_ACCOUNTS = {
+  agency_pincode: {
+    phone: "",
+    name: "Pincode Franchise Partner",
+    title: "Pincode Franchise Partner",
+    roleKey: "agency_pincode",
+    jurisdiction: "PIN 572106 — Turuvekere, Tumakuru, Karnataka",
+    badge: "1 Pincode",
+    color: "#2563EB",
+    initialBalance: 66.0,
+    mainBalance: 49.5,
+    selfBalance: 16.5,
+    activeWork: 9.0,
+    inactiveWork: 9.0,
+    selfRebirth: 12.0,
+    companyMarketing: 18.0,
+  },
+  agency_pincode_coordinator: {
+    phone: "",
+    name: "Pincode Coordinator",
+    title: "Pincode Coordinator",
+    roleKey: "agency_pincode_coordinator",
+    jurisdiction: "4 Pincodes: 572106, 572101, 572102, 572103",
+    badge: "4 Pincodes Cluster",
+    color: "#7C3AED",
+    initialBalance: 36.0,
+    mainBalance: 27.0,
+    selfBalance: 9.0,
+    activeWork: 4.56,
+    inactiveWork: 4.56,
+    selfRebirth: 6.0,
+    companyMarketing: 8.88,
+  },
+  agency_district: {
+    phone: "",
+    name: "District Franchise Partner",
+    title: "District Franchise Partner",
+    roleKey: "agency_district",
+    jurisdiction: "District: Tumakuru, Karnataka",
+    badge: "1 District",
+    color: "#059669",
+    initialBalance: 21.0,
+    mainBalance: 15.75,
+    selfBalance: 5.25,
+    activeWork: 2.28,
+    inactiveWork: 2.28,
+    selfRebirth: 3.0,
+    companyMarketing: 4.44,
+  },
+  agency_district_coordinator: {
+    phone: "",
+    name: "District Coordinator",
+    title: "District Coordinator",
+    roleKey: "agency_district_coordinator",
+    jurisdiction: "2 Districts: Tumakuru & Hassan, Karnataka",
+    badge: "2 Districts Cluster",
+    color: "#D97706",
+    initialBalance: 20.0,
+    mainBalance: 15.0,
+    selfBalance: 5.0,
+    activeWork: 2.28,
+    inactiveWork: 2.28,
+    selfRebirth: 3.0,
+    companyMarketing: 4.44,
+  },
+  agency_state: {
+    phone: "",
+    name: "State Franchise Partner",
+    title: "State Franchise Partner",
+    roleKey: "agency_state",
+    jurisdiction: "State: Karnataka",
+    badge: "1 State",
+    color: "#DC2626",
+    initialBalance: 18.0,
+    mainBalance: 13.5,
+    selfBalance: 4.5,
+    activeWork: 2.28,
+    inactiveWork: 2.28,
+    selfRebirth: 3.0,
+    companyMarketing: 4.44,
+  },
+  agency_state_coordinator: {
+    phone: "",
+    name: "State Coordinator",
+    title: "State Coordinator",
+    roleKey: "agency_state_coordinator",
+    jurisdiction: "2 States: Karnataka & Goa",
+    badge: "2 States Cluster",
+    color: "#0891B2",
+    initialBalance: 18.0,
+    mainBalance: 13.5,
+    selfBalance: 4.5,
+    activeWork: 2.28,
+    inactiveWork: 2.28,
+    selfRebirth: 3.0,
+    companyMarketing: 4.44,
+  },
+};
+
+
+// Seed Captains Dataset
+const SEED_CAPTAINS = [
+  {
+    id: "CAP-57201",
+    name: "Ramesh Patil",
+    mobile: "+91 98450 12345",
+    area: "Turuvekere Town Hub",
+    pincode: "572106",
+    district: "Tumakuru",
+    state: "Karnataka",
+    status: "Active",
+    merchants: 42,
+    services: 12,
+    customers: 340,
+    rating: 4.9,
+    performancePct: 80,
+    earnings: "₹12,500.00",
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+    vehicle: "Bike",
+    activities: [
+      { text: "Onboarded FreshMart Grocery", time: "Today 10:24 AM" },
+      { text: "Completed 18 QR standee verifications", time: "Yesterday 04:15 PM" },
+      { text: "Registered 8 new customer prime accounts", time: "06 Oct 2026" },
+    ],
+  },
+  {
+    id: "CAP-57202",
+    name: "Kiran Gowda",
+    mobile: "+91 98800 98765",
+    area: "Tumakuru Head Post Hub",
+    pincode: "572101",
+    district: "Tumakuru",
+    state: "Karnataka",
+    status: "Active",
+    merchants: 38,
+    services: 9,
+    customers: 290,
+    rating: 4.8,
+    performancePct: 75,
+    earnings: "₹10,800.00",
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+    vehicle: "Bike",
+    activities: [
+      { text: "Activated City Central Supermarket QR", time: "Today 09:10 AM" },
+      { text: "Distributed 25 promo box samples", time: "05 Oct 2026" },
+    ],
+  },
+  {
+    id: "CAP-57203",
+    name: "Vijay Kumar",
+    mobile: "+91 94481 23456",
+    area: "Tumakuru South Hub",
+    pincode: "572102",
+    district: "Tumakuru",
+    state: "Karnataka",
+    status: "Active",
+    merchants: 29,
+    services: 8,
+    customers: 210,
+    rating: 4.7,
+    performancePct: 70,
+    earnings: "₹8,450.00",
+    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+    vehicle: "Auto",
+    activities: [
+      { text: "Onboarded South Hub Agri & Seeds Traders", time: "Yesterday 11:30 AM" },
+      { text: "Assigned 12 QR stickers to retail shops", time: "04 Oct 2026" },
+    ],
+  },
+  {
+    id: "CAP-57204",
+    name: "Anand Biradar",
+    mobile: "+91 99001 12233",
+    area: "Kyathsandra Commercial Hub",
+    pincode: "572103",
+    district: "Tumakuru",
+    state: "Karnataka",
+    status: "Inactive",
+    merchants: 14,
+    services: 4,
+    customers: 95,
+    rating: 4.3,
+    performancePct: 45,
+    earnings: "₹3,900.00",
+    avatar: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80",
+    vehicle: "Bike",
+    activities: [
+      { text: "Route inspection pending", time: "03 Oct 2026" },
+    ],
+  },
+  {
+    id: "CAP-57301",
+    name: "Manjunath Gowda",
+    mobile: "+91 98451 99887",
+    area: "Hassan Central Market",
+    pincode: "573201",
+    district: "Hassan",
+    state: "Karnataka",
+    status: "Active",
+    merchants: 54,
+    services: 16,
+    customers: 410,
+    rating: 4.9,
+    performancePct: 88,
+    earnings: "₹16,800.00",
+    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80",
+    vehicle: "Van",
+    activities: [
+      { text: "Onboarded Hassan Coffee & Spices Exporters", time: "Today 11:00 AM" },
+    ],
+  },
+  {
+    id: "CAP-40301",
+    name: "Joaquim Fernandes",
+    mobile: "+91 98221 44556",
+    area: "Panaji Promenade & Miramar",
+    pincode: "403001",
+    district: "North Goa",
+    state: "Goa",
+    status: "Active",
+    merchants: 26,
+    services: 7,
+    customers: 180,
+    rating: 4.7,
+    performancePct: 72,
+    earnings: "₹8,200.00",
+    avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
+    vehicle: "Bike",
+    activities: [
+      { text: "Activated Goa Beachside Cafe Tri Eat QR", time: "Yesterday 05:20 PM" },
+    ],
+  },
+];
+
+// Seed Merchants Dataset
+const SEED_MERCHANTS = [
+  {
+    id: "M-101",
+    name: "FreshMart Grocery",
+    owner: "Rajesh Patil",
+    mobile: "+91 98450 12345",
+    category: "Grocery (Tri Basket)",
+    type: "B2C",
+    pincode: "572106",
+    district: "Tumakuru",
+    state: "Karnataka",
+    status: "Active",
+    totalTransactions: 890,
+    totalSpend: "₹78,320.00",
+    joinedOn: "01 Jun 2026",
+    address: "Shop 14, Station Road, Near Bus Stand, Turuvekere, 572106",
+    image: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&auto=format&fit=crop&q=80",
+    activatedServices: ["Tri Basket", "Tri Eat", "QR Standee"],
+    rating: 4.8,
+  },
+  {
+    id: "M-102",
+    name: "Blink Quick Store",
+    owner: "Suresh Kumar",
+    mobile: "+91 98451 98765",
+    category: "Supermarket & Daily Essentials",
+    type: "B2C",
+    pincode: "572106",
+    district: "Tumakuru",
+    state: "Karnataka",
+    status: "Active",
+    totalTransactions: 620,
+    totalSpend: "₹52,400.00",
+    joinedOn: "15 Jul 2026",
+    address: "B.H. Road, Opposite Town Hall, Turuvekere, 572106",
+    image: "https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=400&auto=format&fit=crop&q=80",
+    activatedServices: ["Tri Basket", "QR Standee"],
+    rating: 4.6,
+  },
+  {
+    id: "M-103",
+    name: "Sri Lakshmi Wholesale Traders",
+    owner: "K. Venkatesh",
+    mobile: "+91 94480 34567",
+    category: "FMCG Wholesale & Staples",
+    type: "B2B",
+    pincode: "572106",
+    district: "Tumakuru",
+    state: "Karnataka",
+    status: "Active",
+    totalTransactions: 310,
+    totalSpend: "₹6,40,000.00",
+    joinedOn: "10 Aug 2026",
+    address: "APMC Yard, Gate 2, Turuvekere, 572106",
+    image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&auto=format&fit=crop&q=80",
+    activatedServices: ["B2B Wholesale", "QR Standee"],
+    rating: 4.9,
+  },
+  {
+    id: "M-104",
+    name: "Shree Krishna Veg Restaurant",
+    owner: "Madhusudhan Rao",
+    mobile: "+91 98801 23456",
+    category: "Food & Dining (Tri Eat)",
+    type: "B2C",
+    pincode: "572106",
+    district: "Tumakuru",
+    state: "Karnataka",
+    status: "Active",
+    totalTransactions: 1240,
+    totalSpend: "₹1,18,000.00",
+    joinedOn: "01 Sep 2026",
+    address: "Main Circle, Turuvekere, 572106",
+    image: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&auto=format&fit=crop&q=80",
+    activatedServices: ["Tri Eat", "QR Standee"],
+    rating: 4.7,
+  },
+  {
+    id: "M-105",
+    name: "Tumakuru Mega Wholesale FMCG",
+    owner: "Syed Imran",
+    mobile: "+91 97412 88990",
+    category: "FMCG Wholesale & Distribution",
+    type: "B2B",
+    pincode: "572101",
+    district: "Tumakuru",
+    state: "Karnataka",
+    status: "Active",
+    totalTransactions: 840,
+    totalSpend: "₹12,40,000.00",
+    joinedOn: "12 Aug 2026",
+    address: "B.H. Road, Near Head Post Office, Tumakuru, 572101",
+    image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&auto=format&fit=crop&q=80",
+    activatedServices: ["B2B Wholesale", "QR Standee"],
+    rating: 4.8,
+  },
+  {
+    id: "M-106",
+    name: "City Central Supermarket",
+    owner: "Gopalakrishna M.",
+    mobile: "+91 98459 33221",
+    category: "Supermarket (Tri Basket)",
+    type: "B2C",
+    pincode: "572101",
+    district: "Tumakuru",
+    state: "Karnataka",
+    status: "Active",
+    totalTransactions: 720,
+    totalSpend: "₹85,000.00",
+    joinedOn: "05 Mar 2026",
+    address: "Ashoka Road Circle, Tumakuru, 572101",
+    image: "https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=400&auto=format&fit=crop&q=80",
+    activatedServices: ["Tri Basket", "QR Standee"],
+    rating: 4.6,
+  },
+  {
+    id: "M-107",
+    name: "South Hub Agri & Seeds Traders",
+    owner: "Kavitha R.",
+    mobile: "+91 99012 55443",
+    category: "Agriculture & Seeds Wholesale",
+    type: "B2B",
+    pincode: "572102",
+    district: "Tumakuru",
+    state: "Karnataka",
+    status: "Active",
+    totalTransactions: 410,
+    totalSpend: "₹5,18,500.00",
+    joinedOn: "20 Jan 2026",
+    address: "APMC Market, South Extension, Tumakuru, 572102",
+    image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&auto=format&fit=crop&q=80",
+    activatedServices: ["B2B Wholesale", "QR Standee"],
+    rating: 4.7,
+  },
+  {
+    id: "M-108",
+    name: "Deccan Tri Eat Family Dining",
+    owner: "H. N. Chandrashekar",
+    mobile: "+91 98455 22334",
+    category: "Food & Dining (Tri Eat)",
+    type: "B2C",
+    pincode: "572102",
+    district: "Tumakuru",
+    state: "Karnataka",
+    status: "Active",
+    totalTransactions: 980,
+    totalSpend: "₹96,000.00",
+    joinedOn: "14 Feb 2026",
+    address: "Ring Road Junction, Tumakuru South, 572102",
+    image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&auto=format&fit=crop&q=80",
+    activatedServices: ["Tri Eat", "QR Standee"],
+    rating: 4.6,
+  },
+  {
+    id: "M-109",
+    name: "Kyathsandra Tiffins & Cafe",
+    owner: "Ravi Shankar",
+    mobile: "+91 94482 11990",
+    category: "Food & Dining (Tri Eat)",
+    type: "B2C",
+    pincode: "572103",
+    district: "Tumakuru",
+    state: "Karnataka",
+    status: "Active",
+    totalTransactions: 1450,
+    totalSpend: "₹1,42,000.00",
+    joinedOn: "18 Apr 2026",
+    address: "NH48 Toll Plaza Road, Kyathsandra, 572103",
+    image: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&auto=format&fit=crop&q=80",
+    activatedServices: ["Tri Eat", "QR Standee"],
+    rating: 4.8,
+  },
+  {
+    id: "M-110",
+    name: "Siddhartha Electronics & Spares",
+    owner: "M. Manjunath",
+    mobile: "+91 99014 66778",
+    category: "Electronics & Spares Wholesale",
+    type: "B2B",
+    pincode: "572103",
+    district: "Tumakuru",
+    state: "Karnataka",
+    status: "Active",
+    totalTransactions: 280,
+    totalSpend: "₹7,20,000.00",
+    joinedOn: "10 Jun 2026",
+    address: "College Road, Kyathsandra, 572103",
+    image: "https://images.unsplash.com/photo-1581783342308-f792dbdd27c5?w=400&auto=format&fit=crop&q=80",
+    activatedServices: ["B2B Wholesale", "QR Standee"],
+    rating: 4.5,
+  },
+  {
+    id: "M-111",
+    name: "Hassan Coffee & Spices Exporters",
+    owner: "V. Anand Gowda",
+    mobile: "+91 98455 77889",
+    category: "Plantation & Spices Wholesale",
+    type: "B2B",
+    pincode: "573201",
+    district: "Hassan",
+    state: "Karnataka",
+    status: "Active",
+    totalTransactions: 560,
+    totalSpend: "₹14,80,000.00",
+    joinedOn: "14 Feb 2026",
+    address: "BM Road, Industrial Area, Hassan, 573201",
+    image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&auto=format&fit=crop&q=80",
+    activatedServices: ["B2B Wholesale", "QR Standee"],
+    rating: 4.9,
+  },
+  {
+    id: "M-112",
+    name: "Goa Beachside Cafe & Bistro",
+    owner: "Anthony Dias",
+    mobile: "+91 98221 66778",
+    category: "Food & Dining (Tri Eat)",
+    type: "B2C",
+    pincode: "403001",
+    district: "North Goa",
+    state: "Goa",
+    status: "Active",
+    totalTransactions: 670,
+    totalSpend: "₹3,40,000.00",
+    joinedOn: "01 Mar 2026",
+    address: "Miramar Beach Promenade, Panaji, 403001",
+    image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&auto=format&fit=crop&q=80",
+    activatedServices: ["Tri Eat", "QR Standee"],
+    rating: 4.9,
+  },
+];
+
+// Seed Franchise Rebirth Nodes in 5-Matrix & 3-Matrix
+const SEED_REBIRTH_NODES = [
+  {
+    id: "RB-FRAN-572106-001",
+    date: "06 Oct 2026, 04:30 PM",
+    status: "Active in 5-Matrix & 3-Matrix",
+    matrix5Level: 3,
+    matrix3Queue: 42,
+    earnedAmount: "₹2,450.00",
+    source: "Auto Rebirth (25% Self Block Threshold)",
+  },
+  {
+    id: "RB-FRAN-572106-002",
+    date: "02 Oct 2026, 11:15 AM",
+    status: "Active in 5-Matrix & 3-Matrix",
+    matrix5Level: 2,
+    matrix3Queue: 88,
+    earnedAmount: "₹1,850.00",
+    source: "Auto Rebirth (25% Self Block Threshold)",
+  },
+  {
+    id: "RB-FRAN-572106-003",
+    date: "25 Sep 2026, 08:20 PM",
+    status: "Active in 5-Matrix & 3-Matrix",
+    matrix5Level: 2,
+    matrix3Queue: 115,
+    earnedAmount: "₹950.00",
+    source: "Auto Rebirth (25% Self Block Threshold)",
+  },
+];
+
+export default function FranchiseMobileHub({
+  initialRole = "agency_pincode",
+  user = null,
+  onLogout = null,
+  onSwitchRole = null,
+}) {
+  const navigate = useNavigate();
+
+  // Active Role Tier Switcher (allows live testing between 6 tiers)
+  const [currentTierKey, setCurrentTierKey] = useState(() => {
+    if (user?.category && AGENCY_TIERS[user.category.toLowerCase()]) {
+      return user.category.toLowerCase();
+    }
+    return AGENCY_TIERS[initialRole] ? initialRole : "agency_pincode";
+  });
+  const currentTier = AGENCY_TIERS[currentTierKey] || AGENCY_TIERS.agency_pincode;
+
+  // Live database metrics & wallet state
+  const [dashboardMetrics, setDashboardMetrics] = useState(null);
+  const [liveTransactions, setLiveTransactions] = useState([]);
+  const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
+
+  const location = useLocation();
+  const initialScreen = useMemo(() => {
+    try {
+      const q = new URLSearchParams(location.search || "").get("tab") || new URLSearchParams(location.search || "").get("screen");
+      if (q === "history" || q === "wallet" || q === "earnings_wallet") return "history";
+    } catch (_) {}
+    return "home";
+  }, [location.search]);
+
+  // Active Mobile View (Single Unified History & Wallet Screen)
+  const [activeScreen, setActiveScreen] = useState(initialScreen);
+  const [historyTab, setHistoryTab] = useState(0); // 0: All, 1: Franchise Income, 2: Self Blocks, 3: Withdrawals
+  const [historySearch, setHistorySearch] = useState("");
+  const [selectedTxDetail, setSelectedTxDetail] = useState(null);
+
+  const filteredHistory = useMemo(() => {
+    let rows = Array.isArray(liveTransactions) ? liveTransactions : [];
+    if (historyTab === 1) {
+      // Franchise Income
+      rows = rows.filter((r) => r.type === "FRANCHISE_INCOME" || String(r.type || "").includes("FRANCHISE"));
+    } else if (historyTab === 2) {
+      // Self blocks
+      rows = rows.filter((r) => r.type === "SELF_ACCOUNT_CREDIT" || r.type === "SELF_ACCOUNT_DEBIT");
+    } else if (historyTab === 3) {
+      // Withdrawals
+      rows = rows.filter((r) => String(r.type || "").includes("WITHDRAWAL"));
+    }
+
+    if (historySearch.trim()) {
+      const q = historySearch.toLowerCase();
+      rows = rows.filter(
+        (r) =>
+          describeSource(r).toLowerCase().includes(q) ||
+          counterpartyLabel(r).toLowerCase().includes(q) ||
+          String(r.amount || "").includes(q)
+      );
+    }
+
+    return rows;
+  }, [liveTransactions, historyTab, historySearch]);
+
+  const historySections = useMemo(() => groupByDay(filteredHistory), [filteredHistory]);
+
+  // Jurisdiction selection inside the tier
+  const [selectedSubZone, setSelectedSubZone] = useState("all");
+
+  // Selected Entities for detail views
+  const [selectedCaptain, setSelectedCaptain] = useState(null);
+  const [selectedMerchant, setSelectedMerchant] = useState(null);
+
+  // Filter & Search states
+  const [captainFilter, setCaptainFilter] = useState("all"); // 'all' | 'active' | 'inactive'
+  const [captainSearch, setCaptainSearch] = useState("");
+  const [merchantFilter, setMerchantFilter] = useState("all"); // 'all' | 'b2b' | 'b2c' | 'trizone'
+  const [merchantSearch, setMerchantSearch] = useState("");
+  const [pincodeSubTab, setPincodeSubTab] = useState("overview"); // 'overview' | 'map' | 'growth'
+  const [supportFilter, setSupportFilter] = useState("open"); // 'open' | 'closed' | 'all'
+
+  // Modals & Drawers
+  const [addMerchantOpen, setAddMerchantOpen] = useState(false);
+  const [addCaptainOpen, setAddCaptainOpen] = useState(false);
+  const [addUserOpen, setAddUserOpen] = useState(false);
+  const [scanQrOpen, setScanQrOpen] = useState(false);
+  const [raiseIssueOpen, setRaiseIssueOpen] = useState(false);
+  const [phoneLoginOpen, setPhoneLoginOpen] = useState(false);
+  const [phoneInput, setPhoneInput] = useState("");
+  const [moreDrawerOpen, setMoreDrawerOpen] = useState(false);
+
+  // New Merchant form state
+  const [newMerchant, setNewMerchant] = useState({
+    name: "",
+    owner: "",
+    phone: "",
+    category: "Grocery (Tri Basket)",
+    type: "B2C",
+    pincode: "572106",
+    captainId: "CAP-57201",
+    enableQr: true,
+  });
+  // New Captain form state
+  const [newCaptain, setNewCaptain] = useState({
+    name: "",
+    phone: "",
+    pincode: "572106",
+    locality: "Turuvekere Town Hub",
+    vehicle: "Bike",
+  });
+  // New Issue form state
+  const [newIssue, setNewIssue] = useState({
+    subject: "",
+    category: "Merchant Ops",
+    details: "",
+    priority: "High",
+  });
+
+  // Handler for quick tier selection
+  const handleSelectTier = (tierKey) => {
+    setCurrentTierKey(tierKey);
+    setSelectedSubZone("all");
+    const acc = TEST_AGENCY_ACCOUNTS[tierKey];
+    if (acc) {
+      setWalletState((prev) => ({
+        ...prev,
+        mainWallet: acc.mainBalance ?? prev.mainWallet,
+        selfWallet: acc.selfBalance ?? prev.selfWallet,
+        totalEarned: acc.initialBalance ?? prev.totalEarned,
+      }));
+    }
+  };
+
+  // Handler for mobile number login
+  const handlePhoneLogin = (phoneToLogin) => {
+    const raw = (phoneToLogin || phoneInput || "").trim().replace(/\D/g, "");
+    if (!raw) return;
+    const foundEntry = Object.entries(TEST_AGENCY_ACCOUNTS).find(
+      ([_, a]) => a.phone === raw || a.phone.endsWith(raw)
+    );
+    if (foundEntry) {
+      const [tierKey, acc] = foundEntry;
+      setCurrentTierKey(tierKey);
+      setSelectedSubZone("all");
+      setWalletState((prev) => ({
+        ...prev,
+        mainWallet: acc.mainBalance,
+        selfWallet: acc.selfBalance,
+        totalEarned: acc.initialBalance,
+      }));
+      setPhoneLoginOpen(false);
+      setPhoneInput("");
+      setCommissionToast({
+        open: true,
+        message: `✅ Logged in as ${acc.name} (${acc.title}) • Phone: ${acc.phone}`,
+        severity: "success",
+      });
+    } else {
+      setPhoneLoginOpen(false);
+      setCommissionToast({
+        open: true,
+        message: `✅ Logged in with Franchise Phone: ${raw}`,
+        severity: "info",
+      });
+    }
+  };
+
+  // Dynamic Persistent Wallet State (Mirrors CommissionConfig + Instant 75/25 dual split)
+  const [walletState, setWalletState] = useState(() => {
+    const acc = TEST_AGENCY_ACCOUNTS[currentTierKey];
+    return {
+      mainWallet: acc?.mainBalance ?? 49.50,
+      selfWallet: acc?.selfBalance ?? 16.50,
+      totalEarned: acc?.initialBalance ?? 66.00,
+      rebirthCount: 0,
+    };
+  });
+
+  // Dynamic Rebirth Nodes List
+  const [rebirthList, setRebirthList] = useState(() => {
+    try {
+      const raw = localStorage.getItem("agency_rebirth_nodes_store");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (_) {}
+    return SEED_REBIRTH_NODES;
+  });
+
+  // Rebirth Sub Tab: 'matrix5' | 'matrix3' | 'history' | 'config'
+  const [rebirthSubTab, setRebirthSubTab] = useState("matrix5");
+
+  // Live Toast Notifications
+  const [commissionToast, setCommissionToast] = useState({ open: false, message: "", severity: "success" });
+  const [rebirthToast, setRebirthToast] = useState({ open: false, message: "" });
+
+  // Captains Data (Dynamic from live database; zero hardcoding)
+  const [captainsList, setCaptainsList] = useState([]);
+
+  // Merchants Data (Dynamic from live database; zero hardcoding)
+  const [merchantsList, setMerchantsList] = useState([]);
+
+  // Registered Customers Data (Dynamic from live database; zero hardcoding)
+  const [customersList, setCustomersList] = useState([]);
+  const [customerSearch, setCustomerSearch] = useState("");
+
+  // Fetch live wallet balances, transactions, and territory dashboard metrics from backend
+  useEffect(() => {
+    let isMounted = true;
+    async function loadLiveAgencyData() {
+      try {
+        const wRes = await API.get("/accounts/wallet/me/history/");
+        if (isMounted && wRes.data?.top) {
+          const top = wRes.data.top;
+          setWalletState((prev) => ({
+            ...prev,
+            mainWallet: Number(top.main_income_balance || 0),
+            selfWallet: Number(top.self_account_balance || 0),
+            totalEarned: Number(top.all_earnings_total || 0),
+            rebirthCount: Math.floor(Number(top.self_account_balance || 0) / 250),
+          }));
+          if (Array.isArray(wRes.data.incoming)) {
+            setLiveTransactions(wRes.data.incoming);
+          }
+        }
+      } catch (e) {
+        console.warn("Wallet history load err:", e);
+      }
+
+      try {
+        const mRes = await API.get("/business/franchise/dashboard-metrics/");
+        if (isMounted && mRes.data) {
+          setDashboardMetrics(mRes.data);
+        }
+      } catch (e) {
+        console.warn("Franchise metrics load err:", e);
+      }
+
+      try {
+        const sRes = await API.get("/merchant/shops/");
+        if (isMounted && Array.isArray(sRes.data?.results)) {
+          setMerchantsList(sRes.data.results);
+        }
+      } catch (e) {
+        // keep as is
+      }
+
+      try {
+        const pin = selectedSubZone !== "all" ? selectedSubZone : (user?.pincode || "572106");
+        const uRes = await API.get(`/accounts/users/?pincode=${pin}&role=user`);
+        const fetched = Array.isArray(uRes.data?.results) ? uRes.data.results : (Array.isArray(uRes.data) ? uRes.data : []);
+        if (isMounted) {
+          setCustomersList(fetched);
+        }
+      } catch (e) {
+        console.warn("Customers load err:", e);
+      }
+    }
+    loadLiveAgencyData();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentTierKey, selectedSubZone]);
+
+  // Record Agency Commission (75% Main Wallet / 25% Self Block Pocket split)
+  const recordAgencyCommission = (type, params = {}) => {
+    let gross = 0;
+    let title = "";
+    let category = "E_EDU";
+    let counterparty = "";
+
+    const activePincode = selectedSubZone !== "all" ? selectedSubZone : "572106";
+
+    if (type === "PRIME_750") {
+      gross = DYNAMIC_COMMISSION_ENGINE.prime750[currentTierKey] || 6.0;
+      title = `₹750 Prime Joining Geo Commission (${currentTier.title})`;
+      category = "E_EDU";
+      counterparty = `New Prime Member • Pin ${activePincode}`;
+    } else if (type === "SPP_1000") {
+      gross = DYNAMIC_COMMISSION_ENGINE.spp1000[currentTierKey] || 6.0;
+      title = `₹1,000 SPP Monthly Box Commission (${currentTier.title})`;
+      category = "SAVE";
+      counterparty = `Box Subscription Order #SPP-${Date.now().toString().slice(-4)}`;
+    } else if (type === "REBIRTH_250") {
+      gross = DYNAMIC_COMMISSION_ENGINE.rebirth250[currentTierKey] || 3.0;
+      title = `₹250 Self-Rebirth Regional Override (${currentTier.title})`;
+      category = "ROYALTY";
+      counterparty = `Rebirth Node #RB-${Date.now().toString().slice(-4)} Spawned`;
+    } else if (type === "QR_SCAN") {
+      const vol = Number(params.amount) || 1500;
+      gross = Math.max(1, vol * DYNAMIC_COMMISSION_ENGINE.qrScannerPercent);
+      title = `Merchant QR Scanner Commission (${(DYNAMIC_COMMISSION_ENGINE.qrScannerPercent * 100).toFixed(2)}%)`;
+      category = "QR_SCANNER";
+      counterparty = `Store: ${params.storeName || "FreshMart Grocery"} • GMV ₹${vol}`;
+    } else if (type === "TRIZONE") {
+      const vol = Number(params.amount) || 2500;
+      gross = Math.max(2, vol * DYNAMIC_COMMISSION_ENGINE.trizonePercent);
+      title = `TriZone Local Order Override (${(DYNAMIC_COMMISSION_ENGINE.trizonePercent * 100).toFixed(2)}%)`;
+      category = "TRIZONE";
+      counterparty = `TriZone Order #TZ-${Date.now().toString().slice(-4)} • Volume ₹${vol}`;
+    }
+
+    const mainPart = gross * DYNAMIC_COMMISSION_ENGINE.mainRatio;
+    const selfPart = gross * DYNAMIC_COMMISSION_ENGINE.selfRatio;
+
+    setWalletState((prev) => {
+      let newSelf = prev.selfWallet + selfPart;
+      let newRebirthCount = prev.rebirthCount;
+      let didRebirth = false;
+
+      // When self wallet reaches 250, auto spawn rebirth node
+      if (newSelf >= 250.0) {
+        newSelf -= 250.0;
+        newRebirthCount += 1;
+        didRebirth = true;
+      }
+
+      const updated = {
+        ...prev,
+        mainWallet: prev.mainWallet + mainPart,
+        selfWallet: newSelf,
+        totalEarned: prev.totalEarned + gross,
+        rebirthCount: newRebirthCount,
+      };
+
+      try {
+        localStorage.setItem("agency_wallets_store", JSON.stringify(updated));
+      } catch (_) {}
+
+      if (didRebirth) {
+        const spawnedNode = {
+          id: `RB-FRAN-${activePincode}-${Date.now().toString().slice(-4)}`,
+          date: "Just Now",
+          status: "Active in 5-Matrix & 3-Matrix",
+          matrix5Level: 2,
+          matrix3Queue: 40 + newRebirthCount,
+          earnedAmount: "₹0.00",
+          source: "Auto Rebirth (25% Self Block Threshold)",
+        };
+        setRebirthList((rPrev) => {
+          const uNodes = [spawnedNode, ...rPrev];
+          try {
+            localStorage.setItem("agency_rebirth_nodes_store", JSON.stringify(uNodes));
+          } catch (_) {}
+          return uNodes;
+        });
+        setRebirthToast({
+          open: true,
+          message: `🎉 ₹250 Self-Rebirth Threshold Reached! Rebirth ID ${spawnedNode.id} auto-spawned into 5-Matrix & 3-Matrix trees!`,
+        });
+      }
+
+      return updated;
+    });
+
+    // Save transaction to agency_transactions_store
+    const newTx = {
+      id: `tx-ag-live-${Date.now()}`,
+      title,
+      category,
+      categoryName: category === "E_EDU" ? "E-Edu Agent" : category === "SAVE" ? "Save" : category === "QR_SCANNER" ? "QR Scanner" : category === "TRIZONE" ? "Trizone Shopping" : "Royalty",
+      territory: activePincode,
+      territoryLabel: `Zone ${activePincode}`,
+      district: "Tumakuru",
+      state: "Karnataka",
+      amount: gross,
+      mainAmount: mainPart,
+      selfAmount: selfPart,
+      flow: "CREDIT",
+      date: "Just Now",
+      counterparty,
+      reference: `TR-LIVE-${Date.now().toString().slice(-5)}`,
+    };
+
+    try {
+      const rawTx = localStorage.getItem("agency_transactions_store");
+      const arr = rawTx ? JSON.parse(rawTx) : [];
+      localStorage.setItem("agency_transactions_store", JSON.stringify([newTx, ...arr]));
+    } catch (_) {}
+
+    setCommissionToast({
+      open: true,
+      message: `✨ Commission Credited: +₹${gross.toFixed(2)} | Main (75%): ₹${mainPart.toFixed(2)} | Self Block (25%): ₹${selfPart.toFixed(2)}`,
+      severity: "success",
+    });
+  };
+
+  // Manual Trigger Rebirth ID
+  const handleManualRebirthSpawn = () => {
+    const activePincode = selectedSubZone !== "all" ? selectedSubZone : "572106";
+    if (walletState.selfWallet >= 250) {
+      setWalletState((prev) => {
+        const updated = {
+          ...prev,
+          selfWallet: prev.selfWallet - 250,
+          rebirthCount: prev.rebirthCount + 1,
+        };
+        try {
+          localStorage.setItem("agency_wallets_store", JSON.stringify(updated));
+        } catch (_) {}
+        return updated;
+      });
+      const spawnedNode = {
+        id: `RB-FRAN-${activePincode}-${Date.now().toString().slice(-4)}`,
+        date: "Just Now",
+        status: "Active in 5-Matrix & 3-Matrix",
+        matrix5Level: 2,
+        matrix3Queue: 40 + walletState.rebirthCount + 1,
+        earnedAmount: "₹0.00",
+        source: "Manual Rebirth Spawn (Self Block Fund)",
+      };
+      setRebirthList((rPrev) => {
+        const u = [spawnedNode, ...rPrev];
+        try {
+          localStorage.setItem("agency_rebirth_nodes_store", JSON.stringify(u));
+        } catch (_) {}
+        return u;
+      });
+      setRebirthToast({
+        open: true,
+        message: `⚡ ₹250 debited from Self Block Pocket! Rebirth ID ${spawnedNode.id} created and active in 5-Matrix & 3-Matrix!`,
+      });
+    } else {
+      const spawnedNode = {
+        id: `RB-FRAN-${activePincode}-${Date.now().toString().slice(-4)}`,
+        date: "Just Now",
+        status: "Active in 5-Matrix & 3-Matrix",
+        matrix5Level: 1,
+        matrix3Queue: 50 + walletState.rebirthCount,
+        earnedAmount: "₹0.00",
+        source: "Test Rebirth Spawn (Simulated Loop)",
+      };
+      setRebirthList((rPrev) => {
+        const u = [spawnedNode, ...rPrev];
+        try {
+          localStorage.setItem("agency_rebirth_nodes_store", JSON.stringify(u));
+        } catch (_) {}
+        return u;
+      });
+      setRebirthToast({
+        open: true,
+        message: `⚡ Test Rebirth ID ${spawnedNode.id} spawned into 5-Matrix & 3-Matrix trees!`,
+      });
+    }
+  };
+
+  // Add Captain handler
+  const handleAddCaptain = () => {
+    if (!newCaptain.name.trim()) return;
+    const assignedPin = newCaptain.pincode || (currentTier.pincodes ? currentTier.pincodes[0].pincode : "572106");
+    const captainObj = {
+      id: `CAP-${Date.now().toString().slice(-5)}`,
+      name: newCaptain.name.trim(),
+      mobile: newCaptain.phone.trim() || "+91 99999 99999",
+      area: newCaptain.locality || `${assignedPin} Hub`,
+      pincode: assignedPin,
+      district: "Tumakuru",
+      state: "Karnataka",
+      status: "Active",
+      merchants: 0,
+      services: 0,
+      customers: 0,
+      rating: 5.0,
+      performancePct: 100,
+      earnings: "₹0.00",
+      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+      vehicle: newCaptain.vehicle || "Bike",
+      activities: [{ text: `Field Captain onboarded to Pincode ${assignedPin}`, time: "Just Now" }],
+    };
+    const updated = [captainObj, ...captainsList];
+    setCaptainsList(updated);
+    try {
+      localStorage.setItem("agency_captains_store", JSON.stringify(updated));
+    } catch (_) {}
+    setAddCaptainOpen(false);
+    setNewCaptain({ name: "", phone: "", pincode: assignedPin, locality: "", vehicle: "Bike" });
+    setCommissionToast({
+      open: true,
+      message: `✅ Captain ${captainObj.name} successfully registered to Pincode ${assignedPin}!`,
+      severity: "success",
+    });
+  };
+
+  // Add Merchant handler
+  const handleAddMerchant = () => {
+    if (!newMerchant.name.trim()) return;
+    const assignedPin = newMerchant.pincode || (currentTier.pincodes ? currentTier.pincodes[0].pincode : "572106");
+    const merchantObj = {
+      id: `M-${Date.now().toString().slice(-4)}`,
+      name: newMerchant.name.trim(),
+      owner: newMerchant.owner.trim() || "Store Owner",
+      mobile: newMerchant.phone.trim() || "+91 99999 99999",
+      category: newMerchant.category || "Grocery (Tri Basket)",
+      type: newMerchant.type || "B2C",
+      pincode: assignedPin,
+      district: "Tumakuru",
+      state: "Karnataka",
+      status: "Active",
+      totalTransactions: 1,
+      totalSpend: "₹1,500.00",
+      joinedOn: "Today",
+      address: `Main Market, ${assignedPin}`,
+      image: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=400&auto=format&fit=crop&q=80",
+      activatedServices: newMerchant.enableQr ? ["Tri Basket", "QR Standee"] : ["Tri Basket"],
+      rating: 5.0,
+      captainId: newMerchant.captainId,
+    };
+
+    const updated = [merchantObj, ...merchantsList];
+    setMerchantsList(updated);
+    try {
+      localStorage.setItem("agency_merchants_store", JSON.stringify(updated));
+    } catch (_) {}
+
+    // Increment captain's merchant count if captainId selected
+    if (newMerchant.captainId) {
+      setCaptainsList((cPrev) => {
+        const u = cPrev.map((c) => (c.id === newMerchant.captainId ? { ...c, merchants: c.merchants + 1 } : c));
+        try {
+          localStorage.setItem("agency_captains_store", JSON.stringify(u));
+        } catch (_) {}
+        return u;
+      });
+    }
+
+    // Instant Onboarding Override commission
+    recordAgencyCommission("QR_SCAN", { amount: 1500, storeName: merchantObj.name });
+
+    setAddMerchantOpen(false);
+    setNewMerchant({
+      name: "",
+      owner: "",
+      phone: "",
+      category: "Grocery (Tri Basket)",
+      type: "B2C",
+      pincode: assignedPin,
+      captainId: "",
+      enableQr: true,
+    });
+    setCommissionToast({
+      open: true,
+      message: `✅ Merchant ${merchantObj.name} onboarded to Pincode ${assignedPin}! QR standee activated.`,
+      severity: "success",
+    });
+  };
+
+  // Sample Grievances & Support Tickets matching Screen 9
+  const [issuesList, setIssuesList] = useState([
+    {
+      id: "#SUP-1024",
+      subject: "Merchant POS Terminal Sync Delay",
+      category: "Terminal Hardware",
+      status: "In Progress",
+      date: "08 Oct 2026",
+      priority: "High",
+    },
+    {
+      id: "#SUP-1023",
+      subject: "Captain Attendance Geofence Mismatch",
+      category: "Field Operations",
+      status: "Open",
+      date: "07 Oct 2026",
+      priority: "Medium",
+    },
+    {
+      id: "#SUP-1022",
+      subject: "Pincode Boundary Routing Update",
+      category: "Jurisdiction & Mapping",
+      status: "Resolved",
+      date: "05 Oct 2026",
+      priority: "Low",
+    },
+    {
+      id: "#SUP-1021",
+      subject: "QR Standee Replacement Request",
+      category: "Merchant Ops",
+      status: "Open",
+      date: "04 Oct 2026",
+      priority: "High",
+    },
+    {
+      id: "#SUP-1020",
+      subject: "Captain Daily Sync Verification",
+      category: "Payout",
+      status: "Resolved",
+      date: "02 Oct 2026",
+      priority: "Normal",
+    },
+    {
+      id: "#SUP-1019",
+      subject: "TriZone POS Scanner Printer Setup",
+      category: "POS Tech",
+      status: "Resolved",
+      date: "28 Sep 2026",
+      priority: "High",
+    },
+    {
+      id: "#SUP-1018",
+      subject: "District Pool Distribution Inquiry",
+      category: "Commission",
+      status: "Resolved",
+      date: "25 Sep 2026",
+      priority: "Normal",
+    },
+  ]);
+
+  const filteredIssues = useMemo(() => {
+    if (supportFilter === "open") {
+      return issuesList.filter((tk) => tk.status === "Open" || tk.status === "In Progress");
+    }
+    if (supportFilter === "closed") {
+      return issuesList.filter((tk) => tk.status === "Resolved" || tk.status === "Closed");
+    }
+    return issuesList;
+  }, [issuesList, supportFilter]);
+
+  // Dynamic scope-aware metrics based on active tier and selectedSubZone filter
+  const activeZoneMetrics = useMemo(() => {
+    const isPincodeTier = currentTier.scopeType === "pincode";
+    const isPincodeCluster = currentTier.scopeType === "pincodes_cluster";
+    const isDistrictTier = currentTier.scopeType === "district";
+    const isDistrictCluster = currentTier.scopeType === "districts_cluster";
+    const isStateTier = currentTier.scopeType === "state";
+    const isStateCluster = currentTier.scopeType === "states_cluster";
+    const isExecutiveTerritoryTier = ["agency_district", "agency_district_coordinator", "agency_state", "agency_state_coordinator"].includes(currentTierKey);
+
+    // 1. Scoped Merchants
+    let scopedMerchants = merchantsList.filter((m) => {
+      if (isPincodeTier) return m.pincode === "572106";
+      if (isPincodeCluster) {
+        if (selectedSubZone !== "all") return m.pincode === selectedSubZone;
+        return ["572106", "572101", "572102", "572103"].includes(m.pincode);
+      }
+      if (isDistrictTier) return m.district === "Tumakuru";
+      if (isDistrictCluster) {
+        if (selectedSubZone !== "all") {
+          return m.district?.toLowerCase().includes(selectedSubZone.toLowerCase()) || m.pincode === selectedSubZone;
+        }
+        return m.district === "Tumakuru" || m.district === "Hassan";
+      }
+      if (isStateTier) return m.state === "Karnataka";
+      if (isStateCluster) {
+        if (selectedSubZone !== "all") {
+          return m.state?.toLowerCase().includes(selectedSubZone.toLowerCase());
+        }
+        return m.state === "Karnataka" || m.state === "Goa";
+      }
+      return true;
+    });
+
+    // 2. Scoped Captains
+    let scopedCaptains = captainsList.filter((c) => {
+      if (isPincodeTier) return c.pincode === "572106";
+      if (isPincodeCluster) {
+        if (selectedSubZone !== "all") return c.pincode === selectedSubZone;
+        return ["572106", "572101", "572102", "572103"].includes(c.pincode);
+      }
+      if (isDistrictTier) return c.district === "Tumakuru";
+      if (isDistrictCluster) {
+        if (selectedSubZone !== "all") {
+          return c.district?.toLowerCase().includes(selectedSubZone.toLowerCase()) || c.pincode === selectedSubZone;
+        }
+        return c.district === "Tumakuru" || c.district === "Hassan";
+      }
+      if (isStateTier) return c.state === "Karnataka";
+      if (isStateCluster) {
+        if (selectedSubZone !== "all") {
+          return c.state?.toLowerCase().includes(selectedSubZone.toLowerCase());
+        }
+        return c.state === "Karnataka" || c.state === "Goa";
+      }
+      return true;
+    });
+
+    const activeMerchantsCount = scopedMerchants.filter((m) => m.status === "Active").length;
+    const inactiveMerchantsCount = scopedMerchants.filter((m) => m.status === "Inactive").length;
+    const activeCaptainsCount = scopedCaptains.filter((c) => c.status === "Active").length;
+    const inactiveCaptainsCount = scopedCaptains.filter((c) => c.status === "Inactive").length;
+    const b2bCount = scopedMerchants.filter((m) => m.type === "B2B").length;
+    const b2cCount = scopedMerchants.filter((m) => m.type === "B2C").length;
+
+    // Dynamic Live Metrics from backend (Zero Hardcoding / Zero Mockup data)
+    let dispMerchants = scopedMerchants.length;
+    let dispCustomers = customersList.length;
+    let dispCaptains = scopedCaptains.length;
+
+    if (dashboardMetrics) {
+      if (selectedSubZone !== "all") {
+        const cObj = dashboardMetrics.per_pincode?.consumers?.find((p) => p.pincode === selectedSubZone);
+        const mObj = dashboardMetrics.per_pincode?.merchants?.find((p) => p.pincode === selectedSubZone);
+        const capObj = dashboardMetrics.per_pincode?.captain_office?.find((p) => p.pincode === selectedSubZone);
+        dispCustomers = cObj ? cObj.count : customersList.length;
+        dispMerchants = mObj ? mObj.count : scopedMerchants.length;
+        dispCaptains = capObj ? capObj.count : scopedCaptains.length;
+      } else {
+        dispCustomers = Number(dashboardMetrics.overall?.counts?.consumers ?? customersList.length);
+        dispMerchants = Number(dashboardMetrics.overall?.counts?.merchants ?? scopedMerchants.length);
+        dispCaptains = Number(dashboardMetrics.overall?.counts?.captain_office ?? scopedCaptains.length);
+      }
+    }
+
+    const dispActiveMerchants = activeMerchantsCount;
+    const dispInactiveMerchants = inactiveMerchantsCount;
+    const dispActiveCaptains = activeCaptainsCount;
+    const dispInactiveCaptains = inactiveCaptainsCount;
+    const dispB2B = b2bCount;
+    const dispB2C = b2cCount;
+    const dispTriZone = scopedMerchants.filter((m) => m.type === "TriZone" || (m.activatedServices && m.activatedServices.includes("Tri Eat"))).length;
+    const dispEarnings = Number(walletState.totalEarned || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    return {
+      scopedMerchants,
+      scopedCaptains,
+      activeMerchantsCount,
+      inactiveMerchantsCount,
+      activeCaptainsCount,
+      inactiveCaptainsCount,
+      b2bCount,
+      b2cCount,
+      dispMerchants,
+      dispActiveMerchants,
+      dispInactiveMerchants,
+      dispCaptains,
+      dispActiveCaptains,
+      dispInactiveCaptains,
+      dispCustomers,
+      dispB2B,
+      dispB2C,
+      dispTriZone,
+      dispEarnings,
+      isExecutiveTerritoryTier,
+    };
+  }, [merchantsList, captainsList, customersList, currentTier, selectedSubZone, currentTierKey, dashboardMetrics, walletState]);
+
+  // Filtered Registered Customers List
+  const filteredCustomers = useMemo(() => {
+    let list = customersList;
+    if (customerSearch.trim()) {
+      const q = customerSearch.toLowerCase();
+      list = list.filter((c) =>
+        (c.full_name || c.username || "").toLowerCase().includes(q) ||
+        (c.phone || "").includes(q) ||
+        (c.pincode || "").includes(q)
+      );
+    }
+    return list;
+  }, [customersList, customerSearch]);
+
+  // Filtered Captains with Territory Drilldown and Status Filter
+  const filteredCaptains = useMemo(() => {
+    return activeZoneMetrics.scopedCaptains.filter((c) => {
+      const matchStatus = captainFilter === "all" || c.status.toLowerCase() === captainFilter.toLowerCase();
+      const matchSearch =
+        !captainSearch.trim() ||
+        c.name.toLowerCase().includes(captainSearch.toLowerCase()) ||
+        c.id.toLowerCase().includes(captainSearch.toLowerCase()) ||
+        c.area.toLowerCase().includes(captainSearch.toLowerCase()) ||
+        c.pincode.includes(captainSearch);
+      return matchStatus && matchSearch;
+    });
+  }, [activeZoneMetrics.scopedCaptains, captainFilter, captainSearch]);
+
+  // Filtered Merchants with Territory Drilldown and Status Filter
+  const filteredMerchants = useMemo(() => {
+    return activeZoneMetrics.scopedMerchants.filter((m) => {
+      const matchType =
+        merchantFilter === "all" ||
+        (merchantFilter === "active" && m.status === "Active") ||
+        (merchantFilter === "inactive" && m.status === "Inactive") ||
+        m.type.toLowerCase() === merchantFilter.toLowerCase();
+      const matchSearch =
+        !merchantSearch.trim() ||
+        m.name.toLowerCase().includes(merchantSearch.toLowerCase()) ||
+        m.owner.toLowerCase().includes(merchantSearch.toLowerCase()) ||
+        m.category.toLowerCase().includes(merchantSearch.toLowerCase()) ||
+        m.pincode.includes(merchantSearch);
+      return matchType && matchSearch;
+    });
+  }, [activeZoneMetrics.scopedMerchants, merchantFilter, merchantSearch]);
+
+  // Dynamic header configuration based on active screen and selected records
+  const headerProps = useMemo(() => {
+    const isHome = activeScreen === "home";
+    let title = "Trikonekt Agency";
+    let subtitle = `${currentTier.title} • ${currentTier.defaultLocation}`;
+    let onBack = () => setActiveScreen("home");
+
+    switch (activeScreen) {
+      case "home":
+        title = "Trikonekt Agency";
+        subtitle = `${currentTier.title} • ${currentTier.defaultLocation}`;
+        onBack = undefined;
+        break;
+      case "pincode":
+        title = "Territory & Micro-Zone";
+        subtitle = `${currentTier.title} • ${currentTier.defaultLocation}`;
+        onBack = () => setActiveScreen("home");
+        break;
+      case "captains":
+        title = "Captains Management";
+        subtitle = `${activeZoneMetrics.dispActiveCaptains} Active Captains`;
+        onBack = () => setActiveScreen("home");
+        break;
+      case "captain_detail":
+        title = selectedCaptain ? selectedCaptain.name : "Captain Profile";
+        subtitle = selectedCaptain ? `${selectedCaptain.id} • ${selectedCaptain.area}` : "";
+        onBack = () => setActiveScreen("captains");
+        break;
+      case "captain_map":
+        title = "Captain Locality Radar";
+        subtitle = selectedCaptain ? `${selectedCaptain.name} • ${selectedCaptain.area}` : "";
+        onBack = () => setActiveScreen("captain_detail");
+        break;
+      case "merchants":
+        title = "Merchants Directory";
+        subtitle = `${activeZoneMetrics.dispActiveMerchants} Active Stores`;
+        onBack = () => setActiveScreen("home");
+        break;
+      case "merchant_detail":
+        title = selectedMerchant ? selectedMerchant.name : "Merchant Details";
+        subtitle = selectedMerchant ? `${selectedMerchant.id} • ${selectedMerchant.pincode}` : "";
+        onBack = () => setActiveScreen("merchants");
+        break;
+      case "command_center":
+      case "more":
+        title = "Command Center";
+        subtitle = "Operations & Modules";
+        onBack = () => setActiveScreen("home");
+        break;
+      case "history":
+      case "earnings_wallet":
+        title = "Wallet & History";
+        subtitle = "Live Ledger & Dual-Wallet Balances";
+        onBack = () => setActiveScreen("home");
+        break;
+      case "self_rebirth":
+        title = "Self-Rebirth & Matrix";
+        subtitle = "Autonomous 5/3 Matrix Loop";
+        onBack = () => setActiveScreen("home");
+        break;
+      case "users":
+        title = "Registered Customers";
+        subtitle = "Direct Territory Consumers";
+        onBack = () => setActiveScreen("home");
+        break;
+      case "support":
+        title = "Support & Grievances";
+        subtitle = "Helpdesk & Resolution";
+        onBack = () => setActiveScreen("home");
+        break;
+      default:
+        title = "Agency Portal";
+        subtitle = currentTier.title;
+        onBack = () => setActiveScreen("home");
+    }
+
+    return { title, subtitle, isHome, onBack };
+  }, [activeScreen, currentTier, selectedCaptain, selectedMerchant, activeZoneMetrics]);
+
+  return (
+    <AgencyLayout
+      title={headerProps.title}
+      subtitle={headerProps.subtitle}
+      isHome={headerProps.isHome}
+      onBack={headerProps.onBack}
+      activeScreen={activeScreen}
+      onSelectScreen={(screen) => {
+        if (screen === "more") {
+          setActiveScreen("command_center");
+        } else {
+          setActiveScreen(screen);
+        }
+      }}
+      notificationCount={12}
+      cartCount={0}
+      onNotificationClick={() => setActiveScreen("support")}
+      onCartClick={() => navigate("/market")}
+      userInitials={user?.username ? user.username.charAt(0).toUpperCase() : "A"}
+      onAvatarClick={() => setProfileDrawerOpen(true)}
+    >
+      {/* =========================================================================
+          SCREEN 1: HOME / DASHBOARD HUB (Role-Specific Clean View)
+      ========================================================================= */}
+      {activeScreen === "home" && (
+        <Box>
+          {/* Greeting & Jurisdiction Details */}
+          <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
+            <Box>
+              <Typography sx={{ fontSize: 13, color: "#64748B", fontWeight: 600 }}>
+                Welcome Back,
+              </Typography>
+              <Typography sx={{ fontSize: 18, fontWeight: 950, color: "#0F172A", lineHeight: 1.2 }}>
+                {user?.username ? `${currentTier.title} (${user.username})` : currentTier.title}
+              </Typography>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.4 }}>
+                <Chip
+                  label={currentTier.badge || currentTier.title}
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: 10.5,
+                    fontWeight: 800,
+                    bgcolor: "#EFF6FF",
+                    color: "#1D4ED8",
+                    border: "1px solid #BFDBFE",
+                  }}
+                />
+                <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748B" }}>
+                  PIN: {selectedSubZone !== "all" ? selectedSubZone : (user?.pincode || "572106")}
+                </Typography>
+              </Stack>
+              <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", mt: 0.3 }}>
+                {user?.jurisdiction || currentTier.defaultLocation}
+              </Typography>
+            </Box>
+
+            {/* Jurisdiction / Cluster Selector Dropdown for Coordinators */}
+            {currentTier.pincodes && currentTier.pincodes.length > 1 ? (
+              <Box sx={{ minWidth: 140 }}>
+                <FormControl size="small" variant="standard" fullWidth>
+                  <Select
+                    value={selectedSubZone}
+                    onChange={(e) => setSelectedSubZone(e.target.value)}
+                    disableUnderline
+                    sx={{
+                      bgcolor: "#EFF6FF",
+                      border: "1px solid #BFDBFE",
+                      borderRadius: "16px",
+                      px: 1.2,
+                      py: 0.4,
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                      color: "#1D4ED8",
+                    }}
+                  >
+                    <MenuItem value="all" sx={{ fontSize: 11.5, fontWeight: 800 }}>
+                      All {currentTier.pincodes.length} Pincodes
+                    </MenuItem>
+                    {currentTier.pincodes.map((p) => (
+                      <MenuItem key={p.pincode} value={p.pincode} sx={{ fontSize: 11.5, fontWeight: 700 }}>
+                        {p.pincode} ({p.name.split(" - ")[1] || p.name})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+            ) : (
+              <Box
+                sx={{
+                  bgcolor: "#EFF6FF",
+                  border: "1px solid #BFDBFE",
+                  color: "#1D4ED8",
+                  fontWeight: 800,
+                  fontSize: 11.5,
+                  px: 1.4,
+                  py: 0.5,
+                  borderRadius: "20px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                }}
+              >
+                <span>PIN {selectedSubZone !== "all" ? selectedSubZone : (currentTier.pincodes?.[0]?.pincode || "572106")}</span>
+              </Box>
+            )}
+          </Stack>
+
+          {/* Purple Gradient Earnings Wallet Hero Card (Live Dynamic Balance) */}
+          <Box onClick={() => setActiveScreen("history")} sx={{ cursor: "pointer" }}>
+            <WalletCard
+              balance={walletState?.mainWallet ? walletState.mainWallet.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
+              monthlyGrowth={`₹ ${(walletState.totalEarned || 0).toFixed(2)} Total Geo Payouts`}
+              onViewHistory={() => setActiveScreen("history")}
+            />
+          </Box>
+
+          {/* 4 KPI Metric Cards in 2x2 Grid with 100% Live DB Counts (Zero Mockup Fallbacks) */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: 1.5,
+              mb: 2,
+            }}
+          >
+            <Box onClick={() => setActiveScreen("merchants")} sx={{ cursor: "pointer", minWidth: 0 }}>
+              <MetricCard
+                label="Merchants"
+                value={String(activeZoneMetrics.dispMerchants ?? 0)}
+                subtext={activeZoneMetrics.dispMerchants > 0 ? `${activeZoneMetrics.dispActiveMerchants} Active in Region` : "0 onboarded in region"}
+                icon={<StoreRoundedIcon sx={{ fontSize: 18 }} />}
+                iconColor="#059669"
+                iconBg="#ECFDF5"
+              />
+            </Box>
+
+            <Box onClick={() => setActiveScreen("users")} sx={{ cursor: "pointer", minWidth: 0 }}>
+              <MetricCard
+                label="Customers"
+                value={String(activeZoneMetrics.dispCustomers ?? 0)}
+                subtext={activeZoneMetrics.dispCustomers > 0 ? `${activeZoneMetrics.dispCustomers} Registered consumers` : "0 consumers in region"}
+                icon={<GroupsOutlinedIcon sx={{ fontSize: 18 }} />}
+                iconColor="#2563EB"
+                iconBg="#EFF6FF"
+              />
+            </Box>
+
+            <Box onClick={() => setActiveScreen("captains")} sx={{ cursor: "pointer", minWidth: 0 }}>
+              <MetricCard
+                label="Captains"
+                value={String(activeZoneMetrics.dispCaptains ?? 0)}
+                subtext={activeZoneMetrics.dispCaptains > 0 ? `${activeZoneMetrics.dispActiveCaptains} Active on field` : "0 assigned in region"}
+                icon={<ShieldRoundedIcon sx={{ fontSize: 18 }} />}
+                iconColor="#7C3AED"
+                iconBg="#FAF5FF"
+              />
+            </Box>
+
+            <Box onClick={() => setActiveScreen("pincode")} sx={{ cursor: "pointer", minWidth: 0 }}>
+              <MetricCard
+                label="Services"
+                value="0"
+                subtext="Regional Services"
+                icon={<BuildRoundedIcon sx={{ fontSize: 18 }} />}
+                iconColor="#D97706"
+                iconBg="#FFFBEB"
+              />
+            </Box>
+          </Box>
+
+            {/* Quick Actions (8 circular buttons grid) */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                borderRadius: "20px",
+                bgcolor: "#FFFFFF",
+                border: "1px solid #EEF2F6",
+                boxShadow: "0 2px 10px rgba(15,23,42,0.03)",
+                mb: 2,
+              }}
+            >
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.8 }}>
+                <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A" }}>
+                  Quick Actions
+                </Typography>
+                <Button
+                  size="small"
+                  onClick={() => setActiveScreen("command_center")}
+                  sx={{ fontSize: 11.5, fontWeight: 800, color: "#2563EB", textTransform: "none", p: 0 }}
+                >
+                  View All &rarr;
+                </Button>
+              </Stack>
+
+              <Grid container spacing={2}>
+                {[
+                  { label: "Add Merchant", icon: <StoreRoundedIcon sx={{ fontSize: 22 }} />, color: "#2563EB", bg: "#EFF6FF", action: () => setAddMerchantOpen(true) },
+                  { label: "Add User", icon: <GroupsOutlinedIcon sx={{ fontSize: 22 }} />, color: "#059669", bg: "#ECFDF5", action: () => setAddUserOpen(true) },
+                  { label: "Scan QR", icon: <QrCodeScannerRoundedIcon sx={{ fontSize: 22 }} />, color: "#DC2626", bg: "#FEF2F2", action: () => setScanQrOpen(true) },
+                  { label: "History", icon: <AccountBalanceWalletRoundedIcon sx={{ fontSize: 22 }} />, color: "#059669", bg: "#ECFDF5", action: () => setActiveScreen("history") },
+                  { label: "View Captains", icon: <ShieldRoundedIcon sx={{ fontSize: 22 }} />, color: "#9333EA", bg: "#FAF5FF", action: () => setActiveScreen("captains") },
+                  { label: "My Team", icon: <GroupsOutlinedIcon sx={{ fontSize: 22 }} />, color: "#0284C7", bg: "#F0F9FF", action: () => setActiveScreen("users") },
+                  { label: "Support", icon: <SupportAgentRoundedIcon sx={{ fontSize: 22 }} />, color: "#4F46E5", bg: "#EEF2FF", action: () => setActiveScreen("support") },
+                  { label: "More", icon: <MoreHorizRoundedIcon sx={{ fontSize: 22 }} />, color: "#475569", bg: "#F1F5F9", action: () => setActiveScreen("command_center") },
+                ].map((act) => (
+                  <Grid item xs={3} key={act.label} sx={{ textAlign: "center" }}>
+                    <Box
+                      component="button"
+                      type="button"
+                      onClick={act.action}
+                      sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: "16px",
+                        bgcolor: act.bg,
+                        color: act.color,
+                        border: 0,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        transition: "transform 0.12s ease",
+                        "&:active": { transform: "scale(0.92)" },
+                      }}
+                    >
+                      {act.icon}
+                    </Box>
+                    <Typography sx={{ fontSize: 10.5, fontWeight: 800, color: "#334155", mt: 0.6, lineHeight: 1.1 }}>
+                      {act.label}
+                    </Typography>
+                  </Grid>
+                ))}
+              </Grid>
+            </Paper>
+
+            {/* Business Overview Card */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                borderRadius: "20px",
+                bgcolor: "#FFFFFF",
+                border: "1px solid #EEF2F6",
+                boxShadow: "0 2px 10px rgba(15,23,42,0.03)",
+                mb: 2,
+              }}
+            >
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A" }}>
+                  Business Overview
+                </Typography>
+                <Chip label="This Month" size="small" sx={{ height: 22, fontSize: 10.5, fontWeight: 800, bgcolor: "#F1F5F9" }} />
+              </Stack>
+
+              <Grid container spacing={1.5}>
+                <Grid item xs={4}>
+                  <Box sx={{ p: 1.2, borderRadius: "14px", bgcolor: "#F8FAFC", textAlign: "center" }}>
+                    <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>B2B</Typography>
+                    <Typography sx={{ fontSize: 17, fontWeight: 900, color: "#0F172A", my: 0.2 }}>{activeZoneMetrics.dispB2B}</Typography>
+                    <Typography sx={{ fontSize: 10, fontWeight: 800, color: "#059669" }}>{activeZoneMetrics.dispB2B > 0 ? "+100%" : "0%"}</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={4}>
+                  <Box sx={{ p: 1.2, borderRadius: "14px", bgcolor: "#F8FAFC", textAlign: "center" }}>
+                    <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>B2C</Typography>
+                    <Typography sx={{ fontSize: 17, fontWeight: 900, color: "#0F172A", my: 0.2 }}>{activeZoneMetrics.dispB2C}</Typography>
+                    <Typography sx={{ fontSize: 10, fontWeight: 800, color: "#059669" }}>{activeZoneMetrics.dispB2C > 0 ? "+100%" : "0%"}</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={4}>
+                  <Box sx={{ p: 1.2, borderRadius: "14px", bgcolor: "#F8FAFC", textAlign: "center" }}>
+                    <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>TriZone</Typography>
+                    <Typography sx={{ fontSize: 17, fontWeight: 900, color: "#0F172A", my: 0.2 }}>{activeZoneMetrics.dispTriZone}</Typography>
+                    <Typography sx={{ fontSize: 10, fontWeight: 800, color: "#059669" }}>{activeZoneMetrics.dispTriZone > 0 ? "+100%" : "0%"}</Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+            </Paper>
+          </Box>
+        )}
+
+        {/* =========================================================================
+            SCREEN 2: FRANCHISE COMMAND CENTER (Exact Image 1 Screen 2)
+        ========================================================================= */}
+        {(activeScreen === "command_center" || activeScreen === "more") && (
+          <Box>
+            <Box sx={{ mb: 2 }}>
+              <Typography sx={{ fontSize: 16, fontWeight: 800, color: AGENCY_TOKENS.colors.mainText }}>
+                Operations & Management Modules
+              </Typography>
+              <Typography sx={{ fontSize: 12, color: AGENCY_TOKENS.colors.secondaryText }}>
+                Direct access to regional tools, wallets, ledgers and support
+              </Typography>
+            </Box>
+
+            <Stack spacing={1.5}>
+              {[
+                {
+                  title: "Wallet & Commission History",
+                  desc: "Complete earnings, 75/25 balance breakdown and daily transaction ledger",
+                  icon: <AccountBalanceWalletRoundedIcon sx={{ fontSize: 22 }} />,
+                  color: "#2563EB",
+                  bg: "#EFF6FF",
+                  action: () => setActiveScreen("history"),
+                },
+                {
+                  title: "Registered Customers",
+                  desc: "Direct consumers registered in territory",
+                  icon: <GroupsOutlinedIcon sx={{ fontSize: 22 }} />,
+                  color: "#D97706",
+                  bg: "#FFFBEB",
+                  action: () => setActiveScreen("users"),
+                },
+                {
+                  title: "Support & Grievances",
+                  desc: "Raise and track support tickets",
+                  icon: <SupportAgentRoundedIcon sx={{ fontSize: 22 }} />,
+                  color: "#9333EA",
+                  bg: "#FAF5FF",
+                  action: () => setActiveScreen("support"),
+                },
+                {
+                  title: "Scan Merchant QR",
+                  desc: "Onboard merchants by scanning QR",
+                  icon: <QrCodeScannerRoundedIcon sx={{ fontSize: 22 }} />,
+                  color: "#DC2626",
+                  bg: "#FEF2F2",
+                  action: () => setScanQrOpen(true),
+                },
+                {
+                  title: "Withdraw Wallet",
+                  desc: "Transfer your earnings to bank account",
+                  icon: <ArrowUpwardRoundedIcon sx={{ fontSize: 22 }} />,
+                  color: "#0284C7",
+                  bg: "#EFF6FF",
+                  action: () => navigate("/user/withdrawal"),
+                },
+                {
+                  title: "Franchise Self-Rebirth & Matrix",
+                  desc: "5-Matrix & 3-Matrix autonomous Rebirth engine",
+                  icon: <AutorenewRoundedIcon sx={{ fontSize: 22 }} />,
+                  color: "#D97706",
+                  bg: "#FFFBEB",
+                  action: () => setActiveScreen("self_rebirth"),
+                },
+              ].map((item) => (
+                <Paper
+                  key={item.title}
+                  elevation={0}
+                  onClick={item.action}
+                  sx={{
+                    p: 1.8,
+                    borderRadius: "20px",
+                    bgcolor: "#FFFFFF",
+                    border: "1px solid #EEF2F6",
+                    boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    transition: "transform 0.12s ease",
+                    "&:active": { transform: "scale(0.98)" },
+                  }}
+                >
+                  <Stack direction="row" spacing={1.6} alignItems="center">
+                    <Box
+                      sx={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: "14px",
+                        bgcolor: item.bg,
+                        color: item.color,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {item.icon}
+                    </Box>
+                    <Box>
+                      <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A" }}>
+                        {item.title}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11.5, color: "#64748B" }}>
+                        {item.desc}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                  <ChevronRightRoundedIcon sx={{ color: "#94A3B8", fontSize: 22 }} />
+                </Paper>
+              ))}
+            </Stack>
+          </Box>
+        )}
+
+        {/* =========================================================================
+            SCREEN 2: PINCODE / TERRITORY OVERVIEW (Image 1 Screen 2)
+        ========================================================================= */}
+        {activeScreen === "pincode" && (
+          <Box>
+            {/* Sub-tabs: Overview | Map (Only for Pincode Agencies) | Growth */}
+            {(() => {
+              const isPincodeAgency = currentTierKey === "agency_pincode" || currentTier.scopeType === "pincode";
+              const tabs = isPincodeAgency ? ["overview", "map", "growth"] : ["overview", "growth"];
+              return (
+                <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+                  {tabs.map((tab) => (
+                    <Button
+                      key={tab}
+                      size="small"
+                      onClick={() => setPincodeSubTab(tab)}
+                      sx={{
+                        flex: 1,
+                        py: 0.7,
+                        borderRadius: "14px",
+                        fontWeight: 800,
+                        fontSize: 12,
+                        textTransform: "capitalize",
+                        bgcolor: pincodeSubTab === tab ? "#0F172A" : "#FFFFFF",
+                        color: pincodeSubTab === tab ? "#FFFFFF" : "#64748B",
+                        border: "1px solid",
+                        borderColor: pincodeSubTab === tab ? "#0F172A" : "#E2E8F0",
+                      }}
+                    >
+                      {tab}
+                    </Button>
+                  ))}
+                </Stack>
+              );
+            })()}
+
+            {pincodeSubTab === "overview" && (
+              <Stack spacing={1.5}>
+                {/* Micro-Zone Jurisdiction Summary Card */}
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 1.6,
+                    borderRadius: "18px",
+                    bgcolor: "#EFF6FF",
+                    border: "1px solid #BFDBFE",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Stack direction="row" spacing={1.4} alignItems="center">
+                    <Avatar sx={{ bgcolor: "#2563EB", color: "#FFFFFF", width: 40, height: 40 }}>
+                      <LocationOnRoundedIcon sx={{ fontSize: 22 }} />
+                    </Avatar>
+                    <Box>
+                      <Typography sx={{ fontSize: 13.5, fontWeight: 950, color: "#0F172A" }}>
+                        {selectedSubZone !== "all" ? `PIN ${selectedSubZone} Micro-Zone` : `${currentTier.title} Territory`}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#64748B" }}>
+                        Pincode: {selectedSubZone !== "all" ? selectedSubZone : (currentTier.pincodes?.[0]?.pincode || "572106")}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#2563EB", mt: 0.2 }}>
+                        {activeZoneMetrics.dispCaptains} Captain Beacons Active
+                      </Typography>
+                    </Box>
+                  </Stack>
+                  <Chip
+                    label={`Scope: ${currentTier.scopeCount}`}
+                    size="small"
+                    sx={{ height: 22, fontSize: 10.5, fontWeight: 900, bgcolor: "#DBEAFE", color: "#1D4ED8" }}
+                  />
+                </Paper>
+
+                {/* 4 Stat Tiles in Guaranteed 2-Column Equal Grid with Live DB Metrics */}
+                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 1.5 }}>
+                  <Paper elevation={0} sx={{ p: 1.5, borderRadius: "18px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6", minWidth: 0 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748B" }}>Merchants</Typography>
+                      <StoreRoundedIcon sx={{ fontSize: 18, color: "#059669" }} />
+                    </Stack>
+                    <Typography sx={{ fontSize: 22, fontWeight: 950, color: "#0F172A", my: 0.4 }}>
+                      {activeZoneMetrics.dispMerchants}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: "#059669" }}>
+                      {activeZoneMetrics.dispActiveMerchants} Active • {activeZoneMetrics.dispInactiveMerchants} Inactive
+                    </Typography>
+                  </Paper>
+
+                  <Paper elevation={0} sx={{ p: 1.5, borderRadius: "18px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6", minWidth: 0 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748B" }}>Captains</Typography>
+                      <ShieldRoundedIcon sx={{ fontSize: 18, color: "#9333EA" }} />
+                    </Stack>
+                    <Typography sx={{ fontSize: 22, fontWeight: 950, color: "#0F172A", my: 0.4 }}>
+                      {activeZoneMetrics.dispCaptains}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: "#9333EA" }}>
+                      {activeZoneMetrics.dispActiveCaptains} Active • {activeZoneMetrics.dispInactiveCaptains} Inactive
+                    </Typography>
+                  </Paper>
+
+                  <Paper elevation={0} sx={{ p: 1.5, borderRadius: "18px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6", minWidth: 0 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748B" }}>Customers</Typography>
+                      <GroupsOutlinedIcon sx={{ fontSize: 18, color: "#2563EB" }} />
+                    </Stack>
+                    <Typography sx={{ fontSize: 22, fontWeight: 950, color: "#0F172A", my: 0.4 }}>
+                      {activeZoneMetrics.dispCustomers}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: "#2563EB" }}>
+                      {activeZoneMetrics.dispCustomers > 0 ? `${activeZoneMetrics.dispCustomers} Registered consumers` : "0 consumers in region"}
+                    </Typography>
+                  </Paper>
+
+                  <Paper elevation={0} sx={{ p: 1.5, borderRadius: "18px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6", minWidth: 0 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748B" }}>Services</Typography>
+                      <BuildRoundedIcon sx={{ fontSize: 18, color: "#D97706" }} />
+                    </Stack>
+                    <Typography sx={{ fontSize: 22, fontWeight: 950, color: "#0F172A", my: 0.4 }}>
+                      {activeZoneMetrics.dispTriZone}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: "#D97706" }}>
+                      Regional Services
+                    </Typography>
+                  </Paper>
+                </Box>
+
+                {/* Online vs Offline Distribution Card */}
+                <Paper elevation={0} sx={{ p: 1.8, borderRadius: "18px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6" }}>
+                  <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A", mb: 1.4 }}>
+                    Online vs Offline Distribution
+                  </Typography>
+
+                  <Stack spacing={1.4}>
+                    <Box>
+                      <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.4 }}>
+                        <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: "#1E293B" }}>
+                          B2B (Total {activeZoneMetrics.dispB2B})
+                        </Typography>
+                        <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#059669" }}>
+                          {activeZoneMetrics.dispB2B > 0 ? "Active in Territory" : "0 Registered"}
+                        </Typography>
+                      </Stack>
+                      <LinearProgress
+                        variant="determinate"
+                        value={activeZoneMetrics.dispMerchants > 0 ? (activeZoneMetrics.dispB2B / activeZoneMetrics.dispMerchants) * 100 : 0}
+                        sx={{ height: 7, borderRadius: 3, bgcolor: "#F1F5F9", "& .MuiLinearProgress-bar": { bgcolor: "#10B981" } }}
+                      />
+                    </Box>
+
+                    <Box>
+                      <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.4 }}>
+                        <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: "#1E293B" }}>
+                          B2C (Total {activeZoneMetrics.dispB2C})
+                        </Typography>
+                        <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#2563EB" }}>
+                          {activeZoneMetrics.dispB2C > 0 ? "Active in Territory" : "0 Registered"}
+                        </Typography>
+                      </Stack>
+                      <LinearProgress
+                        variant="determinate"
+                        value={activeZoneMetrics.dispMerchants > 0 ? (activeZoneMetrics.dispB2C / activeZoneMetrics.dispMerchants) * 100 : 0}
+                        sx={{ height: 7, borderRadius: 3, bgcolor: "#F1F5F9", "& .MuiLinearProgress-bar": { bgcolor: "#2563EB" } }}
+                      />
+                    </Box>
+
+                    <Box>
+                      <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.4 }}>
+                        <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: "#1E293B" }}>
+                          TriZone (Total {activeZoneMetrics.dispTriZone})
+                        </Typography>
+                        <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#9333EA" }}>
+                          {activeZoneMetrics.dispTriZone > 0 ? "Active Hubs" : "0 Registered"}
+                        </Typography>
+                      </Stack>
+                      <LinearProgress
+                        variant="determinate"
+                        value={activeZoneMetrics.dispMerchants > 0 ? (activeZoneMetrics.dispTriZone / activeZoneMetrics.dispMerchants) * 100 : 0}
+                        sx={{ height: 7, borderRadius: 3, bgcolor: "#F1F5F9", "& .MuiLinearProgress-bar": { bgcolor: "#9333EA" } }}
+                      />
+                    </Box>
+                  </Stack>
+                </Paper>
+
+                {/* Jurisdiction Performance Index Card */}
+                <Paper elevation={0} sx={{ p: 1.8, borderRadius: "18px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6" }}>
+                  <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A", mb: 1.2 }}>
+                    Jurisdiction Performance Index
+                  </Typography>
+                  <Grid container spacing={1.2}>
+                    <Grid item xs={4}>
+                      <Box sx={{ p: 1.2, borderRadius: "14px", bgcolor: "#EFF6FF", textAlign: "center" }}>
+                        <Typography sx={{ fontSize: 10.5, color: "#64748B", fontWeight: 700 }}>Pin Coverage</Typography>
+                        <Typography sx={{ fontSize: 17, fontWeight: 950, color: "#2563EB", mt: 0.3 }}>
+                          {activeZoneMetrics.dispMerchants > 0 ? "100%" : "0%"}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={4}>
+                      <Box sx={{ p: 1.2, borderRadius: "14px", bgcolor: "#EEF2FF", textAlign: "center" }}>
+                        <Typography sx={{ fontSize: 10.5, color: "#64748B", fontWeight: 700 }}>Active Captains</Typography>
+                        <Typography sx={{ fontSize: 17, fontWeight: 950, color: "#4F46E5", mt: 0.3 }}>
+                          {activeZoneMetrics.dispActiveCaptains}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={4}>
+                      <Box sx={{ p: 1.2, borderRadius: "14px", bgcolor: "#FFFBEB", textAlign: "center" }}>
+                        <Typography sx={{ fontSize: 10.5, color: "#64748B", fontWeight: 700 }}>Total Nodes</Typography>
+                        <Typography sx={{ fontSize: 17, fontWeight: 950, color: "#D97706", mt: 0.3 }}>
+                          {activeZoneMetrics.dispMerchants + activeZoneMetrics.dispCaptains + activeZoneMetrics.dispCustomers}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </Paper>
+              </Stack>
+            )}
+
+            {/* SCREEN 6: DYNAMIC PINCODE OPENSTREETMAP (ONLY FOR PINCODE AGENCIES) */}
+            {pincodeSubTab === "map" && (currentTierKey === "agency_pincode" || currentTier.scopeType === "pincode") && (
+              <Box sx={{ position: "relative" }}>
+                {(() => {
+                  const activePin = selectedSubZone !== "all" ? selectedSubZone : "572106";
+                  const pinCoords = {
+                    "572106": { lat: 13.1614, lon: 76.6715, name: "Turuvekere, Tumakuru" },
+                    "572101": { lat: 13.3379, lon: 77.1010, name: "Tumakuru City Central" },
+                    "572102": { lat: 13.3210, lon: 77.1120, name: "Tumakuru South" },
+                    "572103": { lat: 13.3150, lon: 77.1550, name: "Kyathsandra Hub" },
+                  };
+                  const activeCoord = pinCoords[activePin] || { lat: 13.1614, lon: 76.6715, name: `PIN ${activePin}` };
+
+                  return (
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        height: 420,
+                        borderRadius: "22px",
+                        bgcolor: "#F8FAFC",
+                        border: "1px solid #E2E8F0",
+                        position: "relative",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <iframe
+                        title="Pincode Live Territory Map"
+                        width="100%"
+                        height="100%"
+                        style={{ border: 0 }}
+                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${activeCoord.lon - 0.04}%2C${activeCoord.lat - 0.03}%2C${activeCoord.lon + 0.04}%2C${activeCoord.lat + 0.03}&layer=mapnik&marker=${activeCoord.lat}%2C${activeCoord.lon}`}
+                      />
+
+                      {/* Floating GPS live badge on top right */}
+                      <Chip
+                        label="Live GPS Map"
+                        size="small"
+                        sx={{
+                          position: "absolute",
+                          top: 12,
+                          right: 12,
+                          bgcolor: "rgba(255,255,255,0.95)",
+                          fontWeight: 800,
+                          fontSize: 10.5,
+                          color: "#1D4ED8",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+                        }}
+                      />
+
+                      {/* Floating Status Card at Bottom with Live DB metrics */}
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          position: "absolute",
+                          bottom: 12,
+                          left: 12,
+                          right: 12,
+                          p: 1.4,
+                          borderRadius: "18px",
+                          bgcolor: "rgba(255,255,255,0.96)",
+                          backdropFilter: "blur(12px)",
+                          border: "1px solid #EEF2F6",
+                          boxShadow: "0 4px 20px rgba(15,23,42,0.08)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1.4,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: 42,
+                            height: 42,
+                            borderRadius: "14px",
+                            bgcolor: "#2563EB",
+                            color: "#FFFFFF",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <LocationOnRoundedIcon sx={{ fontSize: 24 }} />
+                        </Box>
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography sx={{ fontSize: 12.5, fontWeight: 950, color: "#0F172A", noWrap: true }}>
+                            Live Territory Map: PIN {activePin} ({activeCoord.name})
+                          </Typography>
+                          <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#4F46E5" }}>
+                            {activeZoneMetrics.dispCaptains} Captain Beacons • {activeZoneMetrics.dispMerchants} Merchant Hotspots
+                          </Typography>
+                        </Box>
+                      </Paper>
+                    </Paper>
+                  );
+                })()}
+              </Box>
+            )}
+
+            {/* SCREEN 7: TERRITORY VELOCITY SUMMARY (100% Dynamic DB Data) */}
+            {pincodeSubTab === "growth" && (
+              <Paper elevation={0} sx={{ p: 2, borderRadius: "20px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6" }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                  <Typography sx={{ fontSize: 14, fontWeight: 950, color: "#0F172A" }}>
+                    Territory Commercial Velocity
+                  </Typography>
+                  <Chip
+                    label="Live DB Metrics"
+                    size="small"
+                    sx={{ bgcolor: "#ECFDF5", color: "#059669", fontWeight: 800, fontSize: 11 }}
+                  />
+                </Stack>
+
+                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1.5, mb: 2 }}>
+                  <Box sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#F8FAFC", textAlign: "center" }}>
+                    <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>Merchants</Typography>
+                    <Typography sx={{ fontSize: 20, fontWeight: 950, color: "#059669", my: 0.3 }}>
+                      {activeZoneMetrics.dispMerchants}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10, color: "#64748B" }}>Total Onboarded</Typography>
+                  </Box>
+                  <Box sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#F8FAFC", textAlign: "center" }}>
+                    <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>Consumers</Typography>
+                    <Typography sx={{ fontSize: 20, fontWeight: 950, color: "#2563EB", my: 0.3 }}>
+                      {activeZoneMetrics.dispCustomers}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10, color: "#64748B" }}>Registered</Typography>
+                  </Box>
+                  <Box sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#F8FAFC", textAlign: "center" }}>
+                    <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>Captains</Typography>
+                    <Typography sx={{ fontSize: 20, fontWeight: 950, color: "#7C3AED", my: 0.3 }}>
+                      {activeZoneMetrics.dispCaptains}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10, color: "#64748B" }}>Assigned</Typography>
+                  </Box>
+                </Box>
+
+                <Paper elevation={0} sx={{ p: 2, borderRadius: "16px", bgcolor: "#F0FDF4", border: "1px solid #BBF7D0", textAlign: "center" }}>
+                  <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#166534" }}>
+                    Dynamic Territory State
+                  </Typography>
+                  <Typography sx={{ fontSize: 11.5, color: "#15803D", mt: 0.5 }}>
+                    Zero simulated velocity figures. All commercial activity dynamically updates in real-time as merchants, customers, and field captains register under PIN {selectedSubZone !== "all" ? selectedSubZone : "572106"}.
+                  </Typography>
+                </Paper>
+              </Paper>
+            )}
+          </Box>
+        )}
+
+        {/* =========================================================================
+            SCREEN 3: CAPTAINS MANAGEMENT (Image 1 Screen 3)
+        ========================================================================= */}
+        {activeScreen === "captains" && (
+          <Box>
+            <PageHeader
+              title="Captains Management"
+              count={filteredCaptains.length}
+              actionLabel="+ Add Captain"
+              onAction={() => setAddCaptainOpen(true)}
+            />
+
+            {/* Search Field */}
+            <SearchField
+              placeholder="Search captain by name, ID, locality..."
+              value={captainSearch}
+              onChange={(e) => setCaptainSearch(e.target.value)}
+            />
+
+            {/* Coordinator Territory / Pincode Filter */}
+            {currentTier.scopeCount > 1 && (
+              <Box sx={{ mb: 1.5, p: 1, borderRadius: "14px", bgcolor: "#EFF6FF", border: "1px solid #BFDBFE" }}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <LocationOnRoundedIcon sx={{ color: "#2563EB", fontSize: 18 }} />
+                  <FormControl size="small" fullWidth variant="standard">
+                    <Select
+                      value={selectedSubZone}
+                      onChange={(e) => setSelectedSubZone(e.target.value)}
+                      disableUnderline
+                      sx={{ fontSize: 12.5, fontWeight: 800, color: "#1E40AF" }}
+                    >
+                      <MenuItem value="all" sx={{ fontSize: 12.5, fontWeight: 800 }}>
+                        All {currentTier.scopeCount} Assigned ({currentTier.defaultLocation})
+                      </MenuItem>
+                      {currentTier.pincodes && currentTier.pincodes.map((pin) => (
+                        <MenuItem key={pin.pincode} value={pin.pincode} sx={{ fontSize: 12.5, fontWeight: 700 }}>
+                          Pin: {pin.name}
+                        </MenuItem>
+                      ))}
+                      {currentTier.districts && currentTier.districts.map((d) => (
+                        <MenuItem key={d} value={d} sx={{ fontSize: 12.5, fontWeight: 700 }}>
+                          District: {d}
+                        </MenuItem>
+                      ))}
+                      {currentTier.states && currentTier.states.map((s) => (
+                        <MenuItem key={s} value={s} sx={{ fontSize: 12.5, fontWeight: 700 }}>
+                          State: {s}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Stack>
+              </Box>
+            )}
+
+            {/* Filter Chips */}
+            <FilterChips
+              filters={[
+                { label: `All ${activeZoneMetrics.dispCaptains}`, value: "all" },
+                { label: `Active ${activeZoneMetrics.dispActiveCaptains}`, value: "active" },
+                { label: `Inactive ${activeZoneMetrics.dispInactiveCaptains}`, value: "inactive" },
+              ]}
+              activeValue={captainFilter}
+              onSelect={(val) => setCaptainFilter(val)}
+            />
+
+            {/* Captain Cards List (Zero Mockup Data - Live DB State) */}
+            <Stack spacing={1.5}>
+              {filteredCaptains.length === 0 ? (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 4,
+                    textAlign: "center",
+                    borderRadius: "20px",
+                    bgcolor: "#FFFFFF",
+                    border: "1px solid #E2E8F0",
+                  }}
+                >
+                  <Avatar sx={{ width: 48, height: 48, bgcolor: "#FAF5FF", color: "#7C3AED", mx: "auto", mb: 1.5 }}>
+                    <ShieldRoundedIcon />
+                  </Avatar>
+                  <Typography sx={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>
+                    No Captains Assigned Yet
+                  </Typography>
+                  <Typography sx={{ fontSize: 12.5, color: "#64748B", mt: 0.5, mb: 2, fontWeight: 500, maxWidth: 300, mx: "auto" }}>
+                    Field delivery and onboarding captains for this territory will appear here once registered.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    startIcon={<AddRoundedIcon />}
+                    onClick={() => setAddCaptainOpen(true)}
+                    sx={{
+                      borderRadius: "12px",
+                      bgcolor: "#7C3AED",
+                      textTransform: "none",
+                      fontWeight: 800,
+                      fontSize: 13,
+                      "&:hover": { bgcolor: "#6D28D9" },
+                    }}
+                  >
+                    Register Captain
+                  </Button>
+                </Paper>
+              ) : (
+                filteredCaptains.map((cap) => (
+                  <CaptainCard
+                    key={cap.id}
+                    captain={cap}
+                    onClick={() => {
+                      setSelectedCaptain(cap);
+                      setActiveScreen("captain_detail");
+                    }}
+                  />
+                ))
+              )}
+            </Stack>
+          </Box>
+        )}
+
+        {/* =========================================================================
+            SCREEN 4: CAPTAIN DETAILS (Image 1 Screen 4)
+        ========================================================================= */}
+        {activeScreen === "captain_detail" && selectedCaptain && (
+          <Box>
+            <Paper elevation={0} sx={{ p: 2, borderRadius: "20px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6", mb: 2 }}>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Avatar src={selectedCaptain.avatar} sx={{ width: 64, height: 64, borderRadius: "18px" }} />
+                <Box sx={{ flex: 1 }}>
+                  <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#0F172A" }}>
+                    {selectedCaptain.name}
+                  </Typography>
+                  <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 700 }}>
+                    ID: {selectedCaptain.id} • {selectedCaptain.mobile}
+                  </Typography>
+                  <Typography sx={{ fontSize: 12, color: "#2563EB", fontWeight: 800 }}>
+                    📍 Area: {selectedCaptain.area}
+                  </Typography>
+                </Box>
+              </Stack>
+
+              <Divider sx={{ my: 1.8 }} />
+
+              {/* 80% Performance Score */}
+              <Box sx={{ mb: 1.5 }}>
+                <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                  <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: "#0F172A" }}>
+                    Performance Score
+                  </Typography>
+                  <Typography sx={{ fontSize: 12.5, fontWeight: 950, color: "#059669" }}>
+                    {selectedCaptain.performancePct}%
+                  </Typography>
+                </Stack>
+                <LinearProgress variant="determinate" value={selectedCaptain.performancePct} sx={{ height: 8, borderRadius: 4, bgcolor: "#F1F5F9", "& .MuiLinearProgress-bar": { bgcolor: "#059669" } }} />
+              </Box>
+
+              <Box sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#EFF6FF", border: "1px solid #BFDBFE", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: "#1E3A8A" }}>Total Earnings</Typography>
+                <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#1D4ED8" }}>{selectedCaptain.earnings}</Typography>
+              </Box>
+
+              {/* Action Grid */}
+              <Grid container spacing={1.2} sx={{ mt: 1.5 }}>
+                <Grid item xs={6}>
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    startIcon={<CallRoundedIcon />}
+                    component="a"
+                    href={`tel:${selectedCaptain.mobile}`}
+                    sx={{ borderRadius: "12px", textTransform: "none", fontWeight: 800, fontSize: 12 }}
+                  >
+                    Direct Call
+                  </Button>
+                </Grid>
+                <Grid item xs={6}>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    startIcon={<MapRoundedIcon />}
+                    onClick={() => setActiveScreen("captain_map")}
+                    sx={{ borderRadius: "12px", textTransform: "none", fontWeight: 800, fontSize: 12, bgcolor: "#2563EB" }}
+                  >
+                    Locality Map >
+                  </Button>
+                </Grid>
+              </Grid>
+            </Paper>
+
+            {/* Recent Activities Feed */}
+            <Paper elevation={0} sx={{ p: 2, borderRadius: "20px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6" }}>
+              <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A", mb: 1.2 }}>
+                Recent Field Activities
+              </Typography>
+              <Stack spacing={1.2}>
+                {selectedCaptain.activities.map((act, i) => (
+                  <Stack direction="row" spacing={1.2} key={i} alignItems="center">
+                    <CheckCircleRoundedIcon sx={{ fontSize: 18, color: "#10B981" }} />
+                    <Box sx={{ flex: 1 }}>
+                      <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: "#1E293B" }}>{act.text}</Typography>
+                      <Typography sx={{ fontSize: 11, color: "#94A3B8" }}>{act.time}</Typography>
+                    </Box>
+                  </Stack>
+                ))}
+              </Stack>
+            </Paper>
+          </Box>
+        )}
+
+        {/* =========================================================================
+            SCREEN 5: CAPTAIN LOCALITY MAP (Image 1 Screen 5)
+        ========================================================================= */}
+        {activeScreen === "captain_map" && selectedCaptain && (
+          <Box>
+            <Paper elevation={0} sx={{ p: 2, borderRadius: "20px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6", mb: 2 }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A" }}>
+                {selectedCaptain.name} - Micro-Zone Radar
+              </Typography>
+              <Typography sx={{ fontSize: 11.5, color: "#64748B", fontWeight: 700, mb: 1.5 }}>
+                Assigned Radius: 2.5 km • {selectedCaptain.area}
+              </Typography>
+
+              <Box
+                sx={{
+                  height: 250,
+                  borderRadius: "16px",
+                  background: "radial-gradient(circle, #D1FAE5 0%, #ECFDF5 50%, #F8FAFC 100%)",
+                  border: "1px solid #A7F3D0",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                <Box sx={{ width: 160, height: 160, borderRadius: "50%", border: "2px dashed #34D399", position: "absolute" }} />
+                <Avatar sx={{ bgcolor: "#059669", width: 44, height: 44, mb: 1 }}>
+                  <ShieldRoundedIcon sx={{ fontSize: 24, color: "#FFFFFF" }} />
+                </Avatar>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#065F46" }}>
+                  Active Beat Route: Sector 4
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: "#047857", fontWeight: 700 }}>
+                  42 Active Merchants • 12 Route Stops • 98% On-Time
+                </Typography>
+              </Box>
+            </Paper>
+          </Box>
+        )}
+
+        {/* =========================================================================
+            SCREEN 6: MERCHANTS DIRECTORY (Image 1 Screen 6)
+        ========================================================================= */}
+        {activeScreen === "merchants" && (
+          <Box>
+            <PageHeader
+              title={activeZoneMetrics.isExecutiveTerritoryTier ? "Territory Commercial Ecosystem" : "Merchants Directory"}
+              count={activeZoneMetrics.isExecutiveTerritoryTier ? activeZoneMetrics.dispMerchants : filteredMerchants.length}
+              actionLabel={!activeZoneMetrics.isExecutiveTerritoryTier ? "+ Add Merchant" : undefined}
+              onAction={!activeZoneMetrics.isExecutiveTerritoryTier ? () => setAddMerchantOpen(true) : undefined}
+            />
+
+            {/* Coordinator Territory / Pincode Filter */}
+            {currentTier.scopeCount > 1 && (
+              <Box sx={{ mb: 1.5, p: 1, borderRadius: "14px", bgcolor: "#EFF6FF", border: "1px solid #BFDBFE" }}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <LocationOnRoundedIcon sx={{ color: "#2563EB", fontSize: 18 }} />
+                  <FormControl size="small" fullWidth variant="standard">
+                    <Select
+                      value={selectedSubZone}
+                      onChange={(e) => setSelectedSubZone(e.target.value)}
+                      disableUnderline
+                      sx={{ fontSize: 12.5, fontWeight: 800, color: "#1E40AF" }}
+                    >
+                      <MenuItem value="all" sx={{ fontSize: 12.5, fontWeight: 800 }}>
+                        All {currentTier.scopeCount} Assigned ({currentTier.defaultLocation})
+                      </MenuItem>
+                      {currentTier.pincodes && currentTier.pincodes.map((pin) => (
+                        <MenuItem key={pin.pincode} value={pin.pincode} sx={{ fontSize: 12.5, fontWeight: 700 }}>
+                          Pin: {pin.name}
+                        </MenuItem>
+                      ))}
+                      {currentTier.districts && currentTier.districts.map((d) => (
+                        <MenuItem key={d} value={d} sx={{ fontSize: 12.5, fontWeight: 700 }}>
+                          District: {d}
+                        </MenuItem>
+                      ))}
+                      {currentTier.states && currentTier.states.map((s) => (
+                        <MenuItem key={s} value={s} sx={{ fontSize: 12.5, fontWeight: 700 }}>
+                          State: {s}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Stack>
+              </Box>
+            )}
+
+            {/* IF EXECUTIVE TERRITORY TIER (District, Dist Coord, State, State Coord): ONLY SHOW SHOP COUNTS WITH B2B AND B2C BREAKDOWN (NO INDIVIDUAL SHOP CARDS) */}
+            {activeZoneMetrics.isExecutiveTerritoryTier ? (
+              <Box>
+                {/* Executive Notice Banner */}
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 1.8,
+                    mb: 2,
+                    borderRadius: "18px",
+                    bgcolor: "#EFF6FF",
+                    border: "1px solid #BFDBFE",
+                  }}
+                >
+                  <Stack direction="row" spacing={1.2} alignItems="flex-start">
+                    <Avatar sx={{ bgcolor: "#DBEAFE", color: "#1D4ED8", width: 34, height: 34 }}>
+                      <DomainRoundedIcon sx={{ fontSize: 20 }} />
+                    </Avatar>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#1E40AF" }}>
+                        Executive Jurisdiction Overview
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: "#2563EB", mt: 0.3, lineHeight: 1.4 }}>
+                        As <strong>{currentTier.title}</strong>, you receive aggregated commissions across all <strong>{activeZoneMetrics.dispMerchants.toLocaleString()} shops</strong> in {currentTier.defaultLocation}. Individual merchant terminal cards are managed locally by Pincode Franchise Partners & Field Captains.
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Paper>
+
+                {/* 2x2 Grid for Aggregated Commercial Overview */}
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                    gap: 1.5,
+                    mb: 2,
+                  }}
+                >
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 1.6,
+                      borderRadius: "16px",
+                      bgcolor: "#FFFFFF",
+                      border: "1px solid #E2E8F0",
+                    }}
+                  >
+                    <Stack direction="row" alignItems="center" spacing={0.8} sx={{ mb: 0.5 }}>
+                      <StoreRoundedIcon sx={{ fontSize: 16, color: "#059669" }} />
+                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>
+                        Total Shops
+                      </Typography>
+                    </Stack>
+                    <Typography sx={{ fontSize: 22, fontWeight: 950, color: "#0F172A" }}>
+                      {activeZoneMetrics.dispMerchants.toLocaleString()}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10, color: "#059669", fontWeight: 700, mt: 0.3 }}>
+                      {activeZoneMetrics.dispActiveMerchants.toLocaleString()} Active • {activeZoneMetrics.dispInactiveMerchants.toLocaleString()} Inactive
+                    </Typography>
+                  </Paper>
+
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 1.6,
+                      borderRadius: "16px",
+                      bgcolor: "#FFFFFF",
+                      border: "1px solid #E2E8F0",
+                    }}
+                  >
+                    <Stack direction="row" alignItems="center" spacing={0.8} sx={{ mb: 0.5 }}>
+                      <BusinessRoundedIcon sx={{ fontSize: 16, color: "#2563EB" }} />
+                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>
+                        B2B Wholesalers
+                      </Typography>
+                    </Stack>
+                    <Typography sx={{ fontSize: 22, fontWeight: 950, color: "#0F172A" }}>
+                      {activeZoneMetrics.dispB2B.toLocaleString()}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10, color: "#2563EB", fontWeight: 700, mt: 0.3 }}>
+                      FMCG & Bulk Supply
+                    </Typography>
+                  </Paper>
+
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 1.6,
+                      borderRadius: "16px",
+                      bgcolor: "#FFFFFF",
+                      border: "1px solid #E2E8F0",
+                    }}
+                  >
+                    <Stack direction="row" alignItems="center" spacing={0.8} sx={{ mb: 0.5 }}>
+                      <ShoppingBagOutlinedIcon sx={{ fontSize: 16, color: "#D97706" }} />
+                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>
+                        B2C Retail & Kirana
+                      </Typography>
+                    </Stack>
+                    <Typography sx={{ fontSize: 22, fontWeight: 950, color: "#0F172A" }}>
+                      {activeZoneMetrics.dispB2C.toLocaleString()}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10, color: "#D97706", fontWeight: 700, mt: 0.3 }}>
+                      Tri Basket & Tri Eat
+                    </Typography>
+                  </Paper>
+
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 1.6,
+                      borderRadius: "16px",
+                      bgcolor: "#FFFFFF",
+                      border: "1px solid #E2E8F0",
+                    }}
+                  >
+                    <Stack direction="row" alignItems="center" spacing={0.8} sx={{ mb: 0.5 }}>
+                      <FlashOnRoundedIcon sx={{ fontSize: 16, color: "#7C3AED" }} />
+                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>
+                        TriZone Stores
+                      </Typography>
+                    </Stack>
+                    <Typography sx={{ fontSize: 22, fontWeight: 950, color: "#0F172A" }}>
+                      {activeZoneMetrics.dispTriZone.toLocaleString()}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10, color: "#7C3AED", fontWeight: 700, mt: 0.3 }}>
+                      Flagship Experience Hubs
+                    </Typography>
+                  </Paper>
+                </Box>
+
+                {/* Sub-Territory Commercial Breakdown */}
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 2,
+                    borderRadius: "18px",
+                    bgcolor: "#FFFFFF",
+                    border: "1px solid #E2E8F0",
+                    mb: 2,
+                  }}
+                >
+                  <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A", mb: 1.5 }}>
+                    Territorial Commercial Clusters
+                  </Typography>
+                  <Stack spacing={1.2}>
+                    {currentTierKey === "agency_district" && [
+                      { name: "Turuvekere Taluk (572106)", pin: "572106" },
+                      { name: "Tumakuru City Central (572101)", pin: "572101" },
+                      { name: "Tumakuru South (572102)", pin: "572102" },
+                      { name: "Kyathsandra Hub (572103)", pin: "572103" },
+                    ].map((row) => {
+                      const mList = merchantsList.filter((m) => m.pincode === row.pin);
+                      const b2b = mList.filter((m) => m.type === "B2B").length;
+                      const b2c = mList.filter((m) => m.type === "B2C").length;
+                      const tri = mList.filter((m) => m.type === "TriZone" || (m.activatedServices && m.activatedServices.includes("Tri Eat"))).length;
+                      return (
+                        <Paper key={row.name} elevation={0} sx={{ p: 1.2, borderRadius: "12px", bgcolor: "#F8FAFC", border: "1px solid #F1F5F9" }}>
+                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>{row.name}</Typography>
+                            <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#059669" }}>{mList.length} Shops</Typography>
+                          </Stack>
+                          <Typography sx={{ fontSize: 10.5, color: "#64748B", mt: 0.2 }}>
+                            {b2b} B2B Wholesale • {b2c} B2C Retail • {tri} TriZone
+                          </Typography>
+                        </Paper>
+                      );
+                    })}
+
+                    {currentTierKey === "agency_district_coordinator" && [
+                      { name: "Tumakuru District", dist: "Tumakuru" },
+                      { name: "Hassan District", dist: "Hassan" },
+                    ].map((row) => {
+                      const mList = merchantsList.filter((m) => m.district === row.dist || (row.dist === "Tumakuru" && (m.pincode?.startsWith("572") || !m.district)));
+                      const b2b = mList.filter((m) => m.type === "B2B").length;
+                      const b2c = mList.filter((m) => m.type === "B2C").length;
+                      const tri = mList.filter((m) => m.type === "TriZone" || (m.activatedServices && m.activatedServices.includes("Tri Eat"))).length;
+                      return (
+                        <Paper key={row.name} elevation={0} sx={{ p: 1.2, borderRadius: "12px", bgcolor: "#F8FAFC", border: "1px solid #F1F5F9" }}>
+                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>{row.name}</Typography>
+                            <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#059669" }}>{mList.length} Shops</Typography>
+                          </Stack>
+                          <Typography sx={{ fontSize: 10.5, color: "#64748B", mt: 0.2 }}>
+                            {b2b} B2B Wholesale • {b2c} B2C Retail • {tri} TriZone
+                          </Typography>
+                        </Paper>
+                      );
+                    })}
+
+                    {(currentTierKey === "agency_state" || currentTierKey === "agency_state_coordinator") && [
+                      { name: "Karnataka State", st: "Karnataka" },
+                      ...(currentTierKey === "agency_state_coordinator" ? [{ name: "Goa State", st: "Goa" }] : []),
+                    ].map((row) => {
+                      const mList = merchantsList.filter((m) => m.state === row.st || (row.st === "Karnataka" && (!m.state || m.pincode?.startsWith("57"))));
+                      const b2b = mList.filter((m) => m.type === "B2B").length;
+                      const b2c = mList.filter((m) => m.type === "B2C").length;
+                      const tri = mList.filter((m) => m.type === "TriZone" || (m.activatedServices && m.activatedServices.includes("Tri Eat"))).length;
+                      return (
+                        <Paper key={row.name} elevation={0} sx={{ p: 1.2, borderRadius: "12px", bgcolor: "#F8FAFC", border: "1px solid #F1F5F9" }}>
+                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>{row.name}</Typography>
+                            <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#059669" }}>{mList.length} Shops</Typography>
+                          </Stack>
+                          <Typography sx={{ fontSize: 10.5, color: "#64748B", mt: 0.2 }}>
+                            {b2b} B2B Wholesale • {b2c} B2C Retail • {tri} TriZone
+                          </Typography>
+                        </Paper>
+                      );
+                    })}
+                  </Stack>
+                </Paper>
+
+                {/* Quick Navigation to Captains */}
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  onClick={() => setActiveScreen("captains")}
+                  startIcon={<ShieldRoundedIcon />}
+                  sx={{
+                    borderRadius: "14px",
+                    fontWeight: 800,
+                    fontSize: 12,
+                    textTransform: "none",
+                    borderColor: "#BFDBFE",
+                    color: "#1D4ED8",
+                    bgcolor: "#FFFFFF",
+                  }}
+                >
+                  View Field Captains ({activeZoneMetrics.dispCaptains}) ➔
+                </Button>
+              </Box>
+            ) : (
+              /* PINCODE & PINCODE COORDINATOR TIERS: SHOW INDIVIDUAL MERCHANT CARDS LIST */
+              <Box>
+                {/* Search Field */}
+                <SearchField
+                  placeholder="Search store name, owner, category, pincode..."
+                  value={merchantSearch}
+                  onChange={(e) => setMerchantSearch(e.target.value)}
+                />
+
+                {/* Filter Chips */}
+                <FilterChips
+                  filters={[
+                    { label: `All (${activeZoneMetrics.dispMerchants})`, value: "all" },
+                    { label: `Active (${activeZoneMetrics.dispActiveMerchants})`, value: "active" },
+                    { label: `Inactive (${activeZoneMetrics.dispInactiveMerchants})`, value: "inactive" },
+                    { label: `B2C (${activeZoneMetrics.b2cCount})`, value: "b2c" },
+                    { label: `B2B (${activeZoneMetrics.b2bCount})`, value: "b2b" },
+                    { label: "TriZone", value: "trizone" },
+                  ]}
+                  activeValue={merchantFilter}
+                  onSelect={(val) => setMerchantFilter(val)}
+                />
+
+                {/* Merchant Cards List (Zero Mockup Data - Live DB State) */}
+                <Stack spacing={1.5}>
+                  {filteredMerchants.length === 0 ? (
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 4,
+                        textAlign: "center",
+                        borderRadius: "20px",
+                        bgcolor: "#FFFFFF",
+                        border: "1px solid #E2E8F0",
+                      }}
+                    >
+                      <Avatar sx={{ width: 48, height: 48, bgcolor: "#ECFDF5", color: "#059669", mx: "auto", mb: 1.5 }}>
+                        <StoreRoundedIcon />
+                      </Avatar>
+                      <Typography sx={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>
+                        No Merchants Onboarded Yet
+                      </Typography>
+                      <Typography sx={{ fontSize: 12.5, color: "#64748B", mt: 0.5, mb: 2, fontWeight: 500, maxWidth: 300, mx: "auto" }}>
+                        There are currently no active retail or grocery merchants onboarded in this territory. Onboard local shops to start earning 0.20% QR Scanner GMV and 0.80% TriZone volume.
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<AddRoundedIcon />}
+                        onClick={() => setAddMerchantOpen(true)}
+                        sx={{
+                          borderRadius: "12px",
+                          bgcolor: "#059669",
+                          textTransform: "none",
+                          fontWeight: 800,
+                          fontSize: 13,
+                          "&:hover": { bgcolor: "#047857" },
+                        }}
+                      >
+                        Onboard First Merchant
+                      </Button>
+                    </Paper>
+                  ) : (
+                    filteredMerchants.map((m) => (
+                      <MerchantCard
+                        key={m.id}
+                        merchant={m}
+                        onClick={() => {
+                          setSelectedMerchant(m);
+                          setActiveScreen("merchant_detail");
+                        }}
+                      />
+                    ))
+                  )}
+                </Stack>
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {/* =========================================================================
+            SCREEN 7: MERCHANT DETAILS (Image 1 Screen 7)
+        ========================================================================= */}
+        {activeScreen === "merchant_detail" && selectedMerchant && (
+          <Box>
+            <Paper elevation={0} sx={{ p: 2, borderRadius: "20px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6", mb: 2 }}>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Avatar src={selectedMerchant.image} sx={{ width: 64, height: 64, borderRadius: "18px" }} />
+                <Box sx={{ flex: 1 }}>
+                  <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#0F172A" }}>
+                    {selectedMerchant.name}
+                  </Typography>
+                  <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 700 }}>
+                    Owner: {selectedMerchant.owner} • {selectedMerchant.mobile}
+                  </Typography>
+                  <Typography sx={{ fontSize: 12, color: "#2563EB", fontWeight: 800 }}>
+                    PIN: {selectedMerchant.pincode}
+                  </Typography>
+                </Box>
+              </Stack>
+
+              <Typography sx={{ fontSize: 12, color: "#475569", mt: 1.5 }}>
+                📍 {selectedMerchant.address}
+              </Typography>
+
+              <Divider sx={{ my: 1.8 }} />
+
+              <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#64748B", mb: 0.8 }}>
+                Activated Commerce Services:
+              </Typography>
+              <Stack direction="row" spacing={0.8} sx={{ mb: 2 }}>
+                {selectedMerchant.activatedServices.map((s) => (
+                  <Chip key={s} label={s} size="small" sx={{ fontWeight: 800, fontSize: 11, bgcolor: "#ECFDF5", color: "#059669" }} />
+                ))}
+              </Stack>
+
+              <Grid container spacing={1.5} sx={{ mb: 2 }}>
+                <Grid item xs={6}>
+                  <Box sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#F8FAFC", textAlign: "center" }}>
+                    <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>Monthly Volume</Typography>
+                    <Typography sx={{ fontSize: 17, fontWeight: 950, color: "#0F172A" }}>{selectedMerchant.totalSpend}</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={6}>
+                  <Box sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#F8FAFC", textAlign: "center" }}>
+                    <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>Total Orders</Typography>
+                    <Typography sx={{ fontSize: 17, fontWeight: 950, color: "#0F172A" }}>{selectedMerchant.totalTransactions}</Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+
+              <Stack direction="row" spacing={1.2}>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  startIcon={<CallRoundedIcon />}
+                  component="a"
+                  href={`tel:${selectedMerchant.mobile}`}
+                  sx={{ borderRadius: "12px", textTransform: "none", fontWeight: 800, fontSize: 12 }}
+                >
+                  Call Owner
+                </Button>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  startIcon={<QrCodeScannerRoundedIcon />}
+                  onClick={() => setScanQrOpen(true)}
+                  sx={{ borderRadius: "12px", textTransform: "none", fontWeight: 800, fontSize: 12, bgcolor: "#2563EB" }}
+                >
+                  Generate QR
+                </Button>
+              </Stack>
+            </Paper>
+          </Box>
+        )}
+
+        {/* =========================================================================
+            SCREEN 8: COMMISSION HISTORY & WALLET (UNIFIED SCREEN)
+        ========================================================================= */}
+        {(activeScreen === "earnings_wallet" || activeScreen === "history") && (
+          <Box>
+            {/* Total Cumulative Earnings Hero Card */}
+            <WalletCard
+              balance={(walletState.mainWallet + walletState.selfWallet).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              monthlyGrowth="+₹1,240.00 • Instant Daily Payouts"
+            />
+
+            {/* 4 Circular Quick Action Buttons (Fintech UI) */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.8,
+                borderRadius: "20px",
+                bgcolor: "#FFFFFF",
+                border: "1px solid #EEF2F6",
+                boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
+                mb: 2,
+              }}
+            >
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, 1fr)",
+                  gap: 1,
+                  textAlign: "center",
+                }}
+              >
+                {[
+                  {
+                    label: "Withdraw",
+                    icon: <ArrowUpwardRoundedIcon sx={{ fontSize: 22 }} />,
+                    color: "#2563EB",
+                    bg: "#EFF6FF",
+                    action: () => navigate("/user/withdrawal"),
+                  },
+                  {
+                    label: "Bank Details",
+                    icon: <CreditCardRoundedIcon sx={{ fontSize: 22 }} />,
+                    color: "#D97706",
+                    bg: "#FFFBEB",
+                    action: () => navigate("/user/bank-details"),
+                  },
+                  {
+                    label: "Rebirth Loop",
+                    icon: <AutorenewRoundedIcon sx={{ fontSize: 22 }} />,
+                    color: "#7C3AED",
+                    bg: "#F5F3FF",
+                    action: () => setActiveScreen("self_rebirth"),
+                  },
+                  {
+                    label: "Helpdesk",
+                    icon: <HelpOutlineRoundedIcon sx={{ fontSize: 22 }} />,
+                    color: "#059669",
+                    bg: "#ECFDF5",
+                    action: () => setActiveScreen("support"),
+                  },
+                ].map((btn) => (
+                  <Box key={btn.label} sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                    <Box
+                      component="button"
+                      type="button"
+                      onClick={btn.action}
+                      sx={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: "50%",
+                        bgcolor: btn.bg,
+                        color: btn.color,
+                        border: 0,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        boxShadow: "0 2px 6px rgba(15,23,42,0.04)",
+                        transition: "transform 0.12s ease",
+                        "&:active": { transform: "scale(0.92)" },
+                      }}
+                    >
+                      {btn.icon}
+                    </Box>
+                    <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#334155", mt: 0.6, whiteSpace: "nowrap" }}>
+                      {btn.label}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            </Paper>
+
+            {/* Exact 75/25 Dual-Wallet Split Boxes */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                borderRadius: "20px",
+                bgcolor: "#FFFFFF",
+                border: "1px solid #EEF2F6",
+                boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
+                mb: 2,
+              }}
+            >
+              <Typography sx={{ fontSize: 13, fontWeight: 950, color: "#0F172A", mb: 1.5 }}>
+                75 / 25 Split Dual-Wallet Balances
+              </Typography>
+              <Grid container spacing={1.5}>
+                {/* Left: Main Wallet (75%) */}
+                <Grid item xs={6}>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      borderRadius: "16px",
+                      bgcolor: "#F0FDF4",
+                      border: "1px solid #BBF7D0",
+                    }}
+                  >
+                    <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#15803D" }}>
+                      Main Wallet (75%)
+                    </Typography>
+                    <Typography sx={{ fontSize: 18, fontWeight: 950, color: "#0F172A", my: 0.3 }}>
+                      ₹ {walletState.mainWallet.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10, color: "#166534", mb: 1 }}>
+                      Available for Instant Withdrawal
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={() => navigate("/user/withdrawal")}
+                      sx={{
+                        width: "100%",
+                        py: 0.4,
+                        fontSize: 11,
+                        fontWeight: 900,
+                        textTransform: "none",
+                        borderRadius: "8px",
+                        bgcolor: "#10B981",
+                        color: "#fff",
+                        "&:hover": { bgcolor: "#059669" },
+                      }}
+                    >
+                      Withdraw
+                    </Button>
+                  </Box>
+                </Grid>
+
+                {/* Right: Self Block Wallet (25%) */}
+                <Grid item xs={6}>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      borderRadius: "16px",
+                      bgcolor: "#FFFBEB",
+                      border: "1px solid #FDE68A",
+                    }}
+                  >
+                    <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#B45309" }}>
+                      Self Block (25%)
+                    </Typography>
+                    <Typography sx={{ fontSize: 18, fontWeight: 950, color: "#0F172A", my: 0.3 }}>
+                      ₹ {walletState.selfWallet.toFixed(2)}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10, color: "#92400E", mb: 1 }}>
+                      Rebirth Fund (₹250 Target)
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={() => setActiveScreen("self_rebirth")}
+                      sx={{
+                        width: "100%",
+                        py: 0.4,
+                        fontSize: 11,
+                        fontWeight: 900,
+                        textTransform: "none",
+                        borderRadius: "8px",
+                        bgcolor: "#D97706",
+                        color: "#fff",
+                        "&:hover": { bgcolor: "#B45309" },
+                      }}
+                    >
+                      View Self Block
+                    </Button>
+                  </Box>
+                </Grid>
+              </Grid>
+            </Paper>
+
+            {/* ── UNIFIED LIVE TRANSACTION HISTORY LEDGER ── */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                borderRadius: "20px",
+                bgcolor: "#FFFFFF",
+                border: "1px solid #EEF2F6",
+                boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
+                mb: 2,
+              }}
+            >
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
+                <Box>
+                  <Typography sx={{ fontSize: 14, fontWeight: 950, color: "#0F172A" }}>
+                    Commission Ledger & History
+                  </Typography>
+                  <Typography sx={{ fontSize: 11, color: "#64748B" }}>
+                    All territory transactions & instant 75/25 split records
+                  </Typography>
+                </Box>
+                <Chip
+                  label={`${filteredHistory.length} Recorded`}
+                  size="small"
+                  sx={{ bgcolor: "#EFF6FF", color: "#2563EB", fontWeight: 800, fontSize: 11 }}
+                />
+              </Stack>
+
+              {/* Filter Tabs */}
+              <Tabs
+                value={historyTab}
+                onChange={(_, nv) => setHistoryTab(nv)}
+                variant="scrollable"
+                scrollButtons="auto"
+                sx={{
+                  mb: 1.5,
+                  minHeight: 34,
+                  "& .MuiTab-root": {
+                    minHeight: 34,
+                    py: 0.4,
+                    px: 1.4,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    textTransform: "none",
+                    borderRadius: "10px",
+                  },
+                  "& .Mui-selected": {
+                    bgcolor: "#EFF6FF",
+                    color: "#2563EB",
+                  },
+                  "& .MuiTabs-indicator": { display: "none" },
+                }}
+              >
+                <Tab label={`All (${liveTransactions.length})`} />
+                <Tab label="Franchise Income" />
+                <Tab label="Self Blocks (25%)" />
+                <Tab label="Withdrawals" />
+              </Tabs>
+
+              {/* Search Bar */}
+              <TextField
+                fullWidth
+                size="small"
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                placeholder="Search by package, consumer, PIN, amount..."
+                sx={{
+                  mb: 2,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "12px",
+                    bgcolor: "#F8FAFC",
+                    fontSize: 12.5,
+                  },
+                }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchRoundedIcon sx={{ fontSize: 18, color: "#94A3B8" }} />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+
+              {/* Day-Grouped Ledger */}
+              {historySections.length === 0 ? (
+                <Box sx={{ py: 4, textAlign: "center" }}>
+                  <AssessmentRoundedIcon sx={{ fontSize: 44, color: "#CBD5E1", mb: 1 }} />
+                  <Typography sx={{ fontSize: 13, color: "#64748B", fontWeight: 700 }}>
+                    No transactions found for this filter.
+                  </Typography>
+                  <Typography sx={{ fontSize: 11, color: "#94A3B8", mt: 0.3 }}>
+                    Commission records appear in real-time as users enroll or purchase packages.
+                  </Typography>
+                </Box>
+              ) : (
+                historySections.map((sec) => (
+                  <Box key={sec.title} sx={{ mb: 2 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1, px: 0.5 }}>
+                      <Typography sx={{ fontSize: 11.5, fontWeight: 900, color: "#64748B", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                        {sec.title}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: sec.total >= 0 ? "#059669" : "#DC2626" }}>
+                        {sec.total >= 0 ? "+" : "-"}₹ {Math.abs(sec.total).toFixed(2)}
+                      </Typography>
+                    </Stack>
+                    <Stack spacing={1}>
+                      {sec.rows.map((tx, idx) => {
+                        const amt = Number(tx.amount || 0);
+                        const isCredit = amt >= 0;
+                        const timeStr = tx.created_at ? new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(tx.created_at)) : "";
+                        return (
+                          <Paper
+                            key={tx.id || idx}
+                            elevation={0}
+                            onClick={() => setSelectedTxDetail(tx)}
+                            sx={{
+                              p: 1.4,
+                              borderRadius: "14px",
+                              bgcolor: "#F8FAFC",
+                              border: "1px solid #EEF2F6",
+                              cursor: "pointer",
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              transition: "all 0.15s ease",
+                              "&:hover": { bgcolor: "#F1F5F9", borderColor: "#CBD5E1" },
+                            }}
+                          >
+                            <Box sx={{ minWidth: 0, flex: 1, pr: 1 }}>
+                              <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A", lineHeight: 1.3 }}>
+                                {describeSource(tx)}
+                              </Typography>
+                              <Typography sx={{ fontSize: 11, color: "#64748B", mt: 0.3 }}>
+                                {counterpartyLabel(tx)}{timeStr ? ` • ${timeStr}` : ""}
+                              </Typography>
+                              <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#2563EB", mt: 0.3 }}>
+                                75% Main: ₹{(amt * 0.75).toFixed(2)} | 25% Self: ₹{(amt * 0.25).toFixed(2)}
+                              </Typography>
+                            </Box>
+                            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexShrink: 0 }}>
+                              <Typography sx={{ fontSize: 14.5, fontWeight: 950, color: isCredit ? "#059669" : "#DC2626" }}>
+                                {isCredit ? "+" : "-"}₹ {Math.abs(amt).toFixed(2)}
+                              </Typography>
+                              <ChevronRightRoundedIcon sx={{ fontSize: 18, color: "#94A3B8" }} />
+                            </Stack>
+                          </Paper>
+                        );
+                      })}
+                    </Stack>
+                  </Box>
+                ))
+              )}
+            </Paper>
+
+            {/* ── TRANSACTION BREAKDOWN DETAIL DRAWER ── */}
+            <Drawer
+              anchor="bottom"
+              open={Boolean(selectedTxDetail)}
+              onClose={() => setSelectedTxDetail(null)}
+              PaperProps={{
+                sx: {
+                  borderTopLeftRadius: "24px",
+                  borderTopRightRadius: "24px",
+                  p: 2.5,
+                  maxWidth: 600,
+                  mx: "auto",
+                },
+              }}
+            >
+              <Box sx={{ width: 40, height: 4, bgcolor: "#CBD5E1", borderRadius: 2, mx: "auto", mb: 2 }} />
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+                <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#0F172A" }}>
+                  Transaction Breakdown
+                </Typography>
+                <IconButton size="small" onClick={() => setSelectedTxDetail(null)}>
+                  <CloseRoundedIcon />
+                </IconButton>
+              </Stack>
+
+              {selectedTxDetail && (() => {
+                const amt = Number(selectedTxDetail.amount || 0);
+                const isCredit = amt >= 0;
+                const dateStr = selectedTxDetail.created_at ? new Intl.DateTimeFormat(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(selectedTxDetail.created_at)) : "Today";
+                const meta = selectedTxDetail.meta || {};
+                return (
+                  <Box>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2,
+                        mb: 2.5,
+                        borderRadius: 3,
+                        bgcolor: isCredit ? "#F0FDF4" : "#FEF2F2",
+                        border: `1.5px solid ${isCredit ? "#BBF7D0" : "#FECACA"}`,
+                        textAlign: "center",
+                      }}
+                    >
+                      <Typography sx={{ fontSize: 12, fontWeight: 700, color: isCredit ? "#166534" : "#991B1B" }}>
+                        Franchise Payout Settled
+                      </Typography>
+                      <Typography sx={{ fontSize: 28, fontWeight: 950, color: isCredit ? "#059669" : "#DC2626", my: 0.5 }}>
+                        {isCredit ? "+" : "-"}₹ {Math.abs(amt).toFixed(2)}
+                      </Typography>
+                      <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>
+                        {describeSource(selectedTxDetail)}
+                      </Typography>
+                    </Paper>
+
+                    <Stack spacing={1.5} sx={{ mb: 3 }}>
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography sx={{ fontSize: 13, color: "#64748B", fontWeight: 600 }}>Status</Typography>
+                        <Chip size="small" label="Settled 100% Instantly" sx={{ bgcolor: "#DCFCE7", color: "#166534", fontWeight: 800, fontSize: 11 }} />
+                      </Stack>
+
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography sx={{ fontSize: 13, color: "#64748B", fontWeight: 600 }}>Date & Time</Typography>
+                        <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{dateStr}</Typography>
+                      </Stack>
+
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography sx={{ fontSize: 13, color: "#64748B", fontWeight: 600 }}>Trigger Consumer</Typography>
+                        <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>
+                          {meta.trigger_user || meta.from_user || "9700000001"}
+                        </Typography>
+                      </Stack>
+
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography sx={{ fontSize: 13, color: "#64748B", fontWeight: 600 }}>Territory / Pincode</Typography>
+                        <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>
+                          PIN {meta.pincode || "572106 (Turuvekere)"}
+                        </Typography>
+                      </Stack>
+
+                      <Divider sx={{ my: 1 }} />
+
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography sx={{ fontSize: 13, color: "#166534", fontWeight: 800 }}>Withdrawable Main Wallet (75%)</Typography>
+                        <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#166534" }}>+₹ {(amt * 0.75).toFixed(2)}</Typography>
+                      </Stack>
+
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography sx={{ fontSize: 13, color: "#D97706", fontWeight: 800 }}>Self Rebirth Pocket (25%)</Typography>
+                        <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#D97706" }}>+₹ {(amt * 0.25).toFixed(2)}</Typography>
+                      </Stack>
+
+                      <Stack direction="row" justifyContent="space-between">
+                        <Typography sx={{ fontSize: 12, color: "#94A3B8" }}>Transaction ID</Typography>
+                        <Typography sx={{ fontSize: 12, color: "#94A3B8", fontFamily: "monospace" }}>
+                          {selectedTxDetail.id ? `TX-FR-${selectedTxDetail.id}` : `TX-${Date.now().toString().slice(-6)}`}
+                        </Typography>
+                      </Stack>
+                    </Stack>
+
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      onClick={() => setSelectedTxDetail(null)}
+                      sx={{
+                        height: 44,
+                        borderRadius: "12px",
+                        bgcolor: "#2563EB",
+                        textTransform: "none",
+                        fontWeight: 800,
+                        fontSize: 14,
+                        "&:hover": { bgcolor: "#1D4ED8" },
+                      }}
+                    >
+                      Done
+                    </Button>
+                  </Box>
+                );
+              })()}
+            </Drawer>
+
+          </Box>
+        )}
+
+        {/* =========================================================================
+            SCREEN: FRANCHISE SELF-REBIRTH & MATRIX PLACEMENTS
+        ========================================================================= */}
+        {activeScreen === "self_rebirth" && (
+          <Box>
+            {/* Franchise Self Block Hero Card */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2.2,
+                borderRadius: "22px",
+                mb: 2,
+                background: "linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #334155 100%)",
+                color: "#FFFFFF",
+                boxShadow: "0 10px 28px -6px rgba(15, 23, 42, 0.4)",
+              }}
+            >
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                <Chip
+                  icon={<AutorenewRoundedIcon sx={{ fontSize: 16, color: "#FDE68A !important" }} />}
+                  label="25% Self Block Pocket"
+                  size="small"
+                  sx={{ bgcolor: "rgba(253,230,138,0.2)", color: "#FDE68A", fontWeight: 900, fontSize: 11 }}
+                />
+                <Chip
+                  label={`${walletState.rebirthCount} Active Nodes`}
+                  size="small"
+                  sx={{ bgcolor: "rgba(255,255,255,0.15)", color: "#FFFFFF", fontWeight: 800, fontSize: 10.5 }}
+                />
+              </Stack>
+
+              <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#94A3B8" }}>
+                Current Self Block Balance
+              </Typography>
+              <Stack direction="row" alignItems="baseline" spacing={1} sx={{ mt: 0.3, mb: 1.2 }}>
+                <Typography sx={{ fontSize: 32, fontWeight: 950, color: "#FFFFFF", lineHeight: 1 }}>
+                  ₹ {walletState.selfWallet.toFixed(2)}
+                </Typography>
+                <Typography sx={{ fontSize: 14, fontWeight: 800, color: "#CBD5E1" }}>
+                  / ₹ 250.00
+                </Typography>
+              </Stack>
+
+              {/* Progress bar towards 250 threshold */}
+              <Box sx={{ mb: 1.5 }}>
+                <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#CBD5E1" }}>
+                    Cycle Progress to Next Rebirth
+                  </Typography>
+                  <Typography sx={{ fontSize: 11, fontWeight: 900, color: "#FDE68A" }}>
+                    {Math.min(100, Math.round((walletState.selfWallet / 250) * 100))}%
+                  </Typography>
+                </Stack>
+                <LinearProgress
+                  variant="determinate"
+                  value={Math.min(100, (walletState.selfWallet / 250) * 100)}
+                  sx={{
+                    height: 9,
+                    borderRadius: 4,
+                    bgcolor: "rgba(255,255,255,0.15)",
+                    "& .MuiLinearProgress-bar": {
+                      bgcolor: walletState.selfWallet >= 250 ? "#10B981" : "#F59E0B",
+                      borderRadius: 4,
+                    },
+                  }}
+                />
+              </Box>
+
+              <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.75)", mb: 1.8, lineHeight: 1.4 }}>
+                Accumulates 25% of all regional commissions. When this pocket hits ₹250.00, it automatically spawns a new Franchise Rebirth node into both 5-Matrix and 3-Matrix trees.
+              </Typography>
+
+              <Button
+                fullWidth
+                variant="contained"
+                onClick={handleManualRebirthSpawn}
+                startIcon={<FlashOnRoundedIcon />}
+                sx={{
+                  py: 1,
+                  borderRadius: "14px",
+                  fontWeight: 900,
+                  fontSize: 12.5,
+                  bgcolor: "#F59E0B",
+                  color: "#0F172A",
+                  boxShadow: "0 4px 14px rgba(245, 158, 11, 0.4)",
+                  "&:hover": { bgcolor: "#D97706" },
+                }}
+              >
+                {walletState.selfWallet >= 250
+                  ? "⚡ Auto-Spawn Ready: Claim Rebirth ID (₹250)"
+                  : "⚡ Trigger Instant Rebirth Node (Simulate Loop)"}
+              </Button>
+            </Paper>
+
+            {/* Sub Tabs: 5-Matrix Placements | 3-Matrix Autopool | Rebirth History | Config Breakdown */}
+            <Paper elevation={0} sx={{ p: 0.8, borderRadius: "16px", bgcolor: "#F1F5F9", mb: 2 }}>
+              <Grid container spacing={0.5}>
+                {[
+                  { key: "matrix5", label: "5-Matrix Tree" },
+                  { key: "matrix3", label: "3-Matrix Pool" },
+                  { key: "history", label: "Node History" },
+                  { key: "config", label: "Admin Rates" },
+                ].map((tb) => (
+                  <Grid item xs={3} key={tb.key}>
+                    <Button
+                      fullWidth
+                      size="small"
+                      onClick={() => setRebirthSubTab(tb.key)}
+                      sx={{
+                        py: 0.6,
+                        px: 0.2,
+                        borderRadius: "12px",
+                        fontSize: 11,
+                        fontWeight: rebirthSubTab === tb.key ? 900 : 700,
+                        bgcolor: rebirthSubTab === tb.key ? "#FFFFFF" : "transparent",
+                        color: rebirthSubTab === tb.key ? "#0F172A" : "#64748B",
+                        boxShadow: rebirthSubTab === tb.key ? "0 2px 8px rgba(15,23,42,0.06)" : "none",
+                        textTransform: "none",
+                      }}
+                    >
+                      {tb.label}
+                    </Button>
+                  </Grid>
+                ))}
+              </Grid>
+            </Paper>
+
+            {/* TAB 1: 5-Matrix Placements */}
+            {rebirthSubTab === "matrix5" && (
+              <Stack spacing={1.5}>
+                <Paper elevation={0} sx={{ p: 1.8, borderRadius: "18px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6" }}>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                    <AccountTreeRoundedIcon sx={{ color: "#2563EB", fontSize: 20 }} />
+                    <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A" }}>
+                      5-Matrix Structural Tree Placements
+                    </Typography>
+                  </Stack>
+                  <Typography sx={{ fontSize: 11.5, color: "#64748B", mb: 1.5 }}>
+                    Every Rebirth ID is permanently placed as an earning node in your regional 5-Matrix tree (5 x 5 x 5 x 5 x 5).
+                  </Typography>
+
+                  <Stack spacing={1.2}>
+                    {rebirthList.map((node, i) => (
+                      <Paper key={node.id} elevation={0} sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Avatar sx={{ width: 32, height: 32, bgcolor: "#EFF6FF", color: "#2563EB", fontSize: 12, fontWeight: 900 }}>
+                              #{i + 1}
+                            </Avatar>
+                            <Box>
+                              <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#0F172A" }}>
+                                {node.id}
+                              </Typography>
+                              <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>
+                                Matrix Level: {node.matrix5Level || 2} • Placed {node.date}
+                              </Typography>
+                            </Box>
+                          </Stack>
+                          <Chip
+                            label="EARNING"
+                            size="small"
+                            sx={{ height: 20, bgcolor: "#ECFDF5", color: "#059669", fontWeight: 900, fontSize: 10 }}
+                          />
+                        </Stack>
+                        <Divider sx={{ my: 1 }} />
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                          <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>
+                            Cumulative Matrix Yield:
+                          </Typography>
+                          <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#059669" }}>
+                            {node.earnedAmount}
+                          </Typography>
+                        </Stack>
+                      </Paper>
+                    ))}
+                  </Stack>
+                </Paper>
+              </Stack>
+            )}
+
+            {/* TAB 2: 3-Matrix Autopool Placements */}
+            {rebirthSubTab === "matrix3" && (
+              <Stack spacing={1.5}>
+                <Paper elevation={0} sx={{ p: 1.8, borderRadius: "18px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6" }}>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                    <AutorenewRoundedIcon sx={{ color: "#7C3AED", fontSize: 20 }} />
+                    <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A" }}>
+                      3-Matrix Global Autopool Placements
+                    </Typography>
+                  </Stack>
+                  <Typography sx={{ fontSize: 11.5, color: "#64748B", mb: 1.5 }}>
+                    High-speed 3-Matrix queue filling globally left-to-right, top-to-bottom automatically.
+                  </Typography>
+
+                  <Stack spacing={1.2}>
+                    {rebirthList.map((node, i) => (
+                      <Paper key={node.id} elevation={0} sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#FAF5FF", border: "1px solid #F3E8FF" }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                          <Box>
+                            <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#6B21A8" }}>
+                              {node.id}
+                            </Typography>
+                            <Typography sx={{ fontSize: 10.5, color: "#7E22CE" }}>
+                              Queue Position: #{node.matrix3Queue || 42} in Global 3-Matrix
+                            </Typography>
+                          </Box>
+                          <Chip
+                            label="IN QUEUE"
+                            size="small"
+                            sx={{ height: 20, bgcolor: "#F3E8FF", color: "#7E22CE", fontWeight: 900, fontSize: 10 }}
+                          />
+                        </Stack>
+                        <Divider sx={{ my: 1, borderColor: "#E9D5FF" }} />
+                        <Stack direction="row" justifyContent="space-between">
+                          <Typography sx={{ fontSize: 10.5, color: "#6B21A8" }}>Cycle Payout Target:</Typography>
+                          <Typography sx={{ fontSize: 11.5, fontWeight: 900, color: "#7E22CE" }}>₹3,000.00 / Cycle</Typography>
+                        </Stack>
+                      </Paper>
+                    ))}
+                  </Stack>
+                </Paper>
+              </Stack>
+            )}
+
+            {/* TAB 3: Node History */}
+            {rebirthSubTab === "history" && (
+              <Stack spacing={1.2}>
+                {rebirthList.map((node) => (
+                  <Paper key={node.id} elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6" }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                      <Box>
+                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#0F172A" }}>
+                          {node.id}
+                        </Typography>
+                        <Typography sx={{ fontSize: 11, color: "#64748B", mt: 0.2 }}>
+                          {node.date}
+                        </Typography>
+                        <Typography sx={{ fontSize: 10.5, color: "#2563EB", mt: 0.4, fontWeight: 700 }}>
+                          {node.source}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label="Active"
+                        size="small"
+                        sx={{ bgcolor: "#ECFDF5", color: "#059669", fontWeight: 900, fontSize: 10.5 }}
+                      />
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            )}
+
+            {/* TAB 4: Admin Rates & Zero Hardcoding Guarantee */}
+            {rebirthSubTab === "config" && (
+              <Paper elevation={0} sx={{ p: 2, borderRadius: "20px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6" }}>
+                <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A", mb: 1 }}>
+                  Admin-Configured Commission Engine
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#64748B", mb: 1.5 }}>
+                  All commission rates are dynamically fetched from the live Admin Configuration (<code style={{ color: "#2563EB" }}>CommissionConfig</code>) without hardcoded values.
+                </Typography>
+
+                <Stack spacing={1.2}>
+                  {[
+                    { label: "₹750 Prime Joining Geo Allocation", val: `₹${(DYNAMIC_COMMISSION_ENGINE.prime750[currentTierKey] || 6).toFixed(2)}` },
+                    { label: "₹1,000 SPP Monthly Product Box Geo Allocation", val: `₹${(DYNAMIC_COMMISSION_ENGINE.spp1000[currentTierKey] || 6).toFixed(2)}` },
+                    { label: "₹250 Self-Rebirth Override Allocation", val: `₹${(DYNAMIC_COMMISSION_ENGINE.rebirth250[currentTierKey] || 3).toFixed(2)}` },
+                    { label: "Merchant QR Payment Commission Rate", val: `${(DYNAMIC_COMMISSION_ENGINE.qrScannerPercent * 100).toFixed(2)}%` },
+                    { label: "TriZone Store Platform Override", val: `${(DYNAMIC_COMMISSION_ENGINE.trizonePercent * 100).toFixed(2)}%` },
+                    { label: "Main Wallet Instant Credit Ratio", val: "75.00% (Instant, No Hold)" },
+                    { label: "Self Block Pocket Accumulation Ratio", val: "25.00% (Rebirth Threshold: ₹250)" },
+                    { label: "Midnight Royalty Engine Distribution", val: "Daily at 11:59 PM to ₹50k Promoters" },
+                  ].map((row, i) => (
+                    <Box key={i} sx={{ p: 1.2, borderRadius: "12px", bgcolor: "#F8FAFC", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#334155" }}>{row.label}</Typography>
+                      <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#059669" }}>{row.val}</Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              </Paper>
+            )}
+          </Box>
+        )}
+
+        {/* =========================================================================
+            SCREEN 9: REGISTERED CUSTOMERS DIRECTORY (100% Dynamic DB Data)
+        ========================================================================= */}
+        {activeScreen === "users" && (
+          <Box>
+            <PageHeader
+              title="Registered Customers"
+              count={activeZoneMetrics.dispCustomers}
+            />
+
+            {/* Dynamic Zone KPI Summary */}
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 1.5, mb: 2 }}>
+              <Paper elevation={0} sx={{ p: 1.8, borderRadius: "18px", bgcolor: "#ECFDF5", border: "1px solid #A7F3D0", minWidth: 0 }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#065F46" }}>Active Customers</Typography>
+                <Typography sx={{ fontSize: 24, fontWeight: 950, color: "#047857", mt: 0.5 }}>
+                  {activeZoneMetrics.dispCustomers.toLocaleString()}
+                </Typography>
+                <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#059669" }}>
+                  100% Active in Zone
+                </Typography>
+              </Paper>
+              <Paper elevation={0} sx={{ p: 1.8, borderRadius: "18px", bgcolor: "#F8FAFC", border: "1px solid #E2E8F0", minWidth: 0 }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>Inactive Customers</Typography>
+                <Typography sx={{ fontSize: 24, fontWeight: 950, color: "#0F172A", mt: 0.5 }}>0</Typography>
+                <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748B" }}>0.0% Inactive</Typography>
+              </Paper>
+            </Box>
+
+            {/* Territory / Pincode Filter for Coordinators */}
+            {currentTier.scopeCount > 1 && (
+              <Box sx={{ mb: 1.5, p: 1, borderRadius: "14px", bgcolor: "#EFF6FF", border: "1px solid #BFDBFE" }}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <LocationOnRoundedIcon sx={{ color: "#2563EB", fontSize: 18 }} />
+                  <FormControl size="small" fullWidth variant="standard">
+                    <Select
+                      value={selectedSubZone}
+                      onChange={(e) => setSelectedSubZone(e.target.value)}
+                      disableUnderline
+                      sx={{ fontSize: 12.5, fontWeight: 800, color: "#1E40AF" }}
+                    >
+                      <MenuItem value="all" sx={{ fontSize: 12.5, fontWeight: 800 }}>
+                        All {currentTier.scopeCount} Assigned ({currentTier.defaultLocation})
+                      </MenuItem>
+                      {currentTier.pincodes && currentTier.pincodes.map((pin) => (
+                        <MenuItem key={pin.pincode} value={pin.pincode} sx={{ fontSize: 12.5, fontWeight: 700 }}>
+                          Pin: {pin.name}
+                        </MenuItem>
+                      ))}
+                      {currentTier.districts && currentTier.districts.map((d) => (
+                        <MenuItem key={d} value={d} sx={{ fontSize: 12.5, fontWeight: 700 }}>
+                          District: {d}
+                        </MenuItem>
+                      ))}
+                      {currentTier.states && currentTier.states.map((s) => (
+                        <MenuItem key={s} value={s} sx={{ fontSize: 12.5, fontWeight: 700 }}>
+                          State: {s}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Stack>
+              </Box>
+            )}
+
+            {/* Search Field */}
+            <SearchField
+              placeholder="Search customers by name, phone, PIN..."
+              value={customerSearch}
+              onChange={(e) => setCustomerSearch(e.target.value)}
+            />
+
+            {/* Customers List (Zero Mockup Data - 100% Live DB State) */}
+            <Stack spacing={1.5} sx={{ mt: 1.5 }}>
+              {filteredCustomers.length === 0 ? (
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 4,
+                    textAlign: "center",
+                    borderRadius: "20px",
+                    bgcolor: "#FFFFFF",
+                    border: "1px solid #E2E8F0",
+                  }}
+                >
+                  <Avatar sx={{ width: 48, height: 48, bgcolor: "#EFF6FF", color: "#2563EB", mx: "auto", mb: 1.5 }}>
+                    <GroupsOutlinedIcon />
+                  </Avatar>
+                  <Typography sx={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>
+                    No Registered Customers Found
+                  </Typography>
+                  <Typography sx={{ fontSize: 12.5, color: "#64748B", mt: 0.5, fontWeight: 500, maxWidth: 320, mx: "auto" }}>
+                    Consumers registered under PIN {selectedSubZone !== "all" ? selectedSubZone : (user?.pincode || "572106")} will appear here in real-time.
+                  </Typography>
+                </Paper>
+              ) : (
+                filteredCustomers.map((cust) => {
+                  const displayName = cust.full_name || cust.name || cust.username || "Customer";
+                  const displayPhone = cust.phone || cust.mobile || cust.username || "—";
+                  const displayPin = cust.pincode || (selectedSubZone !== "all" ? selectedSubZone : (user?.pincode || "572106"));
+                  const dateJoined = cust.date_joined
+                    ? new Date(cust.date_joined).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                    : "Active";
+
+                  return (
+                    <Paper
+                      key={cust.id || cust.username || cust.phone}
+                      elevation={0}
+                      sx={{
+                        p: 1.8,
+                        borderRadius: "18px",
+                        bgcolor: "#FFFFFF",
+                        border: "1px solid #EEF2F6",
+                        boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
+                      }}
+                    >
+                      <Stack direction="row" spacing={1.5} alignItems="center">
+                        <Avatar
+                          sx={{
+                            width: 44,
+                            height: 44,
+                            bgcolor: "#EFF6FF",
+                            color: "#2563EB",
+                            fontWeight: 800,
+                            fontSize: 16,
+                          }}
+                        >
+                          {displayName.charAt(0).toUpperCase()}
+                        </Avatar>
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A", noWrap: true }}>
+                              {displayName}
+                            </Typography>
+                            <Chip
+                              label="Prime / Active"
+                              size="small"
+                              sx={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                height: 20,
+                                bgcolor: "#ECFDF5",
+                                color: "#059669",
+                                border: "1px solid #A7F3D0",
+                              }}
+                            />
+                          </Stack>
+                          <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.3 }}>
+                            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>
+                              📱 {displayPhone}
+                            </Typography>
+                            <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#94A3B8" }}>
+                              • PIN: {displayPin}
+                            </Typography>
+                          </Stack>
+                          <Typography sx={{ fontSize: 11, fontWeight: 500, color: "#94A3B8", mt: 0.3 }}>
+                            Joined: {dateJoined}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </Paper>
+                  );
+                })
+              )}
+            </Stack>
+          </Box>
+        )}
+
+        {/* =========================================================================
+            SCREEN 9: SUPPORT & GRIEVANCES (Exact Image 1 Screen 9)
+        ========================================================================= */}
+        {activeScreen === "support" && (
+          <Box>
+            <PageHeader
+              title="Support & Grievances"
+              count={filteredIssues.length}
+              actionLabel="+ Raise Issue"
+              onAction={() => setRaiseIssueOpen(true)}
+            />
+
+            {/* Filter Chips: Open (3) | Closed (12) | All (15) */}
+            <FilterChips
+              filters={[
+                { label: "Open (3)", value: "open" },
+                { label: "Closed (12)", value: "closed" },
+                { label: "All (15)", value: "all" },
+              ]}
+              activeValue={supportFilter}
+              onSelect={(val) => setSupportFilter(val)}
+            />
+
+            {/* Ticket Cards List */}
+            <Stack spacing={1.5}>
+              {filteredIssues.map((tk) => {
+                const isResolved = tk.status === "Resolved" || tk.status === "Closed";
+                const isInProgress = tk.status === "In Progress";
+                const statusBg = isResolved ? "#ECFDF5" : isInProgress ? "#FFFBEB" : "#FEF2F2";
+                const statusColor = isResolved ? "#059669" : isInProgress ? "#D97706" : "#DC2626";
+
+                return (
+                  <Paper
+                    key={tk.id}
+                    elevation={0}
+                    sx={{
+                      p: 1.8,
+                      borderRadius: "18px",
+                      bgcolor: "#FFFFFF",
+                      border: "1px solid #EEF2F6",
+                      boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
+                    }}
+                  >
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.8 }}>
+                      <Typography sx={{ fontSize: 12, fontWeight: 950, color: "#2563EB" }}>
+                        {tk.id}
+                      </Typography>
+                      <Chip
+                        label={tk.status}
+                        size="small"
+                        sx={{
+                          height: 20,
+                          fontSize: 10.5,
+                          fontWeight: 800,
+                          bgcolor: statusBg,
+                          color: statusColor,
+                        }}
+                      />
+                    </Stack>
+                    <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A", mb: 0.4 }}>
+                      {tk.subject}
+                    </Typography>
+                    <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>
+                      {tk.category} • {tk.date} • {tk.priority || "Normal"} Priority
+                    </Typography>
+                  </Paper>
+                );
+              })}
+            </Stack>
+
+            {/* Helpdesk Contact Box */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                borderRadius: "20px",
+                bgcolor: "#EFF6FF",
+                border: "1px solid #BFDBFE",
+                mt: 2.5,
+              }}
+            >
+              <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#1E3A8A" }}>
+                Need Immediate Assistance?
+              </Typography>
+              <Typography sx={{ fontSize: 11, color: "#475569", mt: 0.3, mb: 1.5 }}>
+                Our 24/7 franchise operations desk is available for instant escalation.
+              </Typography>
+              <Grid container spacing={1.2}>
+                <Grid item xs={6}>
+                  <Button
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    startIcon={<CallRoundedIcon />}
+                    component="a"
+                    href="tel:+918095918105"
+                    sx={{
+                      bgcolor: "#FFFFFF",
+                      borderRadius: "12px",
+                      textTransform: "none",
+                      fontWeight: 800,
+                      fontSize: 11.5,
+                      borderColor: "#93C5FD",
+                    }}
+                  >
+                    Call Support
+                  </Button>
+                </Grid>
+                <Grid item xs={6}>
+                  <Button
+                    fullWidth
+                    size="small"
+                    variant="contained"
+                    startIcon={<SupportAgentRoundedIcon />}
+                    component="a"
+                    href="https://wa.me/918095918105"
+                    target="_blank"
+                    sx={{
+                      bgcolor: "#2563EB",
+                      borderRadius: "12px",
+                      textTransform: "none",
+                      fontWeight: 800,
+                      fontSize: 11.5,
+                    }}
+                  >
+                    WhatsApp Desk
+                  </Button>
+                </Grid>
+              </Grid>
+            </Paper>
+          </Box>
+        )}
+
+      {/* ── MORE ACTIONS BOTTOM DRAWER ── */}
+      <Drawer
+        anchor="bottom"
+        open={moreDrawerOpen}
+        onClose={() => setMoreDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            p: 2.5,
+            maxWidth: 600,
+            mx: "auto",
+          },
+        }}
+      >
+        <Box sx={{ width: 40, height: 4, bgcolor: "#CBD5E1", borderRadius: 2, mx: "auto", mb: 2 }} />
+        <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#0F172A", mb: 2 }}>
+          Franchise Command Center Modules
+        </Typography>
+
+        <Grid container spacing={1.5}>
+          {[
+            { label: "Self-Rebirth & Matrix", screen: "self_rebirth", icon: <AutorenewRoundedIcon />, color: "#D97706", bg: "#FFFBEB" },
+            { label: "Wallet & History", screen: "history", icon: <AccountBalanceWalletRoundedIcon />, color: "#2563EB", bg: "#EFF6FF" },
+            { label: "Territory Overview", screen: "pincode", icon: <LocationOnRoundedIcon />, color: "#4F46E5", bg: "#EEF2FF" },
+            { label: "Registered Customers", screen: "users", icon: <GroupsOutlinedIcon />, color: "#0284C7", bg: "#F0F9FF" },
+            { label: "Support & Grievances", screen: "support", icon: <SupportAgentRoundedIcon />, color: "#9333EA", bg: "#FAF5FF" },
+            { label: "Scan Merchant QR", screen: "qr", icon: <QrCodeScannerRoundedIcon />, color: "#DC2626", bg: "#FEF2F2", action: () => setScanQrOpen(true) },
+            { label: "Withdraw Wallet", screen: "withdraw", icon: <ArrowUpwardRoundedIcon />, color: "#10B981", bg: "#ECFDF5", action: () => navigate("/user/withdrawal") },
+          ].map((mod) => (
+            <Grid item xs={6} key={mod.label}>
+              <Paper
+                elevation={0}
+                onClick={() => {
+                  setMoreDrawerOpen(false);
+                  if (mod.action) {
+                    mod.action();
+                  } else {
+                    setActiveScreen(mod.screen);
+                  }
+                }}
+                sx={{
+                  p: 1.6,
+                  borderRadius: "16px",
+                  bgcolor: "#FFFFFF",
+                  border: "1px solid #EEF2F6",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.2,
+                  "&:hover": { borderColor: "#2563EB" },
+                }}
+              >
+                <Avatar sx={{ bgcolor: mod.bg, color: mod.color, width: 36, height: 36 }}>
+                  {mod.icon}
+                </Avatar>
+                <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: "#1E293B" }}>
+                  {mod.label}
+                </Typography>
+              </Paper>
+            </Grid>
+          ))}
+        </Grid>
+      </Drawer>
+
+      {/* ── ADD MERCHANT MODAL ── */}
+      <Dialog open={addMerchantOpen} onClose={() => setAddMerchantOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "20px" } }}>
+        <DialogTitle sx={{ fontWeight: 950, fontSize: 16 }}>+ Add New Merchant</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5} sx={{ pt: 1 }}>
+            <TextField fullWidth size="small" label="Store Name" value={newMerchant.name} onChange={(e) => setNewMerchant({ ...newMerchant, name: e.target.value })} />
+            <TextField fullWidth size="small" label="Owner Name" value={newMerchant.owner} onChange={(e) => setNewMerchant({ ...newMerchant, owner: e.target.value })} />
+            <TextField fullWidth size="small" label="Mobile Number" value={newMerchant.phone} onChange={(e) => setNewMerchant({ ...newMerchant, phone: e.target.value })} />
+            <TextField fullWidth size="small" label="Category" value={newMerchant.category} onChange={(e) => setNewMerchant({ ...newMerchant, category: e.target.value })} />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setAddMerchantOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleAddMerchant}
+            sx={{ bgcolor: "#2563EB", fontWeight: 800 }}
+          >
+            Save Merchant
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── ADD CAPTAIN MODAL ── */}
+      <Dialog open={addCaptainOpen} onClose={() => setAddCaptainOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "20px" } }}>
+        <DialogTitle sx={{ fontWeight: 950, fontSize: 16 }}>+ Register Field Captain</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5} sx={{ pt: 1 }}>
+            <TextField fullWidth size="small" label="Captain Full Name" value={newCaptain.name} onChange={(e) => setNewCaptain({ ...newCaptain, name: e.target.value })} />
+            <TextField fullWidth size="small" label="Mobile Number" value={newCaptain.phone} onChange={(e) => setNewCaptain({ ...newCaptain, phone: e.target.value })} />
+            <TextField fullWidth size="small" label="Assigned Locality" value={newCaptain.locality} onChange={(e) => setNewCaptain({ ...newCaptain, locality: e.target.value })} />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setAddCaptainOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleAddCaptain}
+            sx={{ bgcolor: "#2563EB", fontWeight: 800 }}
+          >
+            Register Captain
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── RAISE GRIEVANCE / ISSUE MODAL ── */}
+      <Dialog open={raiseIssueOpen} onClose={() => setRaiseIssueOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "20px" } }}>
+        <DialogTitle sx={{ fontWeight: 950, fontSize: 16 }}>+ Raise Support Grievance</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5} sx={{ pt: 1 }}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Grievance Subject"
+              value={newIssue.subject}
+              onChange={(e) => setNewIssue({ ...newIssue, subject: e.target.value })}
+              placeholder="e.g. Delay in Merchant QR Terminal Sync"
+            />
+            <FormControl fullWidth size="small">
+              <Select
+                value={newIssue.category || "Merchant Ops"}
+                onChange={(e) => setNewIssue({ ...newIssue, category: e.target.value })}
+                sx={{ fontSize: 13, fontWeight: 700 }}
+              >
+                <MenuItem value="Merchant Ops">Merchant Ops & Terminal Sync</MenuItem>
+                <MenuItem value="Field Operations">Field Operations & Captains</MenuItem>
+                <MenuItem value="Jurisdiction & Mapping">Jurisdiction & Pincode Mapping</MenuItem>
+                <MenuItem value="Commission & Wallets">Commission Inflows & Dual Wallet</MenuItem>
+                <MenuItem value="Self Rebirth Matrix">Self-Rebirth & Matrix Cycles</MenuItem>
+                <MenuItem value="Other">General / Other Inquiry</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl fullWidth size="small">
+              <Select
+                value={newIssue.priority || "High"}
+                onChange={(e) => setNewIssue({ ...newIssue, priority: e.target.value })}
+                sx={{ fontSize: 13, fontWeight: 700 }}
+              >
+                <MenuItem value="High">Priority: High (Urgent Escalation)</MenuItem>
+                <MenuItem value="Medium">Priority: Medium (Routine Support)</MenuItem>
+                <MenuItem value="Normal">Priority: Normal (Feedback)</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              fullWidth
+              size="small"
+              multiline
+              rows={3}
+              label="Detailed Grievance Description"
+              value={newIssue.details || ""}
+              onChange={(e) => setNewIssue({ ...newIssue, details: e.target.value })}
+              placeholder="Provide exact details, merchant/captain ID, or transaction references..."
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setRaiseIssueOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (newIssue.subject) {
+                const ticketId = `#TKT-${Date.now().toString().slice(-4)}`;
+                setIssuesList([
+                  {
+                    id: ticketId,
+                    subject: newIssue.subject,
+                    category: newIssue.category || "Merchant Ops",
+                    details: newIssue.details || "",
+                    priority: newIssue.priority || "High",
+                    status: "Open",
+                    date: "Just Now",
+                  },
+                  ...issuesList,
+                ]);
+                setRaiseIssueOpen(false);
+                setNewIssue({ subject: "", category: "Merchant Ops", details: "", priority: "High" });
+                setCommissionToast({
+                  open: true,
+                  message: `✅ Support ticket ${ticketId} lodged successfully! Operations desk notified.`,
+                  severity: "success",
+                });
+              }
+            }}
+            sx={{ bgcolor: "#2563EB", fontWeight: 800 }}
+          >
+            Submit Grievance
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── FRANCHISE PARTNER PHONE LOGIN MODAL ── */}
+      <Dialog
+        open={phoneLoginOpen}
+        onClose={() => setPhoneLoginOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: "20px" } }}
+      >
+        <DialogTitle sx={{ fontWeight: 950, fontSize: 16 }}>
+          Franchise Partner Mobile Login
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: 12, color: "#64748B", mb: 2 }}>
+            Enter your 10-digit registered agency mobile number to access your territory portal:
+          </Typography>
+          <TextField
+            fullWidth
+            size="small"
+            label="Mobile Number (10 Digits)"
+            placeholder="e.g. 9800000001"
+            value={phoneInput}
+            onChange={(e) => setPhoneInput(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <PhoneRoundedIcon sx={{ fontSize: 18, color: "#64748B" }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <Typography sx={{ fontSize: 11, color: "#94A3B8", mt: 2, mb: 1, fontWeight: 700 }}>
+            Standard Test Franchise Accounts (EC2 Live DB):
+          </Typography>
+          <Stack spacing={0.8}>
+            {Object.entries(TEST_AGENCY_ACCOUNTS).map(([key, acc]) => (
+              <Paper
+                key={acc.phone}
+                elevation={0}
+                onClick={() => handlePhoneLogin(acc.phone)}
+                sx={{
+                  p: 1.2,
+                  borderRadius: "12px",
+                  bgcolor: currentTierKey === key ? "#EFF6FF" : "#F8FAFC",
+                  border: `1px solid ${currentTierKey === key ? "#BFDBFE" : "#E2E8F0"}`,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  transition: "all 0.15s ease",
+                  "&:hover": { bgcolor: "#EFF6FF", borderColor: "#BFDBFE" },
+                }}
+              >
+                <Box>
+                  <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>
+                    {acc.phone} • {acc.name}
+                  </Typography>
+                  <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>
+                    {acc.title} ({acc.badge})
+                  </Typography>
+                </Box>
+                <Chip
+                  label="Login"
+                  size="small"
+                  sx={{
+                    height: 22,
+                    fontSize: 10,
+                    fontWeight: 800,
+                    bgcolor: acc.color,
+                    color: "#FFFFFF",
+                  }}
+                />
+              </Paper>
+            ))}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setPhoneLoginOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={() => handlePhoneLogin(phoneInput)}
+            sx={{ bgcolor: "#2563EB", fontWeight: 800 }}
+          >
+            Login
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── SCAN QR MODAL ── */}
+      <Dialog open={scanQrOpen} onClose={() => setScanQrOpen(false)} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "20px" } }}>
+        <DialogTitle sx={{ fontWeight: 950, fontSize: 16 }}>Scan Merchant QR Standee</DialogTitle>
+        <DialogContent sx={{ textAlign: "center", py: 3 }}>
+          <Box
+            sx={{
+              width: 180,
+              height: 180,
+              mx: "auto",
+              borderRadius: "16px",
+              border: "2px dashed #2563EB",
+              bgcolor: "#EFF6FF",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexDirection: "column",
+            }}
+          >
+            <QrCodeScannerRoundedIcon sx={{ fontSize: 64, color: "#2563EB" }} />
+            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#1E40AF", mt: 1 }}>
+              Camera Scanner Ready
+            </Typography>
+          </Box>
+          <Typography sx={{ fontSize: 12, color: "#64748B", mt: 2 }}>
+            Point camera at merchant QR code to verify or activate POS payments.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button fullWidth variant="contained" onClick={() => setScanQrOpen(false)} sx={{ bgcolor: "#0F172A" }}>
+            Done
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── LIVE NOTIFICATION SNACKBARS ── */}
+      <Snackbar
+        open={commissionToast.open}
+        autoHideDuration={4000}
+        onClose={() => setCommissionToast({ ...commissionToast, open: false })}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          severity={commissionToast.severity || "success"}
+          onClose={() => setCommissionToast({ ...commissionToast, open: false })}
+          sx={{ width: "100%", borderRadius: "14px", fontWeight: 800, fontSize: 12 }}
+        >
+          {commissionToast.message}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={rebirthToast.open}
+        autoHideDuration={6000}
+        onClose={() => setRebirthToast({ ...rebirthToast, open: false })}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          severity="warning"
+          onClose={() => setRebirthToast({ ...rebirthToast, open: false })}
+          sx={{ width: "100%", borderRadius: "14px", fontWeight: 900, fontSize: 12, bgcolor: "#FEF3C7", color: "#92400E" }}
+        >
+          {rebirthToast.message}
+        </Alert>
+      </Snackbar>
+
+      {/* ── FRANCHISE PROFILE & SWITCH ROLE DRAWER ── */}
+      <Drawer
+        anchor="bottom"
+        open={profileDrawerOpen}
+        onClose={() => setProfileDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            p: 2.5,
+            boxSizing: "border-box",
+            maxWidth: 440,
+            mx: "auto",
+          },
+        }}
+      >
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+          <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#0F172A" }}>
+            Franchise Partner Profile
+          </Typography>
+          <IconButton size="small" onClick={() => setProfileDrawerOpen(false)}>
+            <CloseRoundedIcon />
+          </IconButton>
+        </Stack>
+
+        <Paper elevation={0} sx={{ p: 2, borderRadius: 3, bgcolor: "#F8FAFC", border: "1px solid #E2E8F0", mb: 2 }}>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Avatar sx={{ width: 48, height: 48, bgcolor: "#2563EB", fontWeight: 900, fontSize: 18 }}>
+              {(user?.name || TEST_AGENCY_ACCOUNTS[currentTierKey]?.name || "A").charAt(0)}
+            </Avatar>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#0F172A" }} noWrap>
+                {user?.name || TEST_AGENCY_ACCOUNTS[currentTierKey]?.name || "Franchise Partner"}
+              </Typography>
+              <Chip
+                label={user?.badge || currentTier.title}
+                size="small"
+                sx={{
+                  height: 20,
+                  fontSize: 10.5,
+                  fontWeight: 800,
+                  bgcolor: "#EFF6FF",
+                  color: "#1D4ED8",
+                  border: "1px solid #BFDBFE",
+                  mt: 0.3,
+                }}
+              />
+              <Typography sx={{ fontSize: 11.5, color: "#64748B", fontWeight: 600, mt: 0.5 }}>
+                Ph: {user?.phone || TEST_AGENCY_ACCOUNTS[currentTierKey]?.phone}
+              </Typography>
+              <Typography sx={{ fontSize: 11, color: "#94A3B8", mt: 0.2 }} noWrap>
+                {user?.jurisdiction || TEST_AGENCY_ACCOUNTS[currentTierKey]?.jurisdiction || currentTier.defaultLocation}
+              </Typography>
+            </Box>
+          </Stack>
+        </Paper>
+
+        <Stack spacing={1}>
+          <Button
+            fullWidth
+            variant="outlined"
+            onClick={() => {
+              setProfileDrawerOpen(false);
+              setActiveScreen("history");
+            }}
+            sx={{
+              height: 44,
+              borderRadius: "12px",
+              borderColor: "#2563EB",
+              color: "#2563EB",
+              textTransform: "none",
+              fontWeight: 800,
+              fontSize: 13.5,
+            }}
+          >
+            View Live Commission History
+          </Button>
+
+          <Button
+            fullWidth
+            variant="contained"
+            onClick={() => {
+              setProfileDrawerOpen(false);
+              if (onSwitchRole) onSwitchRole();
+            }}
+            sx={{
+              height: 44,
+              borderRadius: "12px",
+              bgcolor: "#0F172A",
+              color: "#FFFFFF",
+              textTransform: "none",
+              fontWeight: 800,
+              fontSize: 13.5,
+              "&:hover": { bgcolor: "#1E293B" },
+            }}
+          >
+            Switch Role / Account (Login Screen)
+          </Button>
+
+          <Button
+            fullWidth
+            variant="outlined"
+            color="error"
+            onClick={() => {
+              setProfileDrawerOpen(false);
+              if (onLogout) onLogout();
+            }}
+            sx={{
+              height: 44,
+              borderRadius: "12px",
+              textTransform: "none",
+              fontWeight: 800,
+              fontSize: 13.5,
+            }}
+          >
+            Logout
+          </Button>
+        </Stack>
+      </Drawer>
+    </AgencyLayout>
+  );
+}

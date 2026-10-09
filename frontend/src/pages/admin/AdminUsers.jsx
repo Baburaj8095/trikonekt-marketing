@@ -81,6 +81,7 @@ const CONSUMER_COLUMN_FIELDS = {
     "full_name",
     "phone",
     "sponsor_id",
+    "sponsor_name",
     "account_active",
     "date_joined",
     "payment_mode",
@@ -1836,13 +1837,13 @@ export default function AdminUsers() {
       },
       {
         field: "sponsor_id",
-        headerName: "Sponsor Code",
-        minWidth: 135,
+        headerName: "Sponsor Username",
+        minWidth: 145,
         align: "center",
         headerAlign: "center",
         renderCell: (p) => {
           const row = p?.row || {};
-          const s = (row?.sponsor_id || row?.sponsor_name || "").trim();
+          const s = (row?.sponsor_id || row?.sponsor_number || "").trim();
           const u = (row?.username || row?.phone || "").trim();
           if (!s || s === "None" || s === "null" || s === u || row?.id === 1 || u === "9999999999") {
             return (
@@ -1872,6 +1873,32 @@ export default function AdminUsers() {
                 }}
               >
                 {s}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        field: "sponsor_name",
+        headerName: "Sponsor Name",
+        minWidth: 150,
+        align: "center",
+        headerAlign: "center",
+        renderCell: (p) => {
+          const row = p?.row || {};
+          const name = (row?.sponsor_name || "").trim();
+          const u = (row?.username || row?.phone || "").trim();
+          if (!name || name === "None" || name === "null" || name === u || row?.id === 1 || u === "9999999999") {
+            return (
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ color: "#94a3b8", fontSize: 12, fontStyle: "italic" }}>—</span>
+              </div>
+            );
+          }
+          return (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontWeight: 600, color: "#1e293b", fontSize: 12 }}>
+                {name}
               </span>
             </div>
           );

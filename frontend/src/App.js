@@ -24,6 +24,7 @@ import EmployeeShell from "./components/layouts/EmployeeShell";
 import EnhancedLogin from "./pages/Auth/EnhancedLogin";
 import Wallet from "./pages/Wallet";
 import History from "./pages/History";
+import AgencyHistory from "./pages/agency/AgencyHistory";
 import LoadingOverlay from "./components/LoadingOverlay";
 import AppLifecycleSync from "./components/common/AppLifecycleSync";
 import MyTeam from "./pages/team/MyTeam";
@@ -190,6 +191,7 @@ import WalletDashboardV2 from "./pages/consumer/WalletDashboardV2";
 import TeamWallet from "./screens/TeamWallet";
 import TeamDashboard from "./pages/team/TeamDashboard";
 const FranchiseDashboard = lazy(() => import("./components/franchise/FranchiseDashboard"));
+const FranchiseMobileHub = lazy(() => import("./components/franchise/FranchiseMobileHub"));
 const FranchiseWalletPlaceholder = lazy(() => import("./components/franchise/FranchiseWalletPlaceholder"));
 import TransactionHistory from "./components/franchise/pages/TransactionHistory";
 import WithdrawalHistory from "./components/franchise/pages/WithdrawalHistory";
@@ -411,25 +413,51 @@ function App() {
           path="/franchise/dashboard"
           element={
             <ProtectedRoute allowedRoles={["agency"]}>
-              <AgencyShell>
-                <Suspense fallback={<LoadingOverlay />}>
-                  <FranchiseDashboard />
-                </Suspense>
-              </AgencyShell>
+              <Suspense fallback={<LoadingOverlay />}>
+                <FranchiseDashboard />
+              </Suspense>
             </ProtectedRoute>
           }
         />
 
         {/* Agency - Franchise screens (new UI, kept inside the existing /agency area) */}
         <Route
+          path="/franchise/hub"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <Suspense fallback={<LoadingOverlay />}>
+                <FranchiseMobileHub />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/hub"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <Suspense fallback={<LoadingOverlay />}>
+                <FranchiseMobileHub />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agency/mobile-hub"
+          element={
+            <ProtectedRoute allowedRoles={["agency"]}>
+              <Suspense fallback={<LoadingOverlay />}>
+                <FranchiseMobileHub />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/agency/franchise-dashboard"
           element={
             <ProtectedRoute allowedRoles={["agency"]}>
-              <AgencyShell>
-                <Suspense fallback={<LoadingOverlay />}>
-                  <FranchiseDashboard />
-                </Suspense>
-              </AgencyShell>
+              <Suspense fallback={<LoadingOverlay />}>
+                <FranchiseDashboard />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -437,11 +465,9 @@ function App() {
           path="/agency/franchise-wallet"
           element={
             <ProtectedRoute allowedRoles={["agency"]}>
-              <AgencyShell>
-                <Suspense fallback={<LoadingOverlay />}>
-                  <FranchiseWalletPlaceholder />
-                </Suspense>
-              </AgencyShell>
+              <Suspense fallback={<LoadingOverlay />}>
+                <FranchiseWalletPlaceholder />
+              </Suspense>
             </ProtectedRoute>
           }
         />
@@ -987,9 +1013,7 @@ function App() {
           path="/agency/wallet"
           element={
             <ProtectedRoute allowedRoles={["agency"]}>
-              <AgencyShell>
-                <AgencyWallet />
-              </AgencyShell>
+              <Navigate to="/franchise/dashboard?tab=history" replace />
             </ProtectedRoute>
           }
         />
@@ -997,9 +1021,7 @@ function App() {
           path="/agency/history"
           element={
             <ProtectedRoute allowedRoles={["agency"]}>
-              <AgencyShell>
-                <History />
-              </AgencyShell>
+              <Navigate to="/franchise/dashboard?tab=history" replace />
             </ProtectedRoute>
           }
         />

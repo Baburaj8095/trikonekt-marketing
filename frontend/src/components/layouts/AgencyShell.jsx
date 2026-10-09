@@ -106,6 +106,7 @@ export default function AgencyShell({ children }) {
       rootPaths={["/agency/franchise-dashboard", "/agency/coupons"]}
       onBackFallbackPath="/agency/franchise-dashboard"
       showBottomNav={false}
+      showMobileHeader={false}
     >
       {children}
     </ShellBase>

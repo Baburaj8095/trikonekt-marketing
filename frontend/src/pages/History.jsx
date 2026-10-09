@@ -30,7 +30,6 @@ import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import SavingsIcon from "@mui/icons-material/Savings";
-import RedeemIcon from "@mui/icons-material/Redeem";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
@@ -42,6 +41,10 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
+import QrCode2RoundedIcon from "@mui/icons-material/QrCode2Rounded";
+import ShoppingCartRoundedIcon from "@mui/icons-material/ShoppingCartRounded";
+import WorkspacePremiumRoundedIcon from "@mui/icons-material/WorkspacePremiumRounded";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PremiumScreenHeader from "../components/common/PremiumScreenHeader";
 import BottomNav from "../components/common/BottomNav";
 
@@ -409,9 +412,42 @@ function AmountBadge({ value }) {
   );
 }
 
-function RowIcon({ value }) {
+function RowIcon({ value, tx }) {
   const num = Number(value || 0);
   const isCredit = num >= 0;
+  const cat = tx ? classifyTransaction(tx) : null;
+
+  let icon = isCredit ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />;
+  let bg = isCredit ? "#ECFDF5" : "#FEF2F2";
+  let color = isCredit ? "#059669" : "#DC2626";
+  let border = isCredit ? "1.5px solid #A7F3D0" : "1.5px solid #FECACA";
+
+  if (cat === "E_EDU") {
+    icon = <SchoolRoundedIcon fontSize="small" />;
+    bg = "#EFF6FF";
+    color = "#2563EB";
+    border = "1.5px solid #BFDBFE";
+  } else if (cat === "SAVE" || cat === "SELF_ACCOUNT") {
+    icon = <SavingsIcon fontSize="small" />;
+    bg = "#FEF3C7";
+    color = "#D97706";
+    border = "1.5px solid #FDE68A";
+  } else if (cat === "QR_SCANNER") {
+    icon = <QrCode2RoundedIcon fontSize="small" />;
+    bg = "#ECFDF5";
+    color = "#059669";
+    border = "1.5px solid #A7F3D0";
+  } else if (cat === "TRIZONE") {
+    icon = <ShoppingCartRoundedIcon fontSize="small" />;
+    bg = "#F0F9FF";
+    color = "#0284C7";
+    border = "1.5px solid #BAE6FD";
+  } else if (cat === "ROYALTY") {
+    icon = <WorkspacePremiumRoundedIcon fontSize="small" />;
+    bg = "#FAF5FF";
+    color = "#9333EA";
+    border = "1.5px solid #E9D5FF";
+  }
 
   return (
     <Avatar
@@ -419,13 +455,13 @@ function RowIcon({ value }) {
         width: 38,
         height: 38,
         borderRadius: "50%",
-        bgcolor: isCredit ? "#ECFDF5" : "#FEF2F2",
-        color: isCredit ? "#059669" : "#DC2626",
-        border: isCredit ? "1.5px solid #A7F3D0" : "1.5px solid #FECACA",
+        bgcolor: bg,
+        color: color,
+        border: border,
       }}
       aria-label={isCredit ? "Credit" : "Debit"}
     >
-      {isCredit ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />}
+      {icon}
     </Avatar>
   );
 }
@@ -733,7 +769,7 @@ function HistoryRow({ tx, onClick }) {
       }}
     >
       <Stack direction="row" spacing={1.2} alignItems="center">
-        <RowIcon value={amount} />
+        <RowIcon value={amount} tx={tx} />
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.8, flexWrap: "wrap" }}>
@@ -1296,6 +1332,14 @@ function PhonePeFilterDrawer({
 /** ---------- main page ---------- */
 export default function History() {
   const navigate = useNavigate();
+  const currentUser = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("user_user") || sessionStorage.getItem("user_user") || localStorage.getItem("user");
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }, []);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [actionDrawerOpen, setActionDrawerOpen] = useState(false);
@@ -1705,7 +1749,22 @@ export default function History() {
       if (flowFilter === "DEBIT" && !isSelf) return false;
 
       // Source filter
-      if (sourceFilter !== "ALL" && classifyTransaction(tx) !== sourceFilter) return false;
+      if (sourceFilter !== "ALL") {
+        const cat = classifyTransaction(tx);
+        if (sourceFilter === "SAVE") {
+          if (cat !== "SELF_ACCOUNT" && cat !== "SAVE") return false;
+        } else if (sourceFilter === "QR_SCANNER") {
+          if (cat !== "QR_SCANNER" && cat !== "MERCHANT_CAPTAIN") return false;
+        } else if (sourceFilter === "TRIZONE") {
+          if (cat !== "TRIZONE" && cat !== "REDEEM") return false;
+        } else if (sourceFilter === "E_EDU") {
+          if (cat !== "E_EDU") return false;
+        } else if (sourceFilter === "ROYALTY") {
+          if (cat !== "ROYALTY") return false;
+        } else if (cat !== sourceFilter) {
+          return false;
+        }
+      }
 
       // Search Query
       if (searchQuery.trim()) {
@@ -1737,6 +1796,8 @@ export default function History() {
     let mainCount = 0;
     let selfCredits = 0;
     let selfDebits = 0;
+    let otherDebits = 0;
+    let debitCount = 0;
     let selfCount = 0;
     let creditCount = 0;
 
@@ -1754,22 +1815,79 @@ export default function History() {
           creditCount += 1;
         } else {
           selfDebits += Math.abs(amt);
+          debitCount += 1;
         }
         selfCount += 1;
       } else if (amt > 0) {
         mainCredits += amt;
         mainCount += 1;
         creditCount += 1;
+      } else if (amt < 0) {
+        otherDebits += Math.abs(amt);
+        debitCount += 1;
       }
     });
 
-    // 100% Total Gross Credits = Combination of Main Credits (75%) + Self Account Credits (25%)
-    // (Never reduced by ₹250 rebirth debits or withdrawals)
     const totalCredits = mainCredits + selfCredits;
+    const finalCreditCount = creditCount;
+    const totalDebits = selfDebits + otherDebits;
+    const finalDebitCount = debitCount;
     const selfBalance = Number(top.self_account_balance || (selfCredits - selfDebits));
 
-    return { totalCredits, creditCount, mainCredits, mainCount, selfCredits, selfDebits, totalSelf: selfBalance, selfCount };
+    return {
+      totalCredits,
+      creditCount: finalCreditCount,
+      totalDebits,
+      debitCount: finalDebitCount,
+      mainCredits,
+      mainCount,
+      selfCredits,
+      selfDebits,
+      totalSelf: selfBalance,
+      selfCount,
+    };
   }, [allTransactions, top.self_account_balance]);
+
+  const categoryStats = useMemo(() => {
+    const stats = {
+      ALL: { count: 0, total: 0 },
+      E_EDU: { count: 0, total: 0 },
+      SAVE: { count: 0, total: 0 },
+      QR_SCANNER: { count: 0, total: 0 },
+      TRIZONE: { count: 0, total: 0 },
+      ROYALTY: { count: 0, total: 0 },
+    };
+
+    (allTransactions || []).forEach((tx) => {
+      const raw = Number(tx?.amount || 0);
+      const meta = tx?.meta || {};
+      const isP2pReceive = tx?.type === "P2P_PACKAGE_COUPON_RECEIVE";
+      const amt = isP2pReceive && raw === 0 ? Number(meta.net_amount ?? meta.gross_amount ?? 0) : raw;
+      const cat = classifyTransaction(tx);
+
+      stats.ALL.count += 1;
+      if (amt > 0) stats.ALL.total += amt;
+
+      if (cat === "E_EDU") {
+        stats.E_EDU.count += 1;
+        if (amt > 0) stats.E_EDU.total += amt;
+      } else if (cat === "SELF_ACCOUNT" || cat === "SAVE") {
+        stats.SAVE.count += 1;
+        if (amt > 0) stats.SAVE.total += amt;
+      } else if (cat === "QR_SCANNER" || cat === "MERCHANT_CAPTAIN") {
+        stats.QR_SCANNER.count += 1;
+        if (amt > 0) stats.QR_SCANNER.total += amt;
+      } else if (cat === "TRIZONE" || cat === "REDEEM") {
+        stats.TRIZONE.count += 1;
+        if (amt > 0) stats.TRIZONE.total += amt;
+      } else if (cat === "ROYALTY") {
+        stats.ROYALTY.count += 1;
+        if (amt > 0) stats.ROYALTY.total += amt;
+      }
+    });
+
+    return stats;
+  }, [allTransactions]);
 
   const dateLabel = useMemo(() => {
     if (datePreset === "all") return "All Time";
@@ -1887,7 +2005,17 @@ export default function History() {
       }}
     >
       <PremiumScreenHeader
-        title="Transaction History"
+        title={
+          <Box>
+            <Typography sx={{ fontWeight: 900, fontSize: { xs: 15, sm: 17 }, color: "#0F172A", lineHeight: 1.1 }}>
+              <span style={{ color: "#0256B4" }}>TRI</span><span style={{ color: "#DC2626" }}>KONEKT</span>
+            </Typography>
+            <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#059669", letterSpacing: "0.2px", lineHeight: 1.2, mt: 0.2 }}>
+              @{currentUser?.username || currentUser?.phone || currentUser?.full_name || "Member"}
+            </Typography>
+          </Box>
+        }
+        notificationCount={1}
         onBack={() => navigate(-1)}
         onNotifications={() => {
           try {
@@ -1908,26 +2036,26 @@ export default function History() {
           zIndex: 1,
         }}
       >
-        {/* 1. MAIN WALLET HERO CARD */}
+        {/* 1. EMERALD GRADIENT MAIN WALLET HERO CARD (Consumer Clean View - No Earning Limit) */}
         <Paper
           elevation={0}
           sx={{
             p: { xs: 2.2, sm: 2.5 },
-            borderRadius: "22px",
+            borderRadius: "24px",
             mb: 1.8,
             position: "relative",
             overflow: "hidden",
-            background: "linear-gradient(135deg, #07152E 0%, #091E3A 40%, #0256B4 100%)",
+            background: "linear-gradient(135deg, #064E3B 0%, #065F46 50%, #022C22 100%)",
             color: "#FFFFFF",
-            boxShadow: "0 14px 34px -8px rgba(2, 86, 180, 0.4)",
-            border: "1px solid rgba(255, 255, 255, 0.14)",
+            boxShadow: "0 14px 34px -8px rgba(6, 78, 59, 0.45)",
+            border: "1px solid rgba(255, 255, 255, 0.16)",
           }}
         >
           <Stack direction="row" alignItems="center" spacing={1.5}>
             <Box
               sx={{
-                width: 44,
-                height: 44,
+                width: 48,
+                height: 48,
                 borderRadius: "14px",
                 bgcolor: "rgba(255, 255, 255, 0.15)",
                 backdropFilter: "blur(12px)",
@@ -1938,10 +2066,10 @@ export default function History() {
                 flexShrink: 0,
               }}
             >
-              <AccountBalanceWalletIcon sx={{ fontSize: 24, color: "#FFFFFF" }} />
+              <AccountBalanceWalletIcon sx={{ fontSize: 26, color: "#FFFFFF" }} />
             </Box>
             <Box>
-              <Typography sx={{ color: "rgba(255, 255, 255, 0.8)", fontWeight: 700, fontSize: 11.5, letterSpacing: 0.3 }}>
+              <Typography sx={{ color: "rgba(255, 255, 255, 0.8)", fontWeight: 700, fontSize: 12, letterSpacing: 0.3 }}>
                 Main Wallet Balance
               </Typography>
               <Typography
@@ -1954,13 +2082,12 @@ export default function History() {
                   letterSpacing: "-0.5px",
                 }}
               >
-                ₹ {fmtAmount(top.main_income_balance)}
+                ₹ {fmtAmount(Number(top.main_income_balance || 0) > 0 ? top.main_income_balance : 0)}
               </Typography>
             </Box>
           </Stack>
 
-          {/* 3 Action Buttons Inside Card - Sleek & Compact */}
-          <Stack direction="row" spacing={1} sx={{ mt: 1.8 }}>
+          <Stack direction="row" spacing={1} sx={{ mt: 2.2 }}>
             <Button
               size="small"
               variant="contained"
@@ -1971,50 +2098,22 @@ export default function History() {
                 setActionDrawerOpen(true);
               }}
               sx={{
-                flex: 1.2,
-                py: 0.6,
+                flex: 1,
+                py: 0.7,
                 minHeight: 36,
-                fontSize: { xs: 10.5, sm: 11.5 },
+                fontSize: { xs: 11, sm: 12 },
                 fontWeight: 800,
                 textTransform: "none",
-                borderRadius: "10px",
-                background: "linear-gradient(135deg, #059669 0%, #10B981 100%)",
-                boxShadow: "0 2px 8px rgba(5, 150, 105, 0.3)",
+                borderRadius: "12px",
+                bgcolor: "#10B981",
+                boxShadow: "0 2px 8px rgba(16, 185, 129, 0.35)",
                 color: "#FFFFFF",
                 border: "1px solid rgba(255, 255, 255, 0.2)",
                 whiteSpace: "nowrap",
-                "&:hover": { background: "linear-gradient(135deg, #047857 0%, #059669 100%)" },
+                "&:hover": { bgcolor: "#059669" },
               }}
             >
               Withdraw Wallet
-            </Button>
-
-            <Button
-              size="small"
-              variant="contained"
-              startIcon={<RedeemIcon sx={{ fontSize: 14 }} />}
-              onClick={() => {
-                setDrawerMode("pockets");
-                setPocketType("coupon");
-                setActionDrawerOpen(true);
-              }}
-              sx={{
-                flex: 1.1,
-                py: 0.6,
-                minHeight: 36,
-                fontSize: { xs: 10.5, sm: 11.5 },
-                fontWeight: 800,
-                textTransform: "none",
-                borderRadius: "10px",
-                background: "linear-gradient(135deg, #0284C7 0%, #0256B4 100%)",
-                boxShadow: "0 2px 8px rgba(2, 86, 180, 0.3)",
-                color: "#FFFFFF",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
-                whiteSpace: "nowrap",
-                "&:hover": { background: "linear-gradient(135deg, #0369A1 0%, #0047AB 100%)" },
-              }}
-            >
-              P2P Coupon
             </Button>
 
             <Button
@@ -2025,13 +2124,10 @@ export default function History() {
                 setActionDrawerOpen(true);
               }}
               sx={{
-                minWidth: 38,
+                minWidth: 42,
                 height: 36,
                 p: 0,
-                fontSize: 11,
-                fontWeight: 800,
-                textTransform: "none",
-                borderRadius: "10px",
+                borderRadius: "12px",
                 bgcolor: "rgba(255, 255, 255, 0.16)",
                 backdropFilter: "blur(8px)",
                 color: "#FFFFFF",
@@ -2039,7 +2135,7 @@ export default function History() {
                 "&:hover": { bgcolor: "rgba(255, 255, 255, 0.25)" },
               }}
             >
-              <MoreHorizRoundedIcon sx={{ fontSize: 18 }} />
+              <MoreHorizRoundedIcon sx={{ fontSize: 20 }} />
             </Button>
           </Stack>
         </Paper>
@@ -2475,7 +2571,7 @@ export default function History() {
             elevation={0}
             onClick={() => {
               setActionDrawerOpen(false);
-              window.open("https://triacademy.trikonekt.com", "_blank", "noopener,noreferrer");
+              navigate("/user/rank-upgrade");
             }}
             sx={{
               p: 1.5,
@@ -2499,7 +2595,7 @@ export default function History() {
                   E-edu Agent Academy
                 </Typography>
                 <Typography sx={{ fontSize: 11.5, color: "#64748B" }}>
-                  Official learning & certification portal at triacademy.trikonekt.com
+                  Digital course learning & rank certification on asiyapp.com
                 </Typography>
               </Box>
             </Stack>
@@ -2544,17 +2640,21 @@ export default function History() {
         </Stack>
       </Drawer>
 
-      {/* 2. TOTAL CREDITS & SELF ACCOUNT SUMMARY CARDS */}
+      {/* 2. TOTAL CREDITS & TOTAL DEBITS KPI CARDS (Matching Image 2) */}
       <Grid container spacing={1.5} sx={{ mb: 1.8 }}>
         <Grid item xs={6}>
           <Paper
             elevation={0}
+            onClick={() => setFlowFilter("CREDIT")}
             sx={{
               p: 1.8,
               borderRadius: "18px",
               bgcolor: "#FFFFFF",
-              border: "1px solid #EEF2F6",
+              border: "1px solid",
+              borderColor: flowFilter === "CREDIT" ? "#059669" : "#EEF2F6",
               boxShadow: "0 2px 8px rgba(15, 23, 42, 0.03)",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
             }}
           >
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
@@ -2589,12 +2689,16 @@ export default function History() {
         <Grid item xs={6}>
           <Paper
             elevation={0}
+            onClick={() => setFlowFilter("DEBIT")}
             sx={{
               p: 1.8,
               borderRadius: "18px",
               bgcolor: "#FFFFFF",
-              border: "1px solid #EEF2F6",
+              border: "1px solid",
+              borderColor: flowFilter === "DEBIT" ? "#DC2626" : "#EEF2F6",
               boxShadow: "0 2px 8px rgba(15, 23, 42, 0.03)",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
             }}
           >
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
@@ -2603,31 +2707,31 @@ export default function History() {
                   width: 28,
                   height: 28,
                   borderRadius: "50%",
-                  bgcolor: "#F5F3FF",
-                  color: "#7C3AED",
+                  bgcolor: "#FEF2F2",
+                  color: "#DC2626",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  border: "1px solid #DDD6FE",
+                  border: "1px solid #FECACA",
                 }}
               >
-                <SavingsIcon sx={{ fontSize: 16 }} />
+                <ArrowDownwardIcon sx={{ fontSize: 16 }} />
               </Box>
               <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>
-                Self Account
+                Total Debits
               </Typography>
             </Stack>
-            <Typography sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 900, color: "#7C3AED", letterSpacing: "-0.02em" }}>
-              ₹ {fmtAmount(Number(top.self_account_balance || 0) > 0 ? top.self_account_balance : ledgerSummary.totalSelf)}
+            <Typography sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 900, color: "#DC2626", letterSpacing: "-0.02em" }}>
+              ₹ {fmtAmount(ledgerSummary.totalDebits)}
             </Typography>
             <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", mt: 0.2 }}>
-              {ledgerSummary.selfCount} transactions
+              {ledgerSummary.debitCount} transactions
             </Typography>
           </Paper>
         </Grid>
       </Grid>
 
-      {/* 3. SEARCH + HORIZONTAL FILTER BAR */}
+      {/* 3. SEARCH + HORIZONTAL FILTER BAR (Image 2 exact styling) */}
       <Stack spacing={1.2} sx={{ mb: 1.8 }}>
         <Stack direction="row" spacing={1} alignItems="center">
           <TextField
@@ -2639,7 +2743,7 @@ export default function History() {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchRoundedIcon sx={{ color: "#0256B4", fontSize: 20 }} />
+                  <SearchRoundedIcon sx={{ color: "#065F46", fontSize: 20 }} />
                 </InputAdornment>
               ),
               endAdornment: searchQuery ? (
@@ -2656,7 +2760,7 @@ export default function History() {
                 boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
                 "& fieldset": { borderColor: "#E2E8F0" },
                 "&:hover fieldset": { borderColor: "#CBD5E1" },
-                "&.Mui-focused fieldset": { borderColor: "#0256B4" },
+                "&.Mui-focused fieldset": { borderColor: "#059669" },
               },
             }}
           />
@@ -2678,7 +2782,7 @@ export default function History() {
                   },
                 }}
               >
-                <TuneRoundedIcon sx={{ fontSize: 18, color: activeFilterCount > 0 ? "#0256B4" : "#475569" }} />
+                <TuneRoundedIcon sx={{ fontSize: 18, color: activeFilterCount > 0 ? "#059669" : "#475569" }} />
               </Badge>
             }
             sx={{
@@ -2688,120 +2792,270 @@ export default function History() {
               textTransform: "none",
               fontWeight: 800,
               fontSize: 12.5,
-              bgcolor: activeFilterCount > 0 ? "#EFF6FF" : "#FFFFFF",
-              borderColor: activeFilterCount > 0 ? "#0256B4" : "#E2E8F0",
-              color: activeFilterCount > 0 ? "#0256B4" : "#334155",
+              bgcolor: activeFilterCount > 0 ? "#ECFDF5" : "#FFFFFF",
+              borderColor: activeFilterCount > 0 ? "#059669" : "#E2E8F0",
+              color: activeFilterCount > 0 ? "#059669" : "#334155",
               boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
               flexShrink: 0,
-              "&:hover": { borderColor: "#0256B4", bgcolor: "#EFF6FF" },
+              "&:hover": { borderColor: "#059669", bgcolor: "#ECFDF5" },
             }}
           >
             Filters
           </Button>
         </Stack>
 
-        {/* Horizontally Scrolling Filter Chips */}
+        {/* 6 Horizontal Category Filter Chips Matching Image 2 */}
         <Box
           sx={{
             display: "flex",
             alignItems: "center",
-            gap: 0.8,
+            gap: 1,
             overflowX: "auto",
-            pb: 0.4,
+            pb: 0.6,
             "&::-webkit-scrollbar": { display: "none" },
             scrollbarWidth: "none",
           }}
         >
+          {/* Chip 1: All */}
           <Chip
-            icon={<CalendarMonthRoundedIcon sx={{ fontSize: "14px !important" }} />}
-            label={`Date: ${dateLabel} ▾`}
-            onClick={() => setFilterDrawerOpen(true)}
+            label={`All (${categoryStats.ALL.count}) ₹${fmtAmount(categoryStats.ALL.total)}`}
+            onClick={() => setSourceFilter("ALL")}
             sx={{
-              fontWeight: 700,
-              fontSize: 11,
+              fontWeight: 800,
+              fontSize: 11.5,
+              height: 32,
               borderRadius: "999px",
-              bgcolor: datePreset !== "all" ? "#EFF6FF" : "#FFFFFF",
-              color: datePreset !== "all" ? "#1D4ED8" : "#475569",
-              border: "1px solid",
-              borderColor: datePreset !== "all" ? "#3B82F6" : "#E2E8F0",
+              bgcolor: sourceFilter === "ALL" ? "#0F172A" : "#FFFFFF",
+              color: sourceFilter === "ALL" ? "#FFFFFF" : "#475569",
+              border: "1.5px solid",
+              borderColor: sourceFilter === "ALL" ? "#0F172A" : "#E2E8F0",
               cursor: "pointer",
+              transition: "all 0.15s ease",
             }}
           />
 
+          {/* Chip 2: E-Edu Agent */}
           <Chip
-            label={flowFilter === "ALL" ? "Flow: All ▾" : `Flow: ${flowLabel} ▾`}
-            onClick={() => setFilterDrawerOpen(true)}
+            icon={<SchoolRoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "E_EDU" ? "#FFFFFF !important" : "#2563EB !important" }} />}
+            label={`E-Edu Agent (${categoryStats.E_EDU.count}) ₹${fmtAmount(categoryStats.E_EDU.total)}`}
+            onClick={() => setSourceFilter("E_EDU")}
             sx={{
-              fontWeight: 700,
-              fontSize: 11,
+              fontWeight: 800,
+              fontSize: 11.5,
+              height: 32,
               borderRadius: "999px",
-              bgcolor: flowFilter !== "ALL" ? "#F5F3FF" : "#FFFFFF",
-              color: flowFilter !== "ALL" ? "#7C3AED" : "#475569",
-              border: "1px solid",
-              borderColor: flowFilter !== "ALL" ? "#8B5CF6" : "#E2E8F0",
+              bgcolor: sourceFilter === "E_EDU" ? "#2563EB" : "#FFFFFF",
+              color: sourceFilter === "E_EDU" ? "#FFFFFF" : "#1E40AF",
+              border: "1.5px solid",
+              borderColor: sourceFilter === "E_EDU" ? "#2563EB" : "#BFDBFE",
               cursor: "pointer",
+              transition: "all 0.15s ease",
             }}
           />
 
+          {/* Chip 3: Save */}
           <Chip
-            label={sourceFilter === "ALL" ? "Source: All ▾" : `Source: ${sourceLabel} ▾`}
-            onClick={() => setFilterDrawerOpen(true)}
+            icon={<SavingsIcon sx={{ fontSize: "16px !important", color: sourceFilter === "SAVE" ? "#FFFFFF !important" : "#D97706 !important" }} />}
+            label={`Save (${categoryStats.SAVE.count}) ₹${fmtAmount(categoryStats.SAVE.total)}`}
+            onClick={() => setSourceFilter("SAVE")}
             sx={{
-              fontWeight: 700,
-              fontSize: 11,
+              fontWeight: 800,
+              fontSize: 11.5,
+              height: 32,
               borderRadius: "999px",
-              bgcolor: sourceFilter !== "ALL" ? "#F0FDF4" : "#FFFFFF",
-              color: sourceFilter !== "ALL" ? "#15803D" : "#475569",
-              border: "1px solid",
-              borderColor: sourceFilter !== "ALL" ? "#22C55E" : "#E2E8F0",
+              bgcolor: sourceFilter === "SAVE" ? "#D97706" : "#FFFFFF",
+              color: sourceFilter === "SAVE" ? "#FFFFFF" : "#92400E",
+              border: "1.5px solid",
+              borderColor: sourceFilter === "SAVE" ? "#D97706" : "#FDE68A",
               cursor: "pointer",
+              transition: "all 0.15s ease",
             }}
           />
 
+          {/* Chip 4: QR Scanner */}
           <Chip
-            label="Wallet: All ▾"
-            onClick={() => setFilterDrawerOpen(true)}
+            icon={<QrCode2RoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "QR_SCANNER" ? "#FFFFFF !important" : "#059669 !important" }} />}
+            label={`QR Scanner (${categoryStats.QR_SCANNER.count}) ₹${fmtAmount(categoryStats.QR_SCANNER.total)}`}
+            onClick={() => setSourceFilter("QR_SCANNER")}
             sx={{
-              fontWeight: 700,
-              fontSize: 11,
+              fontWeight: 800,
+              fontSize: 11.5,
+              height: 32,
               borderRadius: "999px",
-              bgcolor: "#FFFFFF",
-              color: "#475569",
-              border: "1px solid #E2E8F0",
+              bgcolor: sourceFilter === "QR_SCANNER" ? "#059669" : "#FFFFFF",
+              color: sourceFilter === "QR_SCANNER" ? "#FFFFFF" : "#065F46",
+              border: "1.5px solid",
+              borderColor: sourceFilter === "QR_SCANNER" ? "#059669" : "#A7F3D0",
               cursor: "pointer",
+              transition: "all 0.15s ease",
             }}
           />
 
+          {/* Chip 5: Trizone Shopping */}
           <Chip
-            label="Category: All ▾"
-            onClick={() => setFilterDrawerOpen(true)}
+            icon={<ShoppingCartRoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "TRIZONE" ? "#FFFFFF !important" : "#0284C7 !important" }} />}
+            label={`Trizone Shopping (${categoryStats.TRIZONE.count}) ₹${fmtAmount(categoryStats.TRIZONE.total)}`}
+            onClick={() => setSourceFilter("TRIZONE")}
             sx={{
-              fontWeight: 700,
-              fontSize: 11,
+              fontWeight: 800,
+              fontSize: 11.5,
+              height: 32,
               borderRadius: "999px",
-              bgcolor: "#FFFFFF",
-              color: "#475569",
-              border: "1px solid #E2E8F0",
+              bgcolor: sourceFilter === "TRIZONE" ? "#0284C7" : "#FFFFFF",
+              color: sourceFilter === "TRIZONE" ? "#FFFFFF" : "#075985",
+              border: "1.5px solid",
+              borderColor: sourceFilter === "TRIZONE" ? "#0284C7" : "#BAE6FD",
               cursor: "pointer",
+              transition: "all 0.15s ease",
             }}
           />
 
-          {activeFilterCount > 0 && (
-            <Chip
-              label={`✕ Reset (${activeFilterCount})`}
-              onClick={handleResetFilters}
-              sx={{
-                fontWeight: 700,
-                fontSize: 11,
-                borderRadius: "999px",
-                bgcolor: "#FEF2F2",
-                color: "#DC2626",
-                border: "1px solid #FCA5A5",
-                cursor: "pointer",
-              }}
-            />
-          )}
+          {/* Chip 6: Royalty */}
+          <Chip
+            icon={<WorkspacePremiumRoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "ROYALTY" ? "#FFFFFF !important" : "#9333EA !important" }} />}
+            label={`Royalty (${categoryStats.ROYALTY.count}) ₹${fmtAmount(categoryStats.ROYALTY.total)}`}
+            onClick={() => setSourceFilter("ROYALTY")}
+            sx={{
+              fontWeight: 800,
+              fontSize: 11.5,
+              height: 32,
+              borderRadius: "999px",
+              bgcolor: sourceFilter === "ROYALTY" ? "#9333EA" : "#FFFFFF",
+              color: sourceFilter === "ROYALTY" ? "#FFFFFF" : "#7E22CE",
+              border: "1.5px solid",
+              borderColor: sourceFilter === "ROYALTY" ? "#9333EA" : "#E9D5FF",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          />
         </Box>
+
+        {/* Dynamic Category Summary Banner Matching Image 2 */}
+        {sourceFilter === "E_EDU" && (
+          <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#EFF6FF", border: "1px solid #BFDBFE" }}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar sx={{ bgcolor: "#DBEAFE", color: "#1D4ED8", width: 38, height: 38 }}>
+                <SchoolRoundedIcon sx={{ fontSize: 20 }} />
+              </Avatar>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#1E3A8A" }}>
+                  E-Edu Agent Commissions
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#1D4ED8", fontWeight: 700 }}>
+                  Total Transactions: {categoryStats.E_EDU.count} • Total Amount Received: ₹ {fmtAmount(categoryStats.E_EDU.total)}
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: "#1E40AF", opacity: 0.85, mt: 0.2 }}>
+                  Commissions earned from digital courses, LMS modules, and certification on asiyapp.com.
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        )}
+
+        {sourceFilter === "SAVE" && (
+          <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#FFFBEB", border: "1px solid #FDE68A" }}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar sx={{ bgcolor: "#FEF3C7", color: "#B45309", width: 38, height: 38 }}>
+                <SavingsIcon sx={{ fontSize: 20 }} />
+              </Avatar>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#92400E" }}>
+                  Self Block Repurchase Pocket (25%)
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#B45309", fontWeight: 700 }}>
+                  Total Transactions: {categoryStats.SAVE.count} • Total Amount Saved: ₹ {fmtAmount(categoryStats.SAVE.total)}
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: "#92400E", opacity: 0.85, mt: 0.2 }}>
+                  Automatic 25% allocation reserved for the ₹250 Self-Rebirth loop and shopping vouchers.
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        )}
+
+        {sourceFilter === "QR_SCANNER" && (
+          <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#ECFDF5", border: "1px solid #A7F3D0" }}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar sx={{ bgcolor: "#D1FAE5", color: "#065F46", width: 38, height: 38 }}>
+                <QrCode2RoundedIcon sx={{ fontSize: 20 }} />
+              </Avatar>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#065F46" }}>
+                  QR Scanner & Merchant Overrides
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#047857", fontWeight: 700 }}>
+                  Total Transactions: {categoryStats.QR_SCANNER.count} • Total Amount Received: ₹ {fmtAmount(categoryStats.QR_SCANNER.total)}
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: "#065F46", opacity: 0.85, mt: 0.2 }}>
+                  Instant payouts from local merchant QR standee transactions and POS scans.
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        )}
+
+        {sourceFilter === "TRIZONE" && (
+          <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#F0F9FF", border: "1px solid #BAE6FD" }}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar sx={{ bgcolor: "#E0F2FE", color: "#0369A1", width: 38, height: 38 }}>
+                <ShoppingCartRoundedIcon sx={{ fontSize: 20 }} />
+              </Avatar>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0C4A6E" }}>
+                  TriZone Shopping & Retail Cashback
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#0284C7", fontWeight: 700 }}>
+                  Total Transactions: {categoryStats.TRIZONE.count} • Total Amount Received: ₹ {fmtAmount(categoryStats.TRIZONE.total)}
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: "#0369A1", opacity: 0.85, mt: 0.2 }}>
+                  Earnings from 18 TriZone commerce categories across your regional network.
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        )}
+
+        {sourceFilter === "ROYALTY" && (
+          <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#FAF5FF", border: "1px solid #E9D5FF" }}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar sx={{ bgcolor: "#F3E8FF", color: "#7E22CE", width: 38, height: 38 }}>
+                <WorkspacePremiumRoundedIcon sx={{ fontSize: 20 }} />
+              </Avatar>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#581C87" }}>
+                  Territory & Midnight Royalty
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#7E22CE", fontWeight: 700 }}>
+                  Total Transactions: {categoryStats.ROYALTY.count} • Total Amount Received: ₹ {fmtAmount(categoryStats.ROYALTY.total)}
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: "#6B21A8", opacity: 0.85, mt: 0.2 }}>
+                  Daily midnight distributions from Pincode, District, and State pool turnover.
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        )}
+
+        {sourceFilter === "ALL" && (
+          <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#F0FDF4", border: "1px solid #BBF7D0" }}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar sx={{ bgcolor: "#DCFCE7", color: "#166534", width: 38, height: 38 }}>
+                <CheckCircleRoundedIcon sx={{ fontSize: 20 }} />
+              </Avatar>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#166534" }}>
+                  All Transactions Ledger
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#15803D", fontWeight: 700 }}>
+                  Total Transactions: {categoryStats.ALL.count} • Total Amount Received: ₹ {fmtAmount(categoryStats.ALL.total)}
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: "#166534", opacity: 0.85, mt: 0.2 }}>
+                  Live synchronized statement showing 75% Main Wallet and 25% Self Block payouts.
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        )}
 
         {/* Compact Segmented Tabs: All (X), Credits (X), Debits (X) */}
         <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>

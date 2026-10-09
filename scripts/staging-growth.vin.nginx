@@ -1,0 +1,99 @@
+# Staging API & Frontend Nginx Configuration
+server {
+    server_name staging-api.growth.vin;
+
+    access_log /var/log/nginx/trikonekt-staging-api.access.log;
+    error_log /var/log/nginx/trikonekt-staging-api.error.log;
+
+    client_max_body_size 10m;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto http;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 300;
+    }
+
+    listen 443 ssl; # managed by Certbot
+    listen [::]:443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/staging-api.growth.vin/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/staging-api.growth.vin/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+}
+
+server {
+    server_name staging-growth.vin staging-growth.growth.vin;
+
+    root /srv/trikonekt/staging/frontend/build;
+    index index.html;
+
+    access_log /var/log/nginx/trikonekt-staging-frontend.access.log;
+    error_log /var/log/nginx/trikonekt-staging-frontend.error.log;
+
+    client_max_body_size 10m;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8001/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto http;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 300;
+    }
+
+    location = /healthz {
+        proxy_pass http://127.0.0.1:8001/healthz;
+        proxy_set_header Host $host;
+    }
+
+    location / {
+        add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0" always;
+        try_files $uri $uri/ /index.html;
+    }
+
+    listen [::]:443 ssl; # managed by Certbot
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/staging-growth.growth.vin/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/staging-growth.growth.vin/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+}
+
+server {
+    if ($host = staging-api.growth.vin) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+    listen 80;
+    listen [::]:80;
+    server_name staging-api.growth.vin;
+    return 404; # managed by Certbot
+}
+
+server {
+    if ($host = staging-growth.growth.vin) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+    listen 80;
+    listen [::]:80;
+    server_name staging-growth.vin staging-growth.growth.vin;
+    return 404; # managed by Certbot
+}

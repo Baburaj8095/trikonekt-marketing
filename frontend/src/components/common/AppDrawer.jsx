@@ -61,7 +61,7 @@ export default function AppDrawer({
     {
       title: "PACKAGES",
       items: [
-        { label: "E-edu Agent Academy", to: "https://triacademy.trikonekt.com/", external: true, icon: SchoolOutlinedIcon },
+        { label: "E-edu Agent Academy", to: "/user/rank-upgrade", icon: SchoolOutlinedIcon },
         { label: "E-edu Purchase History", to: "/user/prime-invoices", icon: ReceiptLongOutlinedIcon },
         { label: "Smart Shopping Voucher", to: "/user/spp-gift-cards", icon: CardGiftcardOutlinedIcon },
         { label: "Tri Holiday Packages", to: "/user/tri/tri-holidays", icon: FlightTakeoffOutlinedIcon },

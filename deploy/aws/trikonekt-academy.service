@@ -1,0 +1,23 @@
+[Unit]
+Description=Trikonekt Captain Academy Backend Service & Growth Bridge
+After=network.target
+
+[Service]
+Type=simple
+User=trikonekt
+WorkingDirectory=/srv/trikonekt/tri-academy/backend
+Environment=NODE_ENV=production
+Environment=PORT=5005
+Environment=GROWTH_STAGING_API_URL=https://staging-api.growth.vin/api
+Environment=GROWTH_STAGING_WEB_URL=https://staging-growth.growth.vin
+Environment=JWT_SECRET=trikonekt_captain_academy_super_secret_key_2026
+Environment=GROWTH_BRIDGE_SECRET=trikonekt_growth_s2s_bridge_secret_staging_2026
+ExecStart=/usr/bin/node src/server.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=trikonekt-academy
+
+[Install]
+WantedBy=multi-user.target

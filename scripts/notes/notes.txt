@@ -1,0 +1,53 @@
+
+Replace Matrix word with Blocks
+Replace level word with Layer
+Genealogy word to Layer Blocks
+
+remove team consumer from user managment 
+and let the team consumer be present in Team consumer 
+
+User managment - Replace with Layer Blocks -> 5 Layer Blocks
+                                           -> 3 Layer Blocks
+
+Administration -> 
+               ->
+               ->
+               ->
+
+Frachise seperate Login
+
+
+
+self rebirth -  250 
+
+80 - will go as 5 matrix level,
+
+20 3 matrix will go as 3 matrix
+
+
+direct sponsor already configured 
+
+these above are already configured
+
+below need to be implemente -
+
+we need franchise pool [15rs demo amount] - that pool need to be distributed as a percentage to the all the franchises from tracing pincode -
+pincode cordinator, pincode, district cordinator, district, state cordinator, state -  these pool needs to be configured,
+
+also we need District Pool [ex 20rs demo amount] - collecet the amount from all the pincodes and distribute those commission to 
+district boxes, [means today some pincodes from kalaburagi had self rebirth and those need to be added to kalaburagi district boxes and the individual pincodes comission will got to the district pool will] 
+
+example - sone pincode 585013, 585012, 585014, 560073, 560072 - these ppl havse self rebrth and these amount should to go there respective district pool [kalaburagi and bangalore]
+and from these distrit pool night 12 o clock every night it should distribute to the distrct kalaburagi [all pincodes of kalaburagi irespective of consumer 
+contribution in self rebirth but the consumer shuld be active]
+
+next state wise - 10rs demo amount - then each pincodes should go to the state pool account and from there state pool night it should disttibute to each
+state cordintaor, state, district cordinator, district, pincode cordinator, pincode.
+
+
+Franchise 15rs -
+we need an option to distribute the amount to franchise
+
+We need an option in admin for franchise [this franchise will be based on pincode - suppose pincode is 585103 and this pincode regigopns =s pincode cordinator, pincode, district cordinator, district, state, state cordinator] means the pincode upline franchises [ suppose the pincode is 585103, then that pincode district, states should be decided on pincode]
+
+District - 30 

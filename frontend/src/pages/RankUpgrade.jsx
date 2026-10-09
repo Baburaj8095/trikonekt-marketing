@@ -1036,7 +1036,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                     </Stack>
                     <Typography sx={{ fontSize: 11, opacity: 0.9, mb: 1.5 }}>
                       {!isLayerActive
-                        ? "Layer 1 is inactive. Purchase the ₹2,000 package on trieducation.in or upgrade to Layer 1 to start receiving income."
+                        ? "Layer 1 is inactive. Purchase the ₹2,000 package on asiyapp.com or upgrade to Layer 1 to start receiving income."
                         : isLimitReached
                         ? `Limit reached for Layer ${currentLevel}. Upgrade or re-top up to continue income.`
                         : currentLevel >= 10
@@ -1135,7 +1135,8 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#0f172a", mb: 0.5 }}>₹{fmt(earnedRoyalty)}</Typography>
             <Box sx={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 0.5, fontSize: 10, color: "#64748b", mb: 0.5 }}>
               <span>L1 to L7: ₹{fmt(royaltyInfo?.tier1_earned ?? 0)}</span>
-              <span>L8 to L10: ₹{fmt(royaltyInfo?.tier2_earned ?? 0)}</span>
+              <span>Dist L8-L10: ₹{fmt(royaltyInfo?.tier2_district_earned ?? (Number(royaltyInfo?.tier2_earned || 0) * 0.6))}</span>
+              <span>State L8-L10: ₹{fmt(royaltyInfo?.tier2_state_earned ?? (Number(royaltyInfo?.tier2_earned || 0) * 0.4))}</span>
               <span>Recovery: ₹{fmt(royaltyInfo?.tier3_earned ?? 0)}</span>
             </Box>
             <LinearProgress
@@ -1146,16 +1147,16 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             />
             <Divider sx={{ my: 1 }} />
             <Stack spacing={1.2}>
-              {/* Tier 1 */}
+              {/* Tier 1: District Royalty L1-L7 */}
               <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Box>
                   <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>
-                    {royaltyConfig?.tier1_levels ? String(royaltyConfig.tier1_levels).replace(/Level/gi, "LAYER") : "LAYER 1 TO LAYER 7"}
+                    DISTRICT ROYALTY (LAYER 1 TO LAYER 7)
                   </Typography>
                   <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#15803d" }}>
                     {royaltyConfig?.tier1_percent ?? 4}% ₹{fmt(royaltyConfig?.tier1_cap ?? 10000)}
                     <span style={{ fontSize: 10, color: "#64748b", fontWeight: 500, marginLeft: 4 }}>
-                      ({royaltyConfig?.tier1_days ?? 40}d window)
+                      ({royaltyConfig?.tier1_days ?? 7}d window)
                     </span>
                   </Typography>
                   <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#059669" }}>
@@ -1165,30 +1166,50 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                 {renderTierBadge(royaltyInfo?.tier1, currentLevel >= 7)}
               </Stack>
 
-              {/* Tier 2 */}
+              {/* Districtwise Royalty L8-L10 */}
               <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Box>
                   <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>
-                    {royaltyConfig?.tier2_levels ? String(royaltyConfig.tier2_levels).replace(/Level/gi, "LAYER") : "LAYER 8 TO LAYER 10"}
+                    DISTRICTWISE ROYALTY (LAYER 8 TO LAYER 10)
                   </Typography>
                   <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#15803d" }}>
-                    {royaltyConfig?.tier2_percent ?? 6}% ₹{fmt(royaltyConfig?.tier2_cap ?? 40000)}
+                    3.6% ₹{fmt(24000)}
                     <span style={{ fontSize: 10, color: "#64748b", fontWeight: 500, marginLeft: 4 }}>
                       ({royaltyConfig?.tier2_days ?? 7}d from L7)
                     </span>
                   </Typography>
                   <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#059669" }}>
-                    Earned: ₹{fmt(royaltyInfo?.tier2_earned ?? 0)}
+                    Earned: ₹{fmt(royaltyInfo?.tier2_district_earned ?? (Number(royaltyInfo?.tier2_earned || 0) * 0.6))}
                   </Typography>
                 </Box>
                 {renderTierBadge(royaltyInfo?.tier2, currentLevel >= 10)}
               </Stack>
 
+              {/* Statewise Royalty L8-L10 */}
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Box>
+                  <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>
+                    STATEWISE ROYALTY (LAYER 8 TO LAYER 10)
+                  </Typography>
+                  <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#15803d" }}>
+                    2.4% ₹{fmt(16000)}
+                    <span style={{ fontSize: 10, color: "#64748b", fontWeight: 500, marginLeft: 4 }}>
+                      ({royaltyConfig?.tier2_days ?? 7}d from L7)
+                    </span>
+                  </Typography>
+                  <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#059669" }}>
+                    Earned: ₹{fmt(royaltyInfo?.tier2_state_earned ?? (Number(royaltyInfo?.tier2_earned || 0) * 0.4))}
+                  </Typography>
+                </Box>
+                {renderTierBadge(royaltyInfo?.tier2, currentLevel >= 10)}
+              </Stack>
+
+
               {/* Tier 3: Recovery Window */}
               <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Box>
                   <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700 }}>
-                    {royaltyConfig?.tier3_levels ? String(royaltyConfig.tier3_levels).replace(/Level/gi, "LAYER") : "LAYER 1 TO LAYER 10 (RECOVERY)"}
+                    DISTRICT ROYALTY (LAYER 1 TO LAYER 10 RECOVERY)
                   </Typography>
                   <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#15803d" }}>
                     {royaltyConfig?.tier3_percent ?? 4}% ₹{fmt(royaltyConfig?.tier3_cap ?? 10000)}
@@ -1203,6 +1224,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                 {renderTierBadge(royaltyInfo?.tier3, currentLevel >= 10)}
               </Stack>
             </Stack>
+
             <Divider sx={{ my: 1 }} />
             <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#15803d" }}>
               TOTAL ELIGIBLE ROYALTY LIMIT ₹{fmt(totalEligibleRoyaltyCap)}
@@ -1481,7 +1503,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             No active 5-Matrix Education positions found.
           </Typography>
           <Typography sx={{ fontSize: 12, color: "#94A3B8" }}>
-            Purchase the ₹2,000 Digital Education Package (₹750 Prime + ₹1,000 SPP + ₹250 Layer 1 Upgrade) on <strong style={{ color: "#4F46E5" }}>trieducation.in</strong> to activate your 5-Matrix position.
+            Purchase the ₹2,000 Digital Education Package (₹750 Prime + ₹1,000 SPP + ₹250 Layer 1 Upgrade) on <strong style={{ color: "#4F46E5" }}>asiyapp.com</strong> to activate your 5-Matrix position.
           </Typography>
         </Paper>
       )}

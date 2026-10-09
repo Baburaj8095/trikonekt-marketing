@@ -60,10 +60,12 @@ import {
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import API, { setAuthBlocked } from "../../api/api";
 import LOGO from "../../assets/TRIKONEKT.jpg";
+import { FRANCHISE_ROLES } from "../../components/franchise/FranchiseLogin";
 
 const Login = () => {
   // === LOGIC STATES (kept from original) ===
   const [mode, setMode] = useState("login"); // "login" | "register"
+  const [selectedFranchiseKey, setSelectedFranchiseKey] = useState("agency_pincode");
   // NOTE: Login page should show only Team Login and Franchise Login.
   // We still keep the old `role` state because the rest of the file (registration logic, field renderers,
   // resolveRegisteredRole, etc.) references it, but we *force* it based on the selected loginMode.
@@ -97,10 +99,14 @@ const Login = () => {
     if (initLoginModeRef.current) return;
     initLoginModeRef.current = true;
     try {
-      if (lockedRole === "agency") {
+      const params = new URLSearchParams(location.search || "");
+      const qRole = String(params.get("role") || "").toLowerCase();
+      const qMode = String(params.get("mode") || "").toLowerCase();
+      if (lockedRole === "agency" || qRole === "agency" || qMode === "franchise") {
         setLoginMode("franchise");
         setLoginContext("team");
         setRole("agency");
+        setSelectedFranchiseKey("agency_pincode");
       } else {
         // default to team login
         setLoginMode("team");
@@ -108,7 +114,7 @@ const Login = () => {
         setRole("user");
       }
     } catch (_) {}
-  }, [lockedRole]);
+  }, [lockedRole, location.search]);
 
   // If already authenticated:
   // - When a role is locked via the URL, redirect ONLY if a session exists for that role.
@@ -138,7 +144,7 @@ const Login = () => {
             preferredNs === "admin"
               ? "/admin/dashboard"
               : preferredNs === "agency"
-                ? "/agency/franchise-dashboard"
+                ? "/franchise/dashboard"
                 : `/${preferredNs}/dashboard`;
           navigate(to, { replace: true });
         }
@@ -154,7 +160,7 @@ const Login = () => {
             found === "admin"
               ? "/admin/dashboard"
               : found === "agency"
-                ? "/agency/franchise-dashboard"
+                ? "/franchise/dashboard"
                 : `/${found}/dashboard`;
           navigate(to, { replace: true });
         }
@@ -1291,13 +1297,12 @@ const Login = () => {
   };
 
   const loginField = useMemo(() => {
-    // Team login uses phone number; Franchise login uses username.
     if (loginMode === "franchise") {
       return {
-        label: "Username",
-        type: "text",
-        inputMode: "text",
-        placeholder: "Enter username",
+        label: "Phone Number",
+        type: "tel",
+        inputMode: "numeric",
+        placeholder: "Enter 10-digit registered phone number",
       };
     }
     return {
@@ -1469,9 +1474,8 @@ const Login = () => {
               setErrorMsg("This account is not allowed for Franchise Login.");
               return;
             }
-            // Keep agency login behavior under /agency/*.
-            // We expose the new franchise UI screens inside the agency area.
-            navigate(`/agency/franchise-dashboard`, { replace: true });
+            // Franchise partner lands on the dedicated mobile-first Franchise Dashboard
+            navigate(`/franchise/dashboard`, { replace: true });
             return;
           }
 
@@ -2277,17 +2281,17 @@ const Login = () => {
       </AppBar>
 
       {/* Main container */}
-      <Container maxWidth="sm" sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", py: { xs: 4, md: 10 } }}>
+      <Container maxWidth="sm" sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", py: { xs: 4, md: 8 } }}>
         <Paper
           elevation={3}
           sx={{
             width: "100%",
-            maxWidth: 400,
+            maxWidth: loginMode === "franchise" ? 520 : 400,
             mx: "auto",
-            p: { xs: 3, sm: 4 },
+            p: { xs: 2.5, sm: 3.5 },
             borderRadius: 3,
             backgroundColor: "#fff",
-            boxShadow: "0 8px 20px rgba(0,0,0,0.06)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.06)",
             textAlign: "center",
             transition: "all 0.25s ease",
             "&:hover": { boxShadow: "0 10px 24px rgba(0,0,0,0.08)" },
@@ -2433,18 +2437,112 @@ const Login = () => {
                   onChange={(_, v) => {
                     if (!v) return;
                     setLoginMode(v);
-                    // Persist the existing loginContext behaviour (team is already handled)
                     setLoginContext("team");
-                    // Make role consistent with selected mode
-                    try { setRole(v === "franchise" ? "agency" : "user"); } catch (_) {}
+                    if (v === "franchise") {
+                      try { setRole("agency"); } catch (_) {}
+                      setSelectedFranchiseKey("agency_pincode");
+                    } else {
+                      try { setRole("user"); } catch (_) {}
+                      setFormData((prev) => ({
+                        ...prev,
+                        username: "",
+                        password: "",
+                      }));
+                    }
                   }}
                   size="small"
                   fullWidth
-                  sx={{ mb: 1 }}
+                  sx={{ mb: 2 }}
                 >
-                  <ToggleButton value="team">Team Login</ToggleButton>
-                  <ToggleButton value="franchise">Franchise Login</ToggleButton>
+                  <ToggleButton value="team" sx={{ fontWeight: 600 }}>Team Login</ToggleButton>
+                  <ToggleButton value="franchise" sx={{ fontWeight: 600 }}>Franchise Login</ToggleButton>
                 </ToggleButtonGroup>
+
+                {loginMode === "franchise" && (
+                  <Box sx={{ mb: 2, textAlign: "left" }}>
+                    <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1, px: 0.5 }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#1E293B" }}>
+                        Select Franchise Tier
+                      </Typography>
+                    </Box>
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                        gap: 1,
+                        mb: 1.5,
+                      }}
+                    >
+                      {FRANCHISE_ROLES.map((r) => {
+                        const isSelected = selectedFranchiseKey === r.key;
+                        return (
+                          <Paper
+                            key={r.key}
+                            elevation={0}
+                            onClick={() => {
+                              setSelectedFranchiseKey(r.key);
+                              setErrorMsg("");
+                            }}
+                            sx={{
+                              p: 1.25,
+                              borderRadius: "12px",
+                              cursor: "pointer",
+                              border: isSelected ? `2px solid ${r.color}` : "1px solid #E2E8F0",
+                              bgcolor: isSelected ? r.bg : "#FAFAFA",
+                              transition: "all 0.15s ease",
+                              "&:hover": { borderColor: r.color, bgcolor: r.bg },
+                            }}
+                          >
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                              <Box
+                                sx={{
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: "8px",
+                                  bgcolor: isSelected ? r.color : "#E2E8F0",
+                                  color: isSelected ? "#FFF" : r.color,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {r.icon}
+                              </Box>
+                              <Box sx={{ minWidth: 0, flex: 1 }}>
+                                <Typography
+                                  sx={{
+                                    fontSize: 11.5,
+                                    fontWeight: 700,
+                                    color: "#0F172A",
+                                    lineHeight: 1.2,
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                  }}
+                                >
+                                  {r.title}
+                                </Typography>
+                                <Typography
+                                  sx={{
+                                    fontSize: 10,
+                                    color: "#64748B",
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                  }}
+                                >
+                                  {r.badge}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </Paper>
+                        );
+                      })}
+                    </Box>
+                  </Box>
+                )}
+
                 <TextField
                   fullWidth
                   name="username"
@@ -2549,16 +2647,20 @@ const Login = () => {
               onClick={(e) => handleSubmit(e)}
               variant="contained"
               sx={{
-                py: 1.05,
+                py: 1.15,
                 fontWeight: 700,
                 borderRadius: 1.25,
-                background: "linear-gradient(90deg,#1976d2 0%,#42a5f5 100%)",
-                boxShadow: "0 6px 18px rgba(25,118,210,0.16)",
+                background: loginMode === "franchise"
+                  ? "linear-gradient(90deg,#2563EB 0%,#1D4ED8 100%)"
+                  : "linear-gradient(90deg,#1976d2 0%,#42a5f5 100%)",
+                boxShadow: loginMode === "franchise"
+                  ? "0 6px 18px rgba(37,99,235,0.22)"
+                  : "0 6px 18px rgba(25,118,210,0.16)",
                 "&:active": { transform: "translateY(1px)" },
                 mb: 1.25,
               }}
             >
-              {isLogin ? "LOGIN" : "REGISTER"}
+              {isLogin ? (loginMode === "franchise" ? "SIGN IN AS FRANCHISE PARTNER" : "LOGIN") : "REGISTER"}
             </Button>
 
             {isLogin && (
@@ -2570,12 +2672,21 @@ const Login = () => {
             )}
 
             <Box sx={{ mt: 1.5, textAlign: { xs: "left", sm: "center" } }}>
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                Don't have an account?{" "}
-                <Link component="button" type="button" variant="body2" onClick={handleRegisterNav} sx={{ fontWeight: 700 }}>
-                  Register here
-                </Link>
-              </Typography>
+              {loginMode === "franchise" ? (
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  Franchise accounts are assigned by Admin.{" "}
+                  <Link component="button" type="button" variant="body2" onClick={() => navigate("/contact")} sx={{ fontWeight: 700 }}>
+                    Contact Support
+                  </Link>
+                </Typography>
+              ) : (
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  Don't have an account?{" "}
+                  <Link component="button" type="button" variant="body2" onClick={handleRegisterNav} sx={{ fontWeight: 700 }}>
+                    Register here
+                  </Link>
+                </Typography>
+              )}
             </Box>
 
           </Box>

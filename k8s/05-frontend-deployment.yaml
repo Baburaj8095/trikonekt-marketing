@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trikonekt-frontend-deployment
+  namespace: trikonekt-prod
+  labels:
+    app: trikonekt-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: trikonekt-frontend
+  template:
+    metadata:
+      labels:
+        app: trikonekt-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: 65.0.40.184:5000/trikonekt-frontend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "250m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trikonekt-frontend-service
+  namespace: trikonekt-prod
+spec:
+  type: ClusterIP
+  selector:
+    app: trikonekt-frontend
+  ports:
+  - port: 80
+    targetPort: 80
