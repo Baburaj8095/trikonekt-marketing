@@ -839,30 +839,11 @@ function AccordionBranchCard({
           </Box>
         </Stack>
 
-        {/* Right: Total Team Badge + Active pill + Chevron Button */}
+        {/* Right: Active pill + Chevron Button */}
         <Stack direction="row" alignItems="center" spacing={1}>
           <Box
             sx={{
               display: "inline-flex",
-              alignItems: "center",
-              gap: 0.5,
-              px: 1.25,
-              py: 0.35,
-              borderRadius: "12px",
-              bgcolor: "#EFF6FF",
-              color: "#1D4ED8",
-              border: "1px solid #BFDBFE",
-              fontSize: 11,
-              fontWeight: 800,
-            }}
-          >
-            <GroupsRoundedIcon sx={{ fontSize: 14 }} />
-            Total Team: {node?.team_count ?? 0}
-          </Box>
-
-          <Box
-            sx={{
-              display: { xs: "none", sm: "inline-flex" },
               alignItems: "center",
               gap: 0.5,
               px: 1.25,
@@ -1144,26 +1125,7 @@ function AccordionBranchCard({
                         <Stack direction="row" alignItems="center" spacing={1}>
                           <Box
                             sx={{
-                              display: { xs: "none", sm: "inline-flex" },
-                              alignItems: "center",
-                              gap: 0.4,
-                              px: 1,
-                              py: 0.25,
-                              borderRadius: "10px",
-                              bgcolor: "#EFF6FF",
-                              color: "#1D4ED8",
-                              border: "1px solid #BFDBFE",
-                              fontSize: 10.5,
-                              fontWeight: 800,
-                            }}
-                          >
-                            <GroupsRoundedIcon sx={{ fontSize: 12 }} />
-                            Team: {child.team_count ?? 0}
-                          </Box>
-
-                          <Box
-                            sx={{
-                              display: { xs: "none", sm: "inline-flex" },
+                              display: "inline-flex",
                               alignItems: "center",
                               gap: 0.4,
                               px: 1,
