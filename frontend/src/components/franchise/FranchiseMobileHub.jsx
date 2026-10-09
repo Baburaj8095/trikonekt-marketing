@@ -2023,7 +2023,7 @@ export default function FranchiseMobileHub({
     }
 
     return { title, subtitle, isHome, onBack };
-  }, [activeScreen, currentTier, selectedCaptain, selectedMerchant, activeZoneMetrics]);
+  }, [activeScreen, currentTier, selectedCaptain, selectedMerchant, activeZoneMetrics, selectedSubZone, user]);
 
   return (
     <AgencyLayout
@@ -2044,6 +2044,7 @@ export default function FranchiseMobileHub({
       onNotificationClick={() => setActiveScreen("support")}
       onCartClick={() => navigate("/market")}
       userInitials={user?.username ? user.username.charAt(0).toUpperCase() : "A"}
+      userName={user?.username || user?.full_name || currentTier.title}
       onAvatarClick={() => setProfileDrawerOpen(true)}
     >
       {/* =========================================================================
@@ -2051,38 +2052,37 @@ export default function FranchiseMobileHub({
       ========================================================================= */}
       {activeScreen === "home" && (
         <Box>
-          {/* Greeting & Jurisdiction Details */}
-          <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
-            <Box>
-              <Typography sx={{ fontSize: 13, color: "#64748B", fontWeight: 600 }}>
-                Welcome Back,
-              </Typography>
-              <Typography sx={{ fontSize: 18, fontWeight: 950, color: "#0F172A", lineHeight: 1.2 }}>
-                {user?.username ? `${currentTier.title} (${user.username})` : currentTier.title}
-              </Typography>
-              <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.4 }}>
-                <Chip
-                  label={currentTier.badge || currentTier.title}
-                  size="small"
-                  sx={{
-                    height: 20,
-                    fontSize: 10.5,
-                    fontWeight: 800,
-                    bgcolor: "#EFF6FF",
-                    color: "#1D4ED8",
-                    border: "1px solid #BFDBFE",
-                  }}
-                />
-                <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748B" }}>
-                  PIN: {selectedSubZone !== "all" ? selectedSubZone : (user?.pincode || "572106")}
+          {/* Territory & Jurisdiction Status Bar */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 1.4,
+              borderRadius: "16px",
+              bgcolor: "#FFFFFF",
+              border: "1px solid #EEF2F6",
+              boxShadow: "0 1px 3px rgba(15,23,42,0.03)",
+              mb: 1.8,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 1,
+            }}
+          >
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Box sx={{ width: 32, height: 32, borderRadius: "10px", bgcolor: "#EFF6FF", color: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <LocationOnRoundedIcon sx={{ fontSize: 18 }} />
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#0F172A", lineHeight: 1.2 }}>
+                  {user?.jurisdiction || currentTier.defaultLocation}
                 </Typography>
-              </Stack>
-              <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", mt: 0.3 }}>
-                {user?.jurisdiction || currentTier.defaultLocation}
-              </Typography>
-            </Box>
+                <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: "#64748B" }}>
+                  {currentTier.title} • PIN {selectedSubZone !== "all" ? selectedSubZone : (user?.pincode || "572106")}
+                </Typography>
+              </Box>
+            </Stack>
 
-            {/* Jurisdiction / Cluster Selector Dropdown for Coordinators */}
             {currentTier.pincodes && currentTier.pincodes.length > 1 ? (
               <Box sx={{ minWidth: 140 }}>
                 <FormControl size="small" variant="standard" fullWidth>
@@ -2093,11 +2093,11 @@ export default function FranchiseMobileHub({
                     sx={{
                       bgcolor: "#EFF6FF",
                       border: "1px solid #BFDBFE",
-                      borderRadius: "16px",
+                      borderRadius: "12px",
                       px: 1.2,
-                      py: 0.4,
-                      fontSize: 11.5,
-                      fontWeight: 800,
+                      py: 0.3,
+                      fontSize: 11,
+                      fontWeight: 850,
                       color: "#1D4ED8",
                     }}
                   >
@@ -2113,25 +2113,20 @@ export default function FranchiseMobileHub({
                 </FormControl>
               </Box>
             ) : (
-              <Box
+              <Chip
+                label={`PIN ${selectedSubZone !== "all" ? selectedSubZone : (user?.pincode || "572106")}`}
+                size="small"
                 sx={{
                   bgcolor: "#EFF6FF",
                   border: "1px solid #BFDBFE",
                   color: "#1D4ED8",
-                  fontWeight: 800,
-                  fontSize: 11.5,
-                  px: 1.4,
-                  py: 0.5,
-                  borderRadius: "20px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 0.5,
+                  fontWeight: 900,
+                  fontSize: 11,
+                  height: 24,
                 }}
-              >
-                <span>PIN {selectedSubZone !== "all" ? selectedSubZone : (currentTier.pincodes?.[0]?.pincode || "572106")}</span>
-              </Box>
+              />
             )}
-          </Stack>
+          </Paper>
 
           {/* Purple Gradient Earnings Wallet Hero Card (Live Dynamic Balance) */}
           <Box onClick={() => setActiveScreen("history")} sx={{ cursor: "pointer" }}>
@@ -2196,71 +2191,99 @@ export default function FranchiseMobileHub({
             </Box>
           </Box>
 
-            {/* Quick Actions (8 circular buttons grid) */}
-            <Paper
-              elevation={0}
-              sx={{
-                p: 2,
-                borderRadius: "20px",
-                bgcolor: "#FFFFFF",
-                border: "1px solid #EEF2F6",
-                boxShadow: "0 2px 10px rgba(15,23,42,0.03)",
-                mb: 2,
-              }}
-            >
-              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.8 }}>
-                <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A" }}>
-                  Quick Actions
-                </Typography>
-                <Button
-                  size="small"
-                  onClick={() => setActiveScreen("command_center")}
-                  sx={{ fontSize: 11.5, fontWeight: 800, color: "#2563EB", textTransform: "none", p: 0 }}
-                >
-                  View All &rarr;
-                </Button>
-              </Stack>
+          {/* Quick Actions (8 equal-sized tiles in 4x2 grid) */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              borderRadius: "20px",
+              bgcolor: "#FFFFFF",
+              border: "1px solid #EEF2F6",
+              boxShadow: "0 2px 10px rgba(15,23,42,0.03)",
+              mb: 2,
+            }}
+          >
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.8 }}>
+              <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A" }}>
+                Quick Actions
+              </Typography>
+              <Button
+                size="small"
+                onClick={() => setActiveScreen("command_center")}
+                sx={{ fontSize: 11.5, fontWeight: 800, color: "#2563EB", textTransform: "none", p: 0 }}
+              >
+                View All &rarr;
+              </Button>
+            </Stack>
 
-              <Grid container spacing={2}>
-                {[
-                  { label: "Add Merchant", icon: <StoreRoundedIcon sx={{ fontSize: 22 }} />, color: "#2563EB", bg: "#EFF6FF", action: () => setAddMerchantOpen(true) },
-                  { label: "Add User", icon: <GroupsOutlinedIcon sx={{ fontSize: 22 }} />, color: "#059669", bg: "#ECFDF5", action: () => setAddUserOpen(true) },
-                  { label: "Scan QR", icon: <QrCodeScannerRoundedIcon sx={{ fontSize: 22 }} />, color: "#DC2626", bg: "#FEF2F2", action: () => setScanQrOpen(true) },
-                  { label: "History", icon: <AccountBalanceWalletRoundedIcon sx={{ fontSize: 22 }} />, color: "#059669", bg: "#ECFDF5", action: () => setActiveScreen("history") },
-                  { label: "View Captains", icon: <ShieldRoundedIcon sx={{ fontSize: 22 }} />, color: "#9333EA", bg: "#FAF5FF", action: () => setActiveScreen("captains") },
-                  { label: "My Team", icon: <GroupsOutlinedIcon sx={{ fontSize: 22 }} />, color: "#0284C7", bg: "#F0F9FF", action: () => setActiveScreen("users") },
-                  { label: "Support", icon: <SupportAgentRoundedIcon sx={{ fontSize: 22 }} />, color: "#4F46E5", bg: "#EEF2FF", action: () => setActiveScreen("support") },
-                  { label: "More", icon: <MoreHorizRoundedIcon sx={{ fontSize: 22 }} />, color: "#475569", bg: "#F1F5F9", action: () => setActiveScreen("command_center") },
-                ].map((act) => (
-                  <Grid item xs={3} key={act.label} sx={{ textAlign: "center" }}>
+            <Grid container spacing={1.2}>
+              {[
+                { label: "Add Merchant", icon: <StoreRoundedIcon sx={{ fontSize: 22 }} />, color: "#2563EB", bg: "#EFF6FF", action: () => setAddMerchantOpen(true) },
+                { label: "Add User", icon: <GroupsOutlinedIcon sx={{ fontSize: 22 }} />, color: "#059669", bg: "#ECFDF5", action: () => setAddUserOpen(true) },
+                { label: "Scan QR", icon: <QrCodeScannerRoundedIcon sx={{ fontSize: 22 }} />, color: "#DC2626", bg: "#FEF2F2", action: () => setScanQrOpen(true) },
+                { label: "History", icon: <AccountBalanceWalletRoundedIcon sx={{ fontSize: 22 }} />, color: "#059669", bg: "#ECFDF5", action: () => setActiveScreen("history") },
+                { label: "View Captains", icon: <ShieldRoundedIcon sx={{ fontSize: 22 }} />, color: "#9333EA", bg: "#FAF5FF", action: () => setActiveScreen("captains") },
+                { label: "My Team", icon: <GroupsOutlinedIcon sx={{ fontSize: 22 }} />, color: "#0284C7", bg: "#F0F9FF", action: () => setActiveScreen("users") },
+                { label: "Support", icon: <SupportAgentRoundedIcon sx={{ fontSize: 22 }} />, color: "#4F46E5", bg: "#EEF2FF", action: () => setActiveScreen("support") },
+                { label: "More", icon: <MoreHorizRoundedIcon sx={{ fontSize: 22 }} />, color: "#475569", bg: "#F1F5F9", action: () => setActiveScreen("command_center") },
+              ].map((act) => (
+                <Grid item xs={3} key={act.label}>
+                  <Box
+                    component="button"
+                    type="button"
+                    onClick={act.action}
+                    sx={{
+                      width: "100%",
+                      height: 76,
+                      borderRadius: "16px",
+                      bgcolor: "#FFFFFF",
+                      border: "1px solid #EEF2F6",
+                      boxShadow: "0 2px 6px rgba(15,23,42,0.03)",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      p: 0.6,
+                      boxSizing: "border-box",
+                      transition: "all 0.15s ease",
+                      "&:hover": { bgcolor: act.bg, borderColor: act.color + "33", transform: "translateY(-1px)" },
+                      "&:active": { transform: "scale(0.94)" },
+                    }}
+                  >
                     <Box
-                      component="button"
-                      type="button"
-                      onClick={act.action}
                       sx={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: "16px",
+                        width: 36,
+                        height: 36,
+                        borderRadius: "11px",
                         bgcolor: act.bg,
                         color: act.color,
-                        border: 0,
-                        display: "inline-flex",
+                        display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        cursor: "pointer",
-                        transition: "transform 0.12s ease",
-                        "&:active": { transform: "scale(0.92)" },
+                        mb: 0.5,
                       }}
                     >
                       {act.icon}
                     </Box>
-                    <Typography sx={{ fontSize: 10.5, fontWeight: 800, color: "#334155", mt: 0.6, lineHeight: 1.1 }}>
+                    <Typography
+                      noWrap
+                      sx={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: "#334155",
+                        textAlign: "center",
+                        width: "100%",
+                        lineHeight: 1.1,
+                      }}
+                    >
                       {act.label}
                     </Typography>
-                  </Grid>
-                ))}
-              </Grid>
-            </Paper>
+                  </Box>
+                </Grid>
+              ))}
+            </Grid>
+          </Paper>
 
             {/* Business Overview Card */}
             <Paper
@@ -3528,11 +3551,11 @@ export default function FranchiseMobileHub({
                     action: () => navigate("/user/bank-details"),
                   },
                   {
-                    label: "Rebirth Loop",
-                    icon: <AutorenewRoundedIcon sx={{ fontSize: 22 }} />,
+                    label: "Statements",
+                    icon: <DescriptionRoundedIcon sx={{ fontSize: 22 }} />,
                     color: "#7C3AED",
                     bg: "#F5F3FF",
-                    action: () => setActiveScreen("self_rebirth"),
+                    action: () => setFilterDrawerOpen(true),
                   },
                   {
                     label: "Helpdesk",
@@ -4673,27 +4696,27 @@ export default function FranchiseMobileHub({
                 Accumulates 25% of all regional commissions. When this pocket hits ₹{adminRebirthConfig.total_amount.toFixed(2)}, it automatically spawns a new Franchise Rebirth node into both 5-Matrix and 3-Matrix trees.
               </Typography>
 
-              <Button
-                fullWidth
-                variant="contained"
-                onClick={handleManualRebirthSpawn}
-                disabled={walletState.selfWallet < adminRebirthConfig.total_amount}
-                startIcon={<FlashOnRoundedIcon />}
+              <Box
                 sx={{
-                  py: 1,
+                  p: 1.4,
                   borderRadius: "14px",
-                  fontWeight: 900,
-                  fontSize: 12.5,
-                  bgcolor: walletState.selfWallet >= adminRebirthConfig.total_amount ? "#F59E0B" : "rgba(255,255,255,0.15)",
-                  color: walletState.selfWallet >= adminRebirthConfig.total_amount ? "#0F172A" : "#94A3B8",
-                  boxShadow: walletState.selfWallet >= adminRebirthConfig.total_amount ? "0 4px 14px rgba(245, 158, 11, 0.4)" : "none",
-                  "&:hover": { bgcolor: walletState.selfWallet >= adminRebirthConfig.total_amount ? "#D97706" : "rgba(255,255,255,0.2)" },
+                  bgcolor: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.2,
                 }}
               >
-                {walletState.selfWallet >= adminRebirthConfig.total_amount
-                  ? `⚡ Auto-Spawn Ready: Claim Rebirth ID (₹${adminRebirthConfig.total_amount.toFixed(2)})`
-                  : `⚡ Pocket Accumulating (₹${walletState.selfWallet.toFixed(2)} / ₹${adminRebirthConfig.total_amount.toFixed(2)})`}
-              </Button>
+                <AutorenewRoundedIcon sx={{ color: "#FDE68A", fontSize: 24, flexShrink: 0 }} />
+                <Box>
+                  <Typography sx={{ fontSize: 12, color: "#FFFFFF", fontWeight: 800, lineHeight: 1.3 }}>
+                    100% Autonomous Rebirth Engine
+                  </Typography>
+                  <Typography sx={{ fontSize: 11, color: "#CBD5E1", mt: 0.3, lineHeight: 1.35 }}>
+                    When balance reaches ₹{adminRebirthConfig.total_amount.toFixed(2)}, the engine automatically debits ₹{adminRebirthConfig.total_amount.toFixed(2)} and places a new Rebirth node into 5-Matrix & 3-Matrix per Admin Configuration.
+                  </Typography>
+                </Box>
+              </Box>
             </Paper>
 
             {/* Sub Tabs: 5-Matrix Placements | 3-Matrix Autopool | Node History | Admin Rates */}

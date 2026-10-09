@@ -20,7 +20,8 @@ export default function AgencyLayout({
   onSelectScreen,
   notificationCount = 12,
   cartCount = 0,
-  userInitials = "S",
+  userInitials = "A",
+  userName = "Franchise Partner",
   onNotificationClick,
   onCartClick,
   onAvatarClick,
@@ -57,6 +58,7 @@ export default function AgencyLayout({
           notificationCount={notificationCount}
           cartCount={cartCount}
           userInitials={userInitials}
+          userName={userName}
           onNotificationClick={onNotificationClick}
           onCartClick={onCartClick}
           onAvatarClick={onAvatarClick}
