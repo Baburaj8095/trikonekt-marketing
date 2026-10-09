@@ -2005,16 +2005,8 @@ export default function History() {
       }}
     >
       <PremiumScreenHeader
-        title={
-          <Box>
-            <Typography sx={{ fontWeight: 900, fontSize: { xs: 15, sm: 17 }, color: "#0F172A", lineHeight: 1.1 }}>
-              <span style={{ color: "#0256B4" }}>TRI</span><span style={{ color: "#DC2626" }}>KONEKT</span>
-            </Typography>
-            <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#059669", letterSpacing: "0.2px", lineHeight: 1.2, mt: 0.2 }}>
-              @{currentUser?.username || currentUser?.phone || currentUser?.full_name || "Member"}
-            </Typography>
-          </Box>
-        }
+        title="Wallet & History"
+        user={currentUser}
         notificationCount={1}
         onBack={() => navigate(-1)}
         onNotifications={() => {
