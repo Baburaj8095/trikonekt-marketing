@@ -1,11 +1,10 @@
 import React from "react";
 import { TextField, InputAdornment } from "@mui/material";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import { AGENCY_TOKENS } from "./AgencyTokens";
 
 /**
- * Standard SearchField (Phase 5)
- * Full-width responsive search field with 12px radius.
+ * Standard SearchField (Matches Image 2 Reference Design)
+ * Full-width responsive search field with 16px radius and crisp modern styling.
  */
 export default function SearchField({
   value,
@@ -22,20 +21,24 @@ export default function SearchField({
       InputProps={{
         startAdornment: (
           <InputAdornment position="start">
-            <SearchRoundedIcon sx={{ color: AGENCY_TOKENS.colors.secondaryText, fontSize: 20 }} />
+            <SearchRoundedIcon sx={{ color: "#94A3B8", fontSize: 20 }} />
           </InputAdornment>
         ),
         sx: {
-          borderRadius: `${AGENCY_TOKENS.geometry.controlRadius}px`,
-          bgcolor: AGENCY_TOKENS.colors.cardBg,
+          borderRadius: "16px",
+          bgcolor: "#FFFFFF",
           fontSize: "13px",
-          border: `1px solid ${AGENCY_TOKENS.colors.border}`,
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          fontWeight: 600,
+          border: "1px solid #E2E8F0",
+          boxShadow: "0 1px 3px rgba(15, 23, 42, 0.03)",
           "& fieldset": { border: "none" },
-          "&:hover": { borderColor: AGENCY_TOKENS.colors.primary },
-          height: 42,
+          "&:hover": { borderColor: "#CBD5E1" },
+          "&.Mui-focused": { borderColor: "#5F259F", boxShadow: "0 0 0 3px rgba(95, 37, 159, 0.12)" },
+          height: 44,
         },
       }}
-      sx={{ mb: 1.5 }}
+      sx={{ mb: 2 }}
     />
   );
 }

@@ -33,6 +33,17 @@ const FRANCHISE_MENU = [
   },
   {
     type: "section",
+    label: "Commissions & Royalties",
+    collapsible: true,
+    items: [
+      { to: "/admin/franchise/commissions/distribute?tab=REBIRTH", label: "₹250 Self-Rebirth Engine", icon: "tree" },
+      { to: "/admin/franchise/commissions/distribute?tab=ROYALTY", label: "Daily Royalty (11:59 PM)", icon: "star" },
+      { to: "/admin/franchise/commissions/distribute?tab=WITHDRAW", label: "Withdrawal Commission", icon: "wallet" },
+      { to: "/admin/franchise/pools/monitor", label: "Auto Pool Monitor", icon: "chart" },
+    ],
+  },
+  {
+    type: "section",
     label: "Finance & Operations",
     collapsible: true,
     items: [

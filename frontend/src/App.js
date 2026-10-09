@@ -1553,6 +1553,30 @@ function App() {
           }
         />
         <Route
+          path="/admin/franchise/commissions/distribute"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <AdminCommissionDistribute />
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/franchise/commissions"
+          element={<Navigate to="/admin/franchise/commissions/distribute" replace />}
+        />
+        <Route
+          path="/admin/franchise/pools/monitor"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <AdminAutopool />
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/dashboard"
           element={
             <AdminProtectedRoute>

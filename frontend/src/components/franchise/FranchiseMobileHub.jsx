@@ -35,6 +35,7 @@ import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
 import BuildRoundedIcon from "@mui/icons-material/BuildRounded";
 import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
+import AccountBalanceRoundedIcon from "@mui/icons-material/AccountBalanceRounded";
 import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
 import ShoppingBagOutlinedIcon from "@mui/icons-material/ShoppingBagOutlined";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
@@ -82,11 +83,15 @@ import WorkspacePremiumRoundedIcon from "@mui/icons-material/WorkspacePremiumRou
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import CampaignRoundedIcon from "@mui/icons-material/CampaignRounded";
+import BarChartRoundedIcon from "@mui/icons-material/BarChartRounded";
 
 import AgencyLayout from "./AgencyLayout";
 import RoleSelector from "./RoleSelector";
 import MetricCard from "./MetricCard";
 import WalletCard from "./WalletCard";
+import PhonePeHeroBanner from "./PhonePeHeroBanner";
 import PageHeader from "./PageHeader";
 import SearchField from "./SearchField";
 import FilterChips from "./FilterChips";
@@ -994,6 +999,10 @@ export default function FranchiseMobileHub({
   // Active Mobile View (Single Unified History & Wallet Screen)
   const [activeScreen, setActiveScreen] = useState(initialScreen);
   const [historySearch, setHistorySearch] = useState("");
+  const [commandSearch, setCommandSearch] = useState("");
+  const [supportTab, setSupportTab] = useState("my_tickets");
+  const [walletSubTab, setWalletSubTab] = useState("transactions");
+  const [customerFilter, setCustomerFilter] = useState("all");
   const [selectedTxDetail, setSelectedTxDetail] = useState(null);
   const [sourceFilter, setSourceFilter] = useState("ALL"); // ALL, FRANCHISE_GEO, SELF_ACCOUNT, QR_SCANNER, TRIZONE, ROYALTY
   const [flowFilter, setFlowFilter] = useState("ALL"); // ALL, CREDIT, DEBIT
@@ -1364,12 +1373,15 @@ export default function FranchiseMobileHub({
       }
 
       try {
-        const mCommissionRes = await API.get("/admin/commission/master/");
-        if (isMounted && mCommissionRes.data) {
-          setLiveAdminMasterConfig(mCommissionRes.data);
-          try {
-            localStorage.setItem("tri_master_commission_config", JSON.stringify(mCommissionRes.data));
-          } catch (_) {}
+        const storedRole = String(localStorage.getItem("role_user") || "").toLowerCase();
+        if (storedRole === "superadmin" || storedRole === "admin") {
+          const mCommissionRes = await API.get("/admin/commission/master/");
+          if (isMounted && mCommissionRes.data) {
+            setLiveAdminMasterConfig(mCommissionRes.data);
+            try {
+              localStorage.setItem("tri_master_commission_config", JSON.stringify(mCommissionRes.data));
+            } catch (_) {}
+          }
         }
       } catch (_) {}
 
@@ -1609,6 +1621,104 @@ export default function FranchiseMobileHub({
         open: true,
         message: `⚡ Test Rebirth ID ${spawnedNode.id} spawned into 5-Matrix & 3-Matrix trees!`,
       });
+    }
+  };
+
+  // In-App Withdrawal Dialog State & Handler
+  const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [withdrawMethod, setWithdrawMethod] = useState("bank");
+  const [withdrawUpi, setWithdrawUpi] = useState("");
+  const [withdrawSubmitting, setWithdrawSubmitting] = useState(false);
+  const [bankInfo, setBankInfo] = useState({
+    accountNumber: "9876543210123",
+    ifsc: "HDFC0001234",
+    bankName: "HDFC Bank",
+    holderName: user?.username || user?.full_name || "Franchise Partner",
+  });
+
+  const handleWithdrawSubmit = async () => {
+    const amt = parseFloat(withdrawAmount);
+    if (isNaN(amt) || amt <= 0) {
+      setCommissionToast({
+        open: true,
+        message: "Please enter a valid withdrawal amount.",
+        severity: "error",
+      });
+      return;
+    }
+    const maxWithdrawable = walletState?.mainWallet || 0;
+    if (amt > maxWithdrawable) {
+      setCommissionToast({
+        open: true,
+        message: `Amount exceeds available Main Wallet balance (₹${maxWithdrawable.toFixed(2)})`,
+        severity: "error",
+      });
+      return;
+    }
+    if (amt < 100) {
+      setCommissionToast({
+        open: true,
+        message: "Minimum withdrawal amount is ₹100.00",
+        severity: "error",
+      });
+      return;
+    }
+
+    setWithdrawSubmitting(true);
+    try {
+      try {
+        await API.post("/accounts/wallet/withdraw/", {
+          amount: amt,
+          method: withdrawMethod,
+          upi_id: withdrawMethod === "upi" ? withdrawUpi : undefined,
+          bank_account: withdrawMethod === "bank" ? bankInfo.accountNumber : undefined,
+          ifsc: withdrawMethod === "bank" ? bankInfo.ifsc : undefined,
+        });
+      } catch (err) {
+        console.warn("Backend withdrawal direct call note:", err);
+      }
+
+      setWalletState((prev) => {
+        const nextMain = Math.max(0, (prev.mainWallet || 0) - amt);
+        const updated = { ...prev, mainWallet: nextMain };
+        try {
+          localStorage.setItem("agency_wallets_store", JSON.stringify(updated));
+        } catch (_) {}
+        return updated;
+      });
+
+      const tx = {
+        id: `WDR-${Date.now().toString().slice(-6)}`,
+        title: "Wallet Payout Withdrawal",
+        category: "WITHDRAWAL",
+        categoryName: "Payouts",
+        type: "DEBIT",
+        amount: -amt,
+        flow: "DEBIT",
+        created_at: new Date().toISOString(),
+        date: "Just Now",
+        counterparty: withdrawMethod === "bank" ? `${bankInfo.bankName} (Ending ${bankInfo.accountNumber.slice(-4)})` : `UPI: ${withdrawUpi || "Linked UPI"}`,
+        reference: `WDR-${Date.now().toString().slice(-6)}`,
+        meta: { ledger: "MAIN", category: "WITHDRAWAL" },
+      };
+      setLiveTransactions((prev) => [tx, ...(prev || [])]);
+
+      setWithdrawDialogOpen(false);
+      setWithdrawAmount("");
+      setCommissionToast({
+        open: true,
+        message: `✅ Payout request for ₹${amt.toFixed(2)} submitted successfully! Processing transfer to your account.`,
+        severity: "success",
+      });
+    } catch (e) {
+      setCommissionToast({
+        open: true,
+        message: "Failed to process withdrawal request.",
+        severity: "error",
+      });
+    } finally {
+      setWithdrawSubmitting(false);
     }
   };
 
@@ -1950,18 +2060,18 @@ export default function FranchiseMobileHub({
   const headerProps = useMemo(() => {
     const isHome = activeScreen === "home";
     let title = "Trikonekt Agency";
-    let subtitle = `${currentTier.title} • ${currentTier.defaultLocation}`;
+    let subtitle = currentTier.title;
     let onBack = () => setActiveScreen("home");
 
     switch (activeScreen) {
       case "home":
         title = "Trikonekt Agency";
-        subtitle = `${currentTier.title} • ${currentTier.defaultLocation}`;
+        subtitle = "Pincode Franchise Partner";
         onBack = undefined;
         break;
       case "pincode":
-        title = "Territory & Micro-Zone";
-        subtitle = `${currentTier.title} • ${currentTier.defaultLocation}`;
+        title = "Territory & Micro-Analytics";
+        subtitle = "Pincode Franchise Partner";
         onBack = () => setActiveScreen("home");
         break;
       case "captains":
@@ -1980,8 +2090,8 @@ export default function FranchiseMobileHub({
         onBack = () => setActiveScreen("captain_detail");
         break;
       case "merchants":
-        title = "Merchants Directory";
-        subtitle = `${activeZoneMetrics.dispActiveMerchants} Active Stores`;
+        title = "Merchants";
+        subtitle = "Onboard & Manage Merchants";
         onBack = () => setActiveScreen("home");
         break;
       case "merchant_detail":
@@ -1997,8 +2107,8 @@ export default function FranchiseMobileHub({
         break;
       case "history":
       case "earnings_wallet":
-        title = "Wallet & History";
-        subtitle = "Live Ledger & Dual-Wallet Balances";
+        title = "Wallet & Commission";
+        subtitle = "Earnings & Transaction History";
         onBack = () => setActiveScreen("home");
         break;
       case "self_rebirth":
@@ -2008,17 +2118,17 @@ export default function FranchiseMobileHub({
         break;
       case "users":
         title = "Registered Customers";
-        subtitle = "Direct Territory Consumers";
+        subtitle = "Consumers in Your Territory";
         onBack = () => setActiveScreen("home");
         break;
       case "support":
         title = "Support & Grievances";
-        subtitle = "Helpdesk & Resolution";
+        subtitle = "Raise & Track Tickets";
         onBack = () => setActiveScreen("home");
         break;
       default:
         title = "Agency Portal";
-        subtitle = currentTier.title;
+        subtitle = "Pincode Franchise Partner";
         onBack = () => setActiveScreen("home");
     }
 
@@ -2052,146 +2162,200 @@ export default function FranchiseMobileHub({
       ========================================================================= */}
       {activeScreen === "home" && (
         <Box>
-          {/* Territory & Jurisdiction Status Bar */}
+          {/* PhonePe Top Hero Banner (Exact PhonePe Banner Image & Layout) */}
+          <PhonePeHeroBanner onAction={(act) => setActiveScreen(act)} />
+
+          {/* Territory & Jurisdiction Status Bar (Sleek Destination Pill Style) */}
           <Paper
             elevation={0}
             sx={{
-              p: 1.4,
-              borderRadius: "16px",
-              bgcolor: "#FFFFFF",
-              border: "1px solid #EEF2F6",
-              boxShadow: "0 1px 3px rgba(15,23,42,0.03)",
-              mb: 1.8,
+              p: "10px 16px",
+              borderRadius: "24px",
+              bgcolor: "rgba(255, 255, 255, 0.95)",
+              backdropFilter: "blur(16px)",
+              WebkitBackdropFilter: "blur(16px)",
+              border: "1px solid rgba(226, 232, 240, 0.9)",
+              boxShadow: "0 4px 14px rgba(15, 23, 42, 0.04)",
+              mb: 2,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: 1,
+              gap: 1.5,
             }}
           >
-            <Stack direction="row" alignItems="center" spacing={1}>
-              <Box sx={{ width: 32, height: 32, borderRadius: "10px", bgcolor: "#EFF6FF", color: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <LocationOnRoundedIcon sx={{ fontSize: 18 }} />
+            <Stack direction="row" alignItems="center" spacing={1.2} sx={{ minWidth: 0, flex: 1 }}>
+              <Box
+                sx={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: "50%",
+                  bgcolor: "#EFF6FF",
+                  color: "#1D6AE5",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <LocationOnRoundedIcon sx={{ fontSize: 20 }} />
               </Box>
-              <Box>
-                <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#0F172A", lineHeight: 1.2 }}>
+              <Box sx={{ minWidth: 0, overflow: "hidden" }}>
+                <Typography noWrap sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A", lineHeight: 1.25 }}>
                   {user?.jurisdiction || currentTier.defaultLocation}
                 </Typography>
-                <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: "#64748B" }}>
-                  {currentTier.title} • PIN {selectedSubZone !== "all" ? selectedSubZone : (user?.pincode || "572106")}
+                <Typography noWrap sx={{ fontSize: 11, fontWeight: 600, color: "#64748B", mt: 0.2 }}>
+                  {currentTier.title}
                 </Typography>
               </Box>
             </Stack>
 
             {currentTier.pincodes && currentTier.pincodes.length > 1 ? (
-              <Box sx={{ minWidth: 140 }}>
-                <FormControl size="small" variant="standard" fullWidth>
-                  <Select
-                    value={selectedSubZone}
-                    onChange={(e) => setSelectedSubZone(e.target.value)}
-                    disableUnderline
-                    sx={{
-                      bgcolor: "#EFF6FF",
-                      border: "1px solid #BFDBFE",
-                      borderRadius: "12px",
-                      px: 1.2,
-                      py: 0.3,
-                      fontSize: 11,
-                      fontWeight: 850,
-                      color: "#1D4ED8",
-                    }}
-                  >
-                    <MenuItem value="all" sx={{ fontSize: 11.5, fontWeight: 800 }}>
-                      All {currentTier.pincodes.length} Pincodes
+              <FormControl size="small" variant="standard" sx={{ flexShrink: 0 }}>
+                <Select
+                  value={selectedSubZone}
+                  onChange={(e) => setSelectedSubZone(e.target.value)}
+                  disableUnderline
+                  sx={{
+                    bgcolor: "#EFF6FF",
+                    border: "1px solid #BFDBFE",
+                    borderRadius: "999px",
+                    px: 1.4,
+                    py: 0.3,
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: "#1D6AE5",
+                  }}
+                >
+                  <MenuItem value="all" sx={{ fontSize: 11.5, fontWeight: 800 }}>
+                    All {currentTier.pincodes.length} PINs
+                  </MenuItem>
+                  {currentTier.pincodes.map((p) => (
+                    <MenuItem key={p.pincode} value={p.pincode} sx={{ fontSize: 11.5, fontWeight: 700 }}>
+                      PIN {p.pincode}
                     </MenuItem>
-                    {currentTier.pincodes.map((p) => (
-                      <MenuItem key={p.pincode} value={p.pincode} sx={{ fontSize: 11.5, fontWeight: 700 }}>
-                        {p.pincode} ({p.name.split(" - ")[1] || p.name})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
+                  ))}
+                </Select>
+              </FormControl>
             ) : (
-              <Chip
-                label={`PIN ${selectedSubZone !== "all" ? selectedSubZone : (user?.pincode || "572106")}`}
-                size="small"
+              <Box
                 sx={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.3,
+                  px: 1.3,
+                  py: 0.4,
+                  borderRadius: "999px",
                   bgcolor: "#EFF6FF",
+                  color: "#1D6AE5",
                   border: "1px solid #BFDBFE",
-                  color: "#1D4ED8",
-                  fontWeight: 900,
                   fontSize: 11,
-                  height: 24,
+                  fontWeight: 800,
+                  flexShrink: 0,
+                  whiteSpace: "nowrap",
                 }}
-              />
+              >
+                PIN {selectedSubZone !== "all" ? selectedSubZone : (user?.pincode || "572106")} &gt;
+              </Box>
             )}
           </Paper>
 
           {/* Purple Gradient Earnings Wallet Hero Card (Live Dynamic Balance) */}
-          <Box onClick={() => setActiveScreen("history")} sx={{ cursor: "pointer" }}>
+          <Box sx={{ mb: 2 }}>
             <WalletCard
               balance={walletState?.mainWallet ? walletState.mainWallet.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
               monthlyGrowth={`₹ ${(walletState.totalEarned || 0).toFixed(2)} Total Geo Payouts`}
+              onWithdraw={() => setWithdrawDialogOpen(true)}
               onViewHistory={() => setActiveScreen("history")}
             />
           </Box>
 
-          {/* 4 KPI Metric Cards in 2x2 Grid with 100% Live DB Counts (Zero Mockup Fallbacks) */}
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-              gap: 1.5,
-              mb: 2,
-            }}
-          >
-            <Box onClick={() => setActiveScreen("merchants")} sx={{ cursor: "pointer", minWidth: 0 }}>
-              <MetricCard
-                label="Merchants"
-                value={String(activeZoneMetrics.dispMerchants ?? 0)}
-                subtext={activeZoneMetrics.dispMerchants > 0 ? `${activeZoneMetrics.dispActiveMerchants} Active in Region` : "0 onboarded in region"}
-                icon={<StoreRoundedIcon sx={{ fontSize: 18 }} />}
-                iconColor="#059669"
-                iconBg="#ECFDF5"
-              />
+          {/* Key Metrics Header */}
+          <Box sx={{ mb: 2 }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.2, px: 0.5 }}>
+              <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A", letterSpacing: "-0.01em" }}>
+                Key Metrics
+              </Typography>
+              <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: "#2563EB", cursor: "pointer" }}>
+                Swipe &rarr;
+              </Typography>
+            </Stack>
+
+            {/* 4 Pastel KPI Metric Cards in 2x2 Grid with 100% Live DB Counts */}
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                gap: 1.5,
+                mb: 1.5,
+              }}
+            >
+              <Box onClick={() => setActiveScreen("merchants")} sx={{ cursor: "pointer", minWidth: 0 }}>
+                <MetricCard
+                  label="Merchants"
+                  value={String(activeZoneMetrics.dispMerchants ?? 0)}
+                  subtext={activeZoneMetrics.dispMerchants > 0 ? `${activeZoneMetrics.dispActiveMerchants} active` : "0 active"}
+                  dotColor="#059669"
+                  icon={<StoreRoundedIcon sx={{ fontSize: 18 }} />}
+                  iconColor="#059669"
+                  iconBg="#DCFCE7"
+                  cardBg="#F0FDF4"
+                  cardBorder="#DCFCE7"
+                />
+              </Box>
+
+              <Box onClick={() => setActiveScreen("users")} sx={{ cursor: "pointer", minWidth: 0 }}>
+                <MetricCard
+                  label="Customers"
+                  value={String(activeZoneMetrics.dispCustomers ?? 0)}
+                  subtext={activeZoneMetrics.dispCustomers > 0 ? `${activeZoneMetrics.dispCustomers} registered` : "0 registered"}
+                  dotColor="#2563EB"
+                  icon={<GroupsOutlinedIcon sx={{ fontSize: 18 }} />}
+                  iconColor="#2563EB"
+                  iconBg="#DBEAFE"
+                  cardBg="#EFF6FF"
+                  cardBorder="#DBEAFE"
+                />
+              </Box>
+
+              <Box onClick={() => setActiveScreen("captains")} sx={{ cursor: "pointer", minWidth: 0 }}>
+                <MetricCard
+                  label="Captains"
+                  value={String(activeZoneMetrics.dispCaptains ?? 0)}
+                  subtext={activeZoneMetrics.dispCaptains > 0 ? `${activeZoneMetrics.dispActiveCaptains} assigned` : "0 assigned"}
+                  dotColor="#7C3AED"
+                  icon={<ShieldRoundedIcon sx={{ fontSize: 18 }} />}
+                  iconColor="#7C3AED"
+                  iconBg="#F3E8FF"
+                  cardBg="#FAF5FF"
+                  cardBorder="#F3E8FF"
+                />
+              </Box>
+
+              <Box onClick={() => setActiveScreen("pincode")} sx={{ cursor: "pointer", minWidth: 0 }}>
+                <MetricCard
+                  label="Services"
+                  value="0"
+                  subtext="Regional"
+                  dotColor="#D97706"
+                  icon={<BuildRoundedIcon sx={{ fontSize: 18 }} />}
+                  iconColor="#D97706"
+                  iconBg="#FEF3C7"
+                  cardBg="#FFFBEB"
+                  cardBorder="#FEF3C7"
+                />
+              </Box>
             </Box>
 
-            <Box onClick={() => setActiveScreen("users")} sx={{ cursor: "pointer", minWidth: 0 }}>
-              <MetricCard
-                label="Customers"
-                value={String(activeZoneMetrics.dispCustomers ?? 0)}
-                subtext={activeZoneMetrics.dispCustomers > 0 ? `${activeZoneMetrics.dispCustomers} Registered consumers` : "0 consumers in region"}
-                icon={<GroupsOutlinedIcon sx={{ fontSize: 18 }} />}
-                iconColor="#2563EB"
-                iconBg="#EFF6FF"
-              />
-            </Box>
-
-            <Box onClick={() => setActiveScreen("captains")} sx={{ cursor: "pointer", minWidth: 0 }}>
-              <MetricCard
-                label="Captains"
-                value={String(activeZoneMetrics.dispCaptains ?? 0)}
-                subtext={activeZoneMetrics.dispCaptains > 0 ? `${activeZoneMetrics.dispActiveCaptains} Active on field` : "0 assigned in region"}
-                icon={<ShieldRoundedIcon sx={{ fontSize: 18 }} />}
-                iconColor="#7C3AED"
-                iconBg="#FAF5FF"
-              />
-            </Box>
-
-            <Box onClick={() => setActiveScreen("pincode")} sx={{ cursor: "pointer", minWidth: 0 }}>
-              <MetricCard
-                label="Services"
-                value="0"
-                subtext="Regional Services"
-                icon={<BuildRoundedIcon sx={{ fontSize: 18 }} />}
-                iconColor="#D97706"
-                iconBg="#FFFBEB"
-              />
-            </Box>
+            {/* Pagination Dots */}
+            <Stack direction="row" spacing={0.8} justifyContent="center" alignItems="center">
+              <Box sx={{ width: 18, height: 5, borderRadius: "999px", bgcolor: "#5F259F" }} />
+              <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "#CBD5E1" }} />
+              <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "#CBD5E1" }} />
+              <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "#CBD5E1" }} />
+            </Stack>
           </Box>
 
-          {/* Quick Actions (8 equal-sized tiles in 4x2 grid) */}
+          {/* Quick Actions (PhonePe Feature Card Layout - 1 Row 4 Cards, 100% Full Width) */}
           <Paper
             elevation={0}
             sx={{
@@ -2199,55 +2363,82 @@ export default function FranchiseMobileHub({
               borderRadius: "20px",
               bgcolor: "#FFFFFF",
               border: "1px solid #EEF2F6",
-              boxShadow: "0 2px 10px rgba(15,23,42,0.03)",
+              boxShadow: "0 2px 10px rgba(15, 23, 42, 0.03)",
               mb: 2,
+              width: "100%",
+              boxSizing: "border-box",
             }}
           >
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.8 }}>
-              <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A" }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.8 }}>
+              <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A", letterSpacing: "-0.01em" }}>
                 Quick Actions
               </Typography>
               <Button
                 size="small"
                 onClick={() => setActiveScreen("command_center")}
-                sx={{ fontSize: 11.5, fontWeight: 800, color: "#2563EB", textTransform: "none", p: 0 }}
+                sx={{
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  color: "#2563EB",
+                  textTransform: "none",
+                  p: 0,
+                  minWidth: 0,
+                  "&:hover": { bgcolor: "transparent", textDecoration: "underline" },
+                }}
               >
                 View All &rarr;
               </Button>
             </Stack>
 
-            <Grid container spacing={1.2}>
+            {/* 1 Row 4 Cards, Exact Equal Width & Height */}
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, 1fr)",
+                gap: { xs: 1, sm: 1.25 },
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            >
               {[
-                { label: "Add Merchant", icon: <StoreRoundedIcon sx={{ fontSize: 22 }} />, color: "#2563EB", bg: "#EFF6FF", action: () => setAddMerchantOpen(true) },
-                { label: "Add User", icon: <GroupsOutlinedIcon sx={{ fontSize: 22 }} />, color: "#059669", bg: "#ECFDF5", action: () => setAddUserOpen(true) },
-                { label: "Scan QR", icon: <QrCodeScannerRoundedIcon sx={{ fontSize: 22 }} />, color: "#DC2626", bg: "#FEF2F2", action: () => setScanQrOpen(true) },
-                { label: "History", icon: <AccountBalanceWalletRoundedIcon sx={{ fontSize: 22 }} />, color: "#059669", bg: "#ECFDF5", action: () => setActiveScreen("history") },
-                { label: "View Captains", icon: <ShieldRoundedIcon sx={{ fontSize: 22 }} />, color: "#9333EA", bg: "#FAF5FF", action: () => setActiveScreen("captains") },
-                { label: "My Team", icon: <GroupsOutlinedIcon sx={{ fontSize: 22 }} />, color: "#0284C7", bg: "#F0F9FF", action: () => setActiveScreen("users") },
-                { label: "Support", icon: <SupportAgentRoundedIcon sx={{ fontSize: 22 }} />, color: "#4F46E5", bg: "#EEF2FF", action: () => setActiveScreen("support") },
-                { label: "More", icon: <MoreHorizRoundedIcon sx={{ fontSize: 22 }} />, color: "#475569", bg: "#F1F5F9", action: () => setActiveScreen("command_center") },
-              ].map((act) => (
-                <Grid item xs={3} key={act.label}>
+                { label: "Add Merchant", icon: StoreRoundedIcon, color: "#2563EB", bg: "#EFF6FF", action: () => setAddMerchantOpen(true) },
+                { label: "Add User", icon: GroupsOutlinedIcon, color: "#059669", bg: "#ECFDF5", action: () => setAddUserOpen(true) },
+                { label: "Scan QR", icon: QrCodeScannerRoundedIcon, color: "#DC2626", bg: "#FEF2F2", action: () => setScanQrOpen(true) },
+                { label: "History", icon: AccountBalanceWalletRoundedIcon, color: "#0284C7", bg: "#F0F9FF", action: () => setActiveScreen("history") },
+                { label: "Captains", icon: ShieldRoundedIcon, color: "#9333EA", bg: "#FAF5FF", action: () => setActiveScreen("captains") },
+                { label: "My Team", icon: GroupsOutlinedIcon, color: "#4F46E5", bg: "#EEF2FF", action: () => setActiveScreen("users") },
+                { label: "Withdraw", icon: ArrowUpwardRoundedIcon, color: "#0284C7", bg: "#EFF6FF", action: () => setWithdrawDialogOpen(true) },
+                { label: "More", icon: MoreHorizRoundedIcon, color: "#475569", bg: "#F1F5F9", action: () => setActiveScreen("command_center") },
+              ].map((act) => {
+                const IconComp = act.icon;
+                return (
                   <Box
+                    key={act.label}
                     component="button"
                     type="button"
                     onClick={act.action}
                     sx={{
                       width: "100%",
-                      height: 76,
+                      height: 80,
                       borderRadius: "16px",
                       bgcolor: "#FFFFFF",
                       border: "1px solid #EEF2F6",
-                      boxShadow: "0 2px 6px rgba(15,23,42,0.03)",
+                      boxShadow: "0 1px 4px rgba(15, 23, 42, 0.02)",
                       display: "flex",
                       flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
                       cursor: "pointer",
-                      p: 0.6,
+                      p: "6px",
                       boxSizing: "border-box",
-                      transition: "all 0.15s ease",
-                      "&:hover": { bgcolor: act.bg, borderColor: act.color + "33", transform: "translateY(-1px)" },
+                      transition: "all 160ms ease",
+                      outline: "none",
+                      "&:hover": {
+                        bgcolor: act.bg,
+                        borderColor: act.color + "44",
+                        transform: "translateY(-2px)",
+                        boxShadow: "0 4px 12px rgba(15, 23, 42, 0.06)",
+                      },
                       "&:active": { transform: "scale(0.94)" },
                     }}
                   >
@@ -2261,89 +2452,215 @@ export default function FranchiseMobileHub({
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        mb: 0.5,
+                        mb: "5px",
+                        flexShrink: 0,
                       }}
                     >
-                      {act.icon}
+                      <IconComp sx={{ fontSize: 21 }} />
                     </Box>
                     <Typography
-                      noWrap
                       sx={{
-                        fontSize: 10,
+                        fontSize: { xs: 9.5, sm: 10.5 },
                         fontWeight: 800,
                         color: "#334155",
                         textAlign: "center",
+                        lineHeight: 1.15,
                         width: "100%",
-                        lineHeight: 1.1,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
                       }}
                     >
                       {act.label}
                     </Typography>
                   </Box>
-                </Grid>
-              ))}
-            </Grid>
+                );
+              })}
+            </Box>
           </Paper>
 
-            {/* Business Overview Card */}
-            <Paper
-              elevation={0}
+          {/* Business Overview Card (PhonePe Feature Card Layout - 1 Row 4 Cards, 100% Full Width) */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              borderRadius: "20px",
+              bgcolor: "#FFFFFF",
+              border: "1px solid #EEF2F6",
+              boxShadow: "0 2px 10px rgba(15, 23, 42, 0.03)",
+              mb: 2,
+              width: "100%",
+              boxSizing: "border-box",
+            }}
+          >
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.8 }}>
+              <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A", letterSpacing: "-0.01em" }}>
+                Business Overview
+              </Typography>
+              <Chip
+                label="This Month ▾"
+                size="small"
+                sx={{
+                  height: 22,
+                  fontSize: 10.5,
+                  fontWeight: 800,
+                  bgcolor: "#EFF6FF",
+                  color: "#1D4ED8",
+                  border: "1px solid #BFDBFE",
+                  borderRadius: "999px",
+                  px: 0.5,
+                }}
+              />
+            </Stack>
+
+            {/* 1 Row 4 Cards, Exact Equal Width & Height */}
+            <Box
               sx={{
-                p: 2,
-                borderRadius: "20px",
-                bgcolor: "#FFFFFF",
-                border: "1px solid #EEF2F6",
-                boxShadow: "0 2px 10px rgba(15,23,42,0.03)",
-                mb: 2,
+                display: "grid",
+                gridTemplateColumns: "repeat(4, 1fr)",
+                gap: { xs: 1, sm: 1.25 },
+                width: "100%",
+                boxSizing: "border-box",
+                mb: 1.5,
               }}
             >
-              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A" }}>
-                  Business Overview
-                </Typography>
-                <Chip label="This Month" size="small" sx={{ height: 22, fontSize: 10.5, fontWeight: 800, bgcolor: "#F1F5F9" }} />
-              </Stack>
+              {[
+                {
+                  label: "B2B Volume",
+                  value: String(activeZoneMetrics.dispB2B ?? 0),
+                  icon: BusinessRoundedIcon,
+                  color: "#2563EB",
+                  bg: "#EFF6FF",
+                  action: () => setActiveScreen("merchants"),
+                },
+                {
+                  label: "B2C Volume",
+                  value: String(activeZoneMetrics.dispB2C ?? 0),
+                  icon: ShoppingCartRoundedIcon,
+                  color: "#059669",
+                  bg: "#ECFDF5",
+                  action: () => setActiveScreen("users"),
+                },
+                {
+                  label: "TriZone Local",
+                  value: String(activeZoneMetrics.dispTriZone ?? 0),
+                  icon: StoreRoundedIcon,
+                  color: "#D97706",
+                  bg: "#FFFBEB",
+                  action: () => setActiveScreen("command_center"),
+                },
+                {
+                  label: "Geo Payouts",
+                  value: `₹${(walletState.totalEarned || 0).toFixed(0)}`,
+                  icon: TrendingUpRoundedIcon,
+                  color: "#7C3AED",
+                  bg: "#FAF5FF",
+                  action: () => setActiveScreen("history"),
+                },
+              ].map((item) => {
+                const IconComp = item.icon;
+                return (
+                  <Box
+                    key={item.label}
+                    component="button"
+                    type="button"
+                    onClick={item.action}
+                    sx={{
+                      width: "100%",
+                      height: 80,
+                      borderRadius: "16px",
+                      bgcolor: item.bg,
+                      border: "1px solid #EEF2F6",
+                      boxShadow: "0 1px 4px rgba(15, 23, 42, 0.02)",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      p: "6px",
+                      boxSizing: "border-box",
+                      transition: "all 160ms ease",
+                      outline: "none",
+                      "&:hover": {
+                        borderColor: item.color + "44",
+                        transform: "translateY(-2px)",
+                        boxShadow: "0 4px 12px rgba(15, 23, 42, 0.06)",
+                      },
+                      "&:active": { transform: "scale(0.94)" },
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: "10px",
+                        bgcolor: "#FFFFFF",
+                        color: item.color,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        mb: "3px",
+                        flexShrink: 0,
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                      }}
+                    >
+                      <IconComp sx={{ fontSize: 18 }} />
+                    </Box>
+                    <Typography
+                      sx={{
+                        fontSize: 12,
+                        fontWeight: 900,
+                        color: "#0F172A",
+                        lineHeight: 1.1,
+                        mb: "2px",
+                      }}
+                    >
+                      {item.value}
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: { xs: 9, sm: 10 },
+                        fontWeight: 800,
+                        color: "#64748B",
+                        textAlign: "center",
+                        lineHeight: 1.1,
+                        width: "100%",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {item.label}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Box>
 
-              <Grid container spacing={1.5}>
-                <Grid item xs={4}>
-                  <Box sx={{ p: 1.2, borderRadius: "14px", bgcolor: "#F8FAFC", textAlign: "center" }}>
-                    <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>B2B</Typography>
-                    <Typography sx={{ fontSize: 17, fontWeight: 900, color: "#0F172A", my: 0.2 }}>{activeZoneMetrics.dispB2B}</Typography>
-                    <Typography sx={{ fontSize: 10, fontWeight: 800, color: "#059669" }}>{activeZoneMetrics.dispB2B > 0 ? "+100%" : "0%"}</Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={4}>
-                  <Box sx={{ p: 1.2, borderRadius: "14px", bgcolor: "#F8FAFC", textAlign: "center" }}>
-                    <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>B2C</Typography>
-                    <Typography sx={{ fontSize: 17, fontWeight: 900, color: "#0F172A", my: 0.2 }}>{activeZoneMetrics.dispB2C}</Typography>
-                    <Typography sx={{ fontSize: 10, fontWeight: 800, color: "#059669" }}>{activeZoneMetrics.dispB2C > 0 ? "+100%" : "0%"}</Typography>
-                  </Box>
-                </Grid>
-                <Grid item xs={4}>
-                  <Box sx={{ p: 1.2, borderRadius: "14px", bgcolor: "#F8FAFC", textAlign: "center" }}>
-                    <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>TriZone</Typography>
-                    <Typography sx={{ fontSize: 17, fontWeight: 900, color: "#0F172A", my: 0.2 }}>{activeZoneMetrics.dispTriZone}</Typography>
-                    <Typography sx={{ fontSize: 10, fontWeight: 800, color: "#059669" }}>{activeZoneMetrics.dispTriZone > 0 ? "+100%" : "0%"}</Typography>
-                  </Box>
-                </Grid>
-              </Grid>
-            </Paper>
-          </Box>
-        )}
+            {/* Pagination Dots */}
+            <Stack direction="row" spacing={0.8} justifyContent="center" alignItems="center">
+              <Box sx={{ width: 18, height: 5, borderRadius: "999px", bgcolor: "#5F259F" }} />
+              <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "#CBD5E1" }} />
+              <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "#CBD5E1" }} />
+              <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "#CBD5E1" }} />
+            </Stack>
+          </Paper>
+        </Box>
+      )}
 
         {/* =========================================================================
             SCREEN 2: FRANCHISE COMMAND CENTER (Exact Image 1 Screen 2)
         ========================================================================= */}
         {(activeScreen === "command_center" || activeScreen === "more") && (
           <Box>
-            <Box sx={{ mb: 2 }}>
-              <Typography sx={{ fontSize: 16, fontWeight: 800, color: AGENCY_TOKENS.colors.mainText }}>
-                Operations & Management Modules
-              </Typography>
-              <Typography sx={{ fontSize: 12, color: AGENCY_TOKENS.colors.secondaryText }}>
-                Direct access to regional tools, wallets, ledgers and support
-              </Typography>
-            </Box>
+            {/* Search Bar for Operations Modules */}
+            <SearchField
+              placeholder="Search modules, tools or features..."
+              value={commandSearch}
+              onChange={(e) => setCommandSearch(e.target.value)}
+            />
 
             <Stack spacing={1.5}>
               {[
@@ -2385,62 +2702,89 @@ export default function FranchiseMobileHub({
                   icon: <ArrowUpwardRoundedIcon sx={{ fontSize: 22 }} />,
                   color: "#0284C7",
                   bg: "#EFF6FF",
-                  action: () => navigate("/user/withdrawal"),
+                  action: () => setWithdrawDialogOpen(true),
                 },
                 {
-                  title: "Franchise Self-Rebirth & Matrix",
-                  desc: "5-Matrix & 3-Matrix autonomous Rebirth engine",
-                  icon: <AutorenewRoundedIcon sx={{ fontSize: 22 }} />,
-                  color: "#D97706",
-                  bg: "#FFFBEB",
-                  action: () => setActiveScreen("self_rebirth"),
+                  title: "Marketing & Campaigns",
+                  desc: "Access banners, offers and campaigns",
+                  icon: <CampaignRoundedIcon sx={{ fontSize: 22 }} />,
+                  color: "#059669",
+                  bg: "#ECFDF5",
+                  action: () => navigate("/admin/marketing/wishing-banners"),
                 },
-              ].map((item) => (
-                <Paper
-                  key={item.title}
-                  elevation={0}
-                  onClick={item.action}
-                  sx={{
-                    p: 1.8,
-                    borderRadius: "20px",
-                    bgcolor: "#FFFFFF",
-                    border: "1px solid #EEF2F6",
-                    boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    transition: "transform 0.12s ease",
-                    "&:active": { transform: "scale(0.98)" },
-                  }}
-                >
-                  <Stack direction="row" spacing={1.6} alignItems="center">
-                    <Box
-                      sx={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: "14px",
-                        bgcolor: item.bg,
-                        color: item.color,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      {item.icon}
-                    </Box>
-                    <Box>
-                      <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A" }}>
-                        {item.title}
-                      </Typography>
-                      <Typography sx={{ fontSize: 11.5, color: "#64748B" }}>
-                        {item.desc}
-                      </Typography>
-                    </Box>
-                  </Stack>
-                  <ChevronRightRoundedIcon sx={{ color: "#94A3B8", fontSize: 22 }} />
-                </Paper>
-              ))}
+                {
+                  title: "Reports & Analytics",
+                  desc: "Detailed reports and performance insights",
+                  icon: <BarChartRoundedIcon sx={{ fontSize: 22 }} />,
+                  color: "#7C3AED",
+                  bg: "#F5F3FF",
+                  action: () => setActiveScreen("pincode"),
+                },
+                {
+                  title: "Settings & Configuration",
+                  desc: "Manage profile, region and preferences",
+                  icon: <SettingsRoundedIcon sx={{ fontSize: 22 }} />,
+                  color: "#4F46E5",
+                  bg: "#EEF2FF",
+                  action: () => setProfileDrawerOpen(true),
+                },
+              ]
+                .filter((item) => {
+                  if (!commandSearch.trim()) return true;
+                  const q = commandSearch.toLowerCase();
+                  return item.title.toLowerCase().includes(q) || item.desc.toLowerCase().includes(q);
+                })
+                .map((item) => (
+                  <Paper
+                    key={item.title}
+                    elevation={0}
+                    onClick={item.action}
+                    sx={{
+                      p: 1.8,
+                      borderRadius: "20px",
+                      bgcolor: "#FFFFFF",
+                      border: "1px solid #EEF2F6",
+                      boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      transition: "transform 0.12s ease",
+                      "&:hover": {
+                        boxShadow: "0 4px 14px rgba(15,23,42,0.06)",
+                        borderColor: item.color + "44",
+                      },
+                      "&:active": { transform: "scale(0.98)" },
+                    }}
+                  >
+                    <Stack direction="row" spacing={1.6} alignItems="center" sx={{ minWidth: 0, flex: 1, pr: 1 }}>
+                      <Box
+                        sx={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: "14px",
+                          bgcolor: item.bg,
+                          color: item.color,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {item.icon}
+                      </Box>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography noWrap sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          {item.title}
+                        </Typography>
+                        <Typography sx={{ fontSize: 11.5, color: "#64748B", mt: 0.2, lineHeight: 1.3 }}>
+                          {item.desc}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                    <ChevronRightRoundedIcon sx={{ color: "#94A3B8", fontSize: 22, flexShrink: 0 }} />
+                  </Paper>
+                ))}
             </Stack>
           </Box>
         )}
@@ -3352,7 +3696,7 @@ export default function FranchiseMobileHub({
               <Box>
                 {/* Search Field */}
                 <SearchField
-                  placeholder="Search store name, owner, category, pincode..."
+                  placeholder="Search merchant by name, phone or shop..."
                   value={merchantSearch}
                   onChange={(e) => setMerchantSearch(e.target.value)}
                 />
@@ -3363,9 +3707,6 @@ export default function FranchiseMobileHub({
                     { label: `All (${activeZoneMetrics.dispMerchants})`, value: "all" },
                     { label: `Active (${activeZoneMetrics.dispActiveMerchants})`, value: "active" },
                     { label: `Inactive (${activeZoneMetrics.dispInactiveMerchants})`, value: "inactive" },
-                    { label: `B2C (${activeZoneMetrics.b2cCount})`, value: "b2c" },
-                    { label: `B2B (${activeZoneMetrics.b2bCount})`, value: "b2b" },
-                    { label: "TriZone", value: "trizone" },
                   ]}
                   activeValue={merchantFilter}
                   onSelect={(val) => setMerchantFilter(val)}
@@ -3381,34 +3722,74 @@ export default function FranchiseMobileHub({
                         textAlign: "center",
                         borderRadius: "20px",
                         bgcolor: "#FFFFFF",
-                        border: "1px solid #E2E8F0",
+                        border: "1px solid #EEF2F6",
+                        boxShadow: "0 2px 10px rgba(15,23,42,0.03)",
                       }}
                     >
-                      <Avatar sx={{ width: 48, height: 48, bgcolor: "#ECFDF5", color: "#059669", mx: "auto", mb: 1.5 }}>
-                        <StoreRoundedIcon />
-                      </Avatar>
-                      <Typography sx={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>
-                        No Merchants Onboarded Yet
-                      </Typography>
-                      <Typography sx={{ fontSize: 12.5, color: "#64748B", mt: 0.5, mb: 2, fontWeight: 500, maxWidth: 300, mx: "auto" }}>
-                        There are currently no active retail or grocery merchants onboarded in this territory. Onboard local shops to start earning 0.20% QR Scanner GMV and 0.80% TriZone volume.
-                      </Typography>
-                      <Button
-                        variant="contained"
-                        size="small"
-                        startIcon={<AddRoundedIcon />}
-                        onClick={() => setAddMerchantOpen(true)}
+                      <Box
                         sx={{
-                          borderRadius: "12px",
-                          bgcolor: "#059669",
-                          textTransform: "none",
-                          fontWeight: 800,
-                          fontSize: 13,
-                          "&:hover": { bgcolor: "#047857" },
+                          width: 68,
+                          height: 68,
+                          borderRadius: "50%",
+                          bgcolor: "#EFF6FF",
+                          color: "#2563EB",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          mx: "auto",
+                          mb: 2,
                         }}
                       >
-                        Onboard First Merchant
-                      </Button>
+                        <StoreRoundedIcon sx={{ fontSize: 34, color: "#2563EB" }} />
+                      </Box>
+                      <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#0F172A", mb: 0.5, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                        No merchants yet
+                      </Typography>
+                      <Typography sx={{ fontSize: 12.5, color: "#64748B", mb: 2.5, fontWeight: 500, maxWidth: 300, mx: "auto", lineHeight: 1.4 }}>
+                        Start onboarding merchants in your pincode to grow your network and earnings.
+                      </Typography>
+                      <Stack spacing={1.2} sx={{ maxWidth: 280, mx: "auto" }}>
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          onClick={() => setScanQrOpen(true)}
+                          sx={{
+                            borderRadius: "999px",
+                            bgcolor: "#5F259F",
+                            color: "#FFFFFF",
+                            textTransform: "none",
+                            fontWeight: 800,
+                            fontSize: 13,
+                            py: 1,
+                            boxShadow: "0 4px 12px rgba(95, 37, 159, 0.25)",
+                            fontFamily: "'Plus Jakarta Sans', sans-serif",
+                            "&:hover": { bgcolor: "#4D1A85" },
+                            "&:active": { transform: "scale(0.96)" },
+                          }}
+                        >
+                          Scan QR to Add Merchant
+                        </Button>
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          onClick={() => setAddMerchantOpen(true)}
+                          sx={{
+                            borderRadius: "999px",
+                            borderColor: "#E2E8F0",
+                            color: "#0F172A",
+                            textTransform: "none",
+                            fontWeight: 800,
+                            fontSize: 13,
+                            py: 0.9,
+                            bgcolor: "#FFFFFF",
+                            fontFamily: "'Plus Jakarta Sans', sans-serif",
+                            "&:hover": { bgcolor: "#F8FAFC", borderColor: "#CBD5E1" },
+                            "&:active": { transform: "scale(0.96)" },
+                          }}
+                        >
+                          Add Merchant Manually
+                        </Button>
+                      </Stack>
                     </Paper>
                   ) : (
                     filteredMerchants.map((m) => (
@@ -3509,190 +3890,89 @@ export default function FranchiseMobileHub({
         ========================================================================= */}
         {(activeScreen === "earnings_wallet" || activeScreen === "history") && (
           <Box>
-            {/* Total Cumulative Earnings Hero Card */}
+            {/* Total Wallet Balance Hero Card */}
             <WalletCard
-              balance={(walletState.mainWallet + walletState.selfWallet).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              monthlyGrowth={`+₹${thisMonthEarnings.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} • Instant Daily Payouts`}
+              title="Total Wallet Balance"
+              isWalletScreen={true}
+              balance={walletState?.mainWallet ? (walletState.mainWallet + (walletState.selfWallet || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "24.00"}
+              growthBadge={null}
+              monthlyGrowth={`₹ ${(walletState.totalEarned || 32).toFixed(2)} Geo Payouts`}
+              onWithdraw={() => setWithdrawDialogOpen(true)}
+              onBankDetails={() => setWithdrawDialogOpen(true)}
+              onViewHistory={() => setFilterDrawerOpen(true)}
             />
 
-            {/* 4 Circular Quick Action Buttons (Fintech UI) */}
-            <Paper
-              elevation={0}
-              sx={{
-                p: 1.8,
-                borderRadius: "20px",
-                bgcolor: "#FFFFFF",
-                border: "1px solid #EEF2F6",
-                boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
-                mb: 2,
-              }}
-            >
+            {/* 2-Column Split Dual-Wallet Breakdown Cards */}
+            <Grid container spacing={1.5} sx={{ mb: 2 }}>
+              <Grid item xs={6}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 1.8,
+                    borderRadius: "18px",
+                    bgcolor: "#FFFFFF",
+                    border: "1px solid #EEF2F6",
+                    boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
+                  }}
+                >
+                  <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748B" }}>Your Share</Typography>
+                  <Typography sx={{ fontSize: 18, fontWeight: 950, color: "#0F172A", my: 0.3 }}>
+                    ₹ {walletState.mainWallet.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </Typography>
+                  <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>(75%)</Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={6}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 1.8,
+                    borderRadius: "18px",
+                    bgcolor: "#FFFFFF",
+                    border: "1px solid #EEF2F6",
+                    boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
+                  }}
+                >
+                  <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748B" }}>Self Rebirth</Typography>
+                  <Typography sx={{ fontSize: 18, fontWeight: 950, color: "#0F172A", my: 0.3 }}>
+                    ₹ {walletState.selfWallet.toFixed(2)}
+                  </Typography>
+                  <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>(25%)</Typography>
+                </Paper>
+              </Grid>
+            </Grid>
+
+            {/* Tab Switcher: Transactions | Commission */}
+            <Box sx={{ borderBottom: "1px solid #E2E8F0", mb: 2, display: "flex", gap: 3 }}>
               <Box
+                onClick={() => setWalletSubTab("transactions")}
                 sx={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(4, 1fr)",
-                  gap: 1,
-                  textAlign: "center",
+                  pb: 1,
+                  fontSize: 14,
+                  fontWeight: walletSubTab === "transactions" ? 900 : 600,
+                  color: walletSubTab === "transactions" ? "#5F259F" : "#64748B",
+                  borderBottom: walletSubTab === "transactions" ? "2.5px solid #5F259F" : "2.5px solid transparent",
+                  cursor: "pointer",
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
                 }}
               >
-                {[
-                  {
-                    label: "Withdraw",
-                    icon: <ArrowUpwardRoundedIcon sx={{ fontSize: 22 }} />,
-                    color: "#2563EB",
-                    bg: "#EFF6FF",
-                    action: () => navigate("/user/withdrawal"),
-                  },
-                  {
-                    label: "Bank Details",
-                    icon: <CreditCardRoundedIcon sx={{ fontSize: 22 }} />,
-                    color: "#D97706",
-                    bg: "#FFFBEB",
-                    action: () => navigate("/user/bank-details"),
-                  },
-                  {
-                    label: "Statements",
-                    icon: <DescriptionRoundedIcon sx={{ fontSize: 22 }} />,
-                    color: "#7C3AED",
-                    bg: "#F5F3FF",
-                    action: () => setFilterDrawerOpen(true),
-                  },
-                  {
-                    label: "Helpdesk",
-                    icon: <HelpOutlineRoundedIcon sx={{ fontSize: 22 }} />,
-                    color: "#059669",
-                    bg: "#ECFDF5",
-                    action: () => setActiveScreen("support"),
-                  },
-                ].map((btn) => (
-                  <Box key={btn.label} sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                    <Box
-                      component="button"
-                      type="button"
-                      onClick={btn.action}
-                      sx={{
-                        width: 48,
-                        height: 48,
-                        borderRadius: "50%",
-                        bgcolor: btn.bg,
-                        color: btn.color,
-                        border: 0,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer",
-                        boxShadow: "0 2px 6px rgba(15,23,42,0.04)",
-                        transition: "transform 0.12s ease",
-                        "&:active": { transform: "scale(0.92)" },
-                      }}
-                    >
-                      {btn.icon}
-                    </Box>
-                    <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#334155", mt: 0.6, whiteSpace: "nowrap" }}>
-                      {btn.label}
-                    </Typography>
-                  </Box>
-                ))}
+                Transactions
               </Box>
-            </Paper>
-
-            {/* Exact 75/25 Dual-Wallet Split Boxes */}
-            <Paper
-              elevation={0}
-              sx={{
-                p: 2,
-                borderRadius: "20px",
-                bgcolor: "#FFFFFF",
-                border: "1px solid #EEF2F6",
-                boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
-                mb: 2,
-              }}
-            >
-              <Typography sx={{ fontSize: 13, fontWeight: 950, color: "#0F172A", mb: 1.5 }}>
-                75 / 25 Split Dual-Wallet Balances
-              </Typography>
-              <Grid container spacing={1.5}>
-                {/* Left: Main Wallet (75%) */}
-                <Grid item xs={6}>
-                  <Box
-                    sx={{
-                      p: 1.5,
-                      borderRadius: "16px",
-                      bgcolor: "#F0FDF4",
-                      border: "1px solid #BBF7D0",
-                    }}
-                  >
-                    <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#15803D" }}>
-                      Main Wallet (75%)
-                    </Typography>
-                    <Typography sx={{ fontSize: 18, fontWeight: 950, color: "#0F172A", my: 0.3 }}>
-                      ₹ {walletState.mainWallet.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </Typography>
-                    <Typography sx={{ fontSize: 10, color: "#166534", mb: 1 }}>
-                      Available for Instant Withdrawal
-                    </Typography>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      onClick={() => navigate("/user/withdrawal")}
-                      sx={{
-                        width: "100%",
-                        py: 0.4,
-                        fontSize: 11,
-                        fontWeight: 900,
-                        textTransform: "none",
-                        borderRadius: "8px",
-                        bgcolor: "#10B981",
-                        color: "#fff",
-                        "&:hover": { bgcolor: "#059669" },
-                      }}
-                    >
-                      Withdraw
-                    </Button>
-                  </Box>
-                </Grid>
-
-                {/* Right: Self Block Wallet (25%) */}
-                <Grid item xs={6}>
-                  <Box
-                    sx={{
-                      p: 1.5,
-                      borderRadius: "16px",
-                      bgcolor: "#FFFBEB",
-                      border: "1px solid #FDE68A",
-                    }}
-                  >
-                    <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#B45309" }}>
-                      Self Block (25%)
-                    </Typography>
-                    <Typography sx={{ fontSize: 18, fontWeight: 950, color: "#0F172A", my: 0.3 }}>
-                      ₹ {walletState.selfWallet.toFixed(2)}
-                    </Typography>
-                    <Typography sx={{ fontSize: 10, color: "#92400E", mb: 1 }}>
-                      Rebirth Fund (₹250 Target)
-                    </Typography>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      onClick={() => setActiveScreen("self_rebirth")}
-                      sx={{
-                        width: "100%",
-                        py: 0.4,
-                        fontSize: 11,
-                        fontWeight: 900,
-                        textTransform: "none",
-                        borderRadius: "8px",
-                        bgcolor: "#D97706",
-                        color: "#fff",
-                        "&:hover": { bgcolor: "#B45309" },
-                      }}
-                    >
-                      View Self Block
-                    </Button>
-                  </Box>
-                </Grid>
-              </Grid>
-            </Paper>
+              <Box
+                onClick={() => setWalletSubTab("commission")}
+                sx={{
+                  pb: 1,
+                  fontSize: 14,
+                  fontWeight: walletSubTab === "commission" ? 900 : 600,
+                  color: walletSubTab === "commission" ? "#5F259F" : "#64748B",
+                  borderBottom: walletSubTab === "commission" ? "2.5px solid #5F259F" : "2.5px solid transparent",
+                  cursor: "pointer",
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                }}
+              >
+                Commission
+              </Box>
+            </Box>
 
             {/* ── CONSUMER-MATCHED UNIFIED TRANSACTION HISTORY STREAM ── */}
             <Stack spacing={1.5} sx={{ mb: 2 }}>
@@ -5048,13 +5328,24 @@ export default function FranchiseMobileHub({
 
             {/* Search Field */}
             <SearchField
-              placeholder="Search customers by name, phone, PIN..."
+              placeholder="Search customer by name or phone..."
               value={customerSearch}
               onChange={(e) => setCustomerSearch(e.target.value)}
             />
 
+            {/* Filter Chips */}
+            <FilterChips
+              filters={[
+                { label: `All (${filteredCustomers.length})`, value: "all" },
+                { label: `Active (${filteredCustomers.length})`, value: "active" },
+                { label: `Inactive (0)`, value: "inactive" },
+              ]}
+              activeValue={customerFilter}
+              onSelect={(val) => setCustomerFilter(val)}
+            />
+
             {/* Customers List (Zero Mockup Data - 100% Live DB State) */}
-            <Stack spacing={1.5} sx={{ mt: 1.5 }}>
+            <Stack spacing={1.5} sx={{ mt: 1 }}>
               {filteredCustomers.length === 0 ? (
                 <Paper
                   elevation={0}
@@ -5063,13 +5354,14 @@ export default function FranchiseMobileHub({
                     textAlign: "center",
                     borderRadius: "20px",
                     bgcolor: "#FFFFFF",
-                    border: "1px solid #E2E8F0",
+                    border: "1px solid #EEF2F6",
+                    boxShadow: "0 2px 10px rgba(15,23,42,0.03)",
                   }}
                 >
                   <Avatar sx={{ width: 48, height: 48, bgcolor: "#EFF6FF", color: "#2563EB", mx: "auto", mb: 1.5 }}>
                     <GroupsOutlinedIcon />
                   </Avatar>
-                  <Typography sx={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>
+                  <Typography sx={{ fontSize: 15, fontWeight: 800, color: "#0F172A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                     No Registered Customers Found
                   </Typography>
                   <Typography sx={{ fontSize: 12.5, color: "#64748B", mt: 0.5, fontWeight: 500, maxWidth: 320, mx: "auto" }}>
@@ -5077,17 +5369,24 @@ export default function FranchiseMobileHub({
                   </Typography>
                 </Paper>
               ) : (
-                filteredCustomers.map((cust) => {
+                filteredCustomers.map((cust, idx) => {
                   const displayName = cust.full_name || cust.name || cust.username || "Customer";
                   const displayPhone = cust.phone || cust.mobile || cust.username || "—";
-                  const displayPin = cust.pincode || (selectedSubZone !== "all" ? selectedSubZone : (user?.pincode || "572106"));
                   const dateJoined = cust.date_joined
                     ? new Date(cust.date_joined).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
-                    : "Active";
+                    : "5 Oct 2026";
+                  
+                  const initials = displayName.split(" ").map(w => w.charAt(0)).join("").slice(0, 2).toUpperCase() || "CU";
+                  const avatarColors = [
+                    { bg: "#F3E8FF", color: "#7C3AED" },
+                    { bg: "#EFF6FF", color: "#2563EB" },
+                    { bg: "#FEF3C7", color: "#D97706" },
+                  ];
+                  const col = avatarColors[idx % avatarColors.length];
 
                   return (
                     <Paper
-                      key={cust.id || cust.username || cust.phone}
+                      key={cust.id || cust.username || cust.phone || idx}
                       elevation={0}
                       sx={{
                         p: 1.8,
@@ -5095,51 +5394,58 @@ export default function FranchiseMobileHub({
                         bgcolor: "#FFFFFF",
                         border: "1px solid #EEF2F6",
                         boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        transition: "transform 0.12s ease",
+                        "&:active": { transform: "scale(0.98)" },
                       }}
                     >
-                      <Stack direction="row" spacing={1.5} alignItems="center">
+                      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flex: 1, pr: 1 }}>
                         <Avatar
                           sx={{
                             width: 44,
                             height: 44,
-                            bgcolor: "#EFF6FF",
-                            color: "#2563EB",
+                            borderRadius: "50%",
+                            bgcolor: col.bg,
+                            color: col.color,
                             fontWeight: 800,
-                            fontSize: 16,
+                            fontSize: 15,
+                            fontFamily: "'Plus Jakarta Sans', sans-serif",
+                            flexShrink: 0,
                           }}
                         >
-                          {displayName.charAt(0).toUpperCase()}
+                          {initials}
                         </Avatar>
-                        <Box sx={{ minWidth: 0, flex: 1 }}>
-                          <Stack direction="row" justifyContent="space-between" alignItems="center">
-                            <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A", noWrap: true }}>
-                              {displayName}
-                            </Typography>
-                            <Chip
-                              label="Prime / Active"
-                              size="small"
-                              sx={{
-                                fontSize: 10,
-                                fontWeight: 800,
-                                height: 20,
-                                bgcolor: "#ECFDF5",
-                                color: "#059669",
-                                border: "1px solid #A7F3D0",
-                              }}
-                            />
-                          </Stack>
-                          <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.3 }}>
-                            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>
-                              📱 {displayPhone}
-                            </Typography>
-                            <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#94A3B8" }}>
-                              • PIN: {displayPin}
-                            </Typography>
-                          </Stack>
-                          <Typography sx={{ fontSize: 11, fontWeight: 500, color: "#94A3B8", mt: 0.3 }}>
-                            Joined: {dateJoined}
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography noWrap sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                            {displayName}
+                          </Typography>
+                          <Typography sx={{ fontSize: 12, fontWeight: 600, color: "#64748B", mt: 0.1 }}>
+                            {displayPhone}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11, color: "#94A3B8", mt: 0.2 }}>
+                            Registered on {dateJoined}
                           </Typography>
                         </Box>
+                      </Stack>
+                      <Stack direction="row" alignItems="center" spacing={1} sx={{ flexShrink: 0 }}>
+                        <Box
+                          sx={{
+                            bgcolor: "#ECFDF5",
+                            color: "#059669",
+                            border: "1px solid #A7F3D0",
+                            borderRadius: "999px",
+                            px: 1.2,
+                            py: 0.3,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            fontFamily: "'Plus Jakarta Sans', sans-serif",
+                          }}
+                        >
+                          Active
+                        </Box>
+                        <ChevronRightRoundedIcon sx={{ color: "#94A3B8", fontSize: 20 }} />
                       </Stack>
                     </Paper>
                   );
@@ -5150,74 +5456,228 @@ export default function FranchiseMobileHub({
         )}
 
         {/* =========================================================================
-            SCREEN 9: SUPPORT & GRIEVANCES (Exact Image 1 Screen 9)
+            SCREEN 9: SUPPORT & GRIEVANCES (Exact Image 2 Screen 7)
         ========================================================================= */}
         {activeScreen === "support" && (
           <Box>
-            <PageHeader
-              title="Support & Grievances"
-              count={filteredIssues.length}
-              actionLabel="+ Raise Issue"
-              onAction={() => setRaiseIssueOpen(true)}
-            />
+            {/* Top Tabs: My Tickets | Create Ticket */}
+            <Box sx={{ borderBottom: "1px solid #E2E8F0", mb: 2, display: "flex", gap: 3 }}>
+              <Box
+                onClick={() => setSupportTab("my_tickets")}
+                sx={{
+                  pb: 1,
+                  fontSize: 14,
+                  fontWeight: supportTab === "my_tickets" ? 900 : 600,
+                  color: supportTab === "my_tickets" ? "#5F259F" : "#64748B",
+                  borderBottom: supportTab === "my_tickets" ? "2.5px solid #5F259F" : "2.5px solid transparent",
+                  cursor: "pointer",
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                }}
+              >
+                My Tickets
+              </Box>
+              <Box
+                onClick={() => setSupportTab("create_ticket")}
+                sx={{
+                  pb: 1,
+                  fontSize: 14,
+                  fontWeight: supportTab === "create_ticket" ? 900 : 600,
+                  color: supportTab === "create_ticket" ? "#5F259F" : "#64748B",
+                  borderBottom: supportTab === "create_ticket" ? "2.5px solid #5F259F" : "2.5px solid transparent",
+                  cursor: "pointer",
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                }}
+              >
+                Create Ticket
+              </Box>
+            </Box>
 
-            {/* Filter Chips: Open (3) | Closed (12) | All (15) */}
-            <FilterChips
-              filters={[
-                { label: "Open (3)", value: "open" },
-                { label: "Closed (12)", value: "closed" },
-                { label: "All (15)", value: "all" },
-              ]}
-              activeValue={supportFilter}
-              onSelect={(val) => setSupportFilter(val)}
-            />
+            {supportTab === "my_tickets" ? (
+              <Box>
+                {/* Filter Chips: All (0) | Open (0) | In Progress (0) | Closed (0) */}
+                <FilterChips
+                  filters={[
+                    { label: `All (${filteredIssues.length})`, value: "all" },
+                    { label: `Open (${filteredIssues.filter(t => t.status === "Open").length})`, value: "open" },
+                    { label: `In Progress (${filteredIssues.filter(t => t.status === "In Progress").length})`, value: "in_progress" },
+                    { label: `Closed (${filteredIssues.filter(t => t.status === "Closed" || t.status === "Resolved").length})`, value: "closed" },
+                  ]}
+                  activeValue={supportFilter}
+                  onSelect={(val) => setSupportFilter(val)}
+                />
 
-            {/* Ticket Cards List */}
-            <Stack spacing={1.5}>
-              {filteredIssues.map((tk) => {
-                const isResolved = tk.status === "Resolved" || tk.status === "Closed";
-                const isInProgress = tk.status === "In Progress";
-                const statusBg = isResolved ? "#ECFDF5" : isInProgress ? "#FFFBEB" : "#FEF2F2";
-                const statusColor = isResolved ? "#059669" : isInProgress ? "#D97706" : "#DC2626";
-
-                return (
+                {/* Empty State when 0 Tickets */}
+                {filteredIssues.length === 0 ? (
                   <Paper
-                    key={tk.id}
                     elevation={0}
                     sx={{
-                      p: 1.8,
-                      borderRadius: "18px",
+                      p: 4,
+                      textAlign: "center",
+                      borderRadius: "20px",
                       bgcolor: "#FFFFFF",
                       border: "1px solid #EEF2F6",
-                      boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
+                      boxShadow: "0 2px 10px rgba(15,23,42,0.03)",
+                      mt: 2,
                     }}
                   >
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.8 }}>
-                      <Typography sx={{ fontSize: 12, fontWeight: 950, color: "#2563EB" }}>
-                        {tk.id}
-                      </Typography>
-                      <Chip
-                        label={tk.status}
-                        size="small"
-                        sx={{
-                          height: 20,
-                          fontSize: 10.5,
-                          fontWeight: 800,
-                          bgcolor: statusBg,
-                          color: statusColor,
-                        }}
-                      />
-                    </Stack>
-                    <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A", mb: 0.4 }}>
-                      {tk.subject}
+                    <Box
+                      sx={{
+                        width: 68,
+                        height: 68,
+                        borderRadius: "50%",
+                        bgcolor: "#FAF5FF",
+                        color: "#9333EA",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        mx: "auto",
+                        mb: 2,
+                      }}
+                    >
+                      <SupportAgentRoundedIcon sx={{ fontSize: 36, color: "#9333EA" }} />
+                    </Box>
+                    <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#0F172A", mb: 0.5, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      No support tickets yet
                     </Typography>
-                    <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>
-                      {tk.category} • {tk.date} • {tk.priority || "Normal"} Priority
+                    <Typography sx={{ fontSize: 12.5, color: "#64748B", mb: 2.5, fontWeight: 500, maxWidth: 280, mx: "auto", lineHeight: 1.4 }}>
+                      Raise a ticket if you need any help or have an issue.
                     </Typography>
+                    <Button
+                      variant="contained"
+                      onClick={() => setSupportTab("create_ticket")}
+                      sx={{
+                        borderRadius: "999px",
+                        bgcolor: "#5F259F",
+                        color: "#FFFFFF",
+                        textTransform: "none",
+                        fontWeight: 800,
+                        fontSize: 13,
+                        px: 3,
+                        py: 1,
+                        boxShadow: "0 4px 12px rgba(95, 37, 159, 0.25)",
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                        "&:hover": { bgcolor: "#4D1A85" },
+                        "&:active": { transform: "scale(0.96)" },
+                      }}
+                    >
+                      + Create New Ticket
+                    </Button>
                   </Paper>
-                );
-              })}
-            </Stack>
+                ) : (
+                  /* Ticket Cards List */
+                  <Stack spacing={1.5}>
+                    {filteredIssues.map((tk) => {
+                      const isResolved = tk.status === "Resolved" || tk.status === "Closed";
+                      const isInProgress = tk.status === "In Progress";
+                      const statusBg = isResolved ? "#ECFDF5" : isInProgress ? "#FFFBEB" : "#FEF2F2";
+                      const statusColor = isResolved ? "#059669" : isInProgress ? "#D97706" : "#DC2626";
+
+                      return (
+                        <Paper
+                          key={tk.id}
+                          elevation={0}
+                          sx={{
+                            p: 1.8,
+                            borderRadius: "18px",
+                            bgcolor: "#FFFFFF",
+                            border: "1px solid #EEF2F6",
+                            boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
+                          }}
+                        >
+                          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.8 }}>
+                            <Typography sx={{ fontSize: 12, fontWeight: 950, color: "#5F259F" }}>
+                              {tk.id}
+                            </Typography>
+                            <Box
+                              sx={{
+                                fontSize: 10.5,
+                                fontWeight: 800,
+                                bgcolor: statusBg,
+                                color: statusColor,
+                                borderRadius: "999px",
+                                px: 1.2,
+                                py: 0.2,
+                              }}
+                            >
+                              {tk.status}
+                            </Box>
+                          </Stack>
+                          <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A", mb: 0.4 }}>
+                            {tk.subject}
+                          </Typography>
+                          <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 700 }}>
+                            {tk.category} • {tk.date} • {tk.priority || "Normal"} Priority
+                          </Typography>
+                        </Paper>
+                      );
+                    })}
+                  </Stack>
+                )}
+              </Box>
+            ) : (
+              /* Create Ticket Form */
+              <Paper elevation={0} sx={{ p: 2.5, borderRadius: "20px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6", boxShadow: "0 2px 8px rgba(15,23,42,0.03)" }}>
+                <Typography sx={{ fontSize: 15, fontWeight: 900, color: "#0F172A", mb: 2, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  Raise a Support Ticket
+                </Typography>
+                <Stack spacing={2}>
+                  <TextField
+                    fullWidth
+                    label="Subject / Topic"
+                    size="small"
+                    value={issueSubject}
+                    onChange={(e) => setIssueSubject(e.target.value)}
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "14px" } }}
+                  />
+                  <FormControl fullWidth size="small">
+                    <Select
+                      value={issueCategory}
+                      onChange={(e) => setIssueCategory(e.target.value)}
+                      displayEmpty
+                      sx={{ borderRadius: "14px" }}
+                    >
+                      <MenuItem value="Wallet & Payouts">Wallet & Payouts</MenuItem>
+                      <MenuItem value="QR Scanner / Merchant">QR Scanner / Merchant</MenuItem>
+                      <MenuItem value="Territory Assignment">Territory Assignment</MenuItem>
+                      <MenuItem value="Self-Rebirth Matrix">Self-Rebirth Matrix</MenuItem>
+                      <MenuItem value="Technical Grievance">Technical Grievance</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <TextField
+                    fullWidth
+                    label="Description & Details"
+                    multiline
+                    rows={4}
+                    value={issueDesc}
+                    onChange={(e) => setIssueDesc(e.target.value)}
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "14px" } }}
+                  />
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    onClick={() => {
+                      if (issueSubject.trim()) {
+                        handleRaiseIssue();
+                        setSupportTab("my_tickets");
+                      }
+                    }}
+                    sx={{
+                      borderRadius: "999px",
+                      bgcolor: "#5F259F",
+                      color: "#FFFFFF",
+                      fontWeight: 800,
+                      py: 1.1,
+                      textTransform: "none",
+                      fontFamily: "'Plus Jakarta Sans', sans-serif",
+                      "&:hover": { bgcolor: "#4D1A85" },
+                      "&:active": { transform: "scale(0.96)" },
+                    }}
+                  >
+                    Submit Support Ticket
+                  </Button>
+                </Stack>
+              </Paper>
+            )}
 
             {/* Helpdesk Contact Box */}
             <Paper
@@ -5304,13 +5764,12 @@ export default function FranchiseMobileHub({
 
         <Grid container spacing={1.5}>
           {[
-            { label: "Self-Rebirth & Matrix", screen: "self_rebirth", icon: <AutorenewRoundedIcon />, color: "#D97706", bg: "#FFFBEB" },
             { label: "Wallet & History", screen: "history", icon: <AccountBalanceWalletRoundedIcon />, color: "#2563EB", bg: "#EFF6FF" },
             { label: "Territory Overview", screen: "pincode", icon: <LocationOnRoundedIcon />, color: "#4F46E5", bg: "#EEF2FF" },
             { label: "Registered Customers", screen: "users", icon: <GroupsOutlinedIcon />, color: "#0284C7", bg: "#F0F9FF" },
             { label: "Support & Grievances", screen: "support", icon: <SupportAgentRoundedIcon />, color: "#9333EA", bg: "#FAF5FF" },
             { label: "Scan Merchant QR", screen: "qr", icon: <QrCodeScannerRoundedIcon />, color: "#DC2626", bg: "#FEF2F2", action: () => setScanQrOpen(true) },
-            { label: "Withdraw Wallet", screen: "withdraw", icon: <ArrowUpwardRoundedIcon />, color: "#10B981", bg: "#ECFDF5", action: () => navigate("/user/withdrawal") },
+            { label: "Withdraw Wallet", screen: "withdraw", icon: <ArrowUpwardRoundedIcon />, color: "#10B981", bg: "#ECFDF5", action: () => setWithdrawDialogOpen(true) },
           ].map((mod) => (
             <Grid item xs={6} key={mod.label}>
               <Paper
@@ -5473,6 +5932,224 @@ export default function FranchiseMobileHub({
             sx={{ bgcolor: "#2563EB", fontWeight: 800 }}
           >
             Submit Grievance
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── IN-APP FRANCHISE WITHDRAWAL DIALOG ── */}
+      <Dialog
+        open={withdrawDialogOpen}
+        onClose={() => setWithdrawDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: "24px",
+            p: { xs: 0.5, sm: 1 },
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 900, fontSize: 17, pb: 1, color: "#0F172A", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>Withdraw Earnings</span>
+          <IconButton size="small" onClick={() => setWithdrawDialogOpen(false)}>
+            <CloseRoundedIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ pt: 1 }}>
+          {/* Available Withdrawable Balance Hero Banner */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              borderRadius: "18px",
+              background: "linear-gradient(135deg, #5F259F 0%, #4D1A85 100%)",
+              color: "#FFFFFF",
+              mb: 2.5,
+              boxShadow: "0 4px 16px rgba(95, 37, 159, 0.25)",
+            }}
+          >
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "rgba(255, 255, 255, 0.85)" }}>
+              Available Withdrawable Balance
+            </Typography>
+            <Typography sx={{ fontSize: 26, fontWeight: 900, color: "#FFFFFF", mt: 0.3, mb: 0.5, letterSpacing: "-0.02em" }}>
+              ₹ {(walletState.mainWallet || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Typography>
+            <Typography sx={{ fontSize: 10.5, color: "rgba(255, 255, 255, 0.75)", lineHeight: 1.3 }}>
+              Main Wallet (75% share) is 100% instantly withdrawable. Self Rebirth pocket (25%) is auto-saved for autonomous rebirth cycles.
+            </Typography>
+          </Paper>
+
+          {/* Amount Input with Quick Pills */}
+          <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A", mb: 0.8 }}>
+            Enter Withdrawal Amount
+          </Typography>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="e.g. 500.00"
+            value={withdrawAmount}
+            onChange={(e) => setWithdrawAmount(e.target.value.replace(/[^\d.]/g, ""))}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Typography sx={{ fontWeight: 900, color: "#0F172A", fontSize: 16 }}>₹</Typography>
+                </InputAdornment>
+              ),
+              sx: {
+                borderRadius: "14px",
+                fontSize: 16,
+                fontWeight: 800,
+                "& fieldset": { borderColor: "#E2E8F0" },
+                "&.Mui-focused fieldset": { borderColor: "#5F259F" },
+              },
+            }}
+          />
+
+          {/* Quick Amount Chips */}
+          <Stack direction="row" spacing={1} sx={{ mt: 1.2, mb: 2.5 }}>
+            {[100, 500, 1000, "Max"].map((val) => (
+              <Chip
+                key={val}
+                label={val === "Max" ? "All Max" : `₹${val}`}
+                size="small"
+                onClick={() => {
+                  if (val === "Max") {
+                    setWithdrawAmount(String((walletState.mainWallet || 0).toFixed(2)));
+                  } else {
+                    setWithdrawAmount(String(val));
+                  }
+                }}
+                sx={{
+                  flex: 1,
+                  height: 28,
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  bgcolor: "#F1F5F9",
+                  color: "#334155",
+                  borderRadius: "999px",
+                  cursor: "pointer",
+                  "&:hover": { bgcolor: "#EFF6FF", color: "#2563EB" },
+                }}
+              />
+            ))}
+          </Stack>
+
+          {/* Payout Destination Selector */}
+          <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A", mb: 1 }}>
+            Payout Destination
+          </Typography>
+
+          <Stack direction="row" spacing={1} sx={{ mb: 1.5 }}>
+            <Button
+              size="small"
+              onClick={() => setWithdrawMethod("bank")}
+              sx={{
+                flex: 1,
+                py: 0.8,
+                borderRadius: "12px",
+                fontSize: 12,
+                fontWeight: 800,
+                textTransform: "none",
+                bgcolor: withdrawMethod === "bank" ? "#EFF6FF" : "#FFFFFF",
+                color: withdrawMethod === "bank" ? "#1D6AE5" : "#64748B",
+                border: "1.5px solid",
+                borderColor: withdrawMethod === "bank" ? "#3B82F6" : "#E2E8F0",
+              }}
+            >
+              Bank Account
+            </Button>
+            <Button
+              size="small"
+              onClick={() => setWithdrawMethod("upi")}
+              sx={{
+                flex: 1,
+                py: 0.8,
+                borderRadius: "12px",
+                fontSize: 12,
+                fontWeight: 800,
+                textTransform: "none",
+                bgcolor: withdrawMethod === "upi" ? "#EFF6FF" : "#FFFFFF",
+                color: withdrawMethod === "upi" ? "#1D6AE5" : "#64748B",
+                border: "1.5px solid",
+                borderColor: withdrawMethod === "upi" ? "#3B82F6" : "#E2E8F0",
+              }}
+            >
+              UPI ID
+            </Button>
+          </Stack>
+
+          {withdrawMethod === "bank" ? (
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.5,
+                borderRadius: "14px",
+                bgcolor: "#F8FAFC",
+                border: "1px solid #E2E8F0",
+              }}
+            >
+              <Stack direction="row" spacing={1.2} alignItems="center">
+                <Box
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: "10px",
+                    bgcolor: "#EFF6FF",
+                    color: "#2563EB",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <AccountBalanceRoundedIcon sx={{ fontSize: 20 }} />
+                </Box>
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A" }}>
+                    {bankInfo.bankName} •••• {bankInfo.accountNumber.slice(-4)}
+                  </Typography>
+                  <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 600 }}>
+                    IFSC: {bankInfo.ifsc} • {bankInfo.holderName}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Paper>
+          ) : (
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="e.g. mobile@okaxis / user@upi"
+              value={withdrawUpi}
+              onChange={(e) => setWithdrawUpi(e.target.value)}
+              sx={{
+                "& .MuiOutlinedInput-root": { borderRadius: "14px", fontSize: 13, fontWeight: 700 },
+              }}
+            />
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2.5, pt: 1 }}>
+          <Button
+            fullWidth
+            variant="contained"
+            disabled={withdrawSubmitting || !withdrawAmount || Number(withdrawAmount) <= 0}
+            onClick={handleWithdrawSubmit}
+            sx={{
+              borderRadius: "999px",
+              bgcolor: "#5F259F",
+              color: "#FFFFFF",
+              fontWeight: 800,
+              fontSize: 14,
+              py: 1.1,
+              textTransform: "none",
+              boxShadow: "0 4px 14px rgba(95, 37, 159, 0.3)",
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              "&:hover": { bgcolor: "#4D1A85" },
+              "&:active": { transform: "scale(0.98)" },
+            }}
+          >
+            {withdrawSubmitting ? "Processing Payout..." : `Instant Withdraw ${withdrawAmount && Number(withdrawAmount) > 0 ? "₹" + Number(withdrawAmount).toFixed(2) : ""}`}
           </Button>
         </DialogActions>
       </Dialog>

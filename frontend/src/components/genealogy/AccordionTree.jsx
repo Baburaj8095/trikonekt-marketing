@@ -30,6 +30,7 @@ import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
+import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import API from "../../api/api";
@@ -148,6 +149,8 @@ function normalizeEntry(n) {
     full_name: String(n.full_name || "").trim(),
     account_active: isStatusActive,
     direct_count: Number(n.direct_count ?? n.direct_sponsor_count) || 0,
+    direct_sponsor_count: Number(n.direct_sponsor_count ?? n.direct_count) || 0,
+    team_count: Number(n.team_count ?? n.total_team) || 0,
     matrix_position: Number(n.position || n.matrix_position) || 0,
     layer_level: Number(n.level || n.layer_level || n.level_depth) || 0,
     current_rank: currentRank,
@@ -168,6 +171,8 @@ function normalizeRankNode(n) {
     username,
     account_active: currentRank > 0,
     direct_count: Number(n.direct_count ?? n.direct_sponsor_count) || 0,
+    direct_sponsor_count: Number(n.direct_sponsor_count ?? n.direct_count) || 0,
+    team_count: Number(n.team_count ?? n.total_team) || 0,
     matrix_position: Number(n.position || n.matrix_position) || 0,
     layer_level: Number(n.level || n.layer_level || n.level_depth) || 0,
     current_rank: currentRank,
@@ -744,7 +749,27 @@ function AccordionBranchCard({
                 }}
               >
                 <PersonOutlineRoundedIcon sx={{ fontSize: 13 }} />
-                Direct: {node?.direct_count || 0}
+                Direct: {node?.direct_sponsor_count ?? node?.direct_count ?? 0}
+              </Box>
+
+              {/* Total Team Count Pill */}
+              <Box
+                sx={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.4,
+                  px: 1,
+                  py: 0.25,
+                  borderRadius: "10px",
+                  bgcolor: "#EFF6FF",
+                  color: "#1D4ED8",
+                  border: "1px solid #BFDBFE",
+                  fontSize: 11,
+                  fontWeight: 800,
+                }}
+              >
+                <GroupsRoundedIcon sx={{ fontSize: 13 }} />
+                Total Team: {node?.team_count ?? 0}
               </Box>
 
               {/* Level Pill */}
@@ -814,8 +839,27 @@ function AccordionBranchCard({
           </Box>
         </Stack>
 
-        {/* Right: Active pill + Chevron Button */}
+        {/* Right: Total Team Badge + Active pill + Chevron Button */}
         <Stack direction="row" alignItems="center" spacing={1}>
+          <Box
+            sx={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 0.5,
+              px: 1.25,
+              py: 0.35,
+              borderRadius: "12px",
+              bgcolor: "#EFF6FF",
+              color: "#1D4ED8",
+              border: "1px solid #BFDBFE",
+              fontSize: 11,
+              fontWeight: 800,
+            }}
+          >
+            <GroupsRoundedIcon sx={{ fontSize: 14 }} />
+            Total Team: {node?.team_count ?? 0}
+          </Box>
+
           <Box
             sx={{
               display: { xs: "none", sm: "inline-flex" },
@@ -1039,8 +1083,27 @@ function AccordionBranchCard({
                                 }}
                               >
                                 <PersonOutlineRoundedIcon sx={{ fontSize: 11 }} />
-                                Direct: {child.direct_count || 0}
+                                Direct: {child.direct_sponsor_count ?? child.direct_count ?? 0}
                               </Box>
+
+                              <Box
+                                sx={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 0.3,
+                                  px: 0.75,
+                                  py: 0.2,
+                                  borderRadius: "8px",
+                                  bgcolor: "#EFF6FF",
+                                  color: "#1D4ED8",
+                                  fontSize: 10,
+                                  fontWeight: 800,
+                                }}
+                              >
+                                <GroupsRoundedIcon sx={{ fontSize: 11 }} />
+                                Team: {child.team_count ?? 0}
+                              </Box>
+
                               <Box
                                 sx={{
                                   px: 0.75,
@@ -1079,6 +1142,25 @@ function AccordionBranchCard({
                         </Stack>
 
                         <Stack direction="row" alignItems="center" spacing={1}>
+                          <Box
+                            sx={{
+                              display: { xs: "none", sm: "inline-flex" },
+                              alignItems: "center",
+                              gap: 0.4,
+                              px: 1,
+                              py: 0.25,
+                              borderRadius: "10px",
+                              bgcolor: "#EFF6FF",
+                              color: "#1D4ED8",
+                              border: "1px solid #BFDBFE",
+                              fontSize: 10.5,
+                              fontWeight: 800,
+                            }}
+                          >
+                            <GroupsRoundedIcon sx={{ fontSize: 12 }} />
+                            Team: {child.team_count ?? 0}
+                          </Box>
+
                           <Box
                             sx={{
                               display: { xs: "none", sm: "inline-flex" },

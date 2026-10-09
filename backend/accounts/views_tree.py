@@ -737,8 +737,23 @@ class MyMatrix5EntriesTree(APIView):
                 count_memo[nid] = total
                 return total
 
+            # Direct sponsored count from CustomUser
+            from django.db.models import Count
+            from accounts.models import CustomUser
+            owner_ids_all = [node["owner_id"] for node in nodes_by_account.values() if node.get("owner_id")]
+            direct_sponsor_map = dict(
+                CustomUser.objects.filter(registered_by_id__in=owner_ids_all)
+                .values("registered_by_id")
+                .annotate(cnt=Count("id"))
+                .values_list("registered_by_id", "cnt")
+            ) if owner_ids_all else {}
+
             for acc_id, node in nodes_by_account.items():
-                node["direct_count"] = len(parent_to_children.get(acc_id, []))
+                oid = node.get("owner_id")
+                real_direct = direct_sponsor_map.get(oid, 0)
+                node["direct_count"] = real_direct
+                node["direct_sponsor_count"] = real_direct
+                node["matrix_children_count"] = len(parent_to_children.get(acc_id, []))
                 node["team_count"] = _count_all(acc_id)
         except Exception:
             # Fallback: count only loaded descendants

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import API, {
   adminGetMasterCommission,
   adminUpdateMasterCommission,
@@ -182,11 +183,61 @@ const FIXED_FIVE_MATRIX_LEVELS = 10;
 const FIXED_THREE_MATRIX_LEVELS = 15;
 
 export default function AdminCommissionDistribute() {
+  const location = useLocation();
+  const isFranchiseWorkspace = location.pathname.includes("/admin/franchise");
+
   // Global page messages
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
 
-  const [activeTab, setActiveTab] = useState(TABS.ACT750);
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      if (typeof window !== "undefined") {
+        const isFran = window.location.pathname.includes("/admin/franchise");
+        const params = new URLSearchParams(window.location.search);
+        const tabParam = params.get("tab") || params.get("t");
+        if (tabParam) {
+          const upper = tabParam.toUpperCase();
+          if (upper === "REBIRTH" || upper === "SELF_REBIRTH" || upper === "RANK" || upper === "RANK_UPGRADE") {
+            return TABS.RANK_UPGRADE;
+          } else if (upper === "ROYALTY" || upper === "POOLS" || upper === "DAILY") {
+            return TABS.ROYALTY;
+          } else if (upper === "SPP" || upper === "SPP1000") {
+            return TABS.SPP1000;
+          } else if (upper === "750" || upper === "ACT750") {
+            return TABS.ACT750;
+          } else if (upper === "WITHDRAW" || upper === "WITHDRAWAL") {
+            return TABS.WITHDRAW;
+          }
+        }
+        if (isFran) return TABS.RANK_UPGRADE;
+      }
+    } catch (_) {}
+    return isFranchiseWorkspace ? TABS.RANK_UPGRADE : TABS.ACT750;
+  });
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(location.search);
+      const tabParam = params.get("tab") || params.get("t");
+      if (tabParam) {
+        const upper = tabParam.toUpperCase();
+        if (upper === "REBIRTH" || upper === "SELF_REBIRTH" || upper === "RANK" || upper === "RANK_UPGRADE") {
+          setActiveTab(TABS.RANK_UPGRADE);
+        } else if (upper === "ROYALTY" || upper === "POOLS" || upper === "DAILY") {
+          setActiveTab(TABS.ROYALTY);
+        } else if (upper === "SPP" || upper === "SPP1000") {
+          setActiveTab(TABS.SPP1000);
+        } else if (upper === "750" || upper === "ACT750") {
+          setActiveTab(TABS.ACT750);
+        } else if (upper === "WITHDRAW" || upper === "WITHDRAWAL") {
+          setActiveTab(TABS.WITHDRAW);
+        }
+      } else if (isFranchiseWorkspace && (activeTab === TABS.ACT750 || activeTab === TABS.SPP1000)) {
+        setActiveTab(TABS.RANK_UPGRADE);
+      }
+    } catch (_) {}
+  }, [location.search, isFranchiseWorkspace]);
 
   const [rankConfig, setRankConfig] = useState(() => {
     try {
@@ -4958,166 +5009,170 @@ right={
           </div>
         </Section>
 
-        <Section
-          title="Rank Upgrade Time Windows (Days)"
-          subtitle="Configure default upgrade time window limits for Layer 1-7 and Layer 8-10 tiers"
-        >
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <Input
-              label="Upgrade Window (L1 to L7) - Days"
-              type="number"
-              value={rankConfig.upgrade_window_l1_l7}
-              onChange={(val) => {
-                setRankConfig((prev) => ({ ...prev, upgrade_window_l1_l7: Number(val) }));
-                setRankDirty(true);
-              }}
-              placeholder="7"
-            />
-            <Input
-              label="Upgrade Window (L8 to L10) - Days"
-              type="number"
-              value={rankConfig.upgrade_window_l8_l10}
-              onChange={(val) => {
-                setRankConfig((prev) => ({ ...prev, upgrade_window_l8_l10: Number(val) }));
-                setRankDirty(true);
-              }}
-              placeholder="15"
-            />
-          </div>
-        </Section>
-
-        {(() => {
-          const configuredTaxPctRank = customModuleTax.tax_rank !== undefined ? Number(customModuleTax.tax_rank) : (Number(mForm.tax_percent) > 0 ? Number(mForm.tax_percent) : 18);
-          return (
+        {!isFranchiseWorkspace && (
+          <>
             <Section
-              title="Rank Layer Tiers Configuration & Strict Tax Rules"
-              subtitle={`Strict Rule: Gross Upgrade Fee → Deduct ${configuredTaxPctRank}% Company Tax (Retained by Platform) → Net 50% Direct Sponsor + Net 50% Target Layer Upline (fallback to Company Root)`}
-              right={
-                <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", padding: "6px 12px", borderRadius: 8, border: "1px solid #cbd5e1" }}>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: "#1e293b" }}>Rank Upgrade Company Tax:</span>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="100"
-                    value={configuredTaxPctRank}
-                    onChange={(e) => updateModuleTax("tax_rank", e.target.value)}
-                    style={{ width: 60, padding: "3px 6px", fontSize: 12, fontWeight: 800, borderRadius: 4, border: "1px solid #94a3b8", background: "#fff", color: "#0f172a" }}
-                  />
-                  <span style={{ fontSize: 12, fontWeight: 800, color: "#475569" }}>%</span>
-                </div>
-              }
+              title="Rank Upgrade Time Windows (Days)"
+              subtitle="Configure default upgrade time window limits for Layer 1-7 and Layer 8-10 tiers"
             >
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ background: "#1e1b4b", color: "#fff", textAlign: "left" }}>
-                      <th style={{ padding: "10px 12px" }}>Layer</th>
-                      <th style={{ padding: "10px 12px" }}>Rank Name</th>
-                      <th style={{ padding: "10px 12px" }}>Upgrade Amount (₹)</th>
-                      <th style={{ padding: "10px 12px", background: "#312e81" }}>Company Tax ({configuredTaxPctRank}% ₹)</th>
-                      <th style={{ padding: "10px 12px", background: "#3730a3" }}>Net Pool ({(100 - configuredTaxPctRank).toFixed(1)}% ₹)</th>
-                      <th style={{ padding: "10px 12px", background: "#4338ca" }}>50% Sponsor (₹)</th>
-                      <th style={{ padding: "10px 12px", background: "#4f46e5" }}>50% Layer Upline (₹)</th>
-                      <th style={{ padding: "10px 12px" }}>Earning Limit (₹)</th>
-                      <th style={{ padding: "10px 12px" }}>Team Count Required</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rankConfig.levels.map((lvl, idx) => {
-                      const gross = Number(lvl.upgrade_amount || 0);
-                      const tax = Math.round(gross * (configuredTaxPctRank / 100) * 100) / 100;
-                      const net = Math.round((gross - tax) * 100) / 100;
-                      const half = Math.round((net / 2) * 100) / 100;
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+                <Input
+                  label="Upgrade Window (L1 to L7) - Days"
+                  type="number"
+                  value={rankConfig.upgrade_window_l1_l7}
+                  onChange={(val) => {
+                    setRankConfig((prev) => ({ ...prev, upgrade_window_l1_l7: Number(val) }));
+                    setRankDirty(true);
+                  }}
+                  placeholder="7"
+                />
+                <Input
+                  label="Upgrade Window (L8 to L10) - Days"
+                  type="number"
+                  value={rankConfig.upgrade_window_l8_l10}
+                  onChange={(val) => {
+                    setRankConfig((prev) => ({ ...prev, upgrade_window_l8_l10: Number(val) }));
+                    setRankDirty(true);
+                  }}
+                  placeholder="15"
+                />
+              </div>
+            </Section>
 
-                  return (
-                  <tr key={lvl.level} style={{ borderBottom: "1px solid #e2e8f0" }}>
-                    <td style={{ padding: "8px 12px", fontWeight: 800 }}>Layer {lvl.level}</td>
-                    <td style={{ padding: "8px 12px" }}>
-                      <input
-                        type="text"
-                        value={lvl.name}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setRankConfig((prev) => {
-                            const newLvls = [...prev.levels];
-                            newLvls[idx] = { ...newLvls[idx], name: val };
-                            return { ...prev, levels: newLvls };
-                          });
-                          setRankDirty(true);
-                        }}
-                        style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 110 }}
-                      />
-                    </td>
-                    <td style={{ padding: "8px 12px" }}>
+            {(() => {
+              const configuredTaxPctRank = customModuleTax.tax_rank !== undefined ? Number(customModuleTax.tax_rank) : (Number(mForm.tax_percent) > 0 ? Number(mForm.tax_percent) : 18);
+              return (
+                <Section
+                  title="Rank Layer Tiers Configuration & Strict Tax Rules"
+                  subtitle={`Strict Rule: Gross Upgrade Fee → Deduct ${configuredTaxPctRank}% Company Tax (Retained by Platform) → Net 50% Direct Sponsor + Net 50% Target Layer Upline (fallback to Company Root)`}
+                  right={
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", padding: "6px 12px", borderRadius: 8, border: "1px solid #cbd5e1" }}>
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "#1e293b" }}>Rank Upgrade Company Tax:</span>
                       <input
                         type="number"
-                        value={lvl.upgrade_amount}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          setRankConfig((prev) => {
-                            const newLvls = [...prev.levels];
-                            newLvls[idx] = { ...newLvls[idx], upgrade_amount: val };
-                            return { ...prev, levels: newLvls };
-                          });
-                          setRankDirty(true);
-                        }}
-                        style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 110, fontWeight: 700 }}
+                        step="0.1"
+                        min="0"
+                        max="100"
+                        value={configuredTaxPctRank}
+                        onChange={(e) => updateModuleTax("tax_rank", e.target.value)}
+                        style={{ width: 60, padding: "3px 6px", fontSize: 12, fontWeight: 800, borderRadius: 4, border: "1px solid #94a3b8", background: "#fff", color: "#0f172a" }}
                       />
-                    </td>
-                    <td style={{ padding: "8px 12px", fontWeight: 800, color: "#1e40af", background: "#eff6ff" }}>
-                      ₹{tax.toFixed(2)}
-                    </td>
-                    <td style={{ padding: "8px 12px", fontWeight: 800, color: "#047857", background: "#ecfdf5" }}>
-                      ₹{net.toFixed(2)}
-                    </td>
-                    <td style={{ padding: "8px 12px", fontWeight: 700, color: "#6b21a8", background: "#faf5ff" }}>
-                      ₹{half.toFixed(2)}
-                    </td>
-                    <td style={{ padding: "8px 12px", fontWeight: 700, color: "#4338ca", background: "#eef2ff" }}>
-                      ₹{half.toFixed(2)}
-                    </td>
-                    <td style={{ padding: "8px 12px" }}>
-                      <input
-                        type="number"
-                        value={lvl.earning_limit}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          setRankConfig((prev) => {
-                            const newLvls = [...prev.levels];
-                            newLvls[idx] = { ...newLvls[idx], earning_limit: val };
-                            return { ...prev, levels: newLvls };
-                          });
-                          setRankDirty(true);
-                        }}
-                        style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 110 }}
-                      />
-                    </td>
-                    <td style={{ padding: "8px 12px" }}>
-                      <input
-                        type="text"
-                        value={lvl.team_count}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setRankConfig((prev) => {
-                            const newLvls = [...prev.levels];
-                            newLvls[idx] = { ...newLvls[idx], team_count: val };
-                            return { ...prev, levels: newLvls };
-                          });
-                          setRankDirty(true);
-                        }}
-                        style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 80 }}
-                      />
-                    </td>
-                  </tr>
-                );
-                })}
-              </tbody>
-            </table>
-  </div>
-        </Section>
-          );
-        })()}
+                      <span style={{ fontSize: 12, fontWeight: 800, color: "#475569" }}>%</span>
+                    </div>
+                  }
+                >
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: "#1e1b4b", color: "#fff", textAlign: "left" }}>
+                          <th style={{ padding: "10px 12px" }}>Layer</th>
+                          <th style={{ padding: "10px 12px" }}>Rank Name</th>
+                          <th style={{ padding: "10px 12px" }}>Upgrade Amount (₹)</th>
+                          <th style={{ padding: "10px 12px", background: "#312e81" }}>Company Tax ({configuredTaxPctRank}% ₹)</th>
+                          <th style={{ padding: "10px 12px", background: "#3730a3" }}>Net Pool ({(100 - configuredTaxPctRank).toFixed(1)}% ₹)</th>
+                          <th style={{ padding: "10px 12px", background: "#4338ca" }}>50% Sponsor (₹)</th>
+                          <th style={{ padding: "10px 12px", background: "#4f46e5" }}>50% Layer Upline (₹)</th>
+                          <th style={{ padding: "10px 12px" }}>Earning Limit (₹)</th>
+                          <th style={{ padding: "10px 12px" }}>Team Count Required</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rankConfig.levels.map((lvl, idx) => {
+                          const gross = Number(lvl.upgrade_amount || 0);
+                          const tax = Math.round(gross * (configuredTaxPctRank / 100) * 100) / 100;
+                          const net = Math.round((gross - tax) * 100) / 100;
+                          const half = Math.round((net / 2) * 100) / 100;
+
+                          return (
+                            <tr key={lvl.level} style={{ borderBottom: "1px solid #e2e8f0" }}>
+                              <td style={{ padding: "8px 12px", fontWeight: 800 }}>Layer {lvl.level}</td>
+                              <td style={{ padding: "8px 12px" }}>
+                                <input
+                                  type="text"
+                                  value={lvl.name}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setRankConfig((prev) => {
+                                      const newLvls = [...prev.levels];
+                                      newLvls[idx] = { ...newLvls[idx], name: val };
+                                      return { ...prev, levels: newLvls };
+                                    });
+                                    setRankDirty(true);
+                                  }}
+                                  style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 110 }}
+                                />
+                              </td>
+                              <td style={{ padding: "8px 12px" }}>
+                                <input
+                                  type="number"
+                                  value={lvl.upgrade_amount}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    setRankConfig((prev) => {
+                                      const newLvls = [...prev.levels];
+                                      newLvls[idx] = { ...newLvls[idx], upgrade_amount: val };
+                                      return { ...prev, levels: newLvls };
+                                    });
+                                    setRankDirty(true);
+                                  }}
+                                  style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 110, fontWeight: 700 }}
+                                />
+                              </td>
+                              <td style={{ padding: "8px 12px", fontWeight: 800, color: "#1e40af", background: "#eff6ff" }}>
+                                ₹{tax.toFixed(2)}
+                              </td>
+                              <td style={{ padding: "8px 12px", fontWeight: 800, color: "#047857", background: "#ecfdf5" }}>
+                                ₹{net.toFixed(2)}
+                              </td>
+                              <td style={{ padding: "8px 12px", fontWeight: 700, color: "#6b21a8", background: "#faf5ff" }}>
+                                ₹{half.toFixed(2)}
+                              </td>
+                              <td style={{ padding: "8px 12px", fontWeight: 700, color: "#4338ca", background: "#eef2ff" }}>
+                                ₹{half.toFixed(2)}
+                              </td>
+                              <td style={{ padding: "8px 12px" }}>
+                                <input
+                                  type="number"
+                                  value={lvl.earning_limit}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    setRankConfig((prev) => {
+                                      const newLvls = [...prev.levels];
+                                      newLvls[idx] = { ...newLvls[idx], earning_limit: val };
+                                      return { ...prev, levels: newLvls };
+                                    });
+                                    setRankDirty(true);
+                                  }}
+                                  style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 110 }}
+                                />
+                              </td>
+                              <td style={{ padding: "8px 12px" }}>
+                                <input
+                                  type="text"
+                                  value={lvl.team_count}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setRankConfig((prev) => {
+                                      const newLvls = [...prev.levels];
+                                      newLvls[idx] = { ...newLvls[idx], team_count: val };
+                                      return { ...prev, levels: newLvls };
+                                    });
+                                    setRankDirty(true);
+                                  }}
+                                  style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 80 }}
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Section>
+              );
+            })()}
+          </>
+        )}
       </div>
     );
   }
@@ -6522,9 +6577,13 @@ right={
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a" }}>Commission Distribution</div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a" }}>
+              {isFranchiseWorkspace ? "Franchise Commission & Rebirth Distribution" : "Commission Distribution"}
+            </div>
             <div style={{ fontSize: 12, color: "#64748b" }}>
-              Configure commissions with single-click authoritative saving per tab.
+              {isFranchiseWorkspace
+                ? "Configure franchise self-rebirth engine, daily royalties, and withdrawal commissions."
+                : "Configure commissions with single-click authoritative saving per tab."}
             </div>
           </div>
           <SaveBtn
@@ -6532,8 +6591,8 @@ right={
             disabled={tabLoading}
             saving={anySaving}
             dirty={tabDirty}
-            labelSaved={`${activeTab === TABS.ACT750 ? "₹750 Activation" : activeTab === TABS.SPP1000 ? "₹1,000 SPP" : activeTab === TABS.RANK_UPGRADE ? "Rank & Rebirth" : activeTab === TABS.ROYALTY ? "Royalty & Pools" : "All Settings"} Saved ✓`}
-            labelDirty={`Save ${activeTab === TABS.ACT750 ? "₹750 Activation" : activeTab === TABS.SPP1000 ? "₹1,000 SPP" : activeTab === TABS.RANK_UPGRADE ? "Rank & Rebirth" : activeTab === TABS.ROYALTY ? "Royalty & Pools" : "Changes"} *`}
+            labelSaved={`${activeTab === TABS.ACT750 ? "₹750 Activation" : activeTab === TABS.SPP1000 ? "₹1,000 SPP" : activeTab === TABS.RANK_UPGRADE ? (isFranchiseWorkspace ? "₹250 Self-Rebirth" : "Rank & Rebirth") : activeTab === TABS.ROYALTY ? "Royalty & Pools" : activeTab === TABS.WITHDRAW ? "Withdrawal" : "All Settings"} Saved ✓`}
+            labelDirty={`Save ${activeTab === TABS.ACT750 ? "₹750 Activation" : activeTab === TABS.SPP1000 ? "₹1,000 SPP" : activeTab === TABS.RANK_UPGRADE ? (isFranchiseWorkspace ? "₹250 Self-Rebirth" : "Rank & Rebirth") : activeTab === TABS.ROYALTY ? "Royalty & Pools" : activeTab === TABS.WITHDRAW ? "Withdrawal Commission" : "Changes"} *`}
             imbalanced={
               (activeTab === TABS.SPP1000 && !sppBalanceInfo.isBalancedSPP) ||
               (activeTab === TABS.ACT750 && !act750BalanceInfo.isBalanced750) ||
@@ -6556,13 +6615,20 @@ right={
 
         {/* Tabs */}
         <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
-        {[
-          { key: TABS.ACT750, label: "₹750 Activation" },
-          { key: TABS.SPP1000, label: "₹1,000 SPP" },
-          { key: TABS.ROYALTY, label: "Royalty & Daily 11:59 PM Pools" },
-          { key: TABS.WITHDRAW, label: "Withdrawal Commission" },
-          { key: TABS.RANK_UPGRADE, label: "Rank Upgrade Config" },
-        ].map((t) => (
+        {(isFranchiseWorkspace
+          ? [
+              { key: TABS.RANK_UPGRADE, label: "₹250 Self-Rebirth Engine" },
+              { key: TABS.ROYALTY, label: "Royalty & Daily 11:59 PM Pools" },
+              { key: TABS.WITHDRAW, label: "Withdrawal Commission" },
+            ]
+          : [
+              { key: TABS.ACT750, label: "₹750 Activation" },
+              { key: TABS.SPP1000, label: "₹1,000 SPP" },
+              { key: TABS.ROYALTY, label: "Royalty & Daily 11:59 PM Pools" },
+              { key: TABS.WITHDRAW, label: "Withdrawal Commission" },
+              { key: TABS.RANK_UPGRADE, label: "₹250 Self-Rebirth & Rank Upgrades" },
+            ]
+        ).map((t) => (
           <button
             key={t.key}
             type="button"

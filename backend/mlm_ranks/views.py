@@ -7,7 +7,7 @@ from typing import Optional
 from django.db import transaction
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
-from django.db.models import Sum, Max, Prefetch
+from django.db.models import Sum, Max, Prefetch, Count
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -1184,8 +1184,20 @@ class RankMatrixBFSView(APIView):
                 .values_list("user_id", "current_rank__level_number")
             )
 
+            # Direct sponsored count from CustomUser (users who have this user as direct sponsor)
+            from accounts.models import CustomUser
+            direct_sponsor_map = dict(
+                CustomUser.objects.filter(registered_by_id__in=user_ids)
+                .values("registered_by_id")
+                .annotate(cnt=Count("id"))
+                .values_list("registered_by_id", "cnt")
+            )
+
             for uid, node in nodes_by_uid.items():
-                node["direct_count"] = len(parent_to_children.get(uid, []))
+                real_direct = direct_sponsor_map.get(uid, 0)
+                node["direct_count"] = real_direct
+                node["direct_sponsor_count"] = real_direct
+                node["matrix_children_count"] = len(parent_to_children.get(uid, []))
                 node["team_count"] = _count_all(uid)
                 lvl = int(max_ranks.get(uid) or ur_map.get(uid) or 0)
                 node["current_rank"] = lvl
