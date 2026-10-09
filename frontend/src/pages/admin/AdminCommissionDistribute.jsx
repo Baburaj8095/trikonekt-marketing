@@ -515,7 +515,7 @@ export default function AdminCommissionDistribute() {
 
       // Parallel fetch from pools monitor, sales analytics, and royalty transactions
       const [poolRes, salesRes, royaltyRes] = await Promise.allSettled([
-        adminGetPoolsMonitor(queryDate),
+        adminGetPoolsMonitor(queryDate, isFranchiseWorkspace),
         API.get("/admin/analytics/sales/", { params: { from: queryDate, to: queryDate } }),
         API.get("/admin/autopool/transactions/?types=GLOBAL_ROYALTY&page_size=50"),
       ]);
@@ -5872,7 +5872,7 @@ right={
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
             <div style={{ padding: 12, borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>
-                {selectedPoolDate === todayStr ? "TODAY'S REBIRTHS" : `REBIRTHS ON ${selectedPoolDate}`} (PLATFORM)
+                {selectedPoolDate === todayStr ? "TODAY'S REBIRTHS" : `REBIRTHS ON ${selectedPoolDate}`} ({isFranchiseWorkspace ? "FRANCHISE" : "PLATFORM"})
               </div>
               <div style={{ fontSize: 20, fontWeight: 900, color: "#0f172a" }}>
                 {mon.self_rebirth_count ?? accum.rebirth_count ?? 0} IDs
@@ -5884,13 +5884,15 @@ right={
 
             <div style={{ padding: 12, borderRadius: 8, background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: "#166534" }}>
-                ALL-TIME TOTAL REBIRTHS (PLATFORM)
+                ALL-TIME TOTAL REBIRTHS ({isFranchiseWorkspace ? "FRANCHISE" : "PLATFORM"})
               </div>
               <div style={{ fontSize: 20, fontWeight: 900, color: "#14532d" }}>
-                {mon.self_rebirth_count_total ?? 37} IDs
+                {mon.self_rebirth_count_total ?? (isFranchiseWorkspace ? 0 : 37)} IDs
               </div>
               <div style={{ fontSize: 11, color: "#15803d", marginTop: 2 }}>
-                32 IDs by 9999999999 + 5 IDs by other leaders (₹{Number(mon.self_rebirth_amount_total || ((mon.self_rebirth_count_total || 37) * 250)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Total)
+                {isFranchiseWorkspace
+                  ? `${mon.self_rebirth_count_total || 0} Franchise IDs (₹${Number(mon.self_rebirth_amount_total || ((mon.self_rebirth_count_total || 0) * 250)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Total)`
+                  : `Platform Rebirth IDs (₹${Number(mon.self_rebirth_amount_total || ((mon.self_rebirth_count_total || 37) * 250)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Total)`}
               </div>
             </div>
 
@@ -6061,8 +6063,8 @@ right={
 
           return (
             <Section
-              title="₹250 Self-Rebirth Inflow & Distribution Audit Ledger"
-              subtitle="Real-time audit ledger of automated ₹250 Self-Rebirth IDs generated from 25% Self Account pockets, 5/3 Matrix placements, and ₹50 Direct Sponsor bonuses"
+              title={isFranchiseWorkspace ? "Franchise ₹250 Self-Rebirth Inflow & Distribution Audit Ledger" : "₹250 Self-Rebirth Inflow & Distribution Audit Ledger"}
+              subtitle={isFranchiseWorkspace ? "Real-time audit ledger of automated ₹250 Self-Rebirth IDs generated exclusively from franchise 25% Self Rebirth allocations, 5/3 Matrix placements, and upline commissions" : "Real-time audit ledger of automated ₹250 Self-Rebirth IDs generated from 25% Self Account pockets, 5/3 Matrix placements, and ₹50 Direct Sponsor bonuses"}
               right={
                 <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                   <input
@@ -6092,7 +6094,7 @@ right={
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {filtered.length} Platform Rebirth IDs (32 by 9999999999, 5 by other leaders)
+                    {isFranchiseWorkspace ? `${filtered.length} Franchise Rebirth IDs` : `${filtered.length} Platform Rebirth IDs`}
                   </span>
                 </div>
               }

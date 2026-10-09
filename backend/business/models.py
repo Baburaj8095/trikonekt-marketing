@@ -1210,7 +1210,8 @@ class AutoPoolAccount(models.Model):
         """
         # Eligibility gate
         try:
-            if not is_matrix_eligible(user):
+            is_rebirth = str(source_type or "").upper() == "SELF_REBIRTH_250"
+            if not is_matrix_eligible(user) and not is_rebirth:
                 try:
                     logger.info("matrix skipped: user not eligible", extra={"where": "place_in_three_pool", "user_id": getattr(user, "id", None), "pool_type": pool_type})
                 except Exception:
@@ -1241,7 +1242,8 @@ class AutoPoolAccount(models.Model):
         """
         # Eligibility gate
         try:
-            if not is_matrix_eligible(user):
+            is_rebirth = str(source_type or "").upper() == "SELF_REBIRTH_250"
+            if not is_matrix_eligible(user) and not is_rebirth:
                 try:
                     logger.info("matrix skipped: user not eligible", extra={"where": "place_in_five_pool", "user_id": getattr(user, "id", None), "pool_type": pool_type})
                 except Exception:

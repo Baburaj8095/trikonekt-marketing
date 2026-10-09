@@ -931,9 +931,12 @@ export async function adminUpdateMasterCommission(payload = {}, product = null) 
 /**
  * Admin: Get Daily Pool Accumulator & Distribution Monitor
  */
-export async function adminGetPoolsMonitor(date = null) {
+export async function adminGetPoolsMonitor(date = null, isFranchise = false) {
   const cfg = { cacheTTL: 5000, dedupe: "cancelPrevious" };
-  if (date) cfg.params = { date };
+  const params = {};
+  if (date) params.date = date;
+  if (isFranchise) params.is_franchise = "true";
+  if (Object.keys(params).length) cfg.params = params;
   const res = await API.get("/admin/commission/pools/monitor/", cfg);
   return res?.data || res;
 }

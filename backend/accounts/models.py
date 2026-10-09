@@ -563,6 +563,11 @@ class Wallet(models.Model):
                 meta=split_meta,
                 matrix_account_id=matrix_account_id,
             )
+            if (w.franchise_self_rebirth or D("0")) >= D("250.00"):
+                try:
+                    self._apply_franchise_self_rebirth_rule(w)
+                except Exception:
+                    pass
             return w.balance
 
         if (is_commission or is_prime_tx) and not no_withhold and amt > 0:
@@ -606,11 +611,21 @@ class Wallet(models.Model):
                 )
 
             # Post to new double-entry wallet engine
+            posted_double_entry = False
             try:
                 from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
                 from accounts.wallet_engine import WalletEngine, LedgerPosting
                 
                 system_user = WalletEngine.get_system_user()
+                postings = [
+                    LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.DEBIT, amt),
+                    LedgerPosting(self.user, WalletTypes.MAIN, LedgerDirections.CREDIT, income),
+                    LedgerPosting(self.user, WalletTypes.SELF_PACKAGE_POCKET, LedgerDirections.CREDIT, self_part),
+                ]
+                if not inactive and income > 0:
+                    postings.append(
+                        LedgerPosting(self.user, WalletTypes.WITHDRAWAL_WALLET, LedgerDirections.CREDIT, income)
+                    )
                 WalletEngine.post_transaction(
                     category=FinanceCategories.MLM_INCOME,
                     user=self.user,
@@ -624,24 +639,18 @@ class Wallet(models.Model):
                     created_by=system_user,
                     approved_by=system_user,
                     remarks=f"Double-entry payout stream: {tx_type}",
-                    postings=[
-                        LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.DEBIT, amt),
-                        LedgerPosting(self.user, WalletTypes.MAIN, LedgerDirections.CREDIT, income),
-                        LedgerPosting(self.user, WalletTypes.SELF_PACKAGE_POCKET, LedgerDirections.CREDIT, self_part),
-                    ]
+                    postings=postings
                 )
+                posted_double_entry = True
             except Exception:
-                pass
+                posted_double_entry = False
 
-            # Update balances to reflect 75/25 split
-            w.balance = (w.balance or D("0")) + amt
-            w.main_balance = (w.main_balance or D("0")) + income
-            if not inactive:
-                w.withdrawable_balance = (w.withdrawable_balance or D("0")) + income
+            if not posted_double_entry:
+                # Direct property fallback if double-entry engine fails
+                w.main_balance = (w.main_balance or D("0")) + income
                 w.self_account_balance = (w.self_account_balance or D("0")) + self_part
-            else:
-                w.self_account_balance = (w.self_account_balance or D("0")) + self_part
-            w.save(update_fields=['balance', 'main_balance', 'withdrawable_balance', 'self_account_balance', 'updated_at'])
+                if not inactive:
+                    w.withdrawable_balance = (w.withdrawable_balance or D("0")) + income
 
             # Apply micro-packs (₹250) from self reserve for active users
             if not inactive:
@@ -941,6 +950,70 @@ class Wallet(models.Model):
                     _active_self_rules_local.active_set.discard(self.user.id)
             except Exception:
                 pass
+
+    def _apply_franchise_self_rebirth_rule(self, w):
+        """
+        When franchise self_rebirth allocation accumulates >= ₹250:
+        Deduct ₹250 from w.franchise_self_rebirth, record SELF_ACCOUNT_DEBIT with is_franchise=True,
+        and trigger distribute_self_rebirth_250 (placing in 5 & 3 matrix and distributing per admin settings).
+        """
+        if getattr(w, "_applying_franchise_rebirth", False):
+            return
+        w._applying_franchise_rebirth = True
+        try:
+            loops = 0
+            while True:
+                loops += 1
+                if loops > 50:
+                    break
+                try:
+                    w = Wallet.objects.select_for_update().get(pk=w.pk)
+                    cur_rebirth = D(str(getattr(w, "franchise_self_rebirth", "0") or "0"))
+                except Exception:
+                    cur_rebirth = D("0")
+
+                if cur_rebirth < D("250.00"):
+                    break
+
+                # Deduct the pack from franchise_self_rebirth
+                w.franchise_self_rebirth = cur_rebirth - D("250.00")
+                w.save(update_fields=["franchise_self_rebirth", "updated_at"])
+
+                try:
+                    existing = WalletTransaction.objects.filter(
+                        user=self.user,
+                        type="SELF_ACCOUNT_DEBIT",
+                        source_type="SELF_250_PACK",
+                    ).count()
+                    pack_index = int(existing) + 1
+                except Exception:
+                    pack_index = None
+
+                WalletTransaction.objects.create(
+                    user=self.user,
+                    amount=D("-250.00"),
+                    balance_after=w.balance,
+                    type="SELF_ACCOUNT_DEBIT",
+                    source_type="SELF_250_PACK",
+                    source_id=str(pack_index) if pack_index is not None else "",
+                    meta={
+                        "is_franchise": True,
+                        "source_type": "SELF_250_PACK",
+                        "pack_index": pack_index,
+                        "description": f"Franchise Self Rebirth ID #{pack_index} (₹250)",
+                    }
+                )
+
+                # Trigger dedicated ₹250 Self Rebirth distribution engine
+                try:
+                    from business.services.self_rebirth import distribute_self_rebirth_250
+                    distribute_self_rebirth_250(self.user, pack_index=pack_index)
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).exception("Failed to distribute franchise self rebirth 250: %s", e)
+        finally:
+            w._applying_franchise_rebirth = False
+
 
 
 class FranchiseWalletSettings(models.Model):

@@ -6504,10 +6504,25 @@ class AdminDailyPoolMonitorView(APIView):
         today_inflow = (Decimal(today_agents) * Decimal("1000.00")) + (Decimal(PromoPurchase.objects.filter(package__type="MONTHLY", status="APPROVED", requested_at__range=(today_start, today_end)).count()) * Decimal("1000.00"))
 
         # Rebirth stats & history
+        is_franchise = (
+            str(request.query_params.get("is_franchise", "")).lower() in ("true", "1")
+            or str(request.query_params.get("franchise", "")).lower() in ("true", "1")
+            or str(request.query_params.get("context", "")).lower() == "franchise"
+        )
+        from django.db.models import Q
         rebirth_txs_all = WalletTransaction.objects.filter(
             type="SELF_ACCOUNT_DEBIT",
             source_type="SELF_250_PACK"
         ).select_related("user").order_by("-created_at")
+
+        if is_franchise:
+            rebirth_txs_all = rebirth_txs_all.filter(
+                Q(user__role="agency") | Q(user__category__startswith="agency_")
+            )
+        else:
+            rebirth_txs_all = rebirth_txs_all.filter(
+                Q(user__category="consumer") | Q(user__role="user")
+            )
 
         rebirth_count_total = rebirth_txs_all.count()
         rebirth_count_today = rebirth_txs_all.filter(created_at__range=(today_start, today_end)).count()
