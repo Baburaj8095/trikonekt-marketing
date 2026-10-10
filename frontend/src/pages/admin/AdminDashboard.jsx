@@ -124,11 +124,13 @@ export default function AdminDashboard() {
     const sub750 = pkg?.subscription750 || {};
     const spp1000 = pkg?.smartProduct1000 || {};
     const prime2k = pkg?.digitalEducationPrime || {};
+    const super8k = pkg?.superAgent8k || {};
+    const promoter40k = pkg?.promoter40k || {};
 
     return {
       prime2k: {
         title: "Digital Education Prime",
-        tag: "₹ 2,000",
+        tag: "₹ 2,000 Starter",
         price: 2000,
         color: "#4f46e5",
         bg: "linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)",
@@ -140,6 +142,34 @@ export default function AdminDashboard() {
         selfPocket: prime2k?.selfPackagePocket?.totalAmount || 0,
         addMoney: prime2k?.addMoney?.totalAmount || 0,
         couponPocket: prime2k?.couponPocket?.totalAmount || 0,
+      },
+      super8k: {
+        title: "Super Agent Leadership",
+        tag: "₹ 8,000 Leadership (Ranks 2-7)",
+        price: 8000,
+        color: "#7c3aed",
+        bg: "linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)",
+        border: "#ddd6fe",
+        icon: EmojiEventsRoundedIcon,
+        to: "/admin/rank-upgrades",
+        overall: super8k?.overall || { totalCount: 0, totalAmount: 0, todayCount: 0, todayAmount: 0 },
+        directPocket: super8k?.overall?.totalAmount || 0,
+        approvedCount: super8k?.approved?.totalCount || 0,
+        pendingCount: super8k?.pendingApproval?.totalCount || 0,
+      },
+      promoter40k: {
+        title: "District Promoter Master DAP",
+        tag: "₹ 40,000 Master DAP (Ranks 8-10)",
+        price: 40000,
+        color: "#b45309",
+        bg: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)",
+        border: "#fde68a",
+        icon: TrendingUpRoundedIcon,
+        to: "/admin/rank-upgrades",
+        overall: promoter40k?.overall || { totalCount: 0, totalAmount: 0, todayCount: 0, todayAmount: 0 },
+        directPocket: promoter40k?.overall?.totalAmount || 0,
+        approvedCount: promoter40k?.approved?.totalCount || 0,
+        pendingCount: promoter40k?.pendingApproval?.totalCount || 0,
       },
       spp1000: {
         title: "Smart Product Package (SPP)",
@@ -158,7 +188,7 @@ export default function AdminDashboard() {
       },
       sub750: {
         title: "Join Subscription Package",
-        tag: "₹ 750",
+        tag: "₹ 750 Join",
         price: 750,
         color: "#ea580c",
         bg: "linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%)",
@@ -179,6 +209,7 @@ export default function AdminDashboard() {
     const w = data?.wallets || {};
     const wd = data?.withdrawals || {};
     const p = data?.walletPocketStats || {};
+    const cf = data?.cashFlow || {};
 
     const totalBalance = Number(w?.totalBalance || 0);
     const pendingWithdrawalCount = Number(wd?.pendingCount || 0);
@@ -198,19 +229,13 @@ export default function AdminDashboard() {
       couponPocketAmount,
       walletsCount: Number(w?.count || communityMetrics.total),
       transactionsToday: Number(w?.transactionsToday || 0),
+      // Real-time Cash Flow Summary (Zero-drift accounting)
+      totalInflow: Number(cf?.totalInflow || 0),
+      totalOutflow: Number(cf?.totalOutflow || 0),
+      netLiability: Number(cf?.netLiability || totalBalance),
+      netRetained: Number(cf?.netRetained || 0),
     };
   }, [data, communityMetrics.total]);
-
-  // AutoPool and Matrix counts
-  const matrixData = useMemo(() => {
-    const ap = data?.autopool || {};
-    const totalAp = Number(ap?.total ?? 0);
-    return {
-      totalAccounts: totalAp,
-      fiveMatrixActive: 0,
-      threeMatrixActive: totalAp,
-    };
-  }, [data]);
 
   return (
     <RequirePermission anyOf={["reports_basic", "manage_dashboard", "show_dashboard"]}>
@@ -621,7 +646,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* =========================================================================
-            SECTION 2: COMMUNITY PACKAGES & SALES HUB (INDEX 5 - 7)
+            SECTION 2: COMMUNITY PACKAGES & SALES HUB (INDEX 5 - 9)
         ========================================================================= */}
         <div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 10 }}>
@@ -631,25 +656,32 @@ export default function AdminDashboard() {
                 2. Community Packages & Purchase Pockets
               </h2>
             </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              {["all", "prime2k", "spp1k", "sub750"].map((tab) => (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {[
+                { id: "all", label: "All Packages" },
+                { id: "prime2k", label: "₹ 2,000 Starter" },
+                { id: "super8k", label: "₹ 8,000 Super Agent" },
+                { id: "promoter40k", label: "₹ 40,000 Promoter" },
+                { id: "spp1k", label: "₹ 1,000 SPP" },
+                { id: "sub750", label: "₹ 750 Join" },
+              ].map((tab) => (
                 <button
-                  key={tab}
+                  key={tab.id}
                   type="button"
-                  onClick={() => setActivePkgTab(tab)}
+                  onClick={() => setActivePkgTab(tab.id)}
                   style={{
                     border: "none",
-                    background: activePkgTab === tab ? "#0f172a" : "#f1f5f9",
-                    color: activePkgTab === tab ? "#ffffff" : "#64748b",
-                    padding: "4px 10px",
+                    background: activePkgTab === tab.id ? "#0f172a" : "#f1f5f9",
+                    color: activePkgTab === tab.id ? "#ffffff" : "#64748b",
+                    padding: "5px 12px",
                     borderRadius: 6,
                     fontSize: 11,
                     fontWeight: 800,
                     cursor: "pointer",
-                    textTransform: "capitalize",
+                    transition: "all 120ms ease",
                   }}
                 >
-                  {tab === "all" ? "All Packages" : tab === "prime2k" ? "₹ 2,000 Prime" : tab === "spp1k" ? "₹ 1,000 SPP" : "₹ 750 Join"}
+                  {tab.label}
                 </button>
               ))}
             </div>
@@ -677,7 +709,7 @@ export default function AdminDashboard() {
                     <div>
                       <div style={{ fontSize: 14, fontWeight: 950, color: "#0f172a" }}>Digital Education Prime Package</div>
                       <span style={{ background: "#eef2ff", color: "#4f46e5", fontSize: 11, fontWeight: 900, padding: "2px 6px", borderRadius: 4, display: "inline-block", marginTop: 2 }}>
-                        ₹ 2,000 Package
+                        ₹ 2,000 Foundation Starter
                       </span>
                     </div>
                   </div>
@@ -735,12 +767,174 @@ export default function AdminDashboard() {
                     userSelect: "none",
                   }}
                 >
-                  ₹2,000 Prime Package
+                  ₹2,000 Starter Education Track
                 </div>
               </div>
             )}
 
-            {/* Card 6: Smart Product Package Monthly SPP (₹ 1,000) */}
+            {/* Card 6: Super Agent Leadership Package (₹ 8,000) */}
+            {(activePkgTab === "all" || activePkgTab === "super8k") && (
+              <div
+                style={{
+                  background: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 14,
+                  padding: 18,
+                  boxShadow: "0 4px 18px rgba(15,23,42,0.05)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 14,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <span style={{ width: 24, height: 24, borderRadius: 6, background: "#f5f3ff", color: "#7c3aed", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900 }}>6</span>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 950, color: "#0f172a" }}>Super Agent Leadership</div>
+                      <span style={{ background: "#f5f3ff", color: "#7c3aed", fontSize: 11, fontWeight: 900, padding: "2px 6px", borderRadius: 4, display: "inline-block", marginTop: 2 }}>
+                        ₹ 8,000 Package (Ranks 2-7)
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: "#f5f3ff", color: "#7c3aed", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <EmojiEventsRoundedIcon sx={{ fontSize: 22 }} />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, background: "#f8fafc", padding: 12, borderRadius: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Total Activations</div>
+                    <div style={{ fontSize: 18, fontWeight: 950, color: "#0f172a", marginTop: 2 }}>
+                      {number(packageTelemetry.super8k.overall.totalCount)} IDs
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Gross Turnover</div>
+                    <div style={{ fontSize: 18, fontWeight: 950, color: "#7c3aed", marginTop: 2 }}>
+                      {currency(packageTelemetry.super8k.overall.totalAmount)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sub Tier Breakdown */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6, fontSize: 11 }}>
+                  <div style={{ background: "#f1f5f9", padding: "6px 8px", borderRadius: 6 }}>
+                    <div style={{ color: "#64748b", fontWeight: 700 }}>Part 1: Ranks 2–5</div>
+                    <div style={{ color: "#0f172a", fontWeight: 900, marginTop: 2 }}>₹ 4,750 Tier</div>
+                  </div>
+                  <div style={{ background: "#f1f5f9", padding: "6px 8px", borderRadius: 6 }}>
+                    <div style={{ color: "#64748b", fontWeight: 700 }}>Part 2: Ranks 6–7</div>
+                    <div style={{ color: "#0f172a", fontWeight: 900, marginTop: 2 }}>₹ 3,250 Tier</div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "auto",
+                    width: "100%",
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "1px solid #e2e8f0",
+                    background: "#f8fafc",
+                    color: "#64748b",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    userSelect: "none",
+                  }}
+                >
+                  ₹8,000 Super Agent Track
+                </div>
+              </div>
+            )}
+
+            {/* Card 7: District Promoter DAP Package (₹ 40,000) */}
+            {(activePkgTab === "all" || activePkgTab === "promoter40k") && (
+              <div
+                style={{
+                  background: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 14,
+                  padding: 18,
+                  boxShadow: "0 4px 18px rgba(15,23,42,0.05)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 14,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <span style={{ width: 24, height: 24, borderRadius: 6, background: "#fffbeb", color: "#b45309", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900 }}>7</span>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 950, color: "#0f172a" }}>District Promoter DAP</div>
+                      <span style={{ background: "#fffbeb", color: "#b45309", fontSize: 11, fontWeight: 900, padding: "2px 6px", borderRadius: 4, display: "inline-block", marginTop: 2 }}>
+                        ₹ 40,000 Master DAP (Ranks 8-10)
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: "#fffbeb", color: "#b45309", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <TrendingUpRoundedIcon sx={{ fontSize: 22 }} />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, background: "#f8fafc", padding: 12, borderRadius: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Total Activations</div>
+                    <div style={{ fontSize: 18, fontWeight: 950, color: "#0f172a", marginTop: 2 }}>
+                      {number(packageTelemetry.promoter40k.overall.totalCount)} IDs
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>Gross Turnover</div>
+                    <div style={{ fontSize: 18, fontWeight: 950, color: "#b45309", marginTop: 2 }}>
+                      {currency(packageTelemetry.promoter40k.overall.totalAmount)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tranche Breakdown */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, fontSize: 11 }}>
+                  <div style={{ background: "#f1f5f9", padding: "6px 8px", borderRadius: 6 }}>
+                    <div style={{ color: "#64748b", fontWeight: 700 }}>Rank 8</div>
+                    <div style={{ color: "#0f172a", fontWeight: 900, marginTop: 2 }}>₹ 5,000</div>
+                  </div>
+                  <div style={{ background: "#f1f5f9", padding: "6px 8px", borderRadius: 6 }}>
+                    <div style={{ color: "#64748b", fontWeight: 700 }}>Rank 9</div>
+                    <div style={{ color: "#0f172a", fontWeight: 900, marginTop: 2 }}>₹ 10,000</div>
+                  </div>
+                  <div style={{ background: "#f1f5f9", padding: "6px 8px", borderRadius: 6 }}>
+                    <div style={{ color: "#64748b", fontWeight: 700 }}>Rank 10</div>
+                    <div style={{ color: "#0f172a", fontWeight: 900, marginTop: 2 }}>₹ 25,000</div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "auto",
+                    width: "100%",
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "1px solid #e2e8f0",
+                    background: "#f8fafc",
+                    color: "#64748b",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    userSelect: "none",
+                  }}
+                >
+                  ₹40,000 Promoter DAP Track
+                </div>
+              </div>
+            )}
+
+            {/* Card 8: Smart Product Package Monthly SPP (₹ 1,000) */}
             {(activePkgTab === "all" || activePkgTab === "spp1k") && (
               <div
                 style={{
@@ -756,7 +950,7 @@ export default function AdminDashboard() {
               >
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                   <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <span style={{ width: 24, height: 24, borderRadius: 6, background: "#ecfdf5", color: "#059669", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900 }}>6</span>
+                    <span style={{ width: 24, height: 24, borderRadius: 6, background: "#ecfdf5", color: "#059669", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900 }}>8</span>
                     <div>
                       <div style={{ fontSize: 14, fontWeight: 950, color: "#0f172a" }}>Smart Product Package (SPP)</div>
                       <span style={{ background: "#ecfdf5", color: "#059669", fontSize: 11, fontWeight: 900, padding: "2px 6px", borderRadius: 4, display: "inline-block", marginTop: 2 }}>
@@ -823,7 +1017,7 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* Card 7: Join Subscription Package (₹ 750) */}
+            {/* Card 9: Join Subscription Package (₹ 750) */}
             {(activePkgTab === "all" || activePkgTab === "sub750") && (
               <div
                 style={{
@@ -839,7 +1033,7 @@ export default function AdminDashboard() {
               >
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                   <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <span style={{ width: 24, height: 24, borderRadius: 6, background: "#fff7ed", color: "#ea580c", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900 }}>7</span>
+                    <span style={{ width: 24, height: 24, borderRadius: 6, background: "#fff7ed", color: "#ea580c", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900 }}>9</span>
                     <div>
                       <div style={{ fontSize: 14, fontWeight: 950, color: "#0f172a" }}>Join Subscription Package</div>
                       <span style={{ background: "#fff7ed", color: "#ea580c", fontSize: 11, fontWeight: 900, padding: "2px 6px", borderRadius: 4, display: "inline-block", marginTop: 2 }}>
@@ -901,10 +1095,11 @@ export default function AdminDashboard() {
                     userSelect: "none",
                   }}
                 >
-                  ₹750 Subscription Package
+                  ₹750 Join Subscription
                 </div>
               </div>
             )}
+
 
           </div>
         </div>
@@ -1062,126 +1257,74 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-          </div>
-        </div>
-
-        {/* =========================================================================
-            SECTION 4: AUTOPOOL & MATRIX TREES (INDEX 12 - 14)
-        ========================================================================= */}
-        <div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#0284c7" }} />
-              <h2 style={{ margin: 0, fontSize: 15, fontWeight: 950, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                4. Multi-Tier Matrix & Auto Commission Pools
-              </h2>
-            </div>
-            <Link
-              to="/admin/autopool"
-              style={{ fontSize: 12, fontWeight: 800, color: "#0284c7", textDecoration: "none", display: "flex", alignItems: "center", gap: 4 }}
-            >
-              Blocks Explorer <ArrowForwardRoundedIcon sx={{ fontSize: 14 }} />
-            </Link>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
-            
-            {/* Card 12: 5-Block Multi-Tier Pool */}
+            {/* Platform Cash Flow & Inflow/Outflow Master Statement */}
             <div
-              onClick={() => navigate("/admin/matrix-five")}
               style={{
-                background: "#ffffff",
-                border: "1px solid #e2e8f0",
-                borderRadius: 12,
-                padding: 16,
-                boxShadow: "0 4px 16px rgba(15,23,42,0.04)",
-                cursor: "pointer",
+                gridColumn: "1 / -1",
+                background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+                border: "1px solid #334155",
+                borderRadius: 14,
+                padding: "16px 20px",
+                color: "#ffffff",
+                boxShadow: "0 6px 20px rgba(15,23,42,0.15)",
                 display: "flex",
                 flexDirection: "column",
-                gap: 12,
+                gap: 14,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ width: 22, height: 22, borderRadius: 6, background: "#f0f9ff", color: "#0284c7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>12</span>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: "#64748b" }}>5-Block Royalty Network</span>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 8, background: "rgba(37,99,235,0.25)", color: "#60a5fa", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <TrendingUpRoundedIcon sx={{ fontSize: 20 }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 950, letterSpacing: "-0.01em" }}>Platform Cash Flow & Treasury Master Statement</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8" }}>Enterprise Double-Entry Reconciliation • Zero Slippage Guarantee</div>
+                  </div>
                 </div>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: "#f0f9ff", color: "#0284c7", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <AccountTreeRoundedIcon sx={{ fontSize: 18 }} />
-                </div>
+                <Link
+                  to="/admin/wallet-ledger"
+                  style={{
+                    color: "#60a5fa",
+                    background: "rgba(255,255,255,0.08)",
+                    padding: "6px 12px",
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 800,
+                    textDecoration: "none",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  Trace Every Ledger Entry <ArrowForwardRoundedIcon sx={{ fontSize: 14 }} />
+                </Link>
               </div>
-              <div style={{ fontSize: 26, fontWeight: 950, color: "#0284c7" }}>
-                Live 5-Tree
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #f1f5f9", paddingTop: 8, fontSize: 11, color: "#64748b", fontWeight: 700 }}>
-                <span>Layer Commissions</span>
-                <span style={{ color: "#0284c7", fontWeight: 800 }}>50% Layer + 50% Direct</span>
-              </div>
-            </div>
 
-            {/* Card 13: 3-Block AutoPool Accounts */}
-            <div
-              onClick={() => navigate("/admin/autopool")}
-              style={{
-                background: "#ffffff",
-                border: "1px solid #e2e8f0",
-                borderRadius: 12,
-                padding: 16,
-                boxShadow: "0 4px 16px rgba(15,23,42,0.04)",
-                cursor: "pointer",
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ width: 22, height: 22, borderRadius: 6, background: "#ecfdf5", color: "#059669", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>13</span>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: "#64748b" }}>3-Block AutoPool Accounts</span>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+                <div style={{ background: "rgba(255,255,255,0.05)", padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700 }}>Total Cash Inflows</div>
+                  <div style={{ fontSize: 20, fontWeight: 950, color: "#34d399", marginTop: 4 }}>{currency(treasury.totalInflow)}</div>
+                  <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>Packages + Add Money Uploads</div>
                 </div>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: "#ecfdf5", color: "#059669", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <AccountTreeRoundedIcon sx={{ fontSize: 18 }} />
-                </div>
-              </div>
-              <div style={{ fontSize: 26, fontWeight: 950, color: "#059669" }}>
-                {number(matrixData.totalAccounts)} Active Nodes
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #f1f5f9", paddingTop: 8, fontSize: 11, color: "#64748b", fontWeight: 700 }}>
-                <span>Auto-Spillover Nodes</span>
-                <span style={{ color: "#059669", fontWeight: 800 }}>Synchronized</span>
-              </div>
-            </div>
 
-            {/* Card 14: Community Consumer Self Re-Birth */}
-            <div
-              onClick={() => navigate("/admin/workflows/team-admin-board")}
-              style={{
-                background: "#ffffff",
-                border: "1px solid #e2e8f0",
-                borderRadius: 12,
-                padding: 16,
-                boxShadow: "0 4px 16px rgba(15,23,42,0.04)",
-                cursor: "pointer",
-                display: "flex",
-                flexDirection: "column",
-                gap: 12,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ width: 22, height: 22, borderRadius: 6, background: "#fdf2f8", color: "#db2777", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>14</span>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: "#64748b" }}>Self Re-Birth Pockets</span>
+                <div style={{ background: "rgba(255,255,255,0.05)", padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700 }}>Total Cash Outflows</div>
+                  <div style={{ fontSize: 20, fontWeight: 950, color: "#f87171", marginTop: 4 }}>{currency(treasury.totalOutflow)}</div>
+                  <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>Approved Bank Withdrawals</div>
                 </div>
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: "#fdf2f8", color: "#db2777", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <RedeemRoundedIcon sx={{ fontSize: 18 }} />
+
+                <div style={{ background: "rgba(255,255,255,0.05)", padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700 }}>Active User Liabilities</div>
+                  <div style={{ fontSize: 20, fontWeight: 950, color: "#60a5fa", marginTop: 4 }}>{currency(treasury.netLiability)}</div>
+                  <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>Circulating Wallet Balances</div>
                 </div>
-              </div>
-              <div style={{ fontSize: 26, fontWeight: 950, color: "#db2777" }}>
-                {currency(treasury.selfPocketAmount)}
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #f1f5f9", paddingTop: 8, fontSize: 11, color: "#64748b", fontWeight: 700 }}>
-                <span>Re-entry Circulation</span>
-                <span style={{ color: "#db2777", fontWeight: 800 }}>Automated</span>
+
+                <div style={{ background: "rgba(255,255,255,0.05)", padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700 }}>Retained Platform Reserves</div>
+                  <div style={{ fontSize: 20, fontWeight: 950, color: "#fbbf24", marginTop: 4 }}>{currency(treasury.netRetained)}</div>
+                  <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>Gross Margin + Tax Reserves</div>
+                </div>
               </div>
             </div>
 
@@ -1189,14 +1332,14 @@ export default function AdminDashboard() {
         </div>
 
         {/* =========================================================================
-            SECTION 5: OPERATIONS, REWARDS & COMPLIANCE (INDEX 15 - 18)
+            SECTION 4: OPERATIONS, REWARDS & COMPLIANCE (INDEX 12 - 15)
         ========================================================================= */}
         <div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ea580c" }} />
               <h2 style={{ margin: 0, fontSize: 15, fontWeight: 950, color: "#0f172a", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                5. Operations, Rewards & Compliance
+                4. Operations, Rewards & Compliance
               </h2>
             </div>
           </div>
@@ -1219,7 +1362,7 @@ export default function AdminDashboard() {
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ width: 22, height: 22, borderRadius: 6, background: "#f1f5f9", color: "#334155", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>15</span>
+                <span style={{ width: 22, height: 22, borderRadius: 6, background: "#f1f5f9", color: "#334155", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>12</span>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a" }}>Coupons & Vouchers</div>
                   <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>{currency(treasury.couponPocketAmount)} Value</div>
@@ -1228,7 +1371,7 @@ export default function AdminDashboard() {
               <ConfirmationNumberRoundedIcon sx={{ fontSize: 20, color: "#ea580c" }} />
             </div>
 
-            {/* Card 16: Spin & Win Lucky Draw */}
+            {/* Card 13: Spin & Win Lucky Draw */}
             <div
               onClick={() => navigate("/admin/lucky-draw")}
               style={{
@@ -1244,7 +1387,7 @@ export default function AdminDashboard() {
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ width: 22, height: 22, borderRadius: 6, background: "#f1f5f9", color: "#334155", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>16</span>
+                <span style={{ width: 22, height: 22, borderRadius: 6, background: "#f1f5f9", color: "#334155", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>13</span>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a" }}>Spin & Win SPP</div>
                   <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>Lucky Draw Hub</div>
@@ -1253,7 +1396,7 @@ export default function AdminDashboard() {
               <CasinoRoundedIcon sx={{ fontSize: 20, color: "#7c3aed" }} />
             </div>
 
-            {/* Card 17: Tri Tour Package */}
+            {/* Card 14: Tri Tour Package */}
             <div
               onClick={() => navigate("/admin/packages/tri-tour")}
               style={{
@@ -1269,7 +1412,7 @@ export default function AdminDashboard() {
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ width: 22, height: 22, borderRadius: 6, background: "#f1f5f9", color: "#334155", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>17</span>
+                <span style={{ width: 22, height: 22, borderRadius: 6, background: "#f1f5f9", color: "#334155", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>14</span>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a" }}>Tri Tour Leaderboard</div>
                   <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>Tour Contest</div>
@@ -1278,7 +1421,7 @@ export default function AdminDashboard() {
               <EmojiEventsRoundedIcon sx={{ fontSize: 20, color: "#eab308" }} />
             </div>
 
-            {/* Card 18: Package GST Bills & Compliance */}
+            {/* Card 15: Package GST Bills & Compliance */}
             <div
               onClick={() => navigate("/admin/package-management")}
               style={{
@@ -1294,7 +1437,7 @@ export default function AdminDashboard() {
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ width: 22, height: 22, borderRadius: 6, background: "#f1f5f9", color: "#334155", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>18</span>
+                <span style={{ width: 22, height: 22, borderRadius: 6, background: "#f1f5f9", color: "#334155", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>15</span>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a" }}>Package GST Invoices</div>
                   <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>18% Tax Records</div>

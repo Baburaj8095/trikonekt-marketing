@@ -298,12 +298,51 @@ class AdminMetricsView(APIView):
 
         digital_education_prime_stats = {
             "pendingApproval": rank_upgrade_stats(
-                RankUpgrade.objects.filter(payment_status=RankUpgrade.STATUS_INITIATED)
+                RankUpgrade.objects.filter(to_rank__level_number=1, payment_status=RankUpgrade.STATUS_INITIATED)
             ),
             "approved": rank_upgrade_stats(
-                RankUpgrade.objects.filter(payment_status=RankUpgrade.STATUS_SUCCESS)
+                RankUpgrade.objects.filter(to_rank__level_number=1, payment_status=RankUpgrade.STATUS_SUCCESS)
             ),
-            "overall": rank_upgrade_stats(RankUpgrade.objects.all()),
+            "overall": rank_upgrade_stats(RankUpgrade.objects.filter(to_rank__level_number=1)),
+        }
+
+        super_agent_8k_stats = {
+            "pendingApproval": rank_upgrade_stats(
+                RankUpgrade.objects.filter(to_rank__level_number__gte=2, to_rank__level_number__lte=7, payment_status=RankUpgrade.STATUS_INITIATED)
+            ),
+            "approved": rank_upgrade_stats(
+                RankUpgrade.objects.filter(to_rank__level_number__gte=2, to_rank__level_number__lte=7, payment_status=RankUpgrade.STATUS_SUCCESS)
+            ),
+            "overall": rank_upgrade_stats(RankUpgrade.objects.filter(to_rank__level_number__gte=2, to_rank__level_number__lte=7)),
+        }
+
+        promoter_40k_stats = {
+            "pendingApproval": rank_upgrade_stats(
+                RankUpgrade.objects.filter(to_rank__level_number__gte=8, to_rank__level_number__lte=10, payment_status=RankUpgrade.STATUS_INITIATED)
+            ),
+            "approved": rank_upgrade_stats(
+                RankUpgrade.objects.filter(to_rank__level_number__gte=8, to_rank__level_number__lte=10, payment_status=RankUpgrade.STATUS_SUCCESS)
+            ),
+            "overall": rank_upgrade_stats(RankUpgrade.objects.filter(to_rank__level_number__gte=8, to_rank__level_number__lte=10)),
+        }
+
+        # Cash Flow & Inflow/Outflow Rollup
+        from accounts.models import WalletUploadRequest, WithdrawalRequest
+        total_inflow_promo = PromoPurchase.objects.filter(status="APPROVED").aggregate(s=Sum("amount_paid"))["s"] or Decimal("0.00")
+        total_inflow_ranks = RankUpgrade.objects.filter(payment_status=RankUpgrade.STATUS_SUCCESS).aggregate(s=Sum("upgrade_amount"))["s"] or Decimal("0.00")
+        total_inflow_upload = WalletUploadRequest.objects.filter(status="APPROVED").aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+        total_inflow = total_inflow_promo + total_inflow_ranks + total_inflow_upload
+
+        total_outflow_withdrawals = WithdrawalRequest.objects.filter(status="approved").aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
+
+        cash_flow_block = {
+            "totalInflow": float(total_inflow),
+            "inflowPromo": float(total_inflow_promo),
+            "inflowRanks": float(total_inflow_ranks),
+            "inflowUpload": float(total_inflow_upload),
+            "totalOutflow": float(total_outflow_withdrawals),
+            "netLiability": float(total_balance),
+            "netRetained": float(max(total_inflow - total_outflow_withdrawals - total_balance, Decimal("0.00"))),
         }
 
         # Autopool aggregates (single DB hit)
@@ -334,8 +373,11 @@ class AdminMetricsView(APIView):
                 "subscription750": promo_package_stats(750),
                 "smartProduct1000": promo_package_stats_for_queryset(smart_product_qs),
                 "digitalEducationPrime": digital_education_prime_stats,
+                "superAgent8k": super_agent_8k_stats,
+                "promoter40k": promoter_40k_stats,
             },
             "walletPocketStats": wallet_pocket_stats,
+            "cashFlow": cash_flow_block,
             "commission": {
                 "configs": CommissionConfig.objects.count(),
             },
