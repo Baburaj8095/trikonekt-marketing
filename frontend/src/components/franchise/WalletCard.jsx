@@ -11,9 +11,9 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
  */
 export default function WalletCard({
   title = "Total Earnings",
-  balance = "36.00",
-  growthBadge = "+12%",
-  monthlyGrowth = "₹ 48.00 Total Geo Payouts",
+  balance = "0.00",
+  growthBadge = null,
+  monthlyGrowth = "₹ 0.00 Total Geo Payouts",
   isWalletScreen = false,
   onWithdraw,
   onViewHistory,

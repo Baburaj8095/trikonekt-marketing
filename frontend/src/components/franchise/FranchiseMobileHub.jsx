@@ -508,13 +508,13 @@ export const TEST_AGENCY_ACCOUNTS = {
     jurisdiction: "PIN 572106 — Turuvekere, Tumakuru, Karnataka",
     badge: "1 Pincode",
     color: "#2563EB",
-    initialBalance: 66.0,
-    mainBalance: 49.5,
-    selfBalance: 16.5,
-    activeWork: 9.0,
-    inactiveWork: 9.0,
-    selfRebirth: 12.0,
-    companyMarketing: 18.0,
+    initialBalance: 0.0,
+    mainBalance: 0.0,
+    selfBalance: 0.0,
+    activeWork: 0.0,
+    inactiveWork: 0.0,
+    selfRebirth: 0.0,
+    companyMarketing: 0.0,
   },
   agency_pincode_coordinator: {
     phone: "",
@@ -524,13 +524,13 @@ export const TEST_AGENCY_ACCOUNTS = {
     jurisdiction: "4 Pincodes: 572106, 572101, 572102, 572103",
     badge: "4 Pincodes Cluster",
     color: "#7C3AED",
-    initialBalance: 36.0,
-    mainBalance: 27.0,
-    selfBalance: 9.0,
-    activeWork: 4.56,
-    inactiveWork: 4.56,
-    selfRebirth: 6.0,
-    companyMarketing: 8.88,
+    initialBalance: 0.0,
+    mainBalance: 0.0,
+    selfBalance: 0.0,
+    activeWork: 0.0,
+    inactiveWork: 0.0,
+    selfRebirth: 0.0,
+    companyMarketing: 0.0,
   },
   agency_district: {
     phone: "",
@@ -540,13 +540,13 @@ export const TEST_AGENCY_ACCOUNTS = {
     jurisdiction: "District: Tumakuru, Karnataka",
     badge: "1 District",
     color: "#059669",
-    initialBalance: 21.0,
-    mainBalance: 15.75,
-    selfBalance: 5.25,
-    activeWork: 2.28,
-    inactiveWork: 2.28,
-    selfRebirth: 3.0,
-    companyMarketing: 4.44,
+    initialBalance: 0.0,
+    mainBalance: 0.0,
+    selfBalance: 0.0,
+    activeWork: 0.0,
+    inactiveWork: 0.0,
+    selfRebirth: 0.0,
+    companyMarketing: 0.0,
   },
   agency_district_coordinator: {
     phone: "",
@@ -556,13 +556,13 @@ export const TEST_AGENCY_ACCOUNTS = {
     jurisdiction: "2 Districts: Tumakuru & Hassan, Karnataka",
     badge: "2 Districts Cluster",
     color: "#D97706",
-    initialBalance: 20.0,
-    mainBalance: 15.0,
-    selfBalance: 5.0,
-    activeWork: 2.28,
-    inactiveWork: 2.28,
-    selfRebirth: 3.0,
-    companyMarketing: 4.44,
+    initialBalance: 0.0,
+    mainBalance: 0.0,
+    selfBalance: 0.0,
+    activeWork: 0.0,
+    inactiveWork: 0.0,
+    selfRebirth: 0.0,
+    companyMarketing: 0.0,
   },
   agency_state: {
     phone: "",
@@ -572,13 +572,13 @@ export const TEST_AGENCY_ACCOUNTS = {
     jurisdiction: "State: Karnataka",
     badge: "1 State",
     color: "#DC2626",
-    initialBalance: 18.0,
-    mainBalance: 13.5,
-    selfBalance: 4.5,
-    activeWork: 2.28,
-    inactiveWork: 2.28,
-    selfRebirth: 3.0,
-    companyMarketing: 4.44,
+    initialBalance: 0.0,
+    mainBalance: 0.0,
+    selfBalance: 0.0,
+    activeWork: 0.0,
+    inactiveWork: 0.0,
+    selfRebirth: 0.0,
+    companyMarketing: 0.0,
   },
   agency_state_coordinator: {
     phone: "",
@@ -588,13 +588,13 @@ export const TEST_AGENCY_ACCOUNTS = {
     jurisdiction: "2 States: Karnataka & Goa",
     badge: "2 States Cluster",
     color: "#0891B2",
-    initialBalance: 18.0,
-    mainBalance: 13.5,
-    selfBalance: 4.5,
-    activeWork: 2.28,
-    inactiveWork: 2.28,
-    selfRebirth: 3.0,
-    companyMarketing: 4.44,
+    initialBalance: 0.0,
+    mainBalance: 0.0,
+    selfBalance: 0.0,
+    activeWork: 0.0,
+    inactiveWork: 0.0,
+    selfRebirth: 0.0,
+    companyMarketing: 0.0,
   },
 };
 
@@ -1258,9 +1258,9 @@ export default function FranchiseMobileHub({
   const [walletState, setWalletState] = useState(() => {
     const acc = TEST_AGENCY_ACCOUNTS[currentTierKey];
     return {
-      mainWallet: acc?.mainBalance ?? 49.50,
-      selfWallet: acc?.selfBalance ?? 16.50,
-      totalEarned: acc?.initialBalance ?? 66.00,
+      mainWallet: Number(acc?.mainBalance ?? 0),
+      selfWallet: Number(acc?.selfBalance ?? 0),
+      totalEarned: Number(acc?.initialBalance ?? 0),
       rebirthCount: 0,
     };
   });
@@ -3894,9 +3894,9 @@ export default function FranchiseMobileHub({
             <WalletCard
               title="Total Wallet Balance"
               isWalletScreen={true}
-              balance={walletState?.mainWallet ? (walletState.mainWallet + (walletState.selfWallet || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "24.00"}
+              balance={((Number(walletState?.mainWallet) || 0) + (Number(walletState?.selfWallet) || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               growthBadge={null}
-              monthlyGrowth={`₹ ${(walletState.totalEarned || 32).toFixed(2)} Geo Payouts`}
+              monthlyGrowth={`₹ ${(Number(walletState?.totalEarned) || 0).toFixed(2)} Geo Payouts`}
               onWithdraw={() => setWithdrawDialogOpen(true)}
               onBankDetails={() => setWithdrawDialogOpen(true)}
               onViewHistory={() => setFilterDrawerOpen(true)}
@@ -3917,7 +3917,7 @@ export default function FranchiseMobileHub({
                 >
                   <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748B" }}>Your Share</Typography>
                   <Typography sx={{ fontSize: 18, fontWeight: 950, color: "#0F172A", my: 0.3 }}>
-                    ₹ {walletState.mainWallet.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ₹ {(Number(walletState?.mainWallet) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </Typography>
                   <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>(75%)</Typography>
                 </Paper>
@@ -3935,7 +3935,7 @@ export default function FranchiseMobileHub({
                 >
                   <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748B" }}>Self Rebirth</Typography>
                   <Typography sx={{ fontSize: 18, fontWeight: 950, color: "#0F172A", my: 0.3 }}>
-                    ₹ {walletState.selfWallet.toFixed(2)}
+                    ₹ {(Number(walletState?.selfWallet) || 0).toFixed(2)}
                   </Typography>
                   <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>(25%)</Typography>
                 </Paper>
