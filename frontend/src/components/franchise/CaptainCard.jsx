@@ -1,17 +1,19 @@
 import React from "react";
-import { Paper, Box, Typography, Chip, Avatar } from "@mui/material";
+import { Paper, Box, Typography, Chip, Avatar, IconButton } from "@mui/material";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import CallRoundedIcon from "@mui/icons-material/CallRounded";
 import { AGENCY_TOKENS } from "./AgencyTokens";
 
 /**
  * Standard CaptainCard (Phase 5)
- * Matches MerchantCard structure and sizing exactly.
+ * Matches MerchantCard structure and sizing exactly with 1-tap Call button.
  */
 export default function CaptainCard({
   captain,
   onClick,
 }) {
   const isActive = captain.status === "Active";
+  const phone = captain.mobile || captain.phone || "";
 
   return (
     <Paper
@@ -82,7 +84,7 @@ export default function CaptainCard({
             mb: 0.3,
           }}
         >
-          {captain.id} • {captain.area}
+          {captain.id} • {captain.area || `PIN ${captain.pincode}`}
         </Typography>
 
         {/* Row 3: Managed Metrics */}
@@ -97,6 +99,28 @@ export default function CaptainCard({
           {captain.merchants || 0} merchants • {captain.services || 0} services • {captain.customers || 0} customers
         </Typography>
       </Box>
+
+      {/* Quick 1-tap Call Action */}
+      {phone && (
+        <IconButton
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation();
+            window.location.href = `tel:${phone.replace(/\s+/g, "")}`;
+          }}
+          sx={{
+            bgcolor: "#EFF6FF",
+            color: "#2563EB",
+            border: "1px solid #BFDBFE",
+            p: 0.8,
+            flexShrink: 0,
+            "&:hover": { bgcolor: "#DBEAFE" },
+          }}
+          title={`Call ${captain.name}`}
+        >
+          <CallRoundedIcon sx={{ fontSize: 18 }} />
+        </IconButton>
+      )}
 
       {/* Trailing chevron */}
       <ChevronRightRoundedIcon

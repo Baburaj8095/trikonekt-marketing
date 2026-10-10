@@ -1,17 +1,20 @@
 import React from "react";
-import { Paper, Box, Typography, Chip, Avatar } from "@mui/material";
+import { Paper, Box, Typography, Chip, Avatar, IconButton } from "@mui/material";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import CallRoundedIcon from "@mui/icons-material/CallRounded";
 import { AGENCY_TOKENS } from "./AgencyTokens";
 
 /**
  * Standard MerchantCard (Phase 5)
- * Uniform layout structure with fixed thumbnail, flexible text column, and trailing chevron.
+ * Uniform layout structure with fixed thumbnail, flexible text column, and 1-tap Call button.
  */
 export default function MerchantCard({
   merchant,
   onClick,
 }) {
   const isActive = merchant.status === "Active";
+  const phone = merchant.mobile || merchant.phone || "";
+  const channel = merchant.channel || (merchant.activatedServices?.length > 1 ? "Online" : "Offline");
 
   return (
     <Paper
@@ -71,6 +74,19 @@ export default function MerchantCard({
             }}
           />
           <Chip
+            label={channel}
+            size="small"
+            sx={{
+              height: 18,
+              fontSize: "10px",
+              fontWeight: 700,
+              bgcolor: channel === "Online" ? "#EFF6FF" : "#F8FAFC",
+              color: channel === "Online" ? "#2563EB" : "#64748B",
+              border: "1px solid",
+              borderColor: channel === "Online" ? "#BFDBFE" : "#E2E8F0",
+            }}
+          />
+          <Chip
             label={merchant.status}
             size="small"
             sx={{
@@ -108,6 +124,28 @@ export default function MerchantCard({
           Vol: {merchant.totalSpend || "₹0.00"} • Orders: {merchant.totalTransactions || 0}
         </Typography>
       </Box>
+
+      {/* Quick 1-tap Call Action */}
+      {phone && (
+        <IconButton
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation();
+            window.location.href = `tel:${phone.replace(/\s+/g, "")}`;
+          }}
+          sx={{
+            bgcolor: "#F0FDF4",
+            color: "#059669",
+            border: "1px solid #BBF7D0",
+            p: 0.8,
+            flexShrink: 0,
+            "&:hover": { bgcolor: "#DCFCE7" },
+          }}
+          title={`Call ${merchant.name}`}
+        >
+          <CallRoundedIcon sx={{ fontSize: 18 }} />
+        </IconButton>
+      )}
 
       {/* Trailing chevron */}
       <ChevronRightRoundedIcon

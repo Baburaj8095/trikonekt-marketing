@@ -1,13 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
+  Alert,
+  Autocomplete,
   Box,
   Button,
   Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  InputAdornment,
   MenuItem,
   Paper,
   Stack,
@@ -26,6 +30,32 @@ const CATEGORY_OPTIONS = [
   { value: "agency_pincode_coordinator", label: "Pincode Coordinator" },
   { value: "agency_pincode", label: "Pincode" },
 ];
+
+export const INDIAN_STATES = [
+  { id: 1, name: "Karnataka" },
+  { id: 4009, name: "Goa" },
+  { id: 2, name: "Maharashtra" },
+  { id: 3, name: "Tamil Nadu" },
+  { id: 4, name: "Kerala" },
+  { id: 5, name: "Andhra Pradesh" },
+  { id: 6, name: "Telangana" },
+];
+
+export const KARNATAKA_DISTRICTS = [
+  "Tumakuru", "Hassan", "Bengaluru Urban", "Bengaluru Rural", "Mysuru",
+  "Mandya", "Chikkamagaluru", "Shivamogga", "Chitradurga", "Davanagere",
+  "Ballari", "Belagavi", "Vijayapura", "Kalaburagi", "Kolar", "Chikkaballapura",
+  "Dakshina Kannada", "Udupi", "Uttara Kannada", "Kodagu", "Bagalkote",
+  "Bidar", "Chamarajanagara", "Dharwad", "Gadag", "Haveri", "Koppal",
+  "Raichur", "Ramanagara", "Vijayanagara", "Yadgir"
+];
+
+export const GOA_DISTRICTS = ["North Goa", "South Goa"];
+
+function getDistrictsForState(stateName) {
+  if (stateName === "Goa") return GOA_DISTRICTS;
+  return KARNATAKA_DISTRICTS;
+}
 
 function labelFor(value) {
   return CATEGORY_OPTIONS.find((item) => item.value === value)?.label || "All franchise users";
@@ -53,10 +83,50 @@ export default function AdminFranchiseUsers() {
     email: "",
     category: "agency_pincode",
     state: "1",
+    stateName: "Karnataka",
     district: "Tumakuru",
     pincode: "572106",
-    pincodes_cluster: "572106, 572101, 572102, 572103",
+    // Coordinators multi-selectors (strictly max 2)
+    selectedPincodes: ["572106", "572101"],
+    selectedDistricts: ["Tumakuru"],
+    selectedStates: ["Karnataka"],
   });
+  const [pinResolving, setPinResolving] = useState(false);
+  const [pinResolvedInfo, setPinResolvedInfo] = useState(null);
+
+  // Auto-resolve Pincode when 6 digits are typed for agency_pincode
+  const handlePincodeChange = useCallback(async (val) => {
+    const cleaned = String(val || "").replace(/\D/g, "").slice(0, 6);
+    setRegisterForm((f) => ({ ...f, pincode: cleaned }));
+    if (cleaned.length === 6) {
+      setPinResolving(true);
+      try {
+        const res = await API.get(`/locations/pincode/${cleaned}/`);
+        const data = res?.data || {};
+        const resolvedDistrict = data.city || data.district || "Tumakuru";
+        const resolvedState = data.state || "Karnataka";
+        const matchedState = INDIAN_STATES.find(
+          (s) => s.name.toLowerCase() === resolvedState.toLowerCase()
+        );
+        const resolvedStateId = matchedState ? String(matchedState.id) : "1";
+
+        setRegisterForm((f) => ({
+          ...f,
+          district: resolvedDistrict,
+          state: resolvedStateId,
+          stateName: resolvedState,
+        }));
+        setPinResolvedInfo(`${resolvedDistrict}, ${resolvedState}`);
+      } catch (err) {
+        // Fallback
+        setPinResolvedInfo(null);
+      } finally {
+        setPinResolving(false);
+      }
+    } else {
+      setPinResolvedInfo(null);
+    }
+  }, []);
 
   const saveRegister = useCallback(async () => {
     if (!registerForm.full_name || !registerForm.phone) {
@@ -73,12 +143,66 @@ export default function AdminFranchiseUsers() {
         phone: registerForm.phone,
         password: registerForm.password || "Trikonekt@2026!",
         email: registerForm.email || `${registerForm.phone}@trikonekt.in`,
-        state: registerForm.state || 1,
-        pincode: registerForm.pincode || "572106",
+        sponsor_id: "TRIKONEKT",
       };
-      if (registerForm.category === "agency_pincode_coordinator") {
-        payload.pincodes = registerForm.pincodes_cluster.split(",").map((s) => s.trim()).filter(Boolean);
+
+      if (registerForm.category === "agency_pincode") {
+        payload.pincode = registerForm.pincode;
+        payload.selected_pincode = registerForm.pincode;
+        payload.district = registerForm.district;
+        payload.selected_district = registerForm.district;
+        payload.state = registerForm.state || 1;
+      } else if (registerForm.category === "agency_pincode_coordinator") {
+        const pins = (registerForm.selectedPincodes || []).slice(0, 2);
+        if (pins.length === 0) {
+          window.alert("Please select at least 1 pincode (Max 2 pincodes allowed).");
+          setRegisterSubmitting(false);
+          return;
+        }
+        payload.pincode = pins[0];
+        payload.pincodes = pins;
+        payload.assign_pincodes = pins;
+        payload.district = registerForm.district;
+        payload.selected_district = registerForm.district;
+        payload.state = registerForm.state || 1;
+      } else if (registerForm.category === "agency_district") {
+        if (!registerForm.district) {
+          window.alert("Please select a District.");
+          setRegisterSubmitting(false);
+          return;
+        }
+        payload.district = registerForm.district;
+        payload.selected_district = registerForm.district;
+        payload.state = registerForm.state || 1;
+      } else if (registerForm.category === "agency_district_coordinator") {
+        const dists = (registerForm.selectedDistricts || []).slice(0, 2);
+        if (dists.length === 0) {
+          window.alert("Please select at least 1 district (Max 2 districts allowed).");
+          setRegisterSubmitting(false);
+          return;
+        }
+        payload.district = dists[0];
+        payload.districts = dists;
+        payload.assign_districts = dists;
+        payload.state = registerForm.state || 1;
+      } else if (registerForm.category === "agency_state") {
+        payload.state = registerForm.state || 1;
+        payload.selected_state = registerForm.state || 1;
+      } else if (registerForm.category === "agency_state_coordinator") {
+        const stNames = (registerForm.selectedStates || []).slice(0, 2);
+        if (stNames.length === 0) {
+          window.alert("Please select at least 1 state (Max 2 states allowed).");
+          setRegisterSubmitting(false);
+          return;
+        }
+        const stateIds = stNames.map((sn) => {
+          const match = INDIAN_STATES.find((s) => s.name.toLowerCase() === sn.toLowerCase());
+          return match ? match.id : 1;
+        });
+        payload.state = stateIds[0];
+        payload.assign_states = stateIds;
       }
+
       await API.post("/accounts/register/", payload);
       window.alert(`Successfully registered ${registerForm.full_name} (${labelFor(registerForm.category)})!`);
       setRegisterOpen(false);
@@ -468,41 +592,306 @@ export default function AdminFranchiseUsers() {
               ))}
             </TextField>
 
-            <TextField
-              size="small"
-              label="State ID / Name"
-              value={registerForm.state}
-              onChange={(e) => setRegisterForm((f) => ({ ...f, state: e.target.value }))}
-              helperText="1 = Karnataka, 4009 = Goa, etc."
-            />
-            <TextField
-              size="small"
-              label="District Name"
-              value={registerForm.district}
-              onChange={(e) => setRegisterForm((f) => ({ ...f, district: e.target.value }))}
-              placeholder="e.g. Tumakuru"
-            />
-
+            {/* ============================================================== */}
+            {/* CATEGORY 1: PINCODE FRANCHISE (Auto-resolves District & State) */}
+            {/* ============================================================== */}
             {registerForm.category === "agency_pincode" && (
-              <TextField
-                size="small"
-                label="Assigned Pincode (1 Pincode) *"
-                value={registerForm.pincode}
-                onChange={(e) => setRegisterForm((f) => ({ ...f, pincode: e.target.value }))}
-                placeholder="572106"
-                helperText="Pincode Franchise has strictly 1 pincode jurisdiction."
-              />
+              <Stack spacing={1.5}>
+                <TextField
+                  size="small"
+                  label="Enter 6-Digit Pincode *"
+                  value={registerForm.pincode}
+                  onChange={(e) => handlePincodeChange(e.target.value)}
+                  placeholder="e.g. 572106"
+                  required
+                  helperText="District and State are auto-derived as soon as 6 digits are typed."
+                  InputProps={{
+                    endAdornment: pinResolving ? (
+                      <InputAdornment position="end">
+                        <CircularProgress size={18} />
+                      </InputAdornment>
+                    ) : null,
+                  }}
+                />
+
+                {pinResolvedInfo && (
+                  <Alert severity="success" sx={{ py: 0.5, px: 1.5, fontSize: 12.5, fontWeight: 700 }}>
+                    📍 Auto-Resolved Location: <strong>{pinResolvedInfo}</strong>
+                  </Alert>
+                )}
+
+                <TextField
+                  size="small"
+                  label="District (Auto-Derived) *"
+                  value={registerForm.district}
+                  disabled
+                  helperText="Locked automatically from India Post records."
+                />
+
+                <TextField
+                  size="small"
+                  label="State (Auto-Derived) *"
+                  value={registerForm.stateName || "Karnataka"}
+                  disabled
+                  helperText="Locked automatically from India Post records."
+                />
+              </Stack>
             )}
 
+            {/* ============================================================== */}
+            {/* CATEGORY 2: PINCODE COORDINATOR (Strict Max 2 Pincodes)       */}
+            {/* ============================================================== */}
             {registerForm.category === "agency_pincode_coordinator" && (
-              <TextField
-                size="small"
-                label="Assigned Cluster Pincodes (4 Pincodes) *"
-                value={registerForm.pincodes_cluster}
-                onChange={(e) => setRegisterForm((f) => ({ ...f, pincodes_cluster: e.target.value }))}
-                placeholder="572106, 572101, 572102, 572103"
-                helperText="Enter up to 4 comma-separated pincodes for coordinator cluster."
-              />
+              <Stack spacing={1.5}>
+                <TextField
+                  select
+                  size="small"
+                  label="State *"
+                  value={registerForm.stateName}
+                  onChange={(e) => {
+                    const st = INDIAN_STATES.find((s) => s.name === e.target.value);
+                    setRegisterForm((f) => ({
+                      ...f,
+                      stateName: e.target.value,
+                      state: st ? String(st.id) : "1",
+                      district: getDistrictsForState(e.target.value)[0] || "Tumakuru",
+                    }));
+                  }}
+                >
+                  {INDIAN_STATES.map((s) => (
+                    <MenuItem key={s.id} value={s.name}>
+                      {s.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <TextField
+                  select
+                  size="small"
+                  label="District *"
+                  value={registerForm.district}
+                  onChange={(e) => setRegisterForm((f) => ({ ...f, district: e.target.value }))}
+                >
+                  {getDistrictsForState(registerForm.stateName).map((d) => (
+                    <MenuItem key={d} value={d}>
+                      {d}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <Autocomplete
+                  multiple
+                  freeSolo
+                  size="small"
+                  options={["572106", "572101", "572102", "572103", "572128", "572216"]}
+                  value={registerForm.selectedPincodes || []}
+                  onChange={(event, newValue) => {
+                    if (newValue.length > 2) {
+                      window.alert("Maximum 2 pincodes allowed for Pincode Coordinator.");
+                      return;
+                    }
+                    const cleaned = newValue.map((p) => String(p).replace(/\D/g, "").slice(0, 6)).filter(Boolean);
+                    setRegisterForm((f) => ({ ...f, selectedPincodes: cleaned }));
+                  }}
+                  renderTags={(value, getTagProps) =>
+                    value.map((option, index) => (
+                      <Chip
+                        variant="outlined"
+                        size="small"
+                        color="primary"
+                        label={`PIN ${option}`}
+                        {...getTagProps({ index })}
+                        key={option}
+                      />
+                    ))
+                  }
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Assigned Pincodes (Strictly Max 2) *"
+                      placeholder={registerForm.selectedPincodes?.length >= 2 ? "Max 2 reached" : "Type/Select 6-digit PIN and press Enter"}
+                      helperText={`Selected: ${registerForm.selectedPincodes?.length || 0} / 2 pincodes. Pincode Coordinator has maximum 2 pincodes jurisdiction.`}
+                    />
+                  )}
+                />
+              </Stack>
+            )}
+
+            {/* ============================================================== */}
+            {/* CATEGORY 3: DISTRICT PARTNER (Strict 1 District)              */}
+            {/* ============================================================== */}
+            {registerForm.category === "agency_district" && (
+              <Stack spacing={1.5}>
+                <TextField
+                  select
+                  size="small"
+                  label="State *"
+                  value={registerForm.stateName}
+                  onChange={(e) => {
+                    const st = INDIAN_STATES.find((s) => s.name === e.target.value);
+                    setRegisterForm((f) => ({
+                      ...f,
+                      stateName: e.target.value,
+                      state: st ? String(st.id) : "1",
+                      district: getDistrictsForState(e.target.value)[0] || "Tumakuru",
+                    }));
+                  }}
+                >
+                  {INDIAN_STATES.map((s) => (
+                    <MenuItem key={s.id} value={s.name}>
+                      {s.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <TextField
+                  select
+                  size="small"
+                  label="Assigned District (Select 1 District) *"
+                  value={registerForm.district}
+                  onChange={(e) => setRegisterForm((f) => ({ ...f, district: e.target.value }))}
+                  helperText="District Franchise Partner has strictly 1 district jurisdiction."
+                >
+                  {getDistrictsForState(registerForm.stateName).map((d) => (
+                    <MenuItem key={d} value={d}>
+                      {d}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Stack>
+            )}
+
+            {/* ============================================================== */}
+            {/* CATEGORY 4: DISTRICT COORDINATOR (Strict Max 2 Districts)      */}
+            {/* ============================================================== */}
+            {registerForm.category === "agency_district_coordinator" && (
+              <Stack spacing={1.5}>
+                <TextField
+                  select
+                  size="small"
+                  label="State *"
+                  value={registerForm.stateName}
+                  onChange={(e) => {
+                    const st = INDIAN_STATES.find((s) => s.name === e.target.value);
+                    setRegisterForm((f) => ({
+                      ...f,
+                      stateName: e.target.value,
+                      state: st ? String(st.id) : "1",
+                      selectedDistricts: [getDistrictsForState(e.target.value)[0] || "Tumakuru"],
+                    }));
+                  }}
+                >
+                  {INDIAN_STATES.map((s) => (
+                    <MenuItem key={s.id} value={s.name}>
+                      {s.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <Autocomplete
+                  multiple
+                  size="small"
+                  options={getDistrictsForState(registerForm.stateName)}
+                  value={registerForm.selectedDistricts || []}
+                  onChange={(event, newValue) => {
+                    if (newValue.length > 2) {
+                      window.alert("Maximum 2 districts allowed for District Coordinator.");
+                      return;
+                    }
+                    setRegisterForm((f) => ({ ...f, selectedDistricts: newValue, district: newValue[0] || "" }));
+                  }}
+                  renderTags={(value, getTagProps) =>
+                    value.map((option, index) => (
+                      <Chip
+                        variant="outlined"
+                        size="small"
+                        color="secondary"
+                        label={option}
+                        {...getTagProps({ index })}
+                        key={option}
+                      />
+                    ))
+                  }
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Assigned Districts (Strictly Max 2) *"
+                      placeholder={registerForm.selectedDistricts?.length >= 2 ? "Max 2 reached" : "Select districts..."}
+                      helperText={`Selected: ${registerForm.selectedDistricts?.length || 0} / 2 districts. District Coordinator has maximum 2 districts jurisdiction.`}
+                    />
+                  )}
+                />
+              </Stack>
+            )}
+
+            {/* ============================================================== */}
+            {/* CATEGORY 5: STATE PARTNER (Strict 1 State)                    */}
+            {/* ============================================================== */}
+            {registerForm.category === "agency_state" && (
+              <Stack spacing={1.5}>
+                <TextField
+                  select
+                  size="small"
+                  label="Assigned State (Select 1 State) *"
+                  value={registerForm.stateName}
+                  onChange={(e) => {
+                    const st = INDIAN_STATES.find((s) => s.name === e.target.value);
+                    setRegisterForm((f) => ({
+                      ...f,
+                      stateName: e.target.value,
+                      state: st ? String(st.id) : "1",
+                    }));
+                  }}
+                  helperText="State Franchise Partner has strictly 1 state jurisdiction."
+                >
+                  {INDIAN_STATES.map((s) => (
+                    <MenuItem key={s.id} value={s.name}>
+                      {s.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Stack>
+            )}
+
+            {/* ============================================================== */}
+            {/* CATEGORY 6: STATE COORDINATOR (Strict Max 2 States)           */}
+            {/* ============================================================== */}
+            {registerForm.category === "agency_state_coordinator" && (
+              <Stack spacing={1.5}>
+                <Autocomplete
+                  multiple
+                  size="small"
+                  options={INDIAN_STATES.map((s) => s.name)}
+                  value={registerForm.selectedStates || []}
+                  onChange={(event, newValue) => {
+                    if (newValue.length > 2) {
+                      window.alert("Maximum 2 states allowed for State Coordinator.");
+                      return;
+                    }
+                    setRegisterForm((f) => ({ ...f, selectedStates: newValue }));
+                  }}
+                  renderTags={(value, getTagProps) =>
+                    value.map((option, index) => (
+                      <Chip
+                        variant="outlined"
+                        size="small"
+                        color="info"
+                        label={option}
+                        {...getTagProps({ index })}
+                        key={option}
+                      />
+                    ))
+                  }
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Assigned States (Strictly Max 2) *"
+                      placeholder={registerForm.selectedStates?.length >= 2 ? "Max 2 reached" : "Select states..."}
+                      helperText={`Selected: ${registerForm.selectedStates?.length || 0} / 2 states. State Coordinator has maximum 2 states jurisdiction.`}
+                    />
+                  )}
+                />
+              </Stack>
             )}
           </Stack>
         </DialogContent>
