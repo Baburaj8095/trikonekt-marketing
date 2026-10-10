@@ -243,7 +243,7 @@ def _distribute_pincode_royalty(user: CustomUser, pack_index: Optional[int], con
                 tw = Wallet.get_or_create_for_user(target)
                 tw.credit(
                     amt,
-                    tx_type="PINCODE_ROYALTY",
+                    tx_type="FRANCHISE_INCOME",
                     meta={
                         "source": "PINCODE_ROYALTY_REBIRTH_250",
                         "role": role_key,

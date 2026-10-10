@@ -299,12 +299,18 @@ def execute_daily_pool_distribution(
                     )
                 total_distributed += pay_amt
 
-    # 4. District Captain Royalty (Option A: category=agency_sub_franchise)
+    # 4. District Captain Royalty (Option A: category=agency_sub_franchise, fallback: agency_pincode/agency_pincode_coordinator)
     dist_captains = list(CustomUser.objects.filter(
         category="agency_sub_franchise",
         account_active=True,
         is_active=True
     ).select_related("city", "state"))
+    if not dist_captains:
+        dist_captains = list(CustomUser.objects.filter(
+            category__in=["agency_pincode", "agency_pincode_coordinator"],
+            account_active=True,
+            is_active=True
+        ).select_related("city", "state"))
 
     if dist_captains and dist_capt_rate > 0 and rebirth_cnt > 0:
         tot_dist_capt_pot = _q2(Decimal(rebirth_cnt) * dist_capt_rate)
@@ -332,7 +338,7 @@ def execute_daily_pool_distribution(
                     )
                 total_distributed += per_capt_amt
 
-    # 5. State Captain Royalty (Option A: category=agency_sub_franchise)
+    # 5. State Captain Royalty
     if dist_captains and state_capt_rate > 0 and rebirth_cnt > 0:
         tot_state_capt_pot = _q2(Decimal(rebirth_cnt) * state_capt_rate)
         per_state_capt_amt = _q2(tot_state_capt_pot / Decimal(len(dist_captains)))
@@ -359,6 +365,76 @@ def execute_daily_pool_distribution(
                     )
                 total_distributed += per_state_capt_amt
 
+    # 6. Daily District Franchise Royalty Pool
+    tot_dist_pool = _q2(Decimal(rebirth_cnt) * dist_roy_rate)
+    district_franchises = list(CustomUser.objects.filter(
+        category__in=["agency_district", "agency_district_coordinator"],
+        account_active=True,
+        is_active=True
+    ).select_related("city", "state"))
+
+    if district_franchises and tot_dist_pool > 0 and rebirth_cnt > 0:
+        per_dist_amt = _q2(tot_dist_pool / Decimal(len(district_franchises)))
+        if per_dist_amt > 0:
+            for dist_user in district_franchises:
+                payout_logs.append({
+                    "user_id": dist_user.id,
+                    "phone": dist_user.phone,
+                    "tier": "District Franchise Royalty",
+                    "category": dist_user.category,
+                    "amount": float(per_dist_amt),
+                })
+                if not dry_run:
+                    w = Wallet.get_or_create_for_user(dist_user)
+                    w.credit(
+                        per_dist_amt,
+                        tx_type="FRANCHISE_INCOME",
+                        source_type="DAILY_POOL_DISTRIBUTION",
+                        source_id=f"FRANCHISE_DIST_{date_str}_{dist_user.id}",
+                        meta={
+                            "pool": "DAILY_DISTRICT_FRANCHISE_ROYALTY",
+                            "pool_date": date_str,
+                            "category": dist_user.category,
+                            "rate": float(dist_roy_rate),
+                        }
+                    )
+                total_distributed += per_dist_amt
+
+    # 7. Daily State Franchise Royalty Pool
+    tot_state_pool = _q2(Decimal(rebirth_cnt) * state_roy_rate)
+    state_franchises = list(CustomUser.objects.filter(
+        category__in=["agency_state", "agency_state_coordinator"],
+        account_active=True,
+        is_active=True
+    ).select_related("state"))
+
+    if state_franchises and tot_state_pool > 0 and rebirth_cnt > 0:
+        per_state_amt = _q2(tot_state_pool / Decimal(len(state_franchises)))
+        if per_state_amt > 0:
+            for st_user in state_franchises:
+                payout_logs.append({
+                    "user_id": st_user.id,
+                    "phone": st_user.phone,
+                    "tier": "State Franchise Royalty",
+                    "category": st_user.category,
+                    "amount": float(per_state_amt),
+                })
+                if not dry_run:
+                    w = Wallet.get_or_create_for_user(st_user)
+                    w.credit(
+                        per_state_amt,
+                        tx_type="FRANCHISE_INCOME",
+                        source_type="DAILY_POOL_DISTRIBUTION",
+                        source_id=f"FRANCHISE_STATE_{date_str}_{st_user.id}",
+                        meta={
+                            "pool": "DAILY_STATE_FRANCHISE_ROYALTY",
+                            "pool_date": date_str,
+                            "category": st_user.category,
+                            "rate": float(state_roy_rate),
+                        }
+                    )
+                total_distributed += per_state_amt
+
     return {
         "success": True,
         "date": date_str,
@@ -369,8 +445,8 @@ def execute_daily_pool_distribution(
             "tier1_pool": float(t1_pool),
             "tier2_pool": float(t2_pool),
             "tier3_pool": float(t3_pool),
-            "daily_district_pool": float(_q2(Decimal(rebirth_cnt) * dist_roy_rate)),
-            "daily_state_pool": float(_q2(Decimal(rebirth_cnt) * state_roy_rate)),
+            "daily_district_pool": float(tot_dist_pool),
+            "daily_state_pool": float(tot_state_pool),
             "daily_district_captain_pool": float(_q2(Decimal(rebirth_cnt) * dist_capt_rate)),
             "daily_state_captain_pool": float(_q2(Decimal(rebirth_cnt) * state_capt_rate)),
         },
@@ -379,6 +455,8 @@ def execute_daily_pool_distribution(
             "tier2_count": len(t2_achievers),
             "tier3_count": len(t3_achievers),
             "captain_count": len(dist_captains),
+            "district_franchise_count": len(district_franchises),
+            "state_franchise_count": len(state_franchises),
         },
         "total_distributed": float(total_distributed),
         "payout_logs": payout_logs,
