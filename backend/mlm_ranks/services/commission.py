@@ -297,8 +297,20 @@ class CommissionDistributor:
                     now=now,
                 )
             else:
-                # Washout to overhead (do NOT credit any user account)
-                pass
+                # Route unclaimed matching bonus to Company Overhead Overflow Box
+                if level_pool > 0:
+                    try:
+                        cu = cfg.get_company_user()
+                        if cu:
+                            WalletPoster.credit_company_overflow(
+                                cu,
+                                level_pool,
+                                from_user_id=getattr(payer, "id", None) or 0,
+                                upgrade_id=upgrade.id,
+                                level=target_level,
+                            )
+                    except Exception:
+                        pass
                 # Event-driven reevaluation for this recipient's holds (early release/expiry)
                 try:
                     from .five_matrix import FiveMatrixService  # local import to avoid cycle

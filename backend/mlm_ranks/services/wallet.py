@@ -62,3 +62,15 @@ class WalletPoster:
     def credit_company_gst(cls, company_user, amount: Decimal, *, upgrade_id: int) -> WalletPostResult:
         meta = {"upgrade_id": upgrade_id, "kind": "RANK_UPGRADE_GST", "no_withhold": True}
         return cls._credit(company_user, amount, cls.COMPANY_GST_TX, source_type="RANK_UPGRADE", source_id=str(upgrade_id), meta=meta)
+
+    @classmethod
+    def credit_company_overflow(cls, company_user, amount: Decimal, *, from_user_id: int, upgrade_id: int, level: int) -> WalletPostResult:
+        meta = {
+            "from_user_id": from_user_id,
+            "upgrade_id": upgrade_id,
+            "level": level,
+            "kind": "RANK_UPGRADE_OVERFLOW",
+            "no_withhold": True,
+            "description": f"Unclaimed Rank Level {level} Overflow (Company Reserve)",
+        }
+        return cls._credit(company_user, amount, "RANK_OVERFLOW", source_type="RANK_UPGRADE", source_id=str(upgrade_id), meta=meta)
