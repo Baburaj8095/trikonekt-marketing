@@ -58,13 +58,18 @@ function fmtAmount(value) {
 
 function maskUsernameMid(u) {
   const s = String(u || "").trim();
-  // Mask only numeric-looking usernames (phone-based) and keep others as-is.
-  if (!/^\d{8,}$/.test(s)) return s;
-  if (s.length <= 4) return s;
-  // Example: 8095918105 -> 8095****105
-  const prefix = s.slice(0, 4);
-  const suffix = s.slice(-3);
-  return `${prefix}****${suffix}`;
+  const digitsOnly = s.replace(/\D/g, "");
+  if (digitsOnly.length === 10) {
+    // Exactly hide middle 4 numbers: e.g. 9999999999 -> 999****999, 8095918105 -> 809****105
+    return `${s.slice(0, 3)}****${s.slice(-3)}`;
+  }
+  if (digitsOnly.length >= 8) {
+    const len = s.length;
+    const hideLen = 4;
+    const pre = Math.floor((len - hideLen) / 2);
+    return `${s.slice(0, pre)}****${s.slice(pre + hideLen)}`;
+  }
+  return s;
 }
 
 function counterpartyLabel(tx = {}) {
@@ -221,6 +226,53 @@ function describeSource(tx = {}) {
     }
     return "SSV Referral Commission";
   }
+
+  // Main Wallet Specific Transactions
+  if (type === "P2P_PACKAGE_COUPON_SEND" || type.includes("P2P_SEND") || type === "P2P_TRANSFER_SEND") {
+    const rawRec = meta.recipient_phone || meta.recipient_username || meta.recipient_id || meta.to_user || "";
+    const rec = rawRec ? maskUsernameMid(rawRec) : "Member";
+    const fee = meta.fee_amount ? ` (7% Fee: -₹${Number(meta.fee_amount).toFixed(2)})` : "";
+    return `P2P Coupon Sent to ${rec}${fee}`;
+  }
+  if (type === "P2P_PACKAGE_COUPON_RECEIVE" || type.includes("P2P_RECEIVE") || type === "P2P_TRANSFER_RECEIVE") {
+    const rawSender = meta.sender_phone || meta.sender_username || meta.sender_id || meta.from_user || "";
+    const sender = rawSender ? maskUsernameMid(rawSender) : "Member";
+    return `P2P Coupon Received from ${sender}`;
+  }
+  if (type.includes("P2P")) {
+    return "P2P Transfer";
+  }
+  if (type === "VOUCHER_REDEEM_CREDIT") {
+    const code = meta.voucher_code ? ` [${meta.voucher_code}]` : "";
+    const from = meta.creator_username ? ` from ${maskUsernameMid(meta.creator_username)}` : "";
+    return `Coupon Redeemed to Main Wallet${code}${from}`;
+  }
+  if (type === "MAIN_TO_COUPON" || type === "COUPON_WALLET_TRANSFER_OUT") return "Transfer to Coupon Wallet";
+  if (type === "VOUCHER_CREATE_DEBIT") return "Package Voucher Created";
+  if (type === "WITHDRAWAL_DEBIT") return "Withdrawal Payout";
+  if (type === "ADJUSTMENT_DEBIT") {
+    if (st === "ADMIN_SERVICE_CHARGE" || src.includes("SERVICE_CHARGE")) return "7% Service Charge";
+    return "Service / Transfer Charge";
+  }
+  if (type === "ADJUSTMENT_CREDIT") return "System Balance Adjustment";
+  if (type === "TAX_POOL_CREDIT") {
+    if (st === "ADMIN_SERVICE_CHARGE" || src.includes("SERVICE_CHARGE")) return "Admin Service Charge";
+    return "Tax / Admin Pool Credit";
+  }
+  if (type === "INCOME_CREDIT_75" || type === "SELF_ACCOUNT_CREDIT") {
+    if (ot) {
+      const parentLabel = describeSource({ ...tx, type: ot });
+      return `${parentLabel}`;
+    }
+    return type === "SELF_ACCOUNT_CREDIT" ? "Self Account Credit" : "Income Credited";
+  }
+
+  // Prime direct/self
+  if (src === "PRIME_150" || st === "PRIME_150" || tier === 150) return "Prime 150";
+  if (src === "PRIME_750" || st === "PRIME_750" || tier === 750) return "Join Subscription (₹1,000)";
+
+  // Fallback
+  return humanizeType(type) || "Wallet Transfer";
 }
 
 function isSsvLayerTx(tx) {
@@ -253,48 +305,6 @@ function isSsvBonusTx(tx) {
     ((st.includes("MONTHLY") || src === "MONTHLY_759" || trig === "MONTHLY_759") &&
       (ot.includes("DIRECT") || type.includes("DIRECT")))
   );
-
-  // Main Wallet Specific Transactions
-  if (type === "P2P_PACKAGE_COUPON_SEND") {
-    const rec = meta.recipient_phone || meta.recipient_id || "User";
-    const fee = meta.fee_amount ? ` (7% Fee: -₹${Number(meta.fee_amount).toFixed(2)})` : "";
-    return `P2P Coupon Sent to ${rec}${fee}`;
-  }
-  if (type === "P2P_PACKAGE_COUPON_RECEIVE") {
-    const sender = meta.sender_phone || meta.sender_id || "Member";
-    return `P2P Coupon Received from ${sender}`;
-  }
-  if (type === "VOUCHER_REDEEM_CREDIT") {
-    const code = meta.voucher_code ? ` [${meta.voucher_code}]` : "";
-    const from = meta.creator_username ? ` from ${meta.creator_username}` : "";
-    return `Coupon Redeemed to Main Wallet${code}${from}`;
-  }
-  if (type === "MAIN_TO_COUPON" || type === "COUPON_WALLET_TRANSFER_OUT") return "Transfer to Coupon Wallet";
-  if (type === "VOUCHER_CREATE_DEBIT") return "Package Voucher Created";
-  if (type === "WITHDRAWAL_DEBIT") return "Withdrawal Payout";
-  if (type === "ADJUSTMENT_DEBIT") {
-    if (st === "ADMIN_SERVICE_CHARGE" || src.includes("SERVICE_CHARGE")) return "7% Service Charge";
-    return "Service / Transfer Charge";
-  }
-  if (type === "ADJUSTMENT_CREDIT") return "System Balance Adjustment";
-  if (type === "TAX_POOL_CREDIT") {
-    if (st === "ADMIN_SERVICE_CHARGE" || src.includes("SERVICE_CHARGE")) return "Admin Service Charge";
-    return "Tax / Admin Pool Credit";
-  }
-  if (type === "INCOME_CREDIT_75" || type === "SELF_ACCOUNT_CREDIT") {
-    if (ot) {
-      const parentLabel = describeSource({ ...tx, type: ot });
-      return `${parentLabel}`;
-    }
-    return type === "SELF_ACCOUNT_CREDIT" ? "Self Account Credit" : "Income Credited";
-  }
-
-  // Prime direct/self
-  if (src === "PRIME_150" || st === "PRIME_150" || tier === 150) return "Prime 150";
-  if (src === "PRIME_750" || st === "PRIME_750" || tier === 750) return "Join Subscription (₹1,000)";
-
-  // Fallback
-  return humanizeType(type);
 }
 
 function ymd(d) {
@@ -744,7 +754,7 @@ function classifyTransaction(tx) {
   return "OTHER";
 }
 
-function HistoryRow({ tx, onClick }) {
+const HistoryRow = React.memo(function HistoryRow({ tx, onClick }) {
   const rawAmount = Number(tx?.amount || 0);
   const meta = tx?.meta || {};
   const isP2pReceive = tx?.type === "P2P_PACKAGE_COUPON_RECEIVE";
@@ -787,9 +797,10 @@ function HistoryRow({ tx, onClick }) {
   const isRankUpgradeRow =
     String(tx?.source_type || "").toUpperCase() === "RANK_UPGRADE" ||
     String(tx?.meta?.kind || "").toUpperCase().startsWith("RANK_UPGRADE_");
+  const rawSource = describeSource(tx) || humanizeType(tx?.type) || "Wallet Transfer";
   const typeName = isRankUpgradeRow
-    ? describeSource(tx)
-    : `${describeSource(tx)}${Number.isFinite(levelVal) ? ` - Layer ${levelVal}` : ""}`;
+    ? rawSource
+    : `${rawSource}${Number.isFinite(levelVal) ? ` - Layer ${levelVal}` : ""}`;
 
   const cat = classifyTransaction(tx);
   const isCredit = amount >= 0;
@@ -916,7 +927,7 @@ function HistoryRow({ tx, onClick }) {
       </Stack>
     </Paper>
   );
-}
+});
 
 function TxDetailDrawer({ open, onClose, tx }) {
   if (!tx) return null;
@@ -1102,7 +1113,9 @@ function TxDetailDrawer({ open, onClose, tx }) {
   );
 }
 
-function SectionList({ sections, fallbackRows = [], onRowClick }) {
+const SectionList = React.memo(function SectionList({ sections, fallbackRows = [], onRowClick }) {
+  const [visibleLimit, setVisibleLimit] = useState(50);
+
   const empty =
     !sections ||
     sections.length === 0 ||
@@ -1110,15 +1123,26 @@ function SectionList({ sections, fallbackRows = [], onRowClick }) {
 
   if (empty) {
     if (Array.isArray(fallbackRows) && fallbackRows.length > 0) {
+      const visibleFallback = fallbackRows.slice(0, visibleLimit);
       return (
         <Stack spacing={1}>
-          {fallbackRows.map((tx, i) => (
+          {visibleFallback.map((tx, i) => (
             <HistoryRow
               key={`${tx.id || i}-${tx.created_at || i}`}
               tx={tx}
               onClick={() => onRowClick && onRowClick(tx)}
             />
           ))}
+          {fallbackRows.length > visibleLimit && (
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => setVisibleLimit((v) => v + 50)}
+              sx={{ mt: 1, py: 1, borderRadius: 2, textTransform: "none", fontWeight: 700 }}
+            >
+              Load More Transactions ({fallbackRows.length - visibleLimit} remaining)
+            </Button>
+          )}
         </Stack>
       );
     }
@@ -1131,9 +1155,26 @@ function SectionList({ sections, fallbackRows = [], onRowClick }) {
     );
   }
 
+  let rowsCounted = 0;
+  const renderedSections = [];
+  let totalRowsAcross = 0;
+
+  for (const sec of sections) {
+    const sRows = sec.rows || [];
+    totalRowsAcross += sRows.length;
+    if (rowsCounted >= visibleLimit) continue;
+    const remainingBudget = visibleLimit - rowsCounted;
+    const sliceOfRows = sRows.slice(0, remainingBudget);
+    rowsCounted += sliceOfRows.length;
+    renderedSections.push({
+      ...sec,
+      rows: sliceOfRows,
+    });
+  }
+
   return (
     <Stack spacing={1.5}>
-      {sections.map((sec, idx) => (
+      {renderedSections.map((sec, idx) => (
         <Box key={`${sec.title}-${idx}`}>
           <SectionHeader title={sec.title} total={sec.total} />
           <Stack spacing={1}>
@@ -1147,9 +1188,29 @@ function SectionList({ sections, fallbackRows = [], onRowClick }) {
           </Stack>
         </Box>
       ))}
+      {totalRowsAcross > visibleLimit && (
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={() => setVisibleLimit((v) => v + 100)}
+          sx={{
+            mt: 1.5,
+            py: 1,
+            borderRadius: 2.5,
+            textTransform: "none",
+            fontWeight: 800,
+            borderColor: "#CBD5E1",
+            color: "#334155",
+            bgcolor: "#F8FAFC",
+            "&:hover": { bgcolor: "#F1F5F9", borderColor: "#94A3B8" },
+          }}
+        >
+          Load More Transactions ({totalRowsAcross - visibleLimit} remaining)
+        </Button>
+      )}
     </Stack>
   );
-}
+});
 
 function PhonePeFilterDrawer({
   open,
@@ -1382,6 +1443,270 @@ function PhonePeFilterDrawer({
   );
 }
 
+const P2PTransferPanel = React.memo(function P2PTransferPanel({
+  p2pTaxPercent = 7,
+  availableBalance = 0,
+  onSuccess,
+}) {
+  const [recipientPhone, setRecipientPhone] = useState("");
+  const [amount, setAmount] = useState("");
+  const [recipientValid, setRecipientValid] = useState(null);
+  const [recipientChecking, setRecipientChecking] = useState(false);
+  const [recipientInfo, setRecipientInfo] = useState(null);
+  const [p2pBusy, setP2pBusy] = useState(false);
+  const [p2pError, setP2pError] = useState("");
+  const [p2pSuccess, setP2pSuccess] = useState("");
+
+  const handleVerify = async () => {
+    const val = String(recipientPhone || "").trim();
+    if (!val) {
+      setRecipientValid(false);
+      setRecipientInfo(null);
+      return;
+    }
+    setRecipientChecking(true);
+    setRecipientValid(null);
+    setRecipientInfo(null);
+    try {
+      let found = false;
+      let info = null;
+
+      try {
+        const res = await API.get("/accounts/regions/by-sponsor/", {
+          params: { sponsor: val, level: "state" },
+        });
+        const sp = res?.data?.sponsor;
+        if (sp && sp.username) {
+          found = true;
+          info = {
+            name: sp.full_name || sp.name || sp.username,
+            username: sp.username,
+            phone: sp.phone || sp.username,
+            pincode: sp.pincode,
+          };
+        }
+      } catch (_) {}
+
+      if (!found) {
+        try {
+          const res2 = await API.get("/accounts/hierarchy/", {
+            params: { username: val },
+          });
+          const u = res2?.data?.user || res2?.data;
+          if (u && (u.username || u.full_name)) {
+            found = true;
+            info = {
+              name: u.full_name || u.username,
+              username: u.username,
+              phone: u.phone || u.username,
+              pincode: u.pincode,
+            };
+          }
+        } catch (_) {}
+      }
+
+      if (found && info) {
+        setRecipientValid(true);
+        setRecipientInfo(info);
+      } else {
+        setRecipientValid(false);
+        setRecipientInfo(null);
+      }
+    } catch (_) {
+      setRecipientValid(false);
+      setRecipientInfo(null);
+    } finally {
+      setRecipientChecking(false);
+    }
+  };
+
+  const p2pGross = Number(amount || 0);
+  const p2pFee = p2pGross > 0 ? Number(((p2pGross * p2pTaxPercent) / 100).toFixed(2)) : 0;
+  const p2pNet = p2pGross > 0 ? Number((p2pGross - p2pFee).toFixed(2)) : 0;
+
+  const handleTransfer = async () => {
+    if (!recipientPhone.trim()) {
+      setP2pError("Please enter recipient phone number.");
+      return;
+    }
+    if (p2pGross <= 0) {
+      setP2pError("Please enter a valid transfer amount.");
+      return;
+    }
+    if (p2pGross > availableBalance) {
+      setP2pError(`Insufficient balance. Your available balance is ₹${fmtAmount(availableBalance)}.`);
+      return;
+    }
+    try {
+      setP2pBusy(true);
+      setP2pError("");
+      setP2pSuccess("");
+
+      const res = await API.post("/business/coupons/p2p-transfer/", {
+        recipient_phone: recipientPhone.trim(),
+        amount: p2pGross,
+        coupon_type: "PACKAGE_COUPON",
+      });
+
+      const vCode = res.data?.voucher_code;
+      setP2pSuccess(`Successfully sent ₹${fmtAmount(p2pNet)} to ${recipientPhone}! (${p2pTaxPercent}% Tax: ₹${fmtAmount(p2pFee)})${vCode ? ` • Voucher Code: ${vCode}` : ""}`);
+      setRecipientPhone("");
+      setAmount("");
+      setRecipientValid(null);
+      setRecipientInfo(null);
+      if (onSuccess) onSuccess();
+    } catch (err) {
+      setP2pError(err?.response?.data?.detail || err?.response?.data?.message || "Failed to complete P2P transfer.");
+    } finally {
+      setP2pBusy(false);
+    }
+  };
+
+  return (
+    <Box sx={{ bgcolor: "#F8FAFC", p: 2, borderRadius: 3, border: "1px solid #E2E8F0", mb: 2 }}>
+      <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: "#0F172A", mb: 0.5 }}>
+        Instant Peer-to-Peer Transfer
+      </Typography>
+      <Typography sx={{ fontSize: 12, color: "#64748B", mb: 1.5 }}>
+        Transfers package coupon directly to another verified member with {p2pTaxPercent}% GST/Fee deducted.
+      </Typography>
+
+      {p2pError && <Alert severity="error" sx={{ mb: 1.5, borderRadius: 2, fontSize: 12.5 }}>{p2pError}</Alert>}
+      {p2pSuccess && <Alert severity="success" sx={{ mb: 1.5, borderRadius: 2, fontSize: 12.5 }}>{p2pSuccess}</Alert>}
+
+      <Stack spacing={1.5}>
+        <Box>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <TextField
+              fullWidth
+              size="small"
+              label="Recipient Phone Number or User ID"
+              placeholder="Enter 10-digit mobile number"
+              value={recipientPhone}
+              onChange={(e) => {
+                setRecipientPhone(e.target.value);
+                setP2pError("");
+                setRecipientValid(null);
+                setRecipientInfo(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleVerify();
+                }
+              }}
+              inputProps={{ maxLength: 15 }}
+              sx={{ bgcolor: "#fff", borderRadius: 2 }}
+            />
+            <Button
+              variant="contained"
+              disabled={recipientChecking || !recipientPhone.trim()}
+              onClick={handleVerify}
+              sx={{
+                py: 1,
+                px: 2,
+                borderRadius: 2,
+                textTransform: "none",
+                fontWeight: 800,
+                fontSize: "12.5px",
+                bgcolor: "#0F172A",
+                "&:hover": { bgcolor: "#1E293B" },
+                whiteSpace: "nowrap",
+                minWidth: 80,
+              }}
+            >
+              {recipientChecking ? <CircularProgress size={14} color="inherit" /> : "Verify"}
+            </Button>
+          </Stack>
+
+          {!recipientChecking && recipientValid === true && recipientInfo && (
+            <Paper
+              elevation={0}
+              sx={{
+                mt: 1,
+                p: 1,
+                px: 1.2,
+                borderRadius: 2,
+                bgcolor: "#ECFDF5",
+                border: "1px solid #A7F3D0",
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+              }}
+            >
+              <CheckCircleRoundedIcon sx={{ color: "#059669", fontSize: 18 }} />
+              <Box>
+                <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#065F46" }}>
+                  Verified: {recipientInfo.name}
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: "#047857" }}>
+                  ID/Phone: {recipientInfo.username} {recipientInfo.pincode ? `• PIN: ${recipientInfo.pincode}` : ""}
+                </Typography>
+              </Box>
+            </Paper>
+          )}
+
+          {!recipientChecking && recipientValid === false && (
+            <Typography sx={{ fontSize: 11.5, color: "#DC2626", fontWeight: 600, mt: 0.8, px: 0.5 }}>
+              ⚠ Recipient not found. Please verify the mobile number or user ID.
+            </Typography>
+          )}
+        </Box>
+
+        <TextField
+          fullWidth
+          size="small"
+          label="Transfer Amount (₹)"
+          placeholder="e.g. 1000"
+          type="number"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          sx={{ bgcolor: "#fff", borderRadius: 2 }}
+        />
+
+        {p2pGross > 0 && (
+          <Paper elevation={0} sx={{ p: 1.5, bgcolor: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 2 }}>
+            <Stack spacing={0.5}>
+              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                <Typography sx={{ fontSize: 12, color: "#1E3A8A" }}>Transfer Amount:</Typography>
+                <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#1E3A8A" }}>₹ {p2pGross.toFixed(2)}</Typography>
+              </Box>
+              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                <Typography sx={{ fontSize: 12, color: "#DC2626" }}>Transfer Fee / Tax ({p2pTaxPercent}%):</Typography>
+                <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#DC2626" }}>- ₹ {p2pFee.toFixed(2)}</Typography>
+              </Box>
+              <Divider sx={{ my: 0.5, borderColor: "#BFDBFE" }} />
+              <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#1D4ED8" }}>Recipient Receives:</Typography>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#1D4ED8" }}>₹ {p2pNet.toFixed(2)}</Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        )}
+
+        <Button
+          fullWidth
+          variant="contained"
+          disabled={p2pBusy || p2pGross <= 0 || !recipientPhone.trim() || recipientValid !== true}
+          onClick={handleTransfer}
+          startIcon={p2pBusy ? <CircularProgress size={16} color="inherit" /> : <SendRoundedIcon />}
+          sx={{
+            py: 1.25,
+            borderRadius: 2.5,
+            fontWeight: 800,
+            fontSize: 14,
+            textTransform: "none",
+            bgcolor: "#2563EB",
+            "&:hover": { bgcolor: "#1D4ED8" },
+          }}
+        >
+          {p2pBusy ? "Processing Transfer..." : recipientValid === true ? `Transfer ₹${p2pGross > 0 ? fmtAmount(p2pGross) : "0.00"} (Net: ₹${fmtAmount(p2pNet)})` : "Verify Recipient to Transfer"}
+        </Button>
+      </Stack>
+    </Box>
+  );
+});
+
 /** ---------- main page ---------- */
 export default function History() {
   const navigate = useNavigate();
@@ -1418,21 +1743,6 @@ export default function History() {
   const [txDetailOpen, setTxDetailOpen] = useState(false);
   const [tab, setTab] = useState(0);
 
-  // In-Drawer P2P Transfer State
-  const [p2pForm, setP2pForm] = useState({
-    recipient_phone: "",
-    amount: "",
-    coupon_type: "PACKAGE_COUPON",
-  });
-  const [p2pBusy, setP2pBusy] = useState(false);
-  const [p2pError, setP2pError] = useState("");
-  const [p2pSuccess, setP2pSuccess] = useState("");
-
-  // Recipient Verification State
-  const [recipientValid, setRecipientValid] = useState(null); // null | true | false
-  const [recipientChecking, setRecipientChecking] = useState(false);
-  const [recipientInfo, setRecipientInfo] = useState(null);
-
   // PhonePe-Style Filter State
   const [searchQuery, setSearchQuery] = useState("");
   const [datePreset, setDatePreset] = useState("all");
@@ -1443,72 +1753,6 @@ export default function History() {
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-
-  // Explicit Recipient Verification
-  const handleVerifyRecipient = async () => {
-    const val = String(p2pForm.recipient_phone || "").trim();
-    if (!val) {
-      setRecipientValid(false);
-      setRecipientInfo(null);
-      return;
-    }
-    setRecipientChecking(true);
-    setRecipientValid(null);
-    setRecipientInfo(null);
-    try {
-      let found = false;
-      let info = null;
-
-      // Check 1: Sponsor / Region lookup
-      try {
-        const res = await API.get("/accounts/regions/by-sponsor/", {
-          params: { sponsor: val, level: "state" },
-        });
-        const sp = res?.data?.sponsor;
-        if (sp && sp.username) {
-          found = true;
-          info = {
-            name: sp.full_name || sp.username,
-            username: sp.username,
-            phone: sp.phone || sp.username,
-            pincode: sp.pincode,
-          };
-        }
-      } catch {}
-
-      // Check 2: User hierarchy lookup fallback
-      if (!found) {
-        try {
-          const res2 = await API.get("/accounts/hierarchy/", {
-            params: { username: val },
-          });
-          const u = res2?.data?.user || res2?.data;
-          if (u && (u.username || u.full_name)) {
-            found = true;
-            info = {
-              name: u.full_name || u.username,
-              username: u.username,
-              phone: u.phone || u.username,
-              pincode: u.pincode,
-            };
-          }
-        } catch {}
-      }
-
-      if (found && info) {
-        setRecipientValid(true);
-        setRecipientInfo(info);
-      } else {
-        setRecipientValid(false);
-        setRecipientInfo(null);
-      }
-    } catch {
-      setRecipientValid(false);
-      setRecipientInfo(null);
-    } finally {
-      setRecipientChecking(false);
-    }
-  };
 
   const fetchHistory = async () => {
     try {
@@ -1654,46 +1898,7 @@ export default function History() {
     }
   };
 
-  const p2pGross = Number(p2pForm.amount || 0);
   const p2pTaxPercent = Number(taxConfig.p2p_package_tax_percent || 7);
-  const p2pFee = p2pGross > 0 ? Number(((p2pGross * p2pTaxPercent) / 100).toFixed(2)) : 0;
-  const p2pNet = p2pGross > 0 ? Number((p2pGross - p2pFee).toFixed(2)) : 0;
-
-  const handleP2pTransfer = async () => {
-    if (!p2pForm.recipient_phone.trim()) {
-      setP2pError("Please enter recipient phone number.");
-      return;
-    }
-    if (p2pGross <= 0) {
-      setP2pError("Please enter a valid transfer amount.");
-      return;
-    }
-    const avail = Number(top.main_income_balance || top.withdrawable_balance || 0);
-    if (p2pGross > avail) {
-      setP2pError(`Insufficient balance. Your available balance is ₹${fmtAmount(avail)}.`);
-      return;
-    }
-    try {
-      setP2pBusy(true);
-      setP2pError("");
-      setP2pSuccess("");
-
-      const res = await API.post("/business/coupons/p2p-transfer/", {
-        recipient_phone: p2pForm.recipient_phone.trim(),
-        amount: p2pGross,
-        coupon_type: p2pForm.coupon_type,
-      });
-
-      const vCode = res.data?.voucher_code;
-      setP2pSuccess(`Successfully sent ₹${fmtAmount(p2pNet)} to ${p2pForm.recipient_phone}! (${p2pTaxPercent}% Tax: ₹${fmtAmount(p2pFee)})${vCode ? ` • Voucher Code: ${vCode}` : ""}`);
-      setP2pForm({ recipient_phone: "", amount: "", coupon_type: "PACKAGE_COUPON" });
-      fetchHistory();
-    } catch (err) {
-      setP2pError(err?.response?.data?.detail || "Failed to complete P2P transfer.");
-    } finally {
-      setP2pBusy(false);
-    }
-  };
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -2501,147 +2706,11 @@ export default function History() {
 
         {/* Drawer Mode 1: P2P Transfer */}
         {drawerMode === "p2p" && (
-          <Box sx={{ bgcolor: "#F8FAFC", p: 2, borderRadius: 3, border: "1px solid #E2E8F0", mb: 2 }}>
-            <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: "#0F172A", mb: 0.5 }}>
-              Instant Peer-to-Peer Transfer
-            </Typography>
-            <Typography sx={{ fontSize: 12, color: "#64748B", mb: 1.5 }}>
-              Transfers package coupon directly to another verified member with {p2pTaxPercent}% GST/Fee deducted.
-            </Typography>
-
-            {p2pError && <Alert severity="error" sx={{ mb: 1.5, borderRadius: 2, fontSize: 12.5 }}>{p2pError}</Alert>}
-            {p2pSuccess && <Alert severity="success" sx={{ mb: 1.5, borderRadius: 2, fontSize: 12.5 }}>{p2pSuccess}</Alert>}
-
-            <Stack spacing={1.5}>
-              <Box>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Recipient Phone Number or User ID"
-                    placeholder="Enter 10-digit mobile number"
-                    value={p2pForm.recipient_phone}
-                    onChange={(e) => {
-                      setP2pForm({ ...p2pForm, recipient_phone: e.target.value });
-                      setP2pError("");
-                      setRecipientValid(null);
-                      setRecipientInfo(null);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleVerifyRecipient();
-                      }
-                    }}
-                    inputProps={{ maxLength: 15 }}
-                    sx={{ bgcolor: "#fff", borderRadius: 2 }}
-                  />
-                  <Button
-                    variant="contained"
-                    disabled={recipientChecking || !p2pForm.recipient_phone.trim()}
-                    onClick={handleVerifyRecipient}
-                    sx={{
-                      py: 1,
-                      px: 2,
-                      borderRadius: 2,
-                      textTransform: "none",
-                      fontWeight: 800,
-                      fontSize: "12.5px",
-                      bgcolor: "#0F172A",
-                      "&:hover": { bgcolor: "#1E293B" },
-                      whiteSpace: "nowrap",
-                      minWidth: 80,
-                    }}
-                  >
-                    {recipientChecking ? <CircularProgress size={14} color="inherit" /> : "Verify"}
-                  </Button>
-                </Stack>
-
-                {!recipientChecking && recipientValid === true && recipientInfo && (
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      mt: 1,
-                      p: 1,
-                      px: 1.2,
-                      borderRadius: 2,
-                      bgcolor: "#ECFDF5",
-                      border: "1px solid #A7F3D0",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                    }}
-                  >
-                    <CheckCircleRoundedIcon sx={{ color: "#059669", fontSize: 18 }} />
-                    <Box>
-                      <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#065F46" }}>
-                        Verified: {recipientInfo.name}
-                      </Typography>
-                      <Typography sx={{ fontSize: 11, color: "#047857" }}>
-                        ID/Phone: {recipientInfo.username} {recipientInfo.pincode ? `• PIN: ${recipientInfo.pincode}` : ""}
-                      </Typography>
-                    </Box>
-                  </Paper>
-                )}
-
-                {!recipientChecking && recipientValid === false && (
-                  <Typography sx={{ fontSize: 11.5, color: "#DC2626", fontWeight: 600, mt: 0.8, px: 0.5 }}>
-                    ⚠ Recipient not found. Please verify the mobile number or user ID.
-                  </Typography>
-                )}
-              </Box>
-
-              <TextField
-                fullWidth
-                size="small"
-                label="Transfer Amount (₹)"
-                placeholder="e.g. 1000"
-                type="number"
-                value={p2pForm.amount}
-                onChange={(e) => setP2pForm({ ...p2pForm, amount: e.target.value })}
-                sx={{ bgcolor: "#fff", borderRadius: 2 }}
-              />
-
-              {p2pGross > 0 && (
-                <Paper elevation={0} sx={{ p: 1.5, bgcolor: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 2 }}>
-                  <Stack spacing={0.5}>
-                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                      <Typography sx={{ fontSize: 12, color: "#1E3A8A" }}>Transfer Amount:</Typography>
-                      <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#1E3A8A" }}>₹ {p2pGross.toFixed(2)}</Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                      <Typography sx={{ fontSize: 12, color: "#DC2626" }}>Transfer Fee / Tax ({p2pTaxPercent}%):</Typography>
-                      <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#DC2626" }}>- ₹ {p2pFee.toFixed(2)}</Typography>
-                    </Box>
-                    <Divider sx={{ my: 0.5, borderColor: "#BFDBFE" }} />
-                    <Box sx={{ display: "flex", justifyContent: "space-between" }}>
-                      <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#1D4ED8" }}>Recipient Receives:</Typography>
-                      <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#1D4ED8" }}>₹ {p2pNet.toFixed(2)}</Typography>
-                    </Box>
-                  </Stack>
-                </Paper>
-              )}
-
-              <Button
-                fullWidth
-                variant="contained"
-                disabled={p2pBusy || p2pGross <= 0 || !p2pForm.recipient_phone.trim() || recipientValid !== true}
-                onClick={handleP2pTransfer}
-                startIcon={p2pBusy ? <CircularProgress size={16} color="inherit" /> : <SendRoundedIcon />}
-                sx={{
-                  py: 1.25,
-                  borderRadius: 2.5,
-                  fontWeight: 800,
-                  fontSize: 14,
-                  textTransform: "none",
-                  bgcolor: "#2563EB",
-                  "&:hover": { bgcolor: "#1D4ED8" },
-                }}
-              >
-                {p2pBusy ? "Processing Transfer..." : recipientValid === true ? `Transfer ₹${p2pGross > 0 ? fmtAmount(p2pGross) : "0.00"} (Net: ₹${fmtAmount(p2pNet)})` : "Verify Recipient to Transfer"}
-              </Button>
-            </Stack>
-          </Box>
+          <P2PTransferPanel
+            p2pTaxPercent={p2pTaxPercent}
+            availableBalance={Number(top.main_income_balance || top.withdrawable_balance || 0)}
+            onSuccess={() => fetchHistory()}
+          />
         )}
 
         {/* Quick External & Portal Actions */}

@@ -50,6 +50,68 @@ const TOKENS = {
   lineDotted: "#CBD5E1",
 };
 
+function maskUsernameMid(u) {
+  const s = String(u || "").trim();
+  const digitsOnly = s.replace(/\D/g, "");
+  if (digitsOnly.length === 10) {
+    // Exactly hide middle 4 numbers: e.g. 9999999999 -> 999****999, 8095918105 -> 809****105, 1000000101 -> 100****101
+    return `${s.slice(0, 3)}****${s.slice(-3)}`;
+  }
+  if (digitsOnly.length >= 8) {
+    const len = s.length;
+    const hideLen = 4;
+    const pre = Math.floor((len - hideLen) / 2);
+    return `${s.slice(0, pre)}****${s.slice(pre + hideLen)}`;
+  }
+  return s;
+}
+
+function getCurrentUser() {
+  try {
+    const raw =
+      localStorage.getItem("user_user") ||
+      sessionStorage.getItem("user_user") ||
+      localStorage.getItem("user") ||
+      sessionStorage.getItem("user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatNodeUsername(node, currentUser, isAdmin, directsSet) {
+  const raw = String(node?.username || node?.phone || node?.id || "").trim();
+  if (!raw || raw === "Member") return "Member";
+  if (isAdmin) return raw;
+
+  const rawLower = raw.toLowerCase();
+
+  // 1. Is Self? (own account, self-rebirth ID, matching phone/username/id)
+  if (node?.is_self) return raw;
+  if (currentUser) {
+    const cId = String(currentUser.id || currentUser.user_id || "");
+    const cUser = String(currentUser.username || "").trim().toLowerCase();
+    const cPhone = String(currentUser.phone || "").trim().toLowerCase();
+    const nOwnerId = String(node?.owner_id || node?.user_id || node?.id || "");
+
+    if ((cId && nOwnerId === cId) || (cUser && rawLower === cUser) || (cPhone && rawLower === cPhone)) {
+      return raw;
+    }
+  }
+
+  // 2. Is Direct Referral?
+  if (node?.is_direct) return raw;
+  if (directsSet && directsSet.size > 0) {
+    const nOwnerId = String(node?.owner_id || node?.user_id || node?.id || "");
+    if (directsSet.has(rawLower) || (nOwnerId && directsSet.has(nOwnerId))) {
+      return raw;
+    }
+  }
+
+  // 3. Indirect / Spillover Downline: Mask middle 4 numbers with ****
+  return maskUsernameMid(raw);
+}
+
 function getLayerActivationBadge(node, useRankMatrix, isRoot = false, defaultLevel = 0) {
   if (!node) {
     return {
@@ -197,6 +259,33 @@ export default function AccordionTree({
   const is3Block = String(pool || "").toUpperCase().includes("THREE") || String(pool || "").includes("3");
   const maxSlots = is3Block ? 3 : 5;
 
+  const currentUser = useMemo(() => getCurrentUser(), []);
+  const [directsSet, setDirectsSet] = useState(new Set());
+
+  useEffect(() => {
+    if (isAdmin) return;
+    let active = true;
+    API.get("/accounts/team/summary/", { cacheTTL: 60000 })
+      .then((res) => {
+        if (!active) return;
+        const team = res?.data?.direct_team;
+        if (Array.isArray(team)) {
+          const s = new Set();
+          team.forEach((m) => {
+            if (m.username) s.add(String(m.username).trim().toLowerCase());
+            if (m.phone) s.add(String(m.phone).trim().toLowerCase());
+            if (m.id) s.add(String(m.id));
+            if (m.user_id) s.add(String(m.user_id));
+          });
+          setDirectsSet(s);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [isAdmin]);
+
   const [rootNode, setRootNode] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -282,15 +371,16 @@ export default function AccordionTree({
 
   useEffect(() => {
     if (rootNode && trail.length === 0) {
+      const uLabel = formatNodeUsername(rootNode, currentUser, isAdmin, directsSet);
       setBaseRootInfo({
-        label: rootNode.username
-          ? `${rootNode.username}${rootNode.account_id ? ` (#${rootNode.account_id})` : ""}`
+        label: uLabel
+          ? `${uLabel}${rootNode.account_id ? ` (#${rootNode.account_id})` : ""}`
           : `Entry #${rootNode.account_id || rootNode.id || "Root"}`,
         entryId: rootNode.account_id || (useRankMatrix ? (rootNode.user_id || rootNode.id) : rootNode.id),
         username: rootNode.username || rootNode.id,
       });
     }
-  }, [rootNode, trail.length, useRankMatrix]);
+  }, [rootNode, trail.length, useRankMatrix, currentUser, isAdmin, directsSet]);
 
   // Drilldown to a specific node
   const handleDrilldown = (node) => {
@@ -306,9 +396,10 @@ export default function AccordionTree({
       ? (rootNode?.user_id || rootNode?.id)
       : (rootNode?.account_id || rootNode?.id);
 
+    const uLabel = formatNodeUsername(rootNode, currentUser, isAdmin, directsSet);
     const ancestor = {
-      label: currentIdent
-        ? `${currentIdent}${!useRankMatrix && currentEntryId ? ` (#${currentEntryId})` : ""}`
+      label: uLabel
+        ? `${uLabel}${!useRankMatrix && currentEntryId ? ` (#${currentEntryId})` : ""}`
         : `Entry #${currentEntryId || "Root"}`,
       node: rootNode,
       entryId: currentEntryId,
@@ -522,7 +613,10 @@ export default function AccordionTree({
           <>
             <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#94A3B8" }}>→</Typography>
             <Chip
-              label={rootNode.username ? `${rootNode.username}${rootNode.account_id ? ` (#${rootNode.account_id})` : ""}` : `Entry #${rootNode.account_id || rootNode.id}`}
+              label={(() => {
+                const u = formatNodeUsername(rootNode, currentUser, isAdmin, directsSet);
+                return u ? `${u}${rootNode.account_id ? ` (#${rootNode.account_id})` : ""}` : `Entry #${rootNode.account_id || rootNode.id}`;
+              })()}
               size="small"
               sx={{
                 fontWeight: 900,
@@ -545,6 +639,8 @@ export default function AccordionTree({
         pool={pool}
         useEntriesTree={useEntriesTree}
         isAdmin={isAdmin}
+        currentUser={currentUser}
+        directsSet={directsSet}
         useRankMatrix={useRankMatrix}
         onDrilldown={handleDrilldown}
         trailLength={trail.length}
@@ -568,6 +664,8 @@ function AccordionBranchCard({
   pool,
   useEntriesTree,
   isAdmin,
+  currentUser = null,
+  directsSet = null,
   useRankMatrix,
   onDrilldown,
   trailLength = 0,
@@ -654,9 +752,10 @@ function AccordionBranchCard({
 
   // Visual Initial / Avatar number
   const avatarText = useMemo(() => {
-    const raw = String(node?.username || node?.id || "U").trim();
+    const formatted = formatNodeUsername(node, currentUser, isAdmin, directsSet);
+    const raw = String(formatted || node?.id || "U").trim();
     return raw.length > 0 ? raw.charAt(0) : "U";
-  }, [node]);
+  }, [node, currentUser, isAdmin, directsSet]);
 
   return (
     <Box sx={{ width: "100%", position: "relative" }}>
@@ -723,7 +822,7 @@ function AccordionBranchCard({
           <Box>
             <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
               <Typography sx={{ fontSize: { xs: 14, sm: 15.5 }, fontWeight: 900, color: TOKENS.text }}>
-                {node?.username || node?.id || "Member"}
+                {formatNodeUsername(node, currentUser, isAdmin, directsSet)}
               </Typography>
               {node?.account_id && (
                 <Typography sx={{ fontSize: 12, fontWeight: 700, color: TOKENS.textSec }}>
@@ -1033,13 +1132,13 @@ function AccordionBranchCard({
                               justifyContent: "center",
                             }}
                           >
-                            {String(child.username || child.id || "U").charAt(0)}
+                            {String(formatNodeUsername(child, currentUser, isAdmin, directsSet) || child.id || "U").charAt(0)}
                           </Box>
 
                           <Box>
                             <Stack direction="row" alignItems="center" spacing={0.75}>
                               <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: TOKENS.text }}>
-                                {child.username || child.id}
+                                {formatNodeUsername(child, currentUser, isAdmin, directsSet)}
                               </Typography>
                               {child.account_id && (
                                 <Typography sx={{ fontSize: 11, fontWeight: 700, color: TOKENS.textSec }}>
