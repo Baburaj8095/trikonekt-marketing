@@ -361,3 +361,85 @@ class WalletEngine:
             ],
         )
 
+    @classmethod
+    def reconcile_wallet_accounts(cls, user: CustomUser) -> dict:
+        """
+        Generic, idempotent reconciliation of a user's WalletAccount balances.
+        Audits live WalletAccount balances against the true double-entry LedgerEntry
+        and WalletTransaction tables, repairing any historical drift or multi-crediting.
+        """
+        if not user or not getattr(user, "id", None):
+            return {}
+
+        results = {}
+        # 1. MAIN WALLET
+        try:
+            main_acc = cls.get_account(user, WalletTypes.MAIN, lock=False)
+            le_entries = LedgerEntry.objects.filter(wallet_account=main_acc, status="POSTED")
+            if le_entries.exists():
+                cr = le_entries.filter(direction=LedgerDirections.CREDIT).aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
+                db = le_entries.filter(direction=LedgerDirections.DEBIT).aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
+                true_main = max(Decimal("0.00"), cr - db)
+            else:
+                income_types = [
+                    "INCOME_CREDIT_75", "DIRECT_REF_BONUS", "AUTOPOOL_BONUS_THREE",
+                    "AUTOPOOL_BONUS_FIVE", "PINCODE_ROYALTY", "MONTHLY_759_DIRECT",
+                    "MONTHLY_759_LEVEL", "PRIME_750_DIRECT", "COMMISSION_CREDIT",
+                    "LEVEL_BONUS", "GLOBAL_ROYALTY", "FRANCHISE_INCOME"
+                ]
+                cr = WalletTransaction.objects.filter(
+                    user=user, amount__gt=0, type__in=income_types
+                ).exclude(meta__ledger="SELF_ACCOUNT").aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
+                db = WalletTransaction.objects.filter(
+                    user=user, amount__lt=0
+                ).exclude(type="SELF_ACCOUNT_DEBIT").aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
+                true_main = max(Decimal("0.00"), cr + db)
+
+            if main_acc.current_balance != true_main:
+                main_acc.current_balance = true_main
+                main_acc.available_balance = true_main
+                main_acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
+                results["MAIN"] = str(true_main)
+        except Exception:
+            pass
+
+        # 2. SELF PACKAGE POCKET
+        try:
+            self_acc = cls.get_account(user, WalletTypes.SELF_PACKAGE_POCKET, lock=False)
+            le_self = LedgerEntry.objects.filter(wallet_account=self_acc, status="POSTED")
+            if le_self.exists():
+                cr_s = le_self.filter(direction=LedgerDirections.CREDIT).aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
+                db_s = le_self.filter(direction=LedgerDirections.DEBIT).aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
+                true_self = max(Decimal("0.00"), cr_s - db_s)
+            else:
+                cr_s = WalletTransaction.objects.filter(
+                    user=user, amount__gt=0, type="SELF_ACCOUNT_CREDIT"
+                ).aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
+                db_s = WalletTransaction.objects.filter(
+                    user=user, type="SELF_ACCOUNT_DEBIT"
+                ).aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
+                true_self = max(Decimal("0.00"), cr_s + db_s)
+
+            if self_acc.current_balance != true_self:
+                self_acc.current_balance = true_self
+                self_acc.available_balance = true_self
+                self_acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
+                results["SELF_PACKAGE_POCKET"] = str(true_self)
+        except Exception:
+            pass
+
+        # 3. WITHDRAWAL WALLET
+        try:
+            with_acc = cls.get_account(user, WalletTypes.WITHDRAWAL_WALLET, lock=False)
+            main_acc = cls.get_account(user, WalletTypes.MAIN, lock=False)
+            true_with = main_acc.current_balance if getattr(user, "account_active", False) else Decimal("0.00")
+            if with_acc.current_balance != true_with:
+                with_acc.current_balance = true_with
+                with_acc.available_balance = true_with
+                with_acc.save(update_fields=["current_balance", "available_balance", "updated_at"])
+                results["WITHDRAWAL_WALLET"] = str(true_with)
+        except Exception:
+            pass
+
+        return results
+

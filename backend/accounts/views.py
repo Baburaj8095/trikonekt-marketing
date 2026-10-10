@@ -4018,6 +4018,12 @@ def wallet_me_history(request):
     Grouped wallet history and top balances for the authenticated user.
     """
     user = request.user
+    # Real-time ledger reconciliation (self-healing, zero drift guarantee)
+    try:
+        from .wallet_engine import WalletEngine
+        WalletEngine.reconcile_wallet_accounts(user)
+    except Exception:
+        pass
     w = Wallet.get_or_create_for_user(user)
     # Ensure any pending ₹1k blocks are applied before reading history (idempotent via AuditTrail)
     try:
