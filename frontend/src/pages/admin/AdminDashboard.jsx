@@ -1446,6 +1446,32 @@ export default function AdminDashboard() {
               <ReceiptLongRoundedIcon sx={{ fontSize: 20, color: "#2563eb" }} />
             </div>
 
+            {/* Card 16: Validator Commission & Multi-Cycle Activator */}
+            <div
+              onClick={() => navigate("/admin/validator-commission")}
+              style={{
+                background: "linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)",
+                border: "1.5px solid #a7f3d0",
+                borderRadius: 12,
+                padding: 14,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                boxShadow: "0 2px 8px rgba(5, 150, 105, 0.08)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ width: 22, height: 22, borderRadius: 6, background: "#059669", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>16</span>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: "#065f46" }}>Validator Commission & Cycles</div>
+                  <div style={{ fontSize: 11, color: "#047857", fontWeight: 700 }}>Set Amounts, Profit % & Cycle Activator</div>
+                </div>
+              </div>
+              <AccountTreeRoundedIcon sx={{ fontSize: 20, color: "#059669" }} />
+            </div>
+
           </div>
         </div>
 

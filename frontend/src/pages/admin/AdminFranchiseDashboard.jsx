@@ -198,6 +198,7 @@ export default function AdminFranchiseDashboard() {
         <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 1 }}>
           <Typography sx={{ fontWeight: 950, mb: 1 }}>Operational Workflow</Typography>
           <Stack spacing={1}>
+            <WorkflowRow title="Validator Commission & Cycles" body="Admin screen to set each franchise amount (e.g. ₹2L), profit % (e.g. 75%), calculate earning limits, and activate Cycle 2+." to="/admin/franchise/validator-commission" status="Active" />
             <WorkflowRow title="Franchise Users" body="State, district, pincode and coordinator filtered user lists." to="/admin/franchise/users" />
             <WorkflowRow title="Franchise Wallets" body="Wallet exposure for franchise hierarchy users." to="/admin/franchise/wallets" />
             <WorkflowRow title="Achievers Screen" body="Existing franchise achiever management." to="/admin/franchise/achievers" />

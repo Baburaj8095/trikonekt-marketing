@@ -103,6 +103,7 @@ import AdminLevelCommission from "./pages/admin/AdminLevelCommission";
 import AdminMatrixCommission from "./pages/admin/AdminMatrixCommission";
 import AdminCommissionHistory from "./pages/admin/AdminCommissionHistory";
 import AdminCommissionDistribute from "./pages/admin/AdminCommissionDistribute";
+import AdminValidatorCommission from "./pages/admin/AdminValidatorCommission";
 import AdminWalletDebugger from "./pages/admin/AdminWalletDebugger";
 import AdminDailySalesReport from "./pages/admin/AdminDailySalesReport";
 import AdminLedgerStatement from "./pages/admin/AdminLedgerStatement";
@@ -1558,6 +1559,26 @@ function App() {
             <AdminProtectedRoute>
               <AdminFranchiseShell>
                 <AdminCommissionDistribute />
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/franchise/validator-commission"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <AdminValidatorCommission audience="franchise" />
+              </AdminFranchiseShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/validator-commission"
+          element={
+            <AdminProtectedRoute>
+              <AdminFranchiseShell>
+                <AdminValidatorCommission audience="consumer" />
               </AdminFranchiseShell>
             </AdminProtectedRoute>
           }
