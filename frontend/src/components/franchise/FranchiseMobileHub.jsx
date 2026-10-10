@@ -2462,7 +2462,7 @@ export default function FranchiseMobileHub({
               }}
             >
               {[
-                { label: "Add Merchant", icon: StoreRoundedIcon, color: "#2563EB", bg: "#EFF6FF", action: () => setAddMerchantOpen(true) },
+                { label: "Merchants", icon: StoreRoundedIcon, color: "#2563EB", bg: "#EFF6FF", action: () => setActiveScreen("merchants") },
                 { label: "Add User", icon: GroupsOutlinedIcon, color: "#059669", bg: "#ECFDF5", action: () => setAddUserOpen(true) },
                 { label: "Scan QR", icon: QrCodeScannerRoundedIcon, color: "#DC2626", bg: "#FEF2F2", action: () => setScanQrOpen(true) },
                 { label: "History", icon: AccountBalanceWalletRoundedIcon, color: "#0284C7", bg: "#F0F9FF", action: () => setActiveScreen("history") },
@@ -3228,8 +3228,6 @@ export default function FranchiseMobileHub({
             <PageHeader
               title="Captains Management"
               count={filteredCaptains.length}
-              actionLabel="+ Add Captain"
-              onAction={() => setAddCaptainOpen(true)}
             />
 
             {/* Captain Headcount Overview Card */}
@@ -3348,25 +3346,9 @@ export default function FranchiseMobileHub({
                   <Typography sx={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>
                     No Captains Assigned Yet
                   </Typography>
-                  <Typography sx={{ fontSize: 12.5, color: "#64748B", mt: 0.5, mb: 2, fontWeight: 500, maxWidth: 300, mx: "auto" }}>
+                  <Typography sx={{ fontSize: 12.5, color: "#64748B", mt: 0.5, fontWeight: 500, maxWidth: 320, mx: "auto" }}>
                     Field delivery and onboarding captains for this territory will appear here once registered.
                   </Typography>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    startIcon={<AddRoundedIcon />}
-                    onClick={() => setAddCaptainOpen(true)}
-                    sx={{
-                      borderRadius: "12px",
-                      bgcolor: "#7C3AED",
-                      textTransform: "none",
-                      fontWeight: 800,
-                      fontSize: 13,
-                      "&:hover": { bgcolor: "#6D28D9" },
-                    }}
-                  >
-                    Register Captain
-                  </Button>
                 </Paper>
               ) : (
                 filteredCaptains.map((cap) => (
@@ -3523,8 +3505,6 @@ export default function FranchiseMobileHub({
             <PageHeader
               title={activeZoneMetrics.isExecutiveTerritoryTier ? "Territory Commercial Ecosystem" : "Merchants Directory"}
               count={activeZoneMetrics.isExecutiveTerritoryTier ? activeZoneMetrics.dispMerchants : filteredMerchants.length}
-              actionLabel={!activeZoneMetrics.isExecutiveTerritoryTier ? "+ Add Merchant" : undefined}
-              onAction={!activeZoneMetrics.isExecutiveTerritoryTier ? () => setAddMerchantOpen(true) : undefined}
             />
 
             {/* Coordinator Territory / Pincode Filter */}
@@ -4249,51 +4229,9 @@ export default function FranchiseMobileHub({
                       <Typography sx={{ fontSize: 16, fontWeight: 900, color: "#0F172A", mb: 0.5, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                         No merchants yet
                       </Typography>
-                      <Typography sx={{ fontSize: 12.5, color: "#64748B", mb: 2.5, fontWeight: 500, maxWidth: 300, mx: "auto", lineHeight: 1.4 }}>
-                        Start onboarding merchants in your pincode to grow your network and earnings.
+                      <Typography sx={{ fontSize: 12.5, color: "#64748B", fontWeight: 500, maxWidth: 320, mx: "auto", lineHeight: 1.4 }}>
+                        Registered merchants in your assigned territory will appear here once onboarded.
                       </Typography>
-                      <Stack spacing={1.2} sx={{ maxWidth: 280, mx: "auto" }}>
-                        <Button
-                          fullWidth
-                          variant="contained"
-                          onClick={() => setScanQrOpen(true)}
-                          sx={{
-                            borderRadius: "999px",
-                            bgcolor: "#5F259F",
-                            color: "#FFFFFF",
-                            textTransform: "none",
-                            fontWeight: 800,
-                            fontSize: 13,
-                            py: 1,
-                            boxShadow: "0 4px 12px rgba(95, 37, 159, 0.25)",
-                            fontFamily: "'Plus Jakarta Sans', sans-serif",
-                            "&:hover": { bgcolor: "#4D1A85" },
-                            "&:active": { transform: "scale(0.96)" },
-                          }}
-                        >
-                          Scan QR to Add Merchant
-                        </Button>
-                        <Button
-                          fullWidth
-                          variant="outlined"
-                          onClick={() => setAddMerchantOpen(true)}
-                          sx={{
-                            borderRadius: "999px",
-                            borderColor: "#E2E8F0",
-                            color: "#0F172A",
-                            textTransform: "none",
-                            fontWeight: 800,
-                            fontSize: 13,
-                            py: 0.9,
-                            bgcolor: "#FFFFFF",
-                            fontFamily: "'Plus Jakarta Sans', sans-serif",
-                            "&:hover": { bgcolor: "#F8FAFC", borderColor: "#CBD5E1" },
-                            "&:active": { transform: "scale(0.96)" },
-                          }}
-                        >
-                          Add Merchant Manually
-                        </Button>
-                      </Stack>
                     </Paper>
                   ) : (
                     filteredMerchants.map((m) => (
