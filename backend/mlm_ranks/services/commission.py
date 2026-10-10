@@ -199,7 +199,36 @@ class CommissionDistributor:
         now = timezone.now()
         payer = getattr(upgrade, "user", None)
 
+        # Resolve dynamic gross, tax rate, and net pool from CommissionConfig
+        from business.models import CommissionConfig
+        cfg = CommissionConfig.get_solo()
+        master_json = getattr(cfg, "master_commission_json", {}) or {}
+        custom_tax = master_json.get("custom_module_tax", {}) or {}
+        tax_rate_val = custom_tax.get("tax_rank")
+        if tax_rate_val is None:
+            tax_rate_val = cfg.get_tax_percent() or "18.00"
+        tax_pct = Decimal(str(tax_rate_val)) / Decimal("100.00")
+
+        gross_amt = q2(getattr(upgrade, "upgrade_amount", Decimal("0.00")) or Decimal("0.00"))
+        if gross_amt <= 0:
+            to_rank = getattr(upgrade, "to_rank", None)
+            gross_amt = q2(getattr(to_rank, "upgrade_amount", None) or getattr(upgrade, "net_amount", Decimal("0.00")) or Decimal("250.00"))
+
+        gst_amt = q2(getattr(upgrade, "gst_amount", Decimal("0.00")) or Decimal("0.00"))
         net = q2(getattr(upgrade, "net_amount", Decimal("0.00")) or Decimal("0.00"))
+
+        # If gst_amount was not computed or net equaled un-taxed gross, recompute dynamically
+        if gst_amt <= 0 or net >= gross_amt:
+            gst_amt = q2(gross_amt * tax_pct)
+            net = q2(gross_amt - gst_amt)
+            try:
+                upgrade.upgrade_amount = gross_amt
+                upgrade.gst_amount = gst_amt
+                upgrade.net_amount = net
+                upgrade.save(update_fields=["upgrade_amount", "gst_amount", "net_amount"])
+            except Exception:
+                pass
+
         if net <= 0:
             return
         # Idempotency: avoid duplicate payouts if already distributed
@@ -211,15 +240,9 @@ class CommissionDistributor:
         level_pool = q2(net * Decimal("0.50"))
 
         # Retained Platform Tax Credit to Company Root/Tax Account
-        gst_amt = q2(getattr(upgrade, "gst_amount", Decimal("0.00")) or Decimal("0.00"))
         if gst_amt > 0:
             try:
-                from business.models import CommissionConfig
-                cfg = CommissionConfig.get_solo()
                 cu = cfg.get_company_user()
-                if not cu:
-                    from accounts.models import CustomUser
-                    cu = CustomUser.objects.filter(id=1).first() or CustomUser.objects.filter(is_superuser=True).first()
                 if cu:
                     WalletPoster.credit_company_gst(cu, gst_amt, upgrade_id=upgrade.id)
             except Exception:

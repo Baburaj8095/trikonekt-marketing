@@ -475,7 +475,19 @@ class Wallet(models.Model):
         w = self
         amt = Decimal(amount or 0)
         
-        is_company = (self.user.id in (1, 32)) or getattr(self.user, "category", "") == "company" or self.user.is_superuser
+        cfg_company_id = None
+        try:
+            from business.models import CommissionConfig
+            _cu = CommissionConfig.get_solo().get_company_user()
+            if _cu:
+                cfg_company_id = getattr(_cu, "id", None)
+        except Exception:
+            pass
+
+        is_company = (
+            (cfg_company_id is not None and self.user.id == cfg_company_id)
+            or getattr(self.user, "category", "") == "company"
+        )
         if is_company:
             # Skip legacy balance updates for company/system user to prevent row lock contention.
             meta = meta or {}
@@ -641,16 +653,16 @@ class Wallet(models.Model):
                     remarks=f"Double-entry payout stream: {tx_type}",
                     postings=postings
                 )
-                posted_double_entry = True
             except Exception:
-                posted_double_entry = False
+                pass
 
-            if not posted_double_entry:
-                # Direct property fallback if double-entry engine fails
-                w.main_balance = (w.main_balance or D("0")) + income
-                w.self_account_balance = (w.self_account_balance or D("0")) + self_part
-                if not inactive:
-                    w.withdrawable_balance = (w.withdrawable_balance or D("0")) + income
+            # Update balances to reflect 75/25 split
+            w.balance = (w.balance or D("0")) + amt
+            w.main_balance = (w.main_balance or D("0")) + income
+            w.self_account_balance = (w.self_account_balance or D("0")) + self_part
+            if not inactive:
+                w.withdrawable_balance = (w.withdrawable_balance or D("0")) + income
+            w.save(update_fields=['balance', 'main_balance', 'withdrawable_balance', 'self_account_balance', 'updated_at'])
 
             # Apply micro-packs (₹250) from self reserve for active users
             if not inactive:
@@ -694,7 +706,19 @@ class Wallet(models.Model):
         # Use self directly without table lock to prevent foreign key commit timeouts on accounts_wallet
         w = self
 
-        is_company = (self.user.id in (1, 32)) or getattr(self.user, "category", "") == "company" or self.user.is_superuser
+        cfg_company_id = None
+        try:
+            from business.models import CommissionConfig
+            _cu = CommissionConfig.get_solo().get_company_user()
+            if _cu:
+                cfg_company_id = getattr(_cu, "id", None)
+        except Exception:
+            pass
+
+        is_company = (
+            (cfg_company_id is not None and self.user.id == cfg_company_id)
+            or getattr(self.user, "category", "") == "company"
+        )
         if is_company:
             # Skip legacy balance updates for company/system user to prevent row lock contention.
             WalletTransaction.objects.create(
@@ -913,7 +937,7 @@ class Wallet(models.Model):
 
                 # Deduct the pack from self-reserve
                 w.self_account_balance = cur_self - D("250.00")
-                w.save(update_fields=["updated_at"])
+                w.save(update_fields=["self_account_balance", "updated_at"])
 
                 # Record SELF_ACCOUNT_DEBIT marker with breakdown and pack index
                 try:

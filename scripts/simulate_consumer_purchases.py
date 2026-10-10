@@ -87,11 +87,23 @@ distribute_franchise_benefit(u, trigger='spp_1000', source={'type': 'PROMO', 'id
 # 1c. Rank 1 Upgrade (₹250)
 r1 = Rank.objects.filter(level_number=1).first()
 if r1:
+    cfg = CommissionConfig.get_solo()
+    master_json = getattr(cfg, "master_commission_json", {}) or {}
+    custom_tax = master_json.get("custom_module_tax", {}) or {}
+    tax_rate_val = custom_tax.get("tax_rank")
+    if tax_rate_val is None:
+        tax_rate_val = cfg.get_tax_percent() or "18.00"
+    tax_pct = Decimal(str(tax_rate_val)) / Decimal("100.00")
+    upgrade_amt = Decimal(str(r1.upgrade_amount or 250)).quantize(Decimal("0.01"))
+    gst_amt = (upgrade_amt * tax_pct).quantize(Decimal("0.01"))
+    net_amt = (upgrade_amt - gst_amt).quantize(Decimal("0.01"))
     ru1 = RankUpgrade.objects.create(
         user=u,
         from_rank=r1,
         to_rank=r1,
-        net_amount=Decimal(str(r1.upgrade_amount or 250)),
+        upgrade_amount=upgrade_amt,
+        gst_amount=gst_amt,
+        net_amount=net_amt,
         payment_status=RankUpgrade.STATUS_SUCCESS,
         upgraded_at=timezone.now(),
     )

@@ -62,7 +62,20 @@ class WalletEngine:
             wallet_type=wallet_type,
             defaults={"legacy_wallet": legacy_wallet},
         )
-        is_sys = (str(wallet_type or "").upper() == "SYSTEM") or getattr(user, "id", None) in (1, 32) or getattr(user, "category", "") == "company"
+        cfg_company_id = None
+        try:
+            from business.models import CommissionConfig
+            _cu = CommissionConfig.get_solo().get_company_user()
+            if _cu:
+                cfg_company_id = getattr(_cu, "id", None)
+        except Exception:
+            pass
+
+        is_sys = (
+            (str(wallet_type or "").upper() == "SYSTEM")
+            or getattr(user, "category", "") == "company"
+            or (cfg_company_id is not None and getattr(user, "id", None) == cfg_company_id)
+        )
         if lock and not is_sys and not created and transaction.get_connection().in_atomic_block:
             account = WalletAccount.objects.select_for_update().get(pk=account.pk)
         if legacy_wallet:
@@ -164,7 +177,7 @@ class WalletEngine:
                 p_user_cat = getattr(posting.user, "category", "")
                 is_system_acc = (
                     (str(posting.wallet_type or "").upper() == "SYSTEM")
-                    or p_user_id in (1, 32, sys_user_id)
+                    or (sys_user_id is not None and p_user_id == sys_user_id)
                     or p_user_cat == "company"
                 )
                 account = cls.get_account(posting.user, posting.wallet_type, lock=not is_system_acc)

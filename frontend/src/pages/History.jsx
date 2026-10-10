@@ -169,7 +169,18 @@ function describeSource(tx = {}) {
   }
 
   // Referral bonuses
-  if (type === "DIRECT_REF_BONUS" || src === "JOIN_REFERRAL" || st === "JOIN_REFERRAL") {
+  if (
+    type === "DIRECT_REF_BONUS" ||
+    type === "PRIME_750_DIRECT" ||
+    ot === "PRIME_750_DIRECT" ||
+    type === "PRIME_150_DIRECT" ||
+    ot === "PRIME_150_DIRECT" ||
+    src === "JOIN_REFERRAL" ||
+    st === "JOIN_REFERRAL" ||
+    st === "PRIME_750" && (type === "DIRECT_REF_BONUS" || ot === "DIRECT_REF_BONUS" || type === "PRIME_750_DIRECT" || ot === "PRIME_750_DIRECT")
+  ) {
+    if (type === "PRIME_750_DIRECT" || ot === "PRIME_750_DIRECT" || tier === 750) return "Agent Subscription Referral Bonus";
+    if (type === "PRIME_150_DIRECT" || ot === "PRIME_150_DIRECT" || tier === 150) return "Prime 150 Referral Bonus";
     if (tier) return `Referral Bonus ${tier} Prime`;
     return "Referral Bonus";
   }
@@ -748,9 +759,13 @@ function HistoryRow({ tx, onClick }) {
     meta?.ledger === "SELF_ACCOUNT" ||
     String(tx?.type || "").startsWith("SELF_ACCOUNT");
 
-  const isMainWalletCredit =
+  const isSplitMainWalletCredit =
     tx?.type === "INCOME_CREDIT_75" ||
-    meta?.ledger === "MAIN" ||
+    meta?.split === "STREAM_75_25" ||
+    (meta?.ledger === "MAIN" && meta?.income_75 !== undefined);
+
+  const isMainWalletCredit =
+    isSplitMainWalletCredit ||
     (amount > 0 && !isSelfAccount && !isP2pReceive);
 
   const dateStr = tx?.created_at
@@ -883,7 +898,7 @@ function HistoryRow({ tx, onClick }) {
           </Box>
 
           <Typography sx={{ fontSize: 12, color: isSelfAccount ? "#B45309" : isMainWalletCredit ? "#047857" : "text.secondary", fontWeight: 700, mt: 0.2 }}>
-            {isSelfAccount ? "25% Repurchase Self Account" : isMainWalletCredit ? "75% Withdrawable Main Wallet" : ""}
+            {isSelfAccount ? "25% Repurchase Self Account" : isSplitMainWalletCredit ? "75% Withdrawable Main Wallet" : isMainWalletCredit ? "Main Wallet Credit" : ""}
             {counterpartyLabel(tx) ? ` • ${counterpartyLabel(tx)}` : ""}
           </Typography>
 

@@ -267,24 +267,25 @@ class FiveMatrixService:
             # Ensure approved user has a Rank-1 root
             cls.ensure_root_for_rank1(approved_user)
 
-            # If sponsor exists and is a Rank-1 root, place node under sponsor
             sponsor = UplineService.get_direct_sponsor(approved_user)
+            global_root = (
+                RankMatrixRoot.objects.filter(root_user_id=1, rank__level_number=1).first()
+                or RankMatrixRoot.objects.filter(rank__level_number=1).order_by("id").first()
+            )
+            approved_at = getattr(upgrade, "upgraded_at", None) or timezone.now()
+
+            if global_root:
+                cls._place_node_for_root(global_root, approved_user, approved_at, sponsor=sponsor)
+
             if sponsor:
-                sponsor_root = (
-                    RankMatrixRoot.objects.filter(root_user_id=getattr(sponsor, "id", None), rank__level_number=1).first()
-                    if RankMatrixRoot is not None
-                    else None
-                )
-                # Ensure sponsor root lazily so historical approvals also get placed
-                if not sponsor_root and RankMatrixRoot is not None:
+                sponsor_root = RankMatrixRoot.objects.filter(root_user_id=sponsor.id, rank__level_number=1).first()
+                if not sponsor_root:
                     try:
                         sponsor_root = cls.ensure_root_for_rank1(sponsor)
                     except Exception:
                         sponsor_root = None
-                if sponsor_root:
-                    approved_at = getattr(upgrade, "upgraded_at", None) or timezone.now()
+                if sponsor_root and sponsor_root.id != getattr(global_root, "id", None):
                     cls._place_node_for_root(sponsor_root, approved_user, approved_at)
-                    # After placement, reevaluate holds for sponsor
                     cls.reevaluate_hold_state(sponsor_root.root_user_id)
         except Exception:
             # Avoid breaking admin approval flow
@@ -314,32 +315,49 @@ class FiveMatrixService:
         if not sponsor or not getattr(sponsor, "id", None):
             return
 
+        # Resolve dynamic gross, tax rate, and net pool from CommissionConfig
+        from business.models import CommissionConfig
+        cfg = CommissionConfig.get_solo()
+        master_json = getattr(cfg, "master_commission_json", {}) or {}
+        custom_tax = master_json.get("custom_module_tax", {}) or {}
+        tax_rate_val = custom_tax.get("tax_rank")
+        if tax_rate_val is None:
+            tax_rate_val = cfg.get_tax_percent() or "18.00"
+        tax_pct = Decimal(str(tax_rate_val)) / Decimal("100.00")
+
+        gross_amt = q2(getattr(upgrade, "upgrade_amount", Decimal("0.00")) or Decimal("0.00"))
+        if gross_amt <= 0:
+            gross_amt = q2(getattr(upgrade, "net_amount", Decimal("0.00")) or Decimal("250.00"))
+
+        gst_amt = q2(getattr(upgrade, "gst_amount", Decimal("0.00")) or Decimal("0.00"))
         net = q2(getattr(upgrade, "net_amount", Decimal("0.00")) or Decimal("0.00"))
+
+        # If gst_amount was not computed or net equaled un-taxed gross, recompute dynamically
+        if gst_amt <= 0 or net >= gross_amt:
+            gst_amt = q2(gross_amt * tax_pct)
+            net = q2(gross_amt - gst_amt)
+            try:
+                upgrade.upgrade_amount = gross_amt
+                upgrade.gst_amount = gst_amt
+                upgrade.net_amount = net
+                upgrade.save(update_fields=["upgrade_amount", "gst_amount", "net_amount"])
+            except Exception:
+                pass
+
         if net <= 0:
             return
 
-        # Ensure both: payer has a root (as approved rank1) and sponsor has root to accept placement
-        sponsor_root = None
-        try:
-            sponsor_root = (
-                RankMatrixRoot.objects.filter(root_user_id=getattr(sponsor, "id", None), rank__level_number=1).first()
-                if RankMatrixRoot is not None else None
-            )
-            if not sponsor_root and RankMatrixRoot is not None:
-                # create sponsor root lazily
-                sponsor_root = cls.ensure_root_for_rank1(sponsor)
-        except Exception:
-            sponsor_root = None
+        global_root = (
+            RankMatrixRoot.objects.filter(root_user_id=1, rank__level_number=1).first()
+            or RankMatrixRoot.objects.filter(rank__level_number=1).order_by("id").first()
+        )
 
-        parent_for_level = sponsor  # default fallback to sponsor if placement record can't be created
-
-        # Ensure placement exists to discover placement parent
+        parent_for_level = sponsor
         try:
-            if sponsor_root:
+            if global_root:
                 approved_at = getattr(upgrade, "upgraded_at", None) or timezone.now()
-                node = cls._place_node_for_root(sponsor_root, payer, approved_at)
+                node = cls._place_node_for_root(global_root, payer, approved_at, sponsor=sponsor)
                 if node:
-                    # placement parent (root for first five; spillover parent otherwise)
                     try:
                         parent_for_level = getattr(node, "parent_user", None) or sponsor
                     except Exception:
@@ -351,56 +369,32 @@ class FiveMatrixService:
         level_pool = q2(net * Decimal("0.50"))
 
         # Retained Platform Tax Credit to Company Root/Tax Account
-        gst_amt = q2(getattr(upgrade, "gst_amount", Decimal("0.00")) or Decimal("0.00"))
         if gst_amt > 0:
             try:
-                from business.models import CommissionConfig
-                cfg = CommissionConfig.get_solo()
                 cu = cfg.get_company_user()
-                if not cu:
-                    from accounts.models import CustomUser
-                    cu = CustomUser.objects.filter(id=1).first() or CustomUser.objects.filter(is_superuser=True).first()
                 if cu:
                     WalletPoster.credit_company_gst(cu, gst_amt, upgrade_id=upgrade.id)
             except Exception:
                 pass
 
-        # 1) DIRECT 50% -> sponsor (released)
-        if direct_amt > 0:
-            WalletPoster.credit_direct(sponsor, direct_amt, from_user_id=getattr(payer, "id", None) or 0, upgrade_id=upgrade.id)
-            UpgradeCommission.objects.create(
-                upgrade=upgrade,
-                from_user=payer,
-                to_user=sponsor,
-                level=0,
-                commission_amount=direct_amt,
-                commission_type=UpgradeCommission.TYPE_DIRECT,
-                status=UpgradeCommission.STATUS_CREDITED,
-            )
+        WalletPoster.credit_direct_sponsor(
+            sponsor=sponsor,
+            from_user=payer,
+            amount=direct_amt,
+            upgrade_id=upgrade.id,
+            description="Rank 1 Direct Sponsor Bonus",
+            rank_level=1,
+        )
 
-        # 2) LEVEL 50% -> placement parent (100% released immediately, no holds per user request)
-        if level_pool > 0 and parent_for_level and getattr(parent_for_level, "id", None):
-            release_amt = level_pool
-            hold_amt = Decimal("0.00")
-
-            # Released portion
-            if release_amt > 0:
-                WalletPoster.credit_level(parent_for_level, release_amt, from_user_id=getattr(payer, "id", None) or 0, upgrade_id=upgrade.id, level=1)
-                UpgradeCommission.objects.create(
-                    upgrade=upgrade,
-                    from_user=payer,
-                    to_user=parent_for_level,
-                    level=1,
-                    commission_amount=release_amt,
-                    commission_type=UpgradeCommission.TYPE_LEVEL,
-                    status=UpgradeCommission.STATUS_CREDITED,
-                )
-
-            # After creating holds, reevaluate this recipient's holds (early release or expiry)
-            try:
-                cls.reevaluate_user_holds(getattr(parent_for_level, "id", None))
-            except Exception:
-                pass
+        WalletPoster.credit_level_bonus(
+            to_user=parent_for_level,
+            from_user=payer,
+            amount=level_pool,
+            upgrade_id=upgrade.id,
+            level=1,
+            description=f"Rank 1 Level Placement Bonus (Level 1)",
+            rank_level=1,
+        )
 
     @classmethod
     def _counts_for_root(cls, root_user_id: int) -> Dict[str, int]:
