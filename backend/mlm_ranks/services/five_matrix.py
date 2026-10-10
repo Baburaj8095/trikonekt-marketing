@@ -89,30 +89,24 @@ class FiveMatrixService:
             )
 
     @classmethod
-    def _place_node_for_root(cls, root: RankMatrixRoot, child_user, approved_at) -> Optional[RankMatrixNode]:
+    def _place_node_for_root(cls, root: RankMatrixRoot, child_user, approved_at, sponsor=None) -> Optional[RankMatrixNode]:
         """
-        BFS placement under a root:
-          - First 5 approvals go under root (parent_user=root, level_depth=1, position 1..5)
-          - Afterwards, place under the earliest parent (by level_depth ASC then approval order) that has a free child slot
-          - parent_user is the placement parent; used for level bonus routing
-        Idempotent: returns existing node if already placed.
+        BFS placement under a root (Option A: Global Single Spillover Tree).
+        If sponsor is provided, BFS search starts from sponsor's downline in the global matrix.
         """
         if RankMatrixNode is None or root is None or not getattr(root, "root_user_id", None):
             return None
         if not child_user or not getattr(child_user, "id", None):
             return None
 
-        # Prevent root user from ever being placed as a child node under themselves
         if int(child_user.id) == int(root.root_user_id):
             return None
 
-        # Prevent duplicate placements
         existing = RankMatrixNode.objects.filter(root_user_id=root.root_user_id, placed_user_id=child_user.id).first()
         if existing:
             return existing
 
         with transaction.atomic():
-            # Lock root row range
             root_l = (
                 RankMatrixRoot.objects
                 .select_for_update()
@@ -120,14 +114,12 @@ class FiveMatrixService:
                 .first()
             ) or root
 
-            # Re-check duplicate after lock (idempotent)
             existing2 = RankMatrixNode.objects.filter(root_user_id=root_l.root_user_id, placed_user_id=child_user.id).first()
             if existing2:
                 return existing2
 
             rid = int(root_l.root_user_id)
 
-            # Helper: count children and get first free position (1..5) for a parent in this root
             def sibling_count(parent_uid: int) -> int:
                 return int(RankMatrixNode.objects.filter(root_user_id=rid, parent_user_id=int(parent_uid)).count())
 
@@ -138,95 +130,91 @@ class FiveMatrixService:
                         return p
                 return len(used) + 1
 
-            # Case 1: first row under root (fill 1..5)
+            # Option A: If sponsor is given, search in sponsor's downline within this global tree
+            sponsor_node = None
+            if sponsor and getattr(sponsor, "id", None) and int(sponsor.id) != rid:
+                sponsor_node = RankMatrixNode.objects.filter(root_user_id=rid, placed_user_id=int(sponsor.id)).first()
+
+            if sponsor_node:
+                frontier = [sponsor_node.placed_user_id]
+                found_parent = None
+                while frontier and not found_parent:
+                    for pid in frontier:
+                        if sibling_count(pid) < 5:
+                            pnode = RankMatrixNode.objects.filter(root_user_id=rid, placed_user_id=pid).first()
+                            lvl = pnode.level_depth if pnode else sponsor_node.level_depth
+                            found_parent = (pid, first_free_pos(pid), lvl + 1)
+                            break
+                    if found_parent:
+                        break
+                    next_frontier = list(
+                        RankMatrixNode.objects.filter(root_user_id=rid, parent_user_id__in=frontier)
+                        .order_by("level_depth", "approved_at", "position", "id")
+                        .values_list("placed_user_id", flat=True)
+                    )
+                    frontier = next_frontier
+
+                if found_parent:
+                    p_uid, pos, child_level = found_parent
+                    node = RankMatrixNode.objects.create(
+                        root_user_id=rid,
+                        placed_user_id=child_user.id,
+                        parent_user_id=int(p_uid),
+                        level_depth=int(child_level),
+                        position=int(pos),
+                        approved_at=approved_at,
+                    )
+                    return node
+
             total_so_far = int(RankMatrixNode.objects.filter(root_user_id=rid).count())
             if total_so_far < 5:
                 pos = first_free_pos(rid)
-                try:
-                    node = RankMatrixNode.objects.create(
-                        root_user_id=rid,
-                        placed_user_id=child_user.id,
-                        parent_user_id=rid,
-                        level_depth=1,
-                        position=pos,
-                        approved_at=approved_at,
-                    )
-                except IntegrityError:
-                    # recompute once
-                    pos = first_free_pos(rid)
-                    node = RankMatrixNode.objects.create(
-                        root_user_id=rid,
-                        placed_user_id=child_user.id,
-                        parent_user_id=rid,
-                        level_depth=1,
-                        position=pos,
-                        approved_at=approved_at,
-                    )
+                node = RankMatrixNode.objects.create(
+                    root_user_id=rid,
+                    placed_user_id=child_user.id,
+                    parent_user_id=rid,
+                    level_depth=1,
+                    position=pos,
+                    approved_at=approved_at,
+                )
+                return node
             else:
-                # BFS search for first parent with a free slot (1..5)
-                # Determine current max depth
                 try:
                     max_depth = int(
                         RankMatrixNode.objects.filter(root_user_id=rid).aggregate(m=Max("level_depth")).get("m") or 1
                     )
                 except Exception:
-                    # Fallback to scan
-                    try:
-                        max_depth = int(
-                            RankMatrixNode.objects.filter(root_user_id=rid).order_by("-level_depth").values_list("level_depth", flat=True).first() or 1
-                        )
-                    except Exception:
-                        max_depth = 1
-                if max_depth < 1:
                     max_depth = 1
 
                 placed = None
-                # Level 1..N parents (root is implicit level 0 already full at this point)
-                for lvl in range(1, max_depth + 5):  # small buffer to allow growing depth
-                    # Parent candidates are nodes at this level (their placed_user acts as a parent for next level)
-                    parents_qs = (
+                for lvl in range(1, max_depth + 5):
+                    parent_ids = list(
                         RankMatrixNode.objects
                         .filter(root_user_id=rid, level_depth=lvl)
                         .order_by("approved_at", "position", "id")
                         .values_list("placed_user_id", flat=True)
                     )
-                    parent_ids = [int(x) for x in parents_qs]
                     if not parent_ids:
-                        # No parents at this level yet; continue
                         continue
                     found_parent = None
                     for pid in parent_ids:
-                        used = sibling_count(pid)
-                        if used < 5:
+                        if sibling_count(pid) < 5:
                             found_parent = (pid, first_free_pos(pid), lvl + 1)
                             break
                     if found_parent:
                         p_uid, pos, child_level = found_parent
-                        try:
-                            node = RankMatrixNode.objects.create(
-                                root_user_id=rid,
-                                placed_user_id=child_user.id,
-                                parent_user_id=int(p_uid),
-                                level_depth=int(child_level),
-                                position=int(pos),
-                                approved_at=approved_at,
-                            )
-                        except IntegrityError:
-                            # Rare sibling-position clash; recompute once
-                            new_pos = first_free_pos(int(p_uid))
-                            node = RankMatrixNode.objects.create(
-                                root_user_id=rid,
-                                placed_user_id=child_user.id,
-                                parent_user_id=int(p_uid),
-                                level_depth=int(child_level),
-                                position=int(new_pos),
-                                approved_at=approved_at,
-                            )
+                        node = RankMatrixNode.objects.create(
+                            root_user_id=rid,
+                            placed_user_id=child_user.id,
+                            parent_user_id=int(p_uid),
+                            level_depth=int(child_level),
+                            position=int(pos),
+                            approved_at=approved_at,
+                        )
                         placed = node
                         break
 
                 if not placed:
-                    # As a safety net, place under root in next available slot (shouldn't happen in normal BFS growth)
                     pos = first_free_pos(rid)
                     node = RankMatrixNode.objects.create(
                         root_user_id=rid,
@@ -236,15 +224,8 @@ class FiveMatrixService:
                         position=pos,
                         approved_at=approved_at,
                     )
+                return node
 
-            # Initialize 7-day window at first approved direct under this root if not set
-            if not getattr(root_l, "first_upgrade_at", None):
-                now = approved_at or timezone.now()
-                root_l.first_upgrade_at = now
-                root_l.expiry_at = now + timedelta(days=7)
-                root_l.save(update_fields=["first_upgrade_at", "expiry_at"])
-
-            return node
 
     @classmethod
     def on_rank1_approval(cls, upgrade: RankUpgrade):
@@ -276,17 +257,8 @@ class FiveMatrixService:
 
             if global_root:
                 cls._place_node_for_root(global_root, approved_user, approved_at, sponsor=sponsor)
-
             if sponsor:
-                sponsor_root = RankMatrixRoot.objects.filter(root_user_id=sponsor.id, rank__level_number=1).first()
-                if not sponsor_root:
-                    try:
-                        sponsor_root = cls.ensure_root_for_rank1(sponsor)
-                    except Exception:
-                        sponsor_root = None
-                if sponsor_root and sponsor_root.id != getattr(global_root, "id", None):
-                    cls._place_node_for_root(sponsor_root, approved_user, approved_at)
-                    cls.reevaluate_hold_state(sponsor_root.root_user_id)
+                cls.reevaluate_hold_state(sponsor.id)
         except Exception:
             # Avoid breaking admin approval flow
             return
@@ -760,13 +732,22 @@ class FiveMatrixService:
         placements: List[Dict] = []
         approved_count = 0
         if RankMatrixNode is not None:
+            # Under single global tree (Option A), immediate children of root_user_id have parent_user_id = root_user_id
             nodes = (
                 RankMatrixNode.objects
-                .filter(root_user_id=root_user_id, level_depth=1)
+                .filter(parent_user_id=root_user_id)
                 .exclude(placed_user_id=root_user_id)
                 .select_related("placed_user")
-                .order_by("approved_at", "position", "id")
+                .order_by("position", "approved_at", "id")
             )
+            if not nodes.exists():
+                nodes = (
+                    RankMatrixNode.objects
+                    .filter(root_user_id=root_user_id, level_depth=1)
+                    .exclude(placed_user_id=root_user_id)
+                    .select_related("placed_user")
+                    .order_by("position", "approved_at", "id")
+                )
             for n in nodes:
                 placements.append({
                     "position": int(getattr(n, "position", 0) or 0),

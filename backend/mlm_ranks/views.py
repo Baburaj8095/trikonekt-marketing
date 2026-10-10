@@ -81,13 +81,22 @@ class UserUpgradeEligibilityView(APIView):
         # Count placed nodes by level_depth in the user's Rank-1 5-Matrix
         from django.db.models import Count
         from .models import RankMatrixNode
+        # Real-time BFS downline layer counts under request.user (Option A global single tree)
+        level_team_counts = {lvl: 0 for lvl in range(1, 11)}
         try:
-            level_counts = dict(
-                RankMatrixNode.objects.filter(root_user=request.user)
-                .values_list("level_depth")
-                .annotate(c=Count("id"))
-            )
-            level_team_counts = {lvl: level_counts.get(lvl, 0) for lvl in range(1, 11)}
+            frontier = [request.user.id]
+            visited = set(frontier)
+            for lvl in range(1, 11):
+                child_ids = list(
+                    RankMatrixNode.objects.filter(root_user_id=1, parent_user_id__in=frontier)
+                    .values_list("placed_user_id", flat=True)
+                )
+                level_team_counts[lvl] = len(child_ids)
+                next_frontier = [cid for cid in child_ids if cid not in visited]
+                visited.update(next_frontier)
+                frontier = next_frontier
+                if not frontier:
+                    break
         except Exception:
             level_team_counts = {lvl: 0 for lvl in range(1, 11)}
 
@@ -913,8 +922,8 @@ class RankMatrixSubtreeView(APIView):
             rows = list(
                 RankMatrixNode.objects
                 .select_related("placed_user")
-                .filter(root_user_id=root_user_id, parent_user_id=parent_user_id)
-                .exclude(placed_user_id=root_user_id)
+                .filter(root_user_id=1, parent_user_id=parent_user_id)
+                .exclude(placed_user_id=parent_user_id)
                 .order_by("position", "id")
             )
         except Exception:
@@ -1024,22 +1033,21 @@ class RankMatrixBFSView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        # ── Resolve root_user_id ──
-        rid = request.query_params.get("root_user_id")
-        try:
-            root_user_id = int(rid) if rid and str(rid).strip() != "" else int(getattr(request.user, "id", 0) or 0)
-        except Exception:
-            root_user_id = int(getattr(request.user, "id", 0) or 0)
+        # ── Resolve user context (Option A: Global Single Tree) ──
+        from .models import RankMatrixRoot
+        global_root = (
+            RankMatrixRoot.objects.filter(root_user_id=1, rank__level_number=1).first()
+            or RankMatrixRoot.objects.filter(rank__level_number=1).order_by("id").first()
+        )
+        matrix_root_id = int(getattr(global_root, "root_user_id", 1) or 1)
 
-        if root_user_id != getattr(request.user, "id", None) and not getattr(request.user, "is_staff", False):
-            return Response({"detail": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
-
-        # ── Resolve start_user_id ──
-        suid_raw = request.query_params.get("start_user_id")
+        suid_raw = request.query_params.get("start_user_id") or request.query_params.get("user_id")
         try:
-            start_user_id = int(suid_raw) if suid_raw and str(suid_raw).strip() != "" else root_user_id
+            start_user_id = int(suid_raw) if suid_raw and str(suid_raw).strip() != "" else int(getattr(request.user, "id", 0) or 0)
         except Exception:
-            start_user_id = root_user_id
+            start_user_id = int(getattr(request.user, "id", 0) or 0)
+
+        root_user_id = start_user_id
 
         # ── max_depth ──
         try:
@@ -1067,13 +1075,10 @@ class RankMatrixBFSView(APIView):
 
         # ── Fetch RankMatrixNode for start_user (gives position/level) ──
         start_rnode = None
-        if start_user_id != root_user_id:
-            try:
-                start_rnode = RankMatrixNode.objects.filter(
-                    root_user_id=root_user_id, placed_user_id=start_user_id
-                ).first()
-            except Exception:
-                pass
+        try:
+            start_rnode = RankMatrixNode.objects.filter(placed_user_id=start_user_id).first()
+        except Exception:
+            pass
 
         def make_node(user, rnode=None):
             uid = int(getattr(user, "id", 0) or 0) if user else 0
@@ -1107,8 +1112,8 @@ class RankMatrixBFSView(APIView):
             try:
                 rows = list(
                     RankMatrixNode.objects.select_related("placed_user")
-                    .filter(root_user_id=root_user_id, parent_user_id__in=frontier)
-                    .exclude(placed_user_id=root_user_id)
+                    .filter(root_user_id=matrix_root_id, parent_user_id__in=frontier)
+                    .exclude(placed_user_id=start_user_id)
                     .order_by("parent_user_id", "position", "id")
                 )
             except Exception:
@@ -1146,7 +1151,7 @@ class RankMatrixBFSView(APIView):
             while all_ids:
                 child_rows = list(
                     RankMatrixNode.objects.filter(
-                        root_user_id=root_user_id,
+                        root_user_id=matrix_root_id,
                         parent_user_id__in=all_ids,
                     ).values("placed_user_id", "parent_user_id")
                 )
