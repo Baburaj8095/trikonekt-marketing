@@ -1724,6 +1724,28 @@ class AdminWalletListView(APIView):
         return Response({"count": total, "page": page, "page_size": page_size, "results": rows})
 
 
+class AdminCompanyWalletDetailView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def get(self, request):
+        from business.models import CommissionConfig
+        user = CommissionConfig.get_solo().get_company_user() or CustomUser.objects.filter(category="company").first()
+        if not user:
+            return Response({"detail": "Company overhead user not found."}, status=404)
+        return AdminWalletDetailView().get(request, user_id=user.id)
+
+
+class AdminCompanyWalletLedgerView(APIView):
+    permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
+
+    def get(self, request):
+        from business.models import CommissionConfig
+        user = CommissionConfig.get_solo().get_company_user() or CustomUser.objects.filter(category="company").first()
+        if not user:
+            return Response({"detail": "Company overhead user not found."}, status=404)
+        return AdminWalletLedgerView().get(request, user_id=user.id)
+
+
 class AdminWalletDetailView(APIView):
     permission_classes = [IsAdminOrStaff, HasAdminModuleAccess("reports_finance")]
 

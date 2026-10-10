@@ -80,11 +80,11 @@ export default function AdminOverheadIncome() {
     else setRefreshing(true);
 
     try {
-      // 1. Fetch Admin/Company Wallet & Ledgers (User ID 1)
+      // 1. Fetch Company / Overhead Wallet & Ledgers (category="company")
       const [walletRes, ledgerRes, legacyLedgerRes, chargesRes] = await Promise.allSettled([
-        API.get("/admin/wallets/1/"),
-        API.get("/admin/wallets/1/ledger/", { params: { page_size: 1000 } }),
-        API.get("/admin/wallets/1/ledger/", { params: { page_size: 1000, legacy: 1 } }),
+        API.get("/admin/wallets/company/"),
+        API.get("/admin/wallets/company/ledger/", { params: { page_size: 1000 } }),
+        API.get("/admin/wallets/company/ledger/", { params: { page_size: 1000, legacy: 1 } }),
         API.get("/business/admin/total-admin-charges/"),
       ]);
 
@@ -178,15 +178,27 @@ export default function AdminOverheadIncome() {
       let categoryColor = "primary";
 
       if (
+        st === "TAX_POOL_CREDIT" ||
+        st.includes("GST") ||
+        meta.pool_name === "COMPANY_TAX_POOL" ||
+        meta.pool_name === "COMPANY_GST" ||
+        remarks.includes("gst")
+      ) {
+        category = "COMPANY_GST";
+        categoryLabel = "🏛️ Company GST / Tax Pool";
+        categoryColor = "success";
+      } else if (
+        remarks.includes("admin_retention") ||
+        meta.pool_name === "COMPANY_ADMIN_RETENTION" ||
+        st.includes("ADMIN_RETENTION")
+      ) {
+        category = "ADMIN_RETENTION";
+        categoryLabel = "🏢 Company Admin Retention";
+        categoryColor = "primary";
+      } else if (
         remarks.includes("overflow") ||
         remarks.includes("unclaimed") ||
-        remarks.includes("direct_ref_bonus") ||
-        remarks.includes("level_bonus") ||
-        st.includes("RANK_UPGRADE") ||
-        meta.kind === "RANK_UPGRADE_DIRECT" ||
-        meta.kind === "RANK_UPGRADE_LEVEL" ||
-        meta.orig_type === "DIRECT_REF_BONUS" ||
-        meta.orig_type === "LEVEL_BONUS"
+        st.includes("RANK_OVERFLOW")
       ) {
         category = "RANK_OVERFLOW";
         categoryLabel = "📦 Unclaimed Rank Overflow";

@@ -197,18 +197,17 @@ class RootConsumerConfig(models.Model):
         return obj or cls.objects.create()
 
     def get_root_user(self):
-        u = getattr(self, "root_user", None)
         try:
-            if u and is_matrix_eligible(u):
+            u = getattr(self, "root_user", None)
+            if u:
                 return u
         except Exception:
             pass
         try:
-            if u and getattr(u, "category", "") == "consumer" and not getattr(u, "is_staff", False) and not getattr(u, "is_superuser", False):
-                return u
+            from accounts.models import CustomUser
+            return CustomUser.objects.filter(phone="9999999999").first() or CustomUser.objects.filter(id=1).first()
         except Exception:
-            pass
-        return None
+            return None
 
 # ==========================
 # Auto-Pool & Commission CFG
