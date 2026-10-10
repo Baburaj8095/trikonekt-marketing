@@ -263,8 +263,21 @@ export default function AdminCommissionDistribute() {
         direct_sponsor: 40,
         matrix_5: 80,
         matrix_3: 20,
+        pincode_royalty: 15,
+        district_royalty: 10,
+        state_royalty: 15,
+        district_royalty_l1_l7: 15,
+        district_royalty_l1_l10_30d: 10,
+        districtwise_royalty_l8_l10: 15,
+        statewise_royalty_l8_l10: 10,
+        district_captain_royalty: 5,
+        state_captain_royalty: 5,
+        statewise_ssv_voucher: 1,
+        statewise_zonal_head: 1,
+        statewise_rewards: 1,
+        company_admin: 7,
         district_pool: 50,
-        company_gross: 60,
+        company_gross: 7,
         matrix_5_levels: Array.from({ length: 10 }, (_, i) => ({ level: i + 1, amount: 8 })),
         matrix_3_levels: Array.from({ length: 15 }, (_, i) => ({ level: i + 1, amount: i === 14 ? 1.38 : 1.33 })),
       },
@@ -4591,9 +4604,12 @@ right={
     const stateWiseL8L10 = Number(reb.statewise_royalty_l8_l10 ?? 10);
     const distCaptRoy = Number(reb.district_captain_royalty ?? 5);
     const stateCaptRoy = Number(reb.state_captain_royalty ?? 5);
-    const compAdmin = Number(reb.company_admin ?? reb.company_gross ?? 10);
+    const stateWiseSsv = Number(reb.statewise_ssv_voucher ?? 1);
+    const stateWiseZonal = Number(reb.statewise_zonal_head ?? 1);
+    const stateWiseRewards = Number(reb.statewise_rewards ?? 1);
+    const compAdmin = Number(reb.company_admin ?? reb.company_gross ?? 7);
 
-    const sumOut = ds + m5 + m3 + pinRoy + distRoy + stateRoy + distRoyL1L7 + distRoyL1L10 + distWiseL8L10 + stateWiseL8L10 + distCaptRoy + stateCaptRoy + compAdmin;
+    const sumOut = ds + m5 + m3 + pinRoy + distRoy + stateRoy + distRoyL1L7 + distRoyL1L10 + distWiseL8L10 + stateWiseL8L10 + distCaptRoy + stateCaptRoy + stateWiseSsv + stateWiseZonal + stateWiseRewards + compAdmin;
     const isBalanced = totalIn === sumOut;
 
     const fRoles = reb.pincode_roles_pct || reb.franchise_roles_pct || { pincode: 45, pincode_coord: 15, district: 15, district_coord: 10, state: 10, state_coord: 5 };
@@ -4827,6 +4843,48 @@ right={
               placeholder="5"
             />
             <Input
+              label="Statewise SSV Voucher (₹)"
+              type="number"
+              value={stateWiseSsv}
+              onChange={(val) => {
+                const n = Number(val);
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), statewise_ssv_voucher: n },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="1"
+            />
+            <Input
+              label="Statewise Zonal Head (₹)"
+              type="number"
+              value={stateWiseZonal}
+              onChange={(val) => {
+                const n = Number(val);
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), statewise_zonal_head: n },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="1"
+            />
+            <Input
+              label="Statewise Rewards (₹)"
+              type="number"
+              value={stateWiseRewards}
+              onChange={(val) => {
+                const n = Number(val);
+                setRankConfig((prev) => ({
+                  ...prev,
+                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), statewise_rewards: n },
+                }));
+                setRankDirty(true);
+              }}
+              placeholder="1"
+            />
+            <Input
               label="Company Admin Retention (₹)"
               type="number"
               value={compAdmin}
@@ -4838,7 +4896,7 @@ right={
                 }));
                 setRankDirty(true);
               }}
-              placeholder="10"
+              placeholder="7"
             />
           </div>
 
@@ -4856,7 +4914,7 @@ right={
           >
             <span style={{ fontSize: 13, fontWeight: 800, color: isBalanced ? "#166534" : "#991b1b" }}>
               {isBalanced
-                ? `✓ Balanced Financial Accounting: Total Inflow ₹${totalIn} = Outflow (Sponsor ₹${ds} + 5-Block ₹${m5} + 3-Block ₹${m3} + Pincode ₹${pinRoy} + District ₹${distRoy} + State ₹${stateRoy} + L1-L7 ₹${distRoyL1L7} + L1-L10 ₹${distRoyL1L10} + Dist L8-L10 ₹${distWiseL8L10} + State L8-L10 ₹${stateWiseL8L10} + Dist Capt ₹${distCaptRoy} + State Capt ₹${stateCaptRoy}) + Company Admin ₹${compAdmin}`
+                ? `✓ Balanced Financial Accounting: Total Inflow ₹${totalIn} = Outflow (Sponsor ₹${ds} + 5-Block ₹${m5} + 3-Block ₹${m3} + Pincode ₹${pinRoy} + District ₹${distRoy} + State ₹${stateRoy} + L1-L7 ₹${distRoyL1L7} + L1-L10 ₹${distRoyL1L10} + Dist L8-L10 ₹${distWiseL8L10} + State L8-L10 ₹${stateWiseL8L10} + Dist Capt ₹${distCaptRoy} + State Capt ₹${stateCaptRoy} + State SSV ₹${stateWiseSsv} + State Zonal ₹${stateWiseZonal} + State Rewards ₹${stateWiseRewards}) + Company Admin ₹${compAdmin}`
                 : `⚠ Imbalance Alert: Total Inflow (₹${totalIn}) != Allocated Sum (₹${sumOut}). Difference: ₹${totalIn - sumOut}`}
             </span>
           </div>
@@ -5921,6 +5979,9 @@ right={
             const stateWiseRate = Number(rebRates.statewise_l8_l10 ?? rebRates.statewise_royalty_l8_l10 ?? 10);
             const distCaptRate = Number(rebRates.district_captain ?? rebRates.district_captain_royalty ?? 5);
             const stateCaptRate = Number(rebRates.state_captain ?? rebRates.state_captain_royalty ?? 5);
+            const stateWiseSsvRate = Number(rebRates.statewise_ssv_voucher ?? 1);
+            const stateWiseZonalRate = Number(rebRates.statewise_zonal_head ?? 1);
+            const stateWiseRewardsRate = Number(rebRates.statewise_rewards ?? 1);
 
             return (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 12 }}>
@@ -5994,7 +6055,6 @@ right={
                   </div>
                 </div>
 
-
                 <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
                   <div style={{ fontSize: 11, fontWeight: 800, color: "#ea580c" }}>🎖️ DISTRICT CAPTAIN (₹{distCaptRate})</div>
                   <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
@@ -6012,6 +6072,36 @@ right={
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
                     👥 State Captains: <strong>{mon.achievers?.captain_count ?? 0}</strong>
+                  </div>
+                </div>
+
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#0d9488" }}>🎫 STATEWISE SSV VOUCHER (₹{stateWiseSsvRate})</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+                    ₹{Number(mon.pools?.daily_statewise_ssv_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                    👥 SSV Assignees: <strong>{mon.achievers?.ssv_count ?? 0}</strong>
+                  </div>
+                </div>
+
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#0284c7" }}>👔 STATEWISE ZONAL HEAD (₹{stateWiseZonalRate})</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+                    ₹{Number(mon.pools?.daily_statewise_zonal_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                    👥 Zonal Heads: <strong>{mon.achievers?.zonal_head_count ?? 0}</strong>
+                  </div>
+                </div>
+
+                <div style={{ border: "1px solid #e2e8f0", borderRadius: 8, padding: 12, background: "#ffffff" }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#ec4899" }}>🎁 STATEWISE REWARDS (₹{stateWiseRewardsRate})</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a", marginTop: 4 }}>
+                    ₹{Number(mon.pools?.daily_statewise_rewards_pool ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                    👥 Reward Qualifiers: <strong>{mon.achievers?.rewards_count ?? 0}</strong>
                   </div>
                 </div>
               </div>

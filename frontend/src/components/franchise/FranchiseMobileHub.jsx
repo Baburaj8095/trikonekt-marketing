@@ -1342,7 +1342,10 @@ export default function FranchiseMobileHub({
       statewise_royalty_l8_l10: Number(cfg.statewise_royalty_l8_l10 ?? 10),
       district_captain_royalty: Number(cfg.district_captain_royalty ?? 5),
       state_captain_royalty: Number(cfg.state_captain_royalty ?? 5),
-      company_admin: Number(cfg.company_admin ?? cfg.company_gross ?? 10),
+      statewise_ssv_voucher: Number(cfg.statewise_ssv_voucher ?? 1),
+      statewise_zonal_head: Number(cfg.statewise_zonal_head ?? 1),
+      statewise_rewards: Number(cfg.statewise_rewards ?? 1),
+      company_admin: Number(cfg.company_admin ?? cfg.company_gross ?? 7),
       tax_rebirth: Number(liveAdminMasterConfig?.custom_module_tax?.tax_rebirth ?? 18),
       pincode_roles_pct: cfg.pincode_roles_pct || {
         pincode: 20,
@@ -5669,6 +5672,9 @@ export default function FranchiseMobileHub({
                     { label: "Statewise Royalty L8-L10 (7 Days)", val: `₹${adminRebirthConfig.statewise_royalty_l8_l10.toFixed(2)}` },
                     { label: "District Captain Royalty", val: `₹${adminRebirthConfig.district_captain_royalty.toFixed(2)}` },
                     { label: "State Captain Royalty", val: `₹${adminRebirthConfig.state_captain_royalty.toFixed(2)}` },
+                    { label: "Statewise SSV Voucher", val: `₹${adminRebirthConfig.statewise_ssv_voucher.toFixed(2)}` },
+                    { label: "Statewise Zonal Head", val: `₹${adminRebirthConfig.statewise_zonal_head.toFixed(2)}` },
+                    { label: "Statewise Rewards", val: `₹${adminRebirthConfig.statewise_rewards.toFixed(2)}` },
                     { label: "Company Admin Retention", val: `₹${adminRebirthConfig.company_admin.toFixed(2)}` },
                   ].map((row, i) => (
                     <Box key={i} sx={{ p: 1.1, borderRadius: "10px", bgcolor: "#F8FAFC", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
