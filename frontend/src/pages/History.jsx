@@ -2336,40 +2336,57 @@ export default function History() {
             border: "1px solid rgba(255, 255, 255, 0.16)",
           }}
         >
-          <Stack direction="row" alignItems="center" spacing={1.5}>
-            <Box
-              sx={{
-                width: 48,
-                height: 48,
-                borderRadius: "14px",
-                bgcolor: "rgba(255, 255, 255, 0.15)",
-                backdropFilter: "blur(12px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                border: "1px solid rgba(255, 255, 255, 0.25)",
-                flexShrink: 0,
-              }}
-            >
-              <AccountBalanceWalletIcon sx={{ fontSize: 26, color: "#FFFFFF" }} />
-            </Box>
-            <Box>
-              <Typography sx={{ color: "rgba(255, 255, 255, 0.8)", fontWeight: 700, fontSize: 12, letterSpacing: 0.3 }}>
-                Main Wallet Balance
-              </Typography>
-              <Typography
+          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.5}>
+            <Stack direction="row" alignItems="center" spacing={1.5}>
+              <Box
                 sx={{
-                  fontSize: { xs: 26, sm: 30 },
-                  fontWeight: 900,
-                  lineHeight: 1.1,
-                  mt: 0.2,
-                  color: "#FFFFFF",
-                  letterSpacing: "-0.5px",
+                  width: 48,
+                  height: 48,
+                  borderRadius: "14px",
+                  bgcolor: "rgba(255, 255, 255, 0.15)",
+                  backdropFilter: "blur(12px)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px solid rgba(255, 255, 255, 0.25)",
+                  flexShrink: 0,
                 }}
               >
-                ₹ {fmtAmount(Number(top.main_income_balance || 0) > 0 ? top.main_income_balance : 0)}
-              </Typography>
-            </Box>
+                <AccountBalanceWalletIcon sx={{ fontSize: 26, color: "#FFFFFF" }} />
+              </Box>
+              <Box>
+                <Typography sx={{ color: "rgba(255, 255, 255, 0.8)", fontWeight: 700, fontSize: 12, letterSpacing: 0.3 }}>
+                  Main Wallet Balance
+                </Typography>
+                <Typography
+                  sx={{
+                    fontSize: { xs: 26, sm: 30 },
+                    fontWeight: 900,
+                    lineHeight: 1.1,
+                    mt: 0.2,
+                    color: "#FFFFFF",
+                    letterSpacing: "-0.5px",
+                  }}
+                >
+                  ₹ {fmtAmount(Number(top.main_income_balance || 0) > 0 ? top.main_income_balance : 0)}
+                </Typography>
+              </Box>
+            </Stack>
+
+            <Chip
+              label="Cycle 1 Active"
+              size="small"
+              onClick={() => navigate("/rank-upgrade")}
+              sx={{
+                bgcolor: "rgba(255, 255, 255, 0.18)",
+                color: "#FFFFFF",
+                fontWeight: 800,
+                fontSize: 11,
+                cursor: "pointer",
+                border: "1px solid rgba(255, 255, 255, 0.35)",
+                "&:hover": { bgcolor: "rgba(255, 255, 255, 0.3)" },
+              }}
+            />
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ mt: 2.2 }}>

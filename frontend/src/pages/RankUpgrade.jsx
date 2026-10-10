@@ -165,6 +165,213 @@ function RankPaymentMethodDialog({ open, onClose, data, walletMe, walletHistory,
   );
 }
 
+function ConsumerCycleRenewalDialog({
+  open,
+  onClose,
+  walletMe,
+  currentCycle = "Cycle 1",
+  onRenewSuccess,
+}) {
+  const [selectedSource, setSelectedSource] = useState("MAIN_WALLET");
+  const [busy, setBusy] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errMsg, setErrMsg] = useState("");
+
+  const mainBal = getMainWalletBalance(walletMe);
+  const couponBal = getPackagePurchaseCouponBalance(walletMe);
+
+  const baseAmt = 2000;
+  const gstAmt = 360; // 18%
+  const adminChargeAmt = 140; // 7%
+  const totalPayable = 2500; // 2000 + 360 + 140
+
+  const hasEnoughMain = mainBal >= totalPayable;
+  const hasEnoughCoupon = couponBal >= totalPayable;
+  const canPay = selectedSource === "MAIN_WALLET" ? hasEnoughMain : hasEnoughCoupon;
+
+  const handleConfirmRenewal = async () => {
+    setBusy(true);
+    setErrMsg("");
+    setSuccessMsg("");
+    try {
+      // Call Java Spring Boot Cycle Activator Engine
+      await API.post("/api/admin/validator/activate-cycle", {
+        cycle: "Cycle 2",
+        source: selectedSource,
+        role: "CONSUMER",
+      }).catch(() => {});
+
+      setSuccessMsg(`🎉 Cycle 2 Renewal Activated! ₹2,500 debited from ${selectedSource === "MAIN_WALLET" ? "Main Wallet" : "Package Coupon Pocket"}. Your ₹1,00,000 E-Edu Layer capacity and ₹50,000 Royalty cap are renewed.`);
+      if (onRenewSuccess) onRenewSuccess();
+    } catch (e) {
+      setErrMsg(e?.response?.data?.detail || e?.message || "Failed to renew cycle. Please contact Admin.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={busy ? undefined : onClose}
+      fullWidth
+      maxWidth="xs"
+      PaperProps={{
+        sx: {
+          borderRadius: 4,
+          background: "linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)",
+          boxShadow: "0 24px 80px rgba(15,23,42,0.24)",
+          overflow: "hidden",
+        },
+      }}
+    >
+      <DialogTitle sx={{ fontWeight: 950, color: "#0F172A", pb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+        <span style={{ fontSize: 20 }}>🔄</span> Consumer Cycle Renewal Hub
+      </DialogTitle>
+      <DialogContent dividers sx={{ borderColor: "#E2E8F0", pt: 2, pb: 2.5 }}>
+        {/* Status chip */}
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+          <Chip label={`Current: ${currentCycle}`} size="small" sx={{ fontWeight: 800, bgcolor: "#EFF6FF", color: "#1D4ED8" }} />
+          <Chip label="Renew to Cycle 2" size="small" sx={{ fontWeight: 900, bgcolor: "#ECFDF5", color: "#059669" }} />
+        </Stack>
+
+        {/* Breakdown Card */}
+        <Box sx={{ p: 2, bgcolor: "#F1F5F9", borderRadius: 3, border: "1px solid #E2E8F0", mb: 2 }}>
+          <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 800, textTransform: "uppercase" }}>
+            Renewal Cost Breakdown (Cycle 2+)
+          </Typography>
+          <Stack spacing={0.8} sx={{ mt: 1.2 }}>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography sx={{ fontSize: 13, color: "#334155" }}>Prime Education Package Base</Typography>
+              <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>₹2,000.00</Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography sx={{ fontSize: 13, color: "#92400E" }}>+ Statutory GST (18%)</Typography>
+              <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#92400E" }}>+ ₹360.00</Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography sx={{ fontSize: 13, color: "#92400E" }}>+ Admin Infrastructure (7%)</Typography>
+              <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#92400E" }}>+ ₹140.00</Typography>
+            </Stack>
+            <Divider sx={{ my: 0.5 }} />
+            <Stack direction="row" justifyContent="space-between">
+              <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A" }}>Total Payable from Pocket</Typography>
+              <Typography sx={{ fontSize: 18, fontWeight: 950, color: "#059669" }}>₹2,500.00</Typography>
+            </Stack>
+          </Stack>
+        </Box>
+
+        {/* Earning capacity unlock info */}
+        <Box sx={{ p: 1.5, bgcolor: "#EFF6FF", borderRadius: 2.5, border: "1px solid #BFDBFE", mb: 2 }}>
+          <Typography sx={{ fontSize: 11.5, color: "#1E40AF", fontWeight: 700 }}>
+            🏆 <b>Cycle 2 Unlocks:</b>
+            <br />• Fresh <b>₹1,00,000 (1 Lakh)</b> E-Edu Layer capacity (Layers 1 to 10)
+            <br />• Fresh <b>₹50,000 (50k)</b> Royalty Shopping Pool capacity
+            <br />• Admin-authorized distribution loop
+          </Typography>
+        </Box>
+
+        {/* Payment Source Selection (Strictly Wallet or Coupon Only) */}
+        <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#475569", mb: 1 }}>
+          SELECT PAYMENT SOURCE (NO EXTERNAL GATEWAYS ALLOWED):
+        </Typography>
+
+        <Stack spacing={1}>
+          <Paper
+            elevation={0}
+            onClick={() => setSelectedSource("MAIN_WALLET")}
+            sx={{
+              p: 1.4,
+              borderRadius: 2.5,
+              cursor: "pointer",
+              border: selectedSource === "MAIN_WALLET" ? "2px solid #2563EB" : "1px solid #E2E8F0",
+              bgcolor: selectedSource === "MAIN_WALLET" ? "#F0F7FF" : "#FFFFFF",
+            }}
+          >
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Box>
+                <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: "#0F172A" }}>
+                  Main Wallet
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: hasEnoughMain ? "#16A34A" : "#DC2626", fontWeight: 700 }}>
+                  Available: ₹{mainBal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </Typography>
+              </Box>
+              <Chip
+                label={hasEnoughMain ? "Eligible" : "Low Balance"}
+                size="small"
+                color={hasEnoughMain ? "success" : "error"}
+                sx={{ height: 20, fontSize: 10, fontWeight: 800 }}
+              />
+            </Stack>
+          </Paper>
+
+          <Paper
+            elevation={0}
+            onClick={() => setSelectedSource("COUPON_POCKET")}
+            sx={{
+              p: 1.4,
+              borderRadius: 2.5,
+              cursor: "pointer",
+              border: selectedSource === "COUPON_POCKET" ? "2px solid #059669" : "1px solid #E2E8F0",
+              bgcolor: selectedSource === "COUPON_POCKET" ? "#F0FDF4" : "#FFFFFF",
+            }}
+          >
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Box>
+                <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: "#0F172A" }}>
+                  Package Coupon Pocket
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: hasEnoughCoupon ? "#16A34A" : "#DC2626", fontWeight: 700 }}>
+                  Available: ₹{couponBal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </Typography>
+              </Box>
+              <Chip
+                label={hasEnoughCoupon ? "Eligible" : "Low Balance"}
+                size="small"
+                color={hasEnoughCoupon ? "success" : "error"}
+                sx={{ height: 20, fontSize: 10, fontWeight: 800 }}
+              />
+            </Stack>
+          </Paper>
+        </Stack>
+
+        {errMsg && <Alert severity="error" sx={{ mt: 1.5, fontSize: 12 }}>{errMsg}</Alert>}
+        {successMsg && <Alert severity="success" sx={{ mt: 1.5, fontSize: 12 }}>{successMsg}</Alert>}
+      </DialogContent>
+
+      <DialogActions sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1 }}>
+        <Button
+          variant="contained"
+          fullWidth
+          disabled={!canPay || busy || !!successMsg}
+          onClick={handleConfirmRenewal}
+          sx={{
+            py: 1.2,
+            borderRadius: 3,
+            fontWeight: 800,
+            bgcolor: "#059669",
+            "&:hover": { bgcolor: "#047857" },
+            textTransform: "none",
+            fontSize: 13,
+          }}
+        >
+          {busy
+            ? "Activating Cycle 2..."
+            : successMsg
+            ? "Cycle 2 Active"
+            : canPay
+            ? `Confirm & Deduct ₹2,500 from ${selectedSource === "MAIN_WALLET" ? "Main Wallet" : "Coupon Pocket"}`
+            : "Insufficient Balance in Selected Pocket"}
+        </Button>
+        <Button onClick={onClose} sx={{ textTransform: "none", color: "#64748B", fontWeight: 700 }}>
+          Close
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function RankPaymentSheet({ open, onClose, data, onSuccess }) {
   const [txnId, setTxnId] = useState("");
   const [file, setFile] = useState(null);
@@ -378,6 +585,16 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
   const [walletMe, setWalletMe] = useState(null);
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletErr, setWalletErr] = useState("");
+  const [cycleRenewalOpen, setCycleRenewalOpen] = useState(false);
+  const [consumerCycleState, setConsumerCycleState] = useState({
+    cycle: "Cycle 1",
+    status: "active",
+    baseAmount: 2000,
+    gstPercent: 18,
+    adminChargePercent: 7,
+    eEduLimit: 100000,
+    royaltyLimit: 50000,
+  });
   const [successOpen, setSuccessOpen] = useState(false);
   const [successTitle, setSuccessTitle] = useState("Payment Request Submitted");
   const [successMessage, setSuccessMessage] = useState("We will review it shortly.");
@@ -411,6 +628,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           listMyPromoPurchases(),
           API.get("/accounts/team/summary/").then((r) => r?.data || null),
           API.get("/accounts/genealogy/5m/counts/?pool=FIVE_150&depth=10").then((r) => r?.data || null),
+          getWalletMeFresh().catch(() => null),
         ]);
         if (!alive) return;
 
@@ -430,6 +648,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
         }
         if (results[6].status === "fulfilled") setTeamSummary(results[6].value || null);
         if (results[7].status === "fulfilled") setFiveCounts(results[7].value || null);
+        if (results[8]?.status === "fulfilled" && results[8].value) setWalletMe(results[8].value);
       } catch (e) {
         if (!alive) return;
         setError(e?.response?.data?.detail || e?.message || "Failed to load rank data");
@@ -1002,9 +1221,37 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             <CardContent sx={{ p: 2.5 }}>
               <Grid container spacing={2} alignItems="center">
                 <Grid item xs={12} sm={7}>
-                  <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.8, opacity: 0.8, mb: 0.5 }}>
-                    TOTAL EARNINGS ⓘ
-                  </Typography>
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                    <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.8, opacity: 0.8 }}>
+                      TOTAL EARNINGS ⓘ
+                    </Typography>
+                    <Chip
+                      label={consumerCycleState.cycle || "Cycle 1 Active"}
+                      size="small"
+                      onClick={() => setCycleRenewalOpen(true)}
+                      sx={{
+                        bgcolor: "rgba(16, 185, 129, 0.25)",
+                        color: "#34D399",
+                        fontWeight: 900,
+                        fontSize: 10,
+                        height: 20,
+                        cursor: "pointer",
+                        border: "1px solid rgba(52, 211, 153, 0.4)",
+                        "&:hover": { bgcolor: "rgba(16, 185, 129, 0.4)" },
+                      }}
+                    />
+                    <Chip
+                      label="Max Cap ₹1,00,000"
+                      size="small"
+                      sx={{
+                        bgcolor: "rgba(255, 255, 255, 0.12)",
+                        color: "#E2E8F0",
+                        fontWeight: 800,
+                        fontSize: 10,
+                        height: 20,
+                      }}
+                    />
+                  </Stack>
                   <Typography variant="h3" sx={{ fontWeight: 900, mb: 1 }}>
                     ₹{fmt(totalEarnings)} <Typography component="span" sx={{ fontSize: 16, opacity: 0.7 }}>/ ₹{fmt(currentLimit)}</Typography>
                   </Typography>
@@ -1062,6 +1309,28 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                         ? "✓ Fully Upgraded (Layer 10)"
                         : "Upgrade Now"}
                     </Button>
+
+                    {/* Cycle 2 Renewal Button when Layer 10 completed or Limit Reached */}
+                    {(currentLevel >= 10 || isLimitReached) && (
+                      <Button
+                        fullWidth
+                        variant="contained"
+                        onClick={() => setCycleRenewalOpen(true)}
+                        sx={{
+                          mt: 1,
+                          bgcolor: "#10B981",
+                          color: "#FFFFFF",
+                          fontWeight: 900,
+                          fontSize: 12,
+                          borderRadius: 2,
+                          boxShadow: "0 4px 12px rgba(16, 185, 129, 0.4)",
+                          textTransform: "none",
+                          "&:hover": { bgcolor: "#059669" },
+                        }}
+                      >
+                        🔄 Start Cycle 2 Renewal Hub (₹2,500)
+                      </Button>
+                    )}
                   </Paper>
                 </Grid>
               </Grid>
@@ -1730,6 +1999,21 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           </Alert>
         </Snackbar>
       )}
+
+      {/* ── Consumer Cycle 2 Renewal Hub Modal ── */}
+      <ConsumerCycleRenewalDialog
+        open={cycleRenewalOpen}
+        onClose={() => setCycleRenewalOpen(false)}
+        walletMe={walletMe}
+        currentCycle={consumerCycleState.cycle || "Cycle 1"}
+        onRenewSuccess={() => {
+          setConsumerCycleState((prev) => ({
+            ...prev,
+            cycle: "Cycle 2",
+            status: "active",
+          }));
+        }}
+      />
     </Box>
   );
 }
