@@ -136,7 +136,7 @@ export default function AdminFranchiseDashboard() {
               size="small"
               sx={{ textTransform: "none", fontWeight: 900, color: "#2563eb", bgcolor: "#ffffff", boxShadow: "0 2px 8px rgba(15,23,42,0.08)", px: 1.5, py: 0.5, borderRadius: "8px" }}
             >
-              🏢 Franchise Admin
+              🏢 Franchise Admin ({totalFranchiseUsers})
             </Button>
           </Box>
           <TextField select size="small" label="Wallet scope" value={scope} onChange={(e) => setScope(e.target.value)} sx={{ minWidth: 200 }}>

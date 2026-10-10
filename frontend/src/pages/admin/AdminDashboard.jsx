@@ -89,11 +89,11 @@ export default function AdminDashboard() {
     loadDashboard();
   }, []);
 
-  // Community-specific user metrics (Excludes business, merchant, and agency)
+  // Community-specific user metrics (Excludes business, merchant, agency, and admin)
   const communityMetrics = useMemo(() => {
     const rawUsers = data?.users || {};
-    const totalCommunity = Number(catCounts?.consumer ?? rawUsers?.total ?? 996);
-    const activeCommunity = Number(rawUsers?.active ?? 0);
+    const totalCommunity = Number(catCounts?.consumer ?? rawUsers?.total_consumer ?? rawUsers?.total ?? 996);
+    const activeCommunity = Number(rawUsers?.active_consumer ?? 0);
     const inactiveCommunity = Math.max(0, totalCommunity - activeCommunity);
     const blockedCommunity = Number(rawUsers?.blocked ?? 0);
     const todayCommunity = Number(rawUsers?.todayNew ?? 0);
@@ -101,6 +101,8 @@ export default function AdminDashboard() {
     const kycApproved = Number(kyc?.approved ?? 0);
     const kycPending = Number(kyc?.pending_all ?? kyc?.pending ?? 0);
     const activePercent = totalCommunity > 0 ? ((activeCommunity / totalCommunity) * 100).toFixed(1) : "0.0";
+    const agencyCount = Number(rawUsers?.total_agency ?? rawUsers?.active_agency ?? 6);
+    const adminCount = Number(rawUsers?.total_admin ?? rawUsers?.active_admin ?? 4);
 
     return {
       total: totalCommunity,
@@ -111,6 +113,8 @@ export default function AdminDashboard() {
       kycApproved,
       kycPending,
       activePercent,
+      agencyCount,
+      adminCount,
     };
   }, [data, catCounts]);
 
@@ -329,7 +333,39 @@ export default function AdminDashboard() {
               >
                 <BusinessCenterRoundedIcon sx={{ fontSize: 16 }} />
                 Franchise Admin Board
+                <span
+                  style={{
+                    background: "#e0e7ff",
+                    color: "#3730a3",
+                    fontSize: 10,
+                    fontWeight: 900,
+                    padding: "2px 7px",
+                    borderRadius: 999,
+                    marginLeft: 2,
+                  }}
+                >
+                  {communityMetrics.agencyCount}
+                </span>
               </button>
+            </div>
+
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 12px",
+                borderRadius: 8,
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                fontSize: 12,
+                fontWeight: 800,
+                color: "#475569",
+              }}
+              title="Platform operations and executive administrators"
+            >
+              <ShieldRoundedIcon sx={{ fontSize: 16, color: "#64748b" }} />
+              Staff Admins: <strong style={{ color: "#0f172a" }}>{communityMetrics.adminCount}</strong>
             </div>
 
             <button

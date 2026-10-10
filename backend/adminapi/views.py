@@ -60,6 +60,12 @@ class AdminMetricsView(APIView):
             blocked=Count("id", filter=Q(is_active=False)),
             todayNew=Count("id", filter=Q(date_joined__date=today)),
             consumers_without_kyc=Count("id", filter=Q(category="consumer") & Q(kyc__isnull=True)),
+            total_consumer=Count("id", filter=Q(category="consumer")),
+            active_consumer=Count("id", filter=Q(account_active=True, category="consumer")),
+            total_agency=Count("id", filter=Q(category__startswith="agency_")),
+            active_agency=Count("id", filter=Q(account_active=True, category__startswith="agency_")),
+            total_admin=Count("id", filter=Q(category="admin")),
+            active_admin=Count("id", filter=Q(account_active=True, category="admin")),
         )
 
         # KYC pending: users with KYC not verified + users without KYC (consumers)
@@ -73,6 +79,12 @@ class AdminMetricsView(APIView):
             "blocked": users_agg.get("blocked") or 0,
             "todayNew": users_agg.get("todayNew") or 0,
             "kycPending": int(kyc_pending),
+            "total_consumer": users_agg.get("total_consumer") or 0,
+            "active_consumer": users_agg.get("active_consumer") or 0,
+            "total_agency": users_agg.get("total_agency") or 0,
+            "active_agency": users_agg.get("active_agency") or 0,
+            "total_admin": users_agg.get("total_admin") or 0,
+            "active_admin": users_agg.get("active_admin") or 0,
         }
 
         # KYC aggregate block for dashboard (submitted, pending, approved)
