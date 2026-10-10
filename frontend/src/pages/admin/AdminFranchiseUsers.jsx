@@ -34,27 +34,97 @@ const CATEGORY_OPTIONS = [
 export const INDIAN_STATES = [
   { id: 1, name: "Karnataka" },
   { id: 4009, name: "Goa" },
-  { id: 2, name: "Maharashtra" },
+  { id: 4008, name: "Maharashtra" },
   { id: 3, name: "Tamil Nadu" },
-  { id: 4, name: "Kerala" },
-  { id: 5, name: "Andhra Pradesh" },
+  { id: 4028, name: "Kerala" },
+  { id: 4017, name: "Andhra Pradesh" },
   { id: 6, name: "Telangana" },
+  { id: 4030, name: "Gujarat" },
+  { id: 4057, name: "Rajasthan" },
+  { id: 4060, name: "Uttar Pradesh" },
+  { id: 4039, name: "Madhya Pradesh" },
+  { id: 4062, name: "West Bengal" },
+  { id: 4037, name: "Bihar" },
+  { id: 4056, name: "Punjab" },
+  { id: 4007, name: "Haryana" },
+  { id: 4054, name: "Odisha" },
+  { id: 4025, name: "Jharkhand" },
+  { id: 4040, name: "Chhattisgarh" },
+  { id: 4027, name: "Assam" },
+  { id: 4020, name: "Himachal Pradesh" },
+  { id: 4061, name: "Uttarakhand" },
+  { id: 4059, name: "Tripura" },
+  { id: 4051, name: "Meghalaya" },
+  { id: 4050, name: "Manipur" },
+  { id: 4053, name: "Nagaland" },
+  { id: 4024, name: "Arunachal Pradesh" },
+  { id: 4052, name: "Mizoram" },
+  { id: 4058, name: "Sikkim" },
+  { id: 4021, name: "Delhi" },
+  { id: 4029, name: "Jammu and Kashmir" },
+  { id: 4852, name: "Ladakh" },
+  { id: 4031, name: "Chandigarh" },
+  { id: 4055, name: "Puducherry" },
+  { id: 4023, name: "Andaman and Nicobar Islands" },
+  { id: 4033, name: "Dadra and Nagar Haveli and Daman and Diu" },
+  { id: 4019, name: "Lakshadweep" },
 ];
 
-export const KARNATAKA_DISTRICTS = [
-  "Tumakuru", "Hassan", "Bengaluru Urban", "Bengaluru Rural", "Mysuru",
-  "Mandya", "Chikkamagaluru", "Shivamogga", "Chitradurga", "Davanagere",
-  "Ballari", "Belagavi", "Vijayapura", "Kalaburagi", "Kolar", "Chikkaballapura",
-  "Dakshina Kannada", "Udupi", "Uttara Kannada", "Kodagu", "Bagalkote",
-  "Bidar", "Chamarajanagara", "Dharwad", "Gadag", "Haveri", "Koppal",
-  "Raichur", "Ramanagara", "Vijayanagara", "Yadgir"
-];
+export const STATE_DISTRICTS_MAP = {
+  Karnataka: [
+    "Tumakuru", "Gulbarga", "Kalaburagi", "Hassan", "Bengaluru Urban", "Bengaluru Rural", "Mysuru",
+    "Mandya", "Chikkamagaluru", "Shivamogga", "Chitradurga", "Davanagere",
+    "Ballari", "Belagavi", "Vijayapura", "Kolar", "Chikkaballapura",
+    "Dakshina Kannada", "Udupi", "Uttara Kannada", "Kodagu", "Bagalkote",
+    "Bidar", "Chamarajanagara", "Dharwad", "Gadag", "Haveri", "Koppal",
+    "Raichur", "Ramanagara", "Vijayanagara", "Yadgir"
+  ],
+  Goa: ["North Goa", "South Goa"],
+  Maharashtra: [
+    "Mumbai City", "Mumbai Suburban", "Pune", "Nagpur", "Thane", "Nashik",
+    "Aurangabad", "Solapur", "Kolhapur", "Amravati", "Nanded", "Sangli", "Satara"
+  ],
+  "Tamil Nadu": [
+    "Chennai", "Coimbatore", "Madurai", "Tiruchirappalli", "Salem", "Tirunelveli",
+    "Erode", "Vellore", "Thanjavur", "Dindigul", "Kanchipuram", "Tiruppur"
+  ],
+  Kerala: [
+    "Thiruvananthapuram", "Ernakulam", "Kozhikode", "Thrissur", "Kollam", "Palakkad",
+    "Malappuram", "Kannur", "Kottayam", "Alappuzha", "Idukki", "Pathanamthitta", "Wayanad", "Kasaragod"
+  ],
+  "Andhra Pradesh": [
+    "Visakhapatnam", "Vijayawada", "Guntur", "Nellore", "Kurnool", "Tirupati",
+    "Kakinada", "Rajahmundry", "Kadapa", "Anantapur", "Eluru", "Vizianagaram"
+  ],
+  Telangana: [
+    "Hyderabad", "Warangal", "Nizamabad", "Karimnagar", "Khammam", "Ramagundam",
+    "Mahbubnagar", "Nalgonda", "Adilabad", "Suryapet", "Siddipet"
+  ],
+  Gujarat: ["Ahmedabad", "Surat", "Vadodara", "Rajkot", "Bhavnagar", "Jamnagar", "Gandhinagar", "Junagadh"],
+  Rajasthan: ["Jaipur", "Jodhpur", "Udaipur", "Kota", "Bikaner", "Ajmer", "Bhilwara", "Alwar", "Sikar"],
+  "Uttar Pradesh": ["Lucknow", "Kanpur", "Varanasi", "Agra", "Prayagraj", "Meerut", "Ghaziabad", "Noida", "Bareilly", "Aligarh"],
+  "Madhya Pradesh": ["Bhopal", "Indore", "Gwalior", "Jabalpur", "Ujjain", "Sagar", "Dewas", "Satna"],
+  "West Bengal": ["Kolkata", "Howrah", "North 24 Parganas", "South 24 Parganas", "Hooghly", "Darjeeling", "Siliguri", "Asansol"],
+  Bihar: ["Patna", "Gaya", "Bhagalpur", "Muzaffarpur", "Purnia", "Darbhanga", "Bihar Sharif", "Arrah"],
+  Punjab: ["Ludhiana", "Amritsar", "Jalandhar", "Patiala", "Bathinda", "Mohali", "Hoshiarpur"],
+  Haryana: ["Gurugram", "Faridabad", "Panipat", "Ambala", "Yamunanagar", "Rohtak", "Hisar", "Karnal", "Sonipat", "Panchkula"],
+  Delhi: ["Central Delhi", "East Delhi", "New Delhi", "North Delhi", "North East Delhi", "North West Delhi", "South Delhi", "South East Delhi", "South West Delhi", "West Delhi"],
+};
 
-export const GOA_DISTRICTS = ["North Goa", "South Goa"];
+export const KARNATAKA_DISTRICTS = STATE_DISTRICTS_MAP.Karnataka;
+export const GOA_DISTRICTS = STATE_DISTRICTS_MAP.Goa;
 
 function getDistrictsForState(stateName) {
-  if (stateName === "Goa") return GOA_DISTRICTS;
-  return KARNATAKA_DISTRICTS;
+  if (STATE_DISTRICTS_MAP[stateName]) {
+    return STATE_DISTRICTS_MAP[stateName];
+  }
+  return [
+    `${stateName} Central`,
+    `${stateName} North`,
+    `${stateName} South`,
+    `${stateName} East`,
+    `${stateName} West`
+  ];
 }
 
 function labelFor(value) {
@@ -84,12 +154,12 @@ export default function AdminFranchiseUsers() {
     category: "agency_pincode",
     state: "1",
     stateName: "Karnataka",
-    district: "Tumakuru",
-    pincode: "572106",
+    district: "",
+    pincode: "",
     // Coordinators multi-selectors (strictly max 2)
-    selectedPincodes: ["572106", "572101"],
-    selectedDistricts: ["Tumakuru"],
-    selectedStates: ["Karnataka"],
+    selectedPincodes: [],
+    selectedDistricts: [],
+    selectedStates: [],
   });
   const [pinResolving, setPinResolving] = useState(false);
   const [pinResolvedInfo, setPinResolvedInfo] = useState(null);
@@ -101,24 +171,50 @@ export default function AdminFranchiseUsers() {
     if (cleaned.length === 6) {
       setPinResolving(true);
       try {
-        const res = await API.get(`/locations/pincode/${cleaned}/`);
-        const data = res?.data || {};
-        const resolvedDistrict = data.city || data.district || "Tumakuru";
-        const resolvedState = data.state || "Karnataka";
-        const matchedState = INDIAN_STATES.find(
-          (s) => s.name.toLowerCase() === resolvedState.toLowerCase()
-        );
-        const resolvedStateId = matchedState ? String(matchedState.id) : "1";
+        let resolvedDistrict = "";
+        let resolvedState = "";
 
-        setRegisterForm((f) => ({
-          ...f,
-          district: resolvedDistrict,
-          state: resolvedStateId,
-          stateName: resolvedState,
-        }));
-        setPinResolvedInfo(`${resolvedDistrict}, ${resolvedState}`);
+        // 1. Try our backend API first (/location/pincode/${cleaned}/)
+        try {
+          const res = await API.get(`/location/pincode/${cleaned}/`);
+          const data = res?.data || {};
+          resolvedDistrict = data.district || data.city || data.gram_panchayat || "";
+          resolvedState = data.state || "";
+        } catch (_) {}
+
+        // 2. If backend didn't return district, fallback to India Post public API
+        if (!resolvedDistrict) {
+          try {
+            const postalRes = await fetch(`https://api.postalpincode.in/pincode/${cleaned}`);
+            const postalData = await postalRes.json();
+            if (Array.isArray(postalData) && postalData[0]?.Status === "Success") {
+              const po = postalData[0]?.PostOffice?.[0];
+              if (po) {
+                resolvedDistrict = po.District || po.Block || "";
+                resolvedState = po.State || "";
+              }
+            }
+          } catch (_) {}
+        }
+
+        if (resolvedDistrict) {
+          const matchedState = INDIAN_STATES.find(
+            (s) => s.name.toLowerCase() === (resolvedState || "").toLowerCase()
+          );
+          const resolvedStateId = matchedState ? String(matchedState.id) : "1";
+          const finalStateName = matchedState ? matchedState.name : (resolvedState || "Karnataka");
+
+          setRegisterForm((f) => ({
+            ...f,
+            district: resolvedDistrict,
+            state: resolvedStateId,
+            stateName: finalStateName,
+          }));
+          setPinResolvedInfo(`${resolvedDistrict}, ${finalStateName}`);
+        } else {
+          setPinResolvedInfo(null);
+        }
       } catch (err) {
-        // Fallback
         setPinResolvedInfo(null);
       } finally {
         setPinResolving(false);
@@ -623,17 +719,19 @@ export default function AdminFranchiseUsers() {
                 <TextField
                   size="small"
                   label="District (Auto-Derived) *"
-                  value={registerForm.district}
+                  value={registerForm.district || ""}
+                  placeholder="Auto-derived upon pincode entry"
                   disabled
-                  helperText="Locked automatically from India Post records."
+                  helperText={registerForm.district ? `Locked automatically: ${registerForm.district}` : "Type 6-digit Pincode above to auto-load district."}
                 />
 
                 <TextField
                   size="small"
                   label="State (Auto-Derived) *"
-                  value={registerForm.stateName || "Karnataka"}
+                  value={registerForm.stateName || ""}
+                  placeholder="Auto-derived upon pincode entry"
                   disabled
-                  helperText="Locked automatically from India Post records."
+                  helperText={registerForm.stateName ? `Locked automatically: ${registerForm.stateName}` : "Type 6-digit Pincode above to auto-load state."}
                 />
               </Stack>
             )}
