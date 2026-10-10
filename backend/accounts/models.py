@@ -653,16 +653,18 @@ class Wallet(models.Model):
                     remarks=f"Double-entry payout stream: {tx_type}",
                     postings=postings
                 )
+                posted_double_entry = True
             except Exception:
-                pass
+                posted_double_entry = False
 
-            # Update balances to reflect 75/25 split
-            w.balance = (w.balance or D("0")) + amt
-            w.main_balance = (w.main_balance or D("0")) + income
-            w.self_account_balance = (w.self_account_balance or D("0")) + self_part
-            if not inactive:
-                w.withdrawable_balance = (w.withdrawable_balance or D("0")) + income
-            w.save(update_fields=['balance', 'main_balance', 'withdrawable_balance', 'self_account_balance', 'updated_at'])
+            if not posted_double_entry:
+                # Direct property fallback if double-entry engine fails
+                w.main_balance = (w.main_balance or D("0")) + income
+                w.self_account_balance = (w.self_account_balance or D("0")) + self_part
+                if not inactive:
+                    w.withdrawable_balance = (w.withdrawable_balance or D("0")) + income
+
+            w.save(update_fields=['updated_at'])
 
             # Apply micro-packs (₹250) from self reserve for active users
             if not inactive:
