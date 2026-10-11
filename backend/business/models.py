@@ -1078,9 +1078,10 @@ class AutoPoolAccount(models.Model):
     def _base_self_account(cls, user, pool_type: str):
         """
         Oldest ACTIVE self account for this owner in the given pool (acts as the main/root for clustering).
+        Excludes SENTINEL roots so user's first purchased entry is always the base entry.
         """
         try:
-            return cls.objects.filter(owner=user, pool_type=pool_type, status="ACTIVE").order_by("id").first()
+            return cls.objects.filter(owner=user, pool_type=pool_type, status="ACTIVE").exclude(source_type="SENTINEL").order_by("id").first()
         except Exception:
             return None
 
@@ -1093,7 +1094,7 @@ class AutoPoolAccount(models.Model):
         """
         base = (getattr(user, "username", "") or "")
         try:
-            count = cls.objects.filter(owner=user, pool_type=pool_type, status="ACTIVE").count()
+            count = cls.objects.filter(owner=user, pool_type=pool_type, status="ACTIVE").exclude(source_type="SENTINEL").count()
         except Exception:
             count = 0
         idx = int(count) + 1

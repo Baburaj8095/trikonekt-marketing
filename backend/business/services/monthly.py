@@ -471,6 +471,8 @@ def distribute_monthly_759_payouts(
                             if idx >= len(fixed5):
                                 break
                             recipient = getattr(node, "owner", None)
+                            if getattr(recipient, "id", None) == getattr(consumer, "id", None):
+                                continue
                             matrix_account_id = getattr(node, "id", None)
                             amt = _q2(fixed5[idx] or 0)
                             if amt <= 0:
@@ -505,6 +507,8 @@ def distribute_monthly_759_payouts(
                             _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
                     else:
                         for idx, recipient in enumerate(upline6_users):
+                            if getattr(recipient, "id", None) == getattr(consumer, "id", None):
+                                continue
                             if idx >= len(fixed5):
                                 break
                             amt = _q2(fixed5[idx] or 0)
@@ -537,6 +541,8 @@ def distribute_monthly_759_payouts(
                             if idx >= len(five_percents):
                                 break
                             recipient = getattr(node, "owner", None)
+                            if getattr(recipient, "id", None) == getattr(consumer, "id", None):
+                                continue
                             matrix_account_id = getattr(node, "id", None)
                             pct = five_percents[idx] or Decimal("0")
                             amt = _q2(base_amt * pct / Decimal("100"))
@@ -572,6 +578,8 @@ def distribute_monthly_759_payouts(
                             _update_matrix_progress(recipient, pool_type="FIVE_150", level=idx + 1, amount=amt)
                     else:
                         for idx, recipient in enumerate(upline6_users):
+                            if getattr(recipient, "id", None) == getattr(consumer, "id", None):
+                                continue
                             if idx >= len(five_percents):
                                 break
                             pct = five_percents[idx] or Decimal("0")
@@ -618,6 +626,8 @@ def distribute_monthly_759_payouts(
                             if idx >= len(fixed3):
                                 break
                             recipient = getattr(node, "owner", None)
+                            if getattr(recipient, "id", None) == getattr(consumer, "id", None):
+                                continue
                             matrix_account_id = getattr(node, "id", None)
                             amt = _q2(fixed3[idx] or 0)
                             if amt <= 0:
@@ -652,6 +662,8 @@ def distribute_monthly_759_payouts(
                             _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
                     else:
                         for idx, recipient in enumerate(upline15_users):
+                            if getattr(recipient, "id", None) == getattr(consumer, "id", None):
+                                continue
                             if idx >= len(fixed3):
                                 break
                             amt = _q2(fixed3[idx] or 0)
@@ -684,6 +696,8 @@ def distribute_monthly_759_payouts(
                             if idx >= len(three_percents):
                                 break
                             recipient = getattr(node, "owner", None)
+                            if getattr(recipient, "id", None) == getattr(consumer, "id", None):
+                                continue
                             matrix_account_id = getattr(node, "id", None)
                             pct = three_percents[idx] or Decimal("0")
                             amt = _q2(base_amt * pct / Decimal("100"))
@@ -719,6 +733,8 @@ def distribute_monthly_759_payouts(
                             _update_matrix_progress(recipient, pool_type="THREE_150", level=idx + 1, amount=amt)
                     else:
                         for idx, recipient in enumerate(upline15_users):
+                            if getattr(recipient, "id", None) == getattr(consumer, "id", None):
+                                continue
                             if idx >= len(three_percents):
                                 break
                             pct = three_percents[idx] or Decimal("0")

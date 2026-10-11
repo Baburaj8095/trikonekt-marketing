@@ -574,6 +574,8 @@ def distribute_prime_150_payouts(
                                 iterable = [(idx, recipient, None) for idx, recipient in enumerate(_resolve_upline(consumer, depth=five_levels))]
 
                             for idx, recipient, matrix_account_id in iterable:
+                                if getattr(recipient, "id", None) == getattr(consumer, "id", None):
+                                    continue
                                 if idx >= len(fixed5):
                                     break
                                 amt = _q2(fixed5[idx] or 0)
@@ -610,6 +612,8 @@ def distribute_prime_150_payouts(
                                 iterable = [(idx, recipient, None) for idx, recipient in enumerate(_resolve_upline(consumer, depth=five_levels))]
 
                             for idx, recipient, matrix_account_id in iterable:
+                                if getattr(recipient, "id", None) == getattr(consumer, "id", None):
+                                    continue
                                 if idx >= len(five_percents):
                                     break
                                 pct = five_percents[idx] or Decimal("0")
@@ -657,6 +661,8 @@ def distribute_prime_150_payouts(
                                 iterable = [(idx, recipient, None) for idx, recipient in enumerate(_resolve_upline(consumer, depth=three_levels))]
 
                             for idx, recipient, matrix_account_id in iterable:
+                                if getattr(recipient, "id", None) == getattr(consumer, "id", None):
+                                    continue
                                 if idx >= len(fixed3):
                                     break
                                 amt = _q2(fixed3[idx] or 0)
@@ -692,6 +698,8 @@ def distribute_prime_150_payouts(
                                 iterable = [(idx, recipient, None) for idx, recipient in enumerate(_resolve_upline(consumer, depth=three_levels))]
 
                             for idx, recipient, matrix_account_id in iterable:
+                                if getattr(recipient, "id", None) == getattr(consumer, "id", None):
+                                    continue
                                 if idx >= len(three_percents):
                                     break
                                 pct = three_percents[idx] or Decimal("0")
@@ -1069,6 +1077,8 @@ def distribute_prime_750_payouts(
                                 iterable = [(idx, recipient, None) for idx, recipient in enumerate(_resolve_upline(consumer, depth=five_levels))]
 
                             for idx, recipient, matrix_account_id in iterable:
+                                if getattr(recipient, "id", None) == getattr(consumer, "id", None):
+                                    continue
                                 if idx >= len(fixed5):
                                     break
                                 amt = _q2(fixed5[idx] or 0)
@@ -1104,6 +1114,8 @@ def distribute_prime_750_payouts(
                                 iterable = [(idx, recipient, None) for idx, recipient in enumerate(_resolve_upline(consumer, depth=five_levels))]
 
                             for idx, recipient, matrix_account_id in iterable:
+                                if getattr(recipient, "id", None) == getattr(consumer, "id", None):
+                                    continue
                                 if idx >= len(five_percents):
                                     break
                                 pct = five_percents[idx] or Decimal("0")
@@ -1152,6 +1164,8 @@ def distribute_prime_750_payouts(
                                 iterable = [(idx, recipient, None) for idx, recipient in enumerate(_resolve_upline(consumer, depth=three_levels))]
 
                             for idx, recipient, matrix_account_id in iterable:
+                                if getattr(recipient, "id", None) == getattr(consumer, "id", None):
+                                    continue
                                 if idx >= len(fixed3):
                                     break
                                 amt = _q2(fixed3[idx] or 0)
@@ -1187,6 +1201,8 @@ def distribute_prime_750_payouts(
                                 iterable = [(idx, recipient, None) for idx, recipient in enumerate(_resolve_upline(consumer, depth=three_levels))]
 
                             for idx, recipient, matrix_account_id in iterable:
+                                if getattr(recipient, "id", None) == getattr(consumer, "id", None):
+                                    continue
                                 if idx >= len(three_percents):
                                     break
                                 pct = three_percents[idx] or Decimal("0")
