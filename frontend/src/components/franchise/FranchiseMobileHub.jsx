@@ -1265,8 +1265,6 @@ export default function FranchiseMobileHub({
         deb += Math.abs(amt);
       }
     });
-    if (cred === 0) cred = 32735.88;
-    if (deb === 0) deb = 8183.95;
     return { totalCredits: cred, totalDebits: deb };
   }, [liveTransactions]);
 
@@ -1606,18 +1604,76 @@ export default function FranchiseMobileHub({
         console.warn("Wallet history load err:", e);
       }
 
+      // Multi-Cycle & Earning Limit Dynamic Sync for this specific Franchise/Agency user
       try {
-        const storedRole = String(localStorage.getItem("role_user") || "").toLowerCase();
-        if (storedRole === "superadmin" || storedRole === "admin") {
-          const mCommissionRes = await API.get("/admin/commission/master/");
-          if (isMounted && mCommissionRes.data) {
+        let activeCycleConf = null;
+        const myId = user?.id || (typeof localStorage !== "undefined" && (localStorage.getItem("user_id") || JSON.parse(localStorage.getItem("user_agency") || localStorage.getItem("user_user") || localStorage.getItem("user") || "{}")?.id));
+        const myPhone = user?.phone || user?.username || (typeof localStorage !== "undefined" && JSON.parse(localStorage.getItem("user_agency") || localStorage.getItem("user_user") || localStorage.getItem("user") || "{}")?.phone);
+        const myCode = user?.user_code || user?.prefixed_id || (typeof localStorage !== "undefined" && JSON.parse(localStorage.getItem("user_agency") || localStorage.getItem("user_user") || localStorage.getItem("user") || "{}")?.user_code);
+
+        // 1. Check user-specific localStorage cache
+        [myId, myPhone, myCode].forEach((k) => {
+          if (!activeCycleConf && k) {
+            try {
+              const ls = localStorage.getItem(`trikonekt_cycle_user_${k}`);
+              if (ls) activeCycleConf = JSON.parse(ls);
+            } catch (_) {}
+          }
+        });
+
+        // 2. Query Master Commission configs (/admin/commission/master/)
+        try {
+          const mCommissionRes = await API.get("/admin/commission/master/").catch(() => null);
+          if (mCommissionRes?.data) {
             setLiveAdminMasterConfig(mCommissionRes.data);
             try {
               localStorage.setItem("tri_master_commission_config", JSON.stringify(mCommissionRes.data));
             } catch (_) {}
+            const configs = mCommissionRes.data.agency_cycle_configs || {};
+            const found = (myId && configs[myId]) || (myPhone && configs[myPhone]) || (myCode && configs[myCode]);
+            if (found) activeCycleConf = found;
           }
+        } catch (_) {}
+
+        // 3. Fallback to Java Spring Boot cycle status API
+        if (!activeCycleConf && (myId || myPhone || myCode)) {
+          const queryKey = myId || myPhone || myCode;
+          try {
+            const statusRes = await API.get(`/api/admin/validator/cycle-status/${queryKey}`).catch(() => null);
+            if (statusRes?.data?.data) {
+              const d = statusRes.data.data;
+              if (d.baseAmount || d.eligibleLimit) {
+                activeCycleConf = {
+                  active_cycle: d.cycle,
+                  base_amount: Number(d.baseAmount),
+                  profit_percent: Number(d.profitPercent),
+                  total_limit: Number(d.eligibleLimit),
+                  status: d.status,
+                };
+              }
+            }
+          } catch (_) {}
         }
-      } catch (_) {}
+
+        if (isMounted && activeCycleConf) {
+          const base = Number(activeCycleConf.base_amount || activeCycleConf.baseAmount || 200000);
+          const profit = Number(activeCycleConf.profit_percent || activeCycleConf.profitPercent || 75);
+          const limit = Number(activeCycleConf.total_limit || activeCycleConf.eligibleLimit || (base + (base * profit) / 100));
+          const cycleStr = String(activeCycleConf.active_cycle || activeCycleConf.cycle || "1");
+          const cycleNum = Number(cycleStr.replace(/\D/g, "")) || 1;
+          setCycleState((prev) => ({
+            ...prev,
+            currentCycle: cycleNum,
+            baseAmount: base,
+            profitPercent: profit,
+            eligibleLimit: limit,
+            status: activeCycleConf.status || "ACTIVE",
+            adminAuthorized: activeCycleConf.status === "authorized" || prev.adminAuthorized,
+          }));
+        }
+      } catch (err) {
+        console.warn("Franchise cycle config load error:", err);
+      }
 
       try {
         const rootsRes = await API.get("/accounts/genealogy/roots/breakdown/");
@@ -4581,7 +4637,7 @@ export default function FranchiseMobileHub({
                   fontFamily: "'Plus Jakarta Sans', sans-serif",
                 }}
               >
-                ₹ {((Number(walletState?.mainWallet) || 24551.93)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₹ {(Number(walletState?.mainWallet || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </Typography>
 
               {/* Earning Limit & Progress Bar */}
@@ -4591,13 +4647,13 @@ export default function FranchiseMobileHub({
                     Eligible Limit: ₹ {cycleState.eligibleLimit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </Typography>
                   <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#FDE68A" }}>
-                    Earned: ₹ {((Number(walletState?.mainWallet) || 24551.93)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({(Math.min(100, ((Number(walletState?.mainWallet) || 24551.93) / cycleState.eligibleLimit) * 100)).toFixed(2)}%)
+                    Earned: ₹ {(Number(walletState?.mainWallet || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({(Math.min(100, ((Number(walletState?.mainWallet || 0)) / (cycleState.eligibleLimit || 1)) * 100)).toFixed(2)}%)
                   </Typography>
                 </Stack>
 
                 <LinearProgress
                   variant="determinate"
-                  value={Math.min(100, ((Number(walletState?.mainWallet) || 24551.93) / cycleState.eligibleLimit) * 100)}
+                  value={Math.min(100, ((Number(walletState?.mainWallet || 0)) / (cycleState.eligibleLimit || 1)) * 100)}
                   sx={{
                     height: 9,
                     borderRadius: 5,
@@ -7208,7 +7264,7 @@ export default function FranchiseMobileHub({
                   >
                     <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>Main Wallet</Typography>
                     <Typography sx={{ fontSize: 15, fontWeight: 950, color: "#059669", my: 0.3 }}>
-                      ₹ {((Number(walletState?.mainWallet) || 24551.93)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ₹ {(Number(walletState?.mainWallet || 0)).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </Typography>
                     <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>Available balance</Typography>
                   </Paper>

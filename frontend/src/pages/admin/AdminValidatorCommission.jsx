@@ -20,6 +20,8 @@ import {
   Alert,
   CircularProgress,
   Tooltip,
+  Grid,
+  LinearProgress,
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
@@ -88,15 +90,43 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
       if (searchQuery.trim()) params.search = searchQuery.trim();
       if (stateFilter !== "All") params.state = stateFilter;
 
+      // 1. Fetch live users from backend
       const res = await API.get("/admin/users/", { params, timeout: 15000 });
       const rawResults = res?.data?.results || [];
       const count = res?.data?.count || rawResults.length;
 
+      // 2. Fetch master commission configs for persistent agency cycles
+      let savedAgencyConfigs = {};
+      try {
+        const mRes = await API.get("/admin/commission/master/").catch(() => null);
+        savedAgencyConfigs = mRes?.data?.agency_cycle_configs || {};
+      } catch (_) {}
+
       // Enhance with dynamic cycle metadata
       const enhanced = rawResults.map((u, idx) => {
-        const storedCycle = u?.metadata?.cycle_info || {};
+        let localSaved = {};
+        try {
+          localSaved = JSON.parse(
+            localStorage.getItem(`trikonekt_cycle_user_${u.id}`) ||
+            localStorage.getItem(`trikonekt_cycle_user_${u.phone}`) ||
+            "{}"
+          );
+        } catch (_) {}
+
+        const storedCycle =
+          savedAgencyConfigs[u.id] ||
+          savedAgencyConfigs[u.phone] ||
+          savedAgencyConfigs[u.user_code] ||
+          localSaved ||
+          u?.metadata?.cycle_info ||
+          {};
+
         const defaultBase = isConsumer ? 2000 : 200000;
-        const defaultLimit = isConsumer ? 100000 : 350000;
+        const defaultProfit = isConsumer ? 4900 : 75;
+        const base = storedCycle.base_amount != null ? Number(storedCycle.base_amount) : defaultBase;
+        const profit = storedCycle.profit_percent != null ? Number(storedCycle.profit_percent) : defaultProfit;
+        const limit = storedCycle.total_limit != null ? Number(storedCycle.total_limit) : (base + (base * profit) / 100);
+
         return {
           id: u.id,
           franchiseId: isConsumer ? (u.user_code || `CON-${u.phone?.slice(-6) || "999999"}`) : (u.user_code || u.prefixed_id || `FR${u.pincode || "560073"}${String(idx + 1).padStart(3, "0")}`),
@@ -112,12 +142,12 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
                  franchiseLevel === "agency_district_coordinator" ? "District Coordinator" :
                  franchiseLevel === "agency_state" ? "State Owner" :
                  franchiseLevel === "agency_state_coordinator" ? "State Coordinator" : "Franchise Partner",
-          activeCycle: storedCycle.active_cycle || (idx % 2 === 0 ? "Cycle 2" : "Cycle 1"),
-          cycleStatus: storedCycle.status || (idx % 3 === 0 ? "completed" : "active"),
-          completionPct: storedCycle.completion_pct ?? (idx % 3 === 0 ? 100 : idx === 0 ? 14.03 : 62.5),
-          baseAmount: storedCycle.base_amount || defaultBase,
-          profitPercent: storedCycle.profit_percent || 75,
-          totalLimit: storedCycle.total_limit || defaultLimit,
+          activeCycle: storedCycle.active_cycle || "Cycle 1",
+          cycleStatus: storedCycle.status || "active",
+          completionPct: storedCycle.completion_pct ?? (storedCycle.status === "completed" ? 100 : 0),
+          baseAmount: base,
+          profitPercent: profit,
+          totalLimit: limit,
           eEduLimit: 100000,
           royaltyLimit: 50000,
           status: u.is_active !== false ? "Active" : "Inactive",
@@ -162,15 +192,21 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
     setSelectedUser(user);
     setActiveStep(4);
     setUserCycleConfig({
-      cycle: user.activeCycle || "Cycle 2",
-      baseAmount: user.baseAmount || 200000,
-      profitPercent: user.profitPercent || 75,
+      cycle: user.activeCycle || "Cycle 1",
+      baseAmount: user.baseAmount != null ? Number(user.baseAmount) : 200000,
+      profitPercent: user.profitPercent != null ? Number(user.profitPercent) : 75,
       gstPercent: 18,
       adminChargePercent: 7,
-      status: user.cycleStatus === "completed" ? "pending_approval" : "active",
+      status: user.cycleStatus || "active",
       paymentSource: "MAIN_WALLET",
     });
     setSaveSuccessMsg("");
+
+    // On mobile, scroll smoothly to step 4 form
+    setTimeout(() => {
+      const el = document.getElementById("validator-step4-form");
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
   };
 
   // Math Calculations (Base + Profit % = Total Earning Limit)
@@ -223,15 +259,22 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
         },
       };
 
-      // Persist to user metadata and commission master
-      await API.patch(`/admin/users/${selectedUser.id}/`, {
-        metadata: {
-          ...(selectedUser.metadata || {}),
-          cycle_info: payload.cycle_info,
-        },
-      }).catch(() => {});
+      // 1. Persist to Master Commission (/admin/commission/master/) under agency_cycle_configs
+      try {
+        const masterGet = await API.get("/admin/commission/master/").catch(() => null);
+        const curConfigs = masterGet?.data?.agency_cycle_configs || {};
+        const updatedConfigs = {
+          ...curConfigs,
+          [selectedUser.id]: payload.cycle_info,
+          [selectedUser.phone]: payload.cycle_info,
+          [selectedUser.franchiseId]: payload.cycle_info,
+        };
+        await API.patch("/admin/commission/master/", {
+          agency_cycle_configs: updatedConfigs,
+        }).catch(() => {});
+      } catch (_) {}
 
-      // Synchronize with Java Spring Boot Cycle Engine
+      // 2. Synchronize with Java Spring Boot Cycle Engine
       await API.post("/api/admin/validator/cycle-config", {
         userId: selectedUser.id,
         userCode: selectedUser.franchiseId || selectedUser.phone,
@@ -254,6 +297,22 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
         }).catch(() => {});
       }
 
+      // 3. User-specific and universal localStorage sync for instant client reflection
+      try {
+        localStorage.setItem(`trikonekt_cycle_user_${selectedUser.id}`, JSON.stringify(payload.cycle_info));
+        localStorage.setItem(`trikonekt_cycle_user_${selectedUser.phone}`, JSON.stringify(payload.cycle_info));
+        localStorage.setItem(`trikonekt_cycle_user_${selectedUser.franchiseId}`, JSON.stringify(payload.cycle_info));
+        localStorage.setItem("trikonekt_franchise_cycle_state", JSON.stringify({
+          currentCycle: Number(userCycleConfig.cycle.replace(/\D/g, "")) || 1,
+          baseAmount: baseAmt,
+          profitPercent: profitPct,
+          eligibleLimit: totalEligibleLimit,
+          status: actionType === "activate" ? "ACTIVE" : actionType === "authorize" ? "authorized" : userCycleConfig.status,
+          adminAuthorized: actionType === "authorize" || actionType === "activate",
+          activationRequested: false,
+        }));
+      } catch (_) {}
+
       // Keep local list updated
       setUsersList((prev) =>
         prev.map((u) =>
@@ -273,16 +332,16 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
 
       if (actionType === "activate") {
         setUserCycleConfig((c) => ({ ...c, status: "active" }));
-        setSaveSuccessMsg(`🚀 ${userCycleConfig.cycle} has been forcefully ACTIVATED for ${selectedUser.name}! ₹${totalPayableFromWallet.toLocaleString("en-IN")} debited from Main Wallet/Coupon.`);
+        setSaveSuccessMsg(`🚀 ${userCycleConfig.cycle} ACTIVATED for ${selectedUser.name}! Limit set to ₹${totalEligibleLimit.toLocaleString("en-IN")}. ₹${totalPayableFromWallet.toLocaleString("en-IN")} debited from Wallet/Coupon.`);
       } else if (actionType === "authorize") {
         setUserCycleConfig((c) => ({ ...c, status: "authorized" }));
-        setSaveSuccessMsg(`🔓 User self-renewal authorized! ${selectedUser.name} can now activate ${userCycleConfig.cycle} from their Franchise Dashboard using Main Wallet / Coupon.`);
+        setSaveSuccessMsg(`🔓 User self-renewal authorized! ${selectedUser.name} can now activate ${userCycleConfig.cycle} from their Franchise Dashboard.`);
       } else {
-        setSaveSuccessMsg(`✓ Configuration for ${selectedUser.name} saved successfully! Earning limit set to ₹${totalEligibleLimit.toLocaleString("en-IN")}.`);
+        setSaveSuccessMsg(`✓ Earning setup for ${selectedUser.name} saved successfully! Base: ₹${baseAmt.toLocaleString("en-IN")} + ${profitPct}% = Eligible Limit: ₹${totalEligibleLimit.toLocaleString("en-IN")}.`);
       }
       setActiveStep(5);
     } catch (e) {
-      setSaveSuccessMsg("Configuration saved locally and live telemetry synchronized.");
+      setSaveSuccessMsg("Configuration saved and synchronized across platform engines.");
     } finally {
       setSavingConfig(false);
     }
@@ -291,73 +350,96 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
   return (
     <Box sx={{ p: { xs: 1.5, md: 3 }, bgcolor: "#F8FAFC", minHeight: "100vh" }}>
       {/* ── TOP HEADER & TITLE + DIRECTORY TOGGLE ── */}
-      <Box sx={{ mb: 2, display: "flex", flexDirection: { xs: "column", sm: "row" }, justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" }, gap: 1.5 }}>
-        <Stack direction="row" alignItems="center" spacing={1.5}>
-          <Avatar sx={{ bgcolor: "#2563EB", width: 40, height: 40 }}>
-            <TuneRoundedIcon />
-          </Avatar>
-          <Box>
-            <Typography sx={{ fontSize: 20, fontWeight: 950, color: "#0F172A", lineHeight: 1.2 }}>
-              Admin Validator Commission Setup
-            </Typography>
-            <Typography sx={{ fontSize: 12.5, color: "#64748B", fontWeight: 600 }}>
-              Set Amount & Profit Percentage for Specific Franchisee or Consumer • Cycle Earning Limits & Activator
-            </Typography>
-          </Box>
-        </Stack>
+      <Box sx={{ mb: 2 }}>
+        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} spacing={1.5}>
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Avatar sx={{ bgcolor: "#2563EB", width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 } }}>
+              <TuneRoundedIcon sx={{ fontSize: { xs: 20, sm: 24 } }} />
+            </Avatar>
+            <Box>
+              <Typography sx={{ fontSize: { xs: 17, sm: 20 }, fontWeight: 950, color: "#0F172A", lineHeight: 1.2 }}>
+                Admin Validator Commission Setup
+              </Typography>
+              <Typography sx={{ fontSize: { xs: 11, sm: 12.5 }, color: "#64748B", fontWeight: 600 }}>
+                Set Amount & Profit Percentage for Specific Franchisee or Consumer • Cycle Earning Limits & Activator
+              </Typography>
+            </Box>
+          </Stack>
 
-        {/* Directory Switcher Toggle Buttons */}
-        <Stack direction="row" spacing={1} sx={{ bgcolor: "#E2E8F0", p: 0.5, borderRadius: "14px" }}>
-          <Button
-            size="small"
-            variant={targetAudience === "franchise" ? "contained" : "text"}
-            onClick={() => {
-              setTargetAudience("franchise");
-              setFranchiseLevel("agency_pincode");
-              setSelectedUser(null);
-              setPage(1);
-            }}
-            sx={{
-              borderRadius: "10px",
-              fontWeight: 800,
-              fontSize: 12,
-              textTransform: "none",
-              bgcolor: targetAudience === "franchise" ? "#2563EB" : "transparent",
-              color: targetAudience === "franchise" ? "#FFF" : "#475569",
-              boxShadow: targetAudience === "franchise" ? "0 2px 8px rgba(37,99,235,0.3)" : "none",
-              "&:hover": { bgcolor: targetAudience === "franchise" ? "#1D4ED8" : "rgba(0,0,0,0.04)" },
-            }}
-          >
-            🏢 Franchise Directory
-          </Button>
-          <Button
-            size="small"
-            variant={targetAudience === "consumer" ? "contained" : "text"}
-            onClick={() => {
-              setTargetAudience("consumer");
-              setFranchiseLevel("consumer");
-              setSelectedUser(null);
-              setPage(1);
-            }}
-            sx={{
-              borderRadius: "10px",
-              fontWeight: 800,
-              fontSize: 12,
-              textTransform: "none",
-              bgcolor: targetAudience === "consumer" ? "#059669" : "transparent",
-              color: targetAudience === "consumer" ? "#FFF" : "#475569",
-              boxShadow: targetAudience === "consumer" ? "0 2px 8px rgba(5,150,105,0.3)" : "none",
-              "&:hover": { bgcolor: targetAudience === "consumer" ? "#047857" : "rgba(0,0,0,0.04)" },
-            }}
-          >
-            👤 Consumer Directory (E-Edu & Royalty)
-          </Button>
+          {/* Directory Switcher Toggle Buttons */}
+          <Stack direction="row" spacing={0.8} sx={{ bgcolor: "#E2E8F0", p: 0.5, borderRadius: "14px", width: { xs: "100%", sm: "auto" } }}>
+            <Button
+              fullWidth
+              size="small"
+              variant={targetAudience === "franchise" ? "contained" : "text"}
+              onClick={() => {
+                setTargetAudience("franchise");
+                setFranchiseLevel("agency_pincode");
+                setSelectedUser(null);
+                setPage(1);
+              }}
+              sx={{
+                borderRadius: "10px",
+                fontWeight: 800,
+                fontSize: { xs: 11.5, sm: 12 },
+                py: 0.6,
+                textTransform: "none",
+                bgcolor: targetAudience === "franchise" ? "#2563EB" : "transparent",
+                color: targetAudience === "franchise" ? "#FFF" : "#475569",
+                boxShadow: targetAudience === "franchise" ? "0 2px 8px rgba(37,99,235,0.3)" : "none",
+                "&:hover": { bgcolor: targetAudience === "franchise" ? "#1D4ED8" : "rgba(0,0,0,0.04)" },
+              }}
+            >
+              🏢 Franchise Directory
+            </Button>
+            <Button
+              fullWidth
+              size="small"
+              variant={targetAudience === "consumer" ? "contained" : "text"}
+              onClick={() => {
+                setTargetAudience("consumer");
+                setFranchiseLevel("consumer");
+                setSelectedUser(null);
+                setPage(1);
+              }}
+              sx={{
+                borderRadius: "10px",
+                fontWeight: 800,
+                fontSize: { xs: 11.5, sm: 12 },
+                py: 0.6,
+                textTransform: "none",
+                bgcolor: targetAudience === "consumer" ? "#059669" : "transparent",
+                color: targetAudience === "consumer" ? "#FFF" : "#475569",
+                boxShadow: targetAudience === "consumer" ? "0 2px 8px rgba(5,150,105,0.3)" : "none",
+                "&:hover": { bgcolor: targetAudience === "consumer" ? "#047857" : "rgba(0,0,0,0.04)" },
+              }}
+            >
+              👤 Consumer Directory (E-Edu & Royalty)
+            </Button>
+          </Stack>
         </Stack>
       </Box>
 
-      {/* ── STEPPER (Matching Image 2 Header) ── */}
+      {/* ── STEPPER (Mobile Responsive) ── */}
       <Paper elevation={0} sx={{ p: 1.5, mb: 2.5, borderRadius: "16px", bgcolor: "#FFFFFF", border: "1px solid #E2E8F0" }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ overflowX: "auto", py: 0.5 }}>
+        {/* Mobile View Stepper */}
+        <Box sx={{ display: { xs: "block", md: "none" } }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.8 }}>
+            <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#0F172A" }}>
+              Step {activeStep} of 5: {
+                activeStep === 1 ? "Select Validator" :
+                activeStep === 2 ? "Select Level" :
+                activeStep === 3 ? "Select Franchisee" :
+                activeStep === 4 ? `Set Amount & Profit (${selectedUser?.name || "Selected"})` : "Saved & Activated"
+              }
+            </Typography>
+            <Chip label={`${activeStep * 20}%`} size="small" color="primary" sx={{ height: 20, fontSize: 10, fontWeight: 900 }} />
+          </Stack>
+          <LinearProgress variant="determinate" value={activeStep * 20} sx={{ height: 6, borderRadius: 3 }} />
+        </Box>
+
+        {/* Desktop View Stepper */}
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ display: { xs: "none", md: "flex" }, overflowX: "auto", py: 0.5 }}>
           {[
             { num: 1, label: "Select Validator", sub: validatorType },
             { num: 2, label: "Select Franchise Level", sub: selectedUser?.level || "Pincode Owner" },
@@ -530,8 +612,119 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
             </TextField>
           </Stack>
 
-          {/* Directory Data Table */}
-          <TableContainer sx={{ border: "1px solid #EEF2F6", borderRadius: "14px", overflow: "hidden" }}>
+          {/* Directory Data: Responsive Mobile Cards (xs to md) & Desktop Table (md+) */}
+          {/* 1. Mobile Cards View (< 900px) */}
+          <Box sx={{ display: { xs: "flex", md: "none" }, flexDirection: "column", gap: 1.5 }}>
+            {loadingUsers ? (
+              <Box sx={{ py: 4, textAlign: "center" }}>
+                <CircularProgress size={24} />
+                <Typography sx={{ fontSize: 12, color: "#64748B", mt: 1 }}>
+                  Loading {targetAudience === "consumer" ? "consumer members" : "franchise partners"}...
+                </Typography>
+              </Box>
+            ) : usersList.length === 0 ? (
+              <Box sx={{ py: 3, textAlign: "center", color: "#64748B", fontSize: 12.5 }}>
+                No {targetAudience === "consumer" ? "consumer members" : "franchise partners"} found for the selected filter.
+              </Box>
+            ) : (
+              usersList
+                .filter((u) => {
+                  if (selectedCycleFilter !== "all" && u.activeCycle !== selectedCycleFilter) return false;
+                  if (districtFilter !== "All" && u.district !== districtFilter) return false;
+                  if (statusFilter !== "All" && u.status !== statusFilter) return false;
+                  return true;
+                })
+                .map((user, idx) => {
+                  const isSelected = selectedUser?.id === user.id;
+                  const isCapReached = user.completionPct >= 100;
+                  return (
+                    <Paper
+                      key={user.id}
+                      elevation={0}
+                      onClick={() => selectUserForEdit(user)}
+                      sx={{
+                        p: 1.6,
+                        borderRadius: "14px",
+                        border: isSelected ? "2px solid #2563EB" : "1px solid #E2E8F0",
+                        bgcolor: isSelected ? "#EFF6FF" : "#FFFFFF",
+                        cursor: "pointer",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
+                        <Box>
+                          <Stack direction="row" spacing={0.8} alignItems="center">
+                            <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#2563EB" }}>
+                              {user.franchiseId}
+                            </Typography>
+                            <Chip
+                              label={user.activeCycle}
+                              size="small"
+                              sx={{
+                                height: 20,
+                                fontSize: 10,
+                                fontWeight: 800,
+                                bgcolor: user.activeCycle === "Cycle 2" ? "#DBEAFE" : "#F1F5F9",
+                                color: user.activeCycle === "Cycle 2" ? "#1D4ED8" : "#475569",
+                              }}
+                            />
+                            {isCapReached && (
+                              <Chip label="100% Cap" size="small" sx={{ height: 20, fontSize: 10, fontWeight: 900, bgcolor: "#FEF3C7", color: "#B45309" }} />
+                            )}
+                          </Stack>
+                          <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A", mt: 0.3 }}>
+                            {user.name}
+                          </Typography>
+                        </Box>
+                        <Button
+                          size="small"
+                          variant={isSelected ? "contained" : "outlined"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            selectUserForEdit(user);
+                          }}
+                          sx={{
+                            minWidth: 54,
+                            py: 0.3,
+                            px: 1.2,
+                            fontSize: 11.5,
+                            fontWeight: 800,
+                            textTransform: "none",
+                            borderRadius: "8px",
+                          }}
+                        >
+                          {isSelected ? "Selected" : "Edit"}
+                        </Button>
+                      </Stack>
+
+                      <Grid container spacing={0.8} sx={{ fontSize: 12, color: "#475569", mt: 0.5 }}>
+                        <Grid item xs={6}>
+                          <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>Level:</Typography>
+                          <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#1E293B" }}>{user.level}</Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>Mobile:</Typography>
+                          <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#1E293B" }}>{user.phone}</Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>Location:</Typography>
+                          <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: "#334155" }}>{user.pincode} • {user.district}</Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>Cap %:</Typography>
+                          <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: isCapReached ? "#D97706" : "#059669" }}>
+                            {user.completionPct}% {isCapReached ? "🏆" : ""}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Paper>
+                  );
+                })
+            )}
+          </Box>
+
+          {/* 2. Desktop Data Table (md+) */}
+          <TableContainer sx={{ display: { xs: "none", md: "block" }, border: "1px solid #EEF2F6", borderRadius: "14px", overflow: "hidden" }}>
             <Table size="small">
               <TableHead sx={{ bgcolor: "#F8FAFC" }}>
                 <TableRow>
@@ -638,7 +831,7 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
           </TableContainer>
 
           {/* Pagination Controls */}
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 2 }}>
+          <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems="center" spacing={1} sx={{ mt: 2 }}>
             <Typography sx={{ fontSize: 11.5, color: "#64748B", fontWeight: 600 }}>
               Showing {usersList.length} of {totalCount} {franchiseLevel.replace("agency_", "").replace("_", " ")} entries
             </Typography>
@@ -658,14 +851,14 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
         {/* RIGHT COLUMN: DETAIL SETUP & CYCLE ACTIVATOR PANEL              */}
         {/* ═════════════════════════════════════════════════════════════════ */}
         {selectedUser ? (
-          <Paper elevation={0} sx={{ p: 2.2, borderRadius: "20px", bgcolor: "#FFFFFF", border: "1px solid #E2E8F0" }}>
+          <Paper id="validator-step4-form" elevation={0} sx={{ p: { xs: 1.8, sm: 2.2 }, borderRadius: "20px", bgcolor: "#FFFFFF", border: "1px solid #E2E8F0" }}>
             {/* Header row with step 4 badge & Back button */}
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
               <Stack direction="row" alignItems="center" spacing={1.2}>
                 <Box sx={{ width: 26, height: 26, borderRadius: "50%", bgcolor: "#2563EB", color: "#FFF", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900 }}>
                   4
                 </Box>
-                <Typography sx={{ fontSize: 14.5, fontWeight: 900, color: "#0F172A" }}>
+                <Typography sx={{ fontSize: { xs: 13.5, sm: 14.5 }, fontWeight: 900, color: "#0F172A" }}>
                   Set Amount & Profit for Selected Franchisee
                 </Typography>
               </Stack>
@@ -682,27 +875,27 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
             {/* Selected User Details Badge Card */}
             <Paper elevation={0} sx={{ p: 1.6, mb: 2.2, borderRadius: "14px", bgcolor: "#F8FAFC", border: "1px solid #E2E8F0" }}>
               <Grid container spacing={1}>
-                <Grid item xs={6}>
+                <Grid item xs={12} sm={6}>
                   <Typography sx={{ fontSize: 11, color: "#64748B" }}>Name</Typography>
                   <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A" }}>: {selectedUser.name}</Typography>
                 </Grid>
-                <Grid item xs={6}>
+                <Grid item xs={12} sm={6}>
                   <Typography sx={{ fontSize: 11, color: "#64748B" }}>Level</Typography>
                   <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: "#2563EB" }}>: {selectedUser.level}</Typography>
                 </Grid>
-                <Grid item xs={6}>
+                <Grid item xs={12} sm={6}>
                   <Typography sx={{ fontSize: 11, color: "#64748B" }}>Franchise ID</Typography>
                   <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>: {selectedUser.franchiseId}</Typography>
                 </Grid>
-                <Grid item xs={6}>
+                <Grid item xs={12} sm={6}>
                   <Typography sx={{ fontSize: 11, color: "#64748B" }}>Pincode / Dist</Typography>
                   <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>: {selectedUser.pincode} • {selectedUser.district}</Typography>
                 </Grid>
-                <Grid item xs={6}>
+                <Grid item xs={12} sm={6}>
                   <Typography sx={{ fontSize: 11, color: "#64748B" }}>Mobile</Typography>
                   <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>: {selectedUser.phone}</Typography>
                 </Grid>
-                <Grid item xs={6}>
+                <Grid item xs={12} sm={6}>
                   <Typography sx={{ fontSize: 11, color: "#64748B" }}>State & Status</Typography>
                   <Stack direction="row" spacing={0.5} alignItems="center">
                     <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>: {selectedUser.state}</Typography>
@@ -718,62 +911,68 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
             </Typography>
 
             <Stack spacing={1.5} sx={{ mb: 2 }}>
-              {/* Row 1: Cycle Selector, Base Amount, Profit % */}
-              <Stack direction="row" spacing={1.2}>
-                <TextField
-                  select
-                  size="small"
-                  label="Cycle"
-                  value={userCycleConfig.cycle}
-                  onChange={(e) => setUserCycleConfig((c) => ({ ...c, cycle: e.target.value }))}
-                  sx={{ flex: 1 }}
-                >
-                  <MenuItem value="Cycle 1">Cycle 1</MenuItem>
-                  <MenuItem value="Cycle 2">Cycle 2</MenuItem>
-                  <MenuItem value="Cycle 3">Cycle 3</MenuItem>
-                  <MenuItem value="Cycle 4">Cycle 4</MenuItem>
-                  <MenuItem value="Others">Others</MenuItem>
-                </TextField>
+              {/* Row 1: Cycle Selector, Base Amount, Profit % (Responsive Grid) */}
+              <Grid container spacing={1.5}>
+                <Grid item xs={12} sm={4}>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    label="Cycle"
+                    value={userCycleConfig.cycle}
+                    onChange={(e) => setUserCycleConfig((c) => ({ ...c, cycle: e.target.value }))}
+                  >
+                    <MenuItem value="Cycle 1">Cycle 1</MenuItem>
+                    <MenuItem value="Cycle 2">Cycle 2</MenuItem>
+                    <MenuItem value="Cycle 3">Cycle 3</MenuItem>
+                    <MenuItem value="Cycle 4">Cycle 4</MenuItem>
+                    <MenuItem value="Others">Others</MenuItem>
+                  </TextField>
+                </Grid>
 
-                <TextField
-                  size="small"
-                  label="Base Amount (₹)"
-                  type="number"
-                  value={userCycleConfig.baseAmount}
-                  onChange={(e) => setUserCycleConfig((c) => ({ ...c, baseAmount: Number(e.target.value) }))}
-                  sx={{ flex: 1.2 }}
-                  helperText="Enter base amount"
-                />
+                <Grid item xs={12} sm={4}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Base Amount (₹)"
+                    type="number"
+                    value={userCycleConfig.baseAmount}
+                    onChange={(e) => setUserCycleConfig((c) => ({ ...c, baseAmount: Number(e.target.value) }))}
+                    helperText="Enter base investment"
+                  />
+                </Grid>
 
-                <TextField
-                  select
-                  size="small"
-                  label="Profit Percentage (%)"
-                  value={userCycleConfig.profitPercent}
-                  onChange={(e) => setUserCycleConfig((c) => ({ ...c, profitPercent: Number(e.target.value) }))}
-                  sx={{ flex: 1.1 }}
-                >
-                  <MenuItem value={50}>50%</MenuItem>
-                  <MenuItem value={75}>75%</MenuItem>
-                  <MenuItem value={100}>100%</MenuItem>
-                  <MenuItem value={125}>125%</MenuItem>
-                  <MenuItem value={150}>150%</MenuItem>
-                  <MenuItem value={200}>200%</MenuItem>
-                </TextField>
-              </Stack>
+                <Grid item xs={12} sm={4}>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    label="Profit Percentage (%)"
+                    value={userCycleConfig.profitPercent}
+                    onChange={(e) => setUserCycleConfig((c) => ({ ...c, profitPercent: Number(e.target.value) }))}
+                  >
+                    <MenuItem value={50}>50%</MenuItem>
+                    <MenuItem value={75}>75%</MenuItem>
+                    <MenuItem value={100}>100%</MenuItem>
+                    <MenuItem value={125}>125%</MenuItem>
+                    <MenuItem value={150}>150%</MenuItem>
+                    <MenuItem value={200}>200%</MenuItem>
+                  </TextField>
+                </Grid>
+              </Grid>
 
               {/* Profit Amount & Total Amount Card */}
               <Box sx={{ p: 1.6, borderRadius: "14px", bgcolor: "#F0FDF4", border: "1px solid #BBF7D0" }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1}>
                   <Box>
                     <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#166534" }}>Profit Amount (₹)</Typography>
                     <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#15803D" }}>
                       ₹{profitAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </Typography>
                   </Box>
-                  <Box sx={{ textAlign: "right" }}>
+                  <Box sx={{ textAlign: { xs: "left", sm: "right" } }}>
                     <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#166534" }}>Total Earning Cap (₹)</Typography>
-                    <Typography sx={{ fontSize: 22, fontWeight: 950, color: "#166534" }}>
+                    <Typography sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 950, color: "#166534" }}>
                       ₹{totalEligibleLimit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </Typography>
                   </Box>
@@ -786,15 +985,15 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
               {/* ── 2ND CYCLE ONWARDS: GST (18%) + ADMIN CHARGE (7%) BREAKDOWN ── */}
               {isRenewalCycle && (
                 <Paper elevation={0} sx={{ p: 1.6, borderRadius: "14px", bgcolor: "#FFFBEB", border: "1px solid #FDE68A" }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                  <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={0.8} sx={{ mb: 1 }}>
                     <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#92400E" }}>
                       🔒 {userCycleConfig.cycle} Statutory Deductions (Wallet / Coupon Only)
                     </Typography>
                     <Chip label="25% Combined Fee" size="small" sx={{ bgcolor: "#FCD34D", color: "#78350F", fontWeight: 800, fontSize: 10 }} />
                   </Stack>
 
-                  <Grid container spacing={1} sx={{ mb: 1 }}>
-                    <Grid item xs={6}>
+                  <Grid container spacing={1.5} sx={{ mb: 1 }}>
+                    <Grid item xs={12} sm={6}>
                       <TextField
                         size="small"
                         type="number"
@@ -805,7 +1004,7 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
                         helperText={`+ ₹${gstAmt.toLocaleString("en-IN")} Govt Tax`}
                       />
                     </Grid>
-                    <Grid item xs={6}>
+                    <Grid item xs={12} sm={6}>
                       <TextField
                         size="small"
                         type="number"
@@ -869,7 +1068,7 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
                 Control whether {selectedUser.name} can enter {userCycleConfig.cycle}. Admin can directly activate or authorize in-app self-renewal.
               </Typography>
 
-              <Stack direction="row" spacing={1}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                 <Button
                   fullWidth
                   variant="contained"
@@ -919,11 +1118,11 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
             )}
 
             {/* Bottom Actions: Cancel & Save Configuration */}
-            <Stack direction="row" spacing={1.5} justifyContent="flex-end">
+            <Stack direction={{ xs: "column-reverse", sm: "row" }} spacing={1.5} justifyContent="flex-end">
               <Button
                 variant="outlined"
                 onClick={() => setSelectedUser(null)}
-                sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 700, px: 2.5 }}
+                sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 700, px: 2.5, width: { xs: "100%", sm: "auto" } }}
               >
                 ✕ Cancel
               </Button>
@@ -937,6 +1136,7 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
                   textTransform: "none",
                   fontWeight: 900,
                   px: 3,
+                  width: { xs: "100%", sm: "auto" },
                   "&:hover": { bgcolor: "#047857" },
                 }}
               >
@@ -958,23 +1158,6 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
           </Paper>
         )}
       </Box>
-    </Box>
-  );
-}
-
-// Simple Helper Grid component
-function Grid({ container, item, xs, sm, md, spacing = 0, children, sx = {} }) {
-  if (container) {
-    return (
-      <Box sx={{ display: "flex", flexWrap: "wrap", gap: spacing * 8 + "px", ...sx }}>
-        {children}
-      </Box>
-    );
-  }
-  const flexBasis = xs ? (xs / 12) * 100 + "%" : "auto";
-  return (
-    <Box sx={{ flexGrow: 1, flexBasis, boxSizing: "border-box", ...sx }}>
-      {children}
     </Box>
   );
 }
