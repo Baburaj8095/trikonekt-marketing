@@ -37,16 +37,13 @@ import VerifiedUserRoundedIcon from "@mui/icons-material/VerifiedUserRounded";
 import API from "../../api/api";
 import { INDIAN_STATES, STATE_DISTRICTS_MAP } from "./AdminFranchiseUsers";
 
-export default function AdminValidatorCommission({ audience = "franchise" }) {
-  // Audience mode: "franchise" or "consumer"
-  const [targetAudience, setTargetAudience] = useState(audience);
-
+export default function AdminValidatorCommission() {
   // Stepper State
   const [activeStep, setActiveStep] = useState(3);
 
   // Filters State
   const [validatorType, setValidatorType] = useState("Main Validator");
-  const [franchiseLevel, setFranchiseLevel] = useState(audience === "consumer" ? "consumer" : "agency_pincode");
+  const [franchiseLevel, setFranchiseLevel] = useState("agency_pincode");
   const [selectedCycleFilter, setSelectedCycleFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [stateFilter, setStateFilter] = useState("All");
@@ -55,7 +52,7 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
-  // Franchise/Consumer Directory State
+  // Franchise Directory State
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [usersList, setUsersList] = useState([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -64,33 +61,32 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
   const [selectedUser, setSelectedUser] = useState(null);
   const [userCycleConfig, setUserCycleConfig] = useState({
     cycle: "Cycle 2",
-    baseAmount: audience === "consumer" ? 2000 : 200000,
+    baseAmount: 200000,
     profitPercent: 75,
     gstPercent: 18,
     adminChargePercent: 7,
-    status: "pending_approval", // 'active' | 'completed' | 'pending_approval' | 'authorized' | 'locked'
+    status: "active",
     paymentSource: "MAIN_WALLET",
   });
   const [savingConfig, setSavingConfig] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState("");
 
-  // Fetch users from API (Franchise or Consumer)
+  // Fetch users from API (Strictly Franchise)
   const fetchUsers = useCallback(async () => {
     setLoadingUsers(true);
     try {
-      const isConsumer = targetAudience === "consumer" || franchiseLevel.startsWith("consumer");
       const params = {
         page,
         page_size: pageSize,
-        role: isConsumer ? "user" : "agency",
+        role: "agency",
       };
-      if (!isConsumer) {
+      if (franchiseLevel && franchiseLevel !== "all") {
         params.category = franchiseLevel;
       }
       if (searchQuery.trim()) params.search = searchQuery.trim();
       if (stateFilter !== "All") params.state = stateFilter;
 
-      // 1. Fetch live users from backend
+      // 1. Fetch live franchise users from backend
       const res = await API.get("/admin/users/", { params, timeout: 15000 });
       const rawResults = res?.data?.results || [];
       const count = res?.data?.count || rawResults.length;
@@ -101,6 +97,17 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
         const mRes = await API.get("/admin/commission/master/").catch(() => null);
         savedAgencyConfigs = mRes?.data?.agency_cycle_configs || {};
       } catch (_) {}
+
+      const levelNameMap = {
+        agency_state_coordinator: "State Coordinator",
+        agency_state: "State Owner",
+        agency_district_coordinator: "District Coordinator",
+        agency_district: "District Owner",
+        agency_pincode_coordinator: "Pincode Coordinator",
+        agency_pincode: "Pincode Owner",
+        agency_sub_franchise: "Sub-Franchise",
+        merchant: "B2B Merchant",
+      };
 
       // Enhance with dynamic cycle metadata
       const enhanced = rawResults.map((u, idx) => {
@@ -121,35 +128,25 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
           u?.metadata?.cycle_info ||
           {};
 
-        const defaultBase = isConsumer ? 2000 : 200000;
-        const defaultProfit = isConsumer ? 4900 : 75;
-        const base = storedCycle.base_amount != null ? Number(storedCycle.base_amount) : defaultBase;
-        const profit = storedCycle.profit_percent != null ? Number(storedCycle.profit_percent) : defaultProfit;
+        const base = storedCycle.base_amount != null ? Number(storedCycle.base_amount) : 200000;
+        const profit = storedCycle.profit_percent != null ? Number(storedCycle.profit_percent) : 75;
         const limit = storedCycle.total_limit != null ? Number(storedCycle.total_limit) : (base + (base * profit) / 100);
 
         return {
           id: u.id,
-          franchiseId: isConsumer ? (u.user_code || `CON-${u.phone?.slice(-6) || "999999"}`) : (u.user_code || u.prefixed_id || `FR${u.pincode || "560073"}${String(idx + 1).padStart(3, "0")}`),
-          name: u.full_name || u.username || (isConsumer ? "Consumer Member" : "Franchise Partner"),
+          franchiseId: u.user_code || u.prefixed_id || `FR${u.pincode || "560073"}${String(idx + 1).padStart(3, "0")}`,
+          name: u.full_name || u.username || "Franchise Partner",
           phone: u.phone || u.username || "9999999999",
           pincode: u.pincode || "560073",
           district: u.district || u.city || "Tumakuru",
           state: u.state_name || u.state || "Karnataka",
-          level: isConsumer ? "Consumer (E-Edu & Royalty)" :
-                 franchiseLevel === "agency_pincode" ? "Pincode Owner" :
-                 franchiseLevel === "agency_pincode_coordinator" ? "Pincode Coordinator" :
-                 franchiseLevel === "agency_district" ? "District Owner" :
-                 franchiseLevel === "agency_district_coordinator" ? "District Coordinator" :
-                 franchiseLevel === "agency_state" ? "State Owner" :
-                 franchiseLevel === "agency_state_coordinator" ? "State Coordinator" : "Franchise Partner",
+          level: levelNameMap[u.category] || levelNameMap[franchiseLevel] || "Franchise Partner",
           activeCycle: storedCycle.active_cycle || "Cycle 1",
           cycleStatus: storedCycle.status || "active",
           completionPct: storedCycle.completion_pct ?? (storedCycle.status === "completed" ? 100 : 0),
           baseAmount: base,
           profitPercent: profit,
           totalLimit: limit,
-          eEduLimit: 100000,
-          royaltyLimit: 50000,
           status: u.is_active !== false ? "Active" : "Inactive",
         };
       });
@@ -161,14 +158,8 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
         selectUserForEdit(enhanced[0]);
       }
     } catch (_) {
-      // Offline fallback mock data for testing
-      const isConsumer = targetAudience === "consumer" || franchiseLevel.startsWith("consumer");
-      const fallbackList = isConsumer ? [
-        { id: 9001, franchiseId: "CON-999999", name: "Candidate 9999", phone: "9999999999", pincode: "572106", district: "Tumakuru", state: "Karnataka", level: "Consumer (L10 Master)", activeCycle: "Cycle 1", cycleStatus: "completed", completionPct: 100, baseAmount: 2000, profitPercent: 4900, totalLimit: 100000, eEduLimit: 100000, royaltyLimit: 50000, status: "Active" },
-        { id: 9002, franchiseId: "CON-809591", name: "Baburaj", phone: "8095918105", pincode: "572102", district: "Tumakuru", state: "Karnataka", level: "Consumer (L7 Leader)", activeCycle: "Cycle 1", cycleStatus: "active", completionPct: 48.5, baseAmount: 2000, profitPercent: 4900, totalLimit: 100000, eEduLimit: 100000, royaltyLimit: 50000, status: "Active" },
-        { id: 9003, franchiseId: "CON-984552", name: "Chandrashekar", phone: "9845522334", pincode: "572102", district: "Tumakuru", state: "Karnataka", level: "Consumer (L4 Agent)", activeCycle: "Cycle 1", cycleStatus: "active", completionPct: 24.0, baseAmount: 2000, profitPercent: 4900, totalLimit: 100000, eEduLimit: 100000, royaltyLimit: 50000, status: "Active" },
-        { id: 9004, franchiseId: "CON-944821", name: "Ravi Shankar", phone: "9448211990", pincode: "572103", district: "Tumakuru", state: "Karnataka", level: "Consumer (Cycle 2 Active)", activeCycle: "Cycle 2", cycleStatus: "active", completionPct: 12.5, baseAmount: 2000, profitPercent: 4900, totalLimit: 100000, eEduLimit: 100000, royaltyLimit: 50000, status: "Active" },
-      ] : [
+      // Offline fallback mock data strictly for franchise
+      const fallbackList = [
         { id: 1080, franchiseId: "FR560073001", name: "Ravi Kumar", phone: "9999999999", pincode: "560073", district: "Tumakuru", state: "Karnataka", level: "Pincode Owner", activeCycle: "Cycle 2", cycleStatus: "active", completionPct: 14.03, baseAmount: 200000, profitPercent: 75, totalLimit: 350000, status: "Active" },
         { id: 1081, franchiseId: "FR560082001", name: "Sumanth M", phone: "9845011111", pincode: "560082", district: "Bengaluru", state: "Karnataka", level: "Pincode Owner", activeCycle: "Cycle 1", cycleStatus: "completed", completionPct: 100, baseAmount: 200000, profitPercent: 75, totalLimit: 350000, status: "Active" },
         { id: 1082, franchiseId: "FR560090001", name: "Lakshmi N", phone: "9845022222", pincode: "560090", district: "Bengaluru", state: "Karnataka", level: "Pincode Owner", activeCycle: "Cycle 1", cycleStatus: "active", completionPct: 45.2, baseAmount: 200000, profitPercent: 75, totalLimit: 350000, status: "Active" },
@@ -182,7 +173,7 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
     } finally {
       setLoadingUsers(false);
     }
-  }, [page, targetAudience, franchiseLevel, searchQuery, stateFilter]);
+  }, [page, franchiseLevel, searchQuery, stateFilter]);
 
   useEffect(() => {
     fetchUsers();
@@ -191,12 +182,10 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
   const selectUserForEdit = (user) => {
     setSelectedUser(user);
     setActiveStep(4);
-    const defaultBase = targetAudience === "consumer" ? 50000 : 200000;
-    const defaultProfit = targetAudience === "consumer" ? 200 : 75;
     setUserCycleConfig({
       cycle: user.activeCycle || "Cycle 1",
-      baseAmount: user.baseAmount != null ? Number(user.baseAmount) : defaultBase,
-      profitPercent: user.profitPercent != null ? Number(user.profitPercent) : defaultProfit,
+      baseAmount: user.baseAmount != null ? Number(user.baseAmount) : 200000,
+      profitPercent: user.profitPercent != null ? Number(user.profitPercent) : 75,
       gstPercent: 18,
       adminChargePercent: 7,
       status: user.cycleStatus || "active",
@@ -281,7 +270,7 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
         userId: selectedUser.id,
         userCode: selectedUser.franchiseId || selectedUser.phone,
         phone: selectedUser.phone,
-        role: targetAudience === "consumer" ? "CONSUMER" : "FRANCHISE",
+        role: "FRANCHISE",
         cycle: userCycleConfig.cycle,
         baseAmount: baseAmt,
         profitPercent: profitPct,
@@ -351,7 +340,7 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
 
   return (
     <Box sx={{ p: { xs: 1.5, md: 3 }, bgcolor: "#F8FAFC", minHeight: "100vh" }}>
-      {/* ── TOP HEADER & TITLE + DIRECTORY TOGGLE ── */}
+      {/* ── TOP HEADER & TITLE (FRANCHISE WORKSPACE ONLY) ── */}
       <Box sx={{ mb: 2 }}>
         <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} spacing={1.5}>
           <Stack direction="row" alignItems="center" spacing={1.5}>
@@ -363,62 +352,27 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
                 Admin Validator Commission Setup
               </Typography>
               <Typography sx={{ fontSize: { xs: 11, sm: 12.5 }, color: "#64748B", fontWeight: 600 }}>
-                Set Amount & Profit Percentage for Specific Franchisee or Consumer • Cycle Earning Limits & Activator
+                Set Amount & Profit Percentage for Specific Franchisee • Cycle Earning Limits & Activator
               </Typography>
             </Box>
           </Stack>
 
-          {/* Directory Switcher Toggle Buttons */}
-          <Stack direction="row" spacing={0.8} sx={{ bgcolor: "#E2E8F0", p: 0.5, borderRadius: "14px", width: { xs: "100%", sm: "auto" } }}>
-            <Button
-              fullWidth
-              size="small"
-              variant={targetAudience === "franchise" ? "contained" : "text"}
-              onClick={() => {
-                setTargetAudience("franchise");
-                setFranchiseLevel("agency_pincode");
-                setSelectedUser(null);
-                setPage(1);
-              }}
-              sx={{
-                borderRadius: "10px",
-                fontWeight: 800,
-                fontSize: { xs: 11.5, sm: 12 },
-                py: 0.6,
-                textTransform: "none",
-                bgcolor: targetAudience === "franchise" ? "#2563EB" : "transparent",
-                color: targetAudience === "franchise" ? "#FFF" : "#475569",
-                boxShadow: targetAudience === "franchise" ? "0 2px 8px rgba(37,99,235,0.3)" : "none",
-                "&:hover": { bgcolor: targetAudience === "franchise" ? "#1D4ED8" : "rgba(0,0,0,0.04)" },
-              }}
-            >
-              🏢 Franchise Directory
-            </Button>
-            <Button
-              fullWidth
-              size="small"
-              variant={targetAudience === "consumer" ? "contained" : "text"}
-              onClick={() => {
-                setTargetAudience("consumer");
-                setFranchiseLevel("consumer");
-                setSelectedUser(null);
-                setPage(1);
-              }}
-              sx={{
-                borderRadius: "10px",
-                fontWeight: 800,
-                fontSize: { xs: 11.5, sm: 12 },
-                py: 0.6,
-                textTransform: "none",
-                bgcolor: targetAudience === "consumer" ? "#059669" : "transparent",
-                color: targetAudience === "consumer" ? "#FFF" : "#475569",
-                boxShadow: targetAudience === "consumer" ? "0 2px 8px rgba(5,150,105,0.3)" : "none",
-                "&:hover": { bgcolor: targetAudience === "consumer" ? "#047857" : "rgba(0,0,0,0.04)" },
-              }}
-            >
-              👤 Consumer Directory (E-Edu & Royalty)
-            </Button>
-          </Stack>
+          {/* Franchise Board Badge */}
+          <Chip
+            icon={<VerifiedUserRoundedIcon sx={{ fontSize: "16px !important", color: "#1D4ED8 !important" }} />}
+            label="Franchise Admin & Franchise Users Only"
+            size="small"
+            sx={{
+              bgcolor: "#EFF6FF",
+              color: "#1D4ED8",
+              fontWeight: 800,
+              fontSize: 12,
+              px: 1.5,
+              py: 2,
+              borderRadius: "12px",
+              border: "1px solid #BFDBFE",
+            }}
+          />
         </Stack>
       </Box>
 
@@ -498,7 +452,7 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
               3
             </Box>
             <Typography sx={{ fontSize: 15, fontWeight: 900, color: "#0F172A" }}>
-              Select Franchisee or Consumer
+              Select Franchisee
             </Typography>
           </Stack>
 
@@ -519,7 +473,7 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
             <TextField
               select
               size="small"
-              label="Franchise / User Level"
+              label="Franchise Level"
               value={franchiseLevel}
               onChange={(e) => {
                 setFranchiseLevel(e.target.value);
@@ -527,14 +481,15 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
               }}
               sx={{ flex: 1.2 }}
             >
+              <MenuItem value="all">All Franchise Levels</MenuItem>
               <MenuItem value="agency_pincode">Pincode Owner</MenuItem>
               <MenuItem value="agency_pincode_coordinator">Pincode Coordinator</MenuItem>
               <MenuItem value="agency_district">District Owner</MenuItem>
               <MenuItem value="agency_district_coordinator">District Coordinator</MenuItem>
               <MenuItem value="agency_state">State Owner</MenuItem>
               <MenuItem value="agency_state_coordinator">State Coordinator</MenuItem>
-              <Divider sx={{ my: 0.5 }} />
-              <MenuItem value="consumer">Consumer (Prime / Agents)</MenuItem>
+              <MenuItem value="agency_sub_franchise">Sub-Franchise</MenuItem>
+              <MenuItem value="merchant">B2B Merchant</MenuItem>
             </TextField>
 
             <TextField
@@ -621,12 +576,12 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
               <Box sx={{ py: 4, textAlign: "center" }}>
                 <CircularProgress size={24} />
                 <Typography sx={{ fontSize: 12, color: "#64748B", mt: 1 }}>
-                  Loading {targetAudience === "consumer" ? "consumer members" : "franchise partners"}...
+                  Loading franchise partners...
                 </Typography>
               </Box>
             ) : usersList.length === 0 ? (
               <Box sx={{ py: 3, textAlign: "center", color: "#64748B", fontSize: 12.5 }}>
-                No {targetAudience === "consumer" ? "consumer members" : "franchise partners"} found for the selected filter.
+                No franchise partners found for the selected filter.
               </Box>
             ) : (
               usersList
@@ -732,7 +687,7 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 800, fontSize: 11.5, color: "#475569" }}>Sl No</TableCell>
                   <TableCell sx={{ fontWeight: 800, fontSize: 11.5, color: "#475569" }}>
-                    {targetAudience === "consumer" ? "Member ID" : "Franchise ID"}
+                    Franchise ID
                   </TableCell>
                   <TableCell sx={{ fontWeight: 800, fontSize: 11.5, color: "#475569" }}>Name</TableCell>
                   <TableCell sx={{ fontWeight: 800, fontSize: 11.5, color: "#475569" }}>Pincode</TableCell>
@@ -749,14 +704,14 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
                     <TableCell colSpan={9} sx={{ py: 4, textAlign: "center" }}>
                       <CircularProgress size={24} />
                       <Typography sx={{ fontSize: 12, color: "#64748B", mt: 1 }}>
-                        Loading {targetAudience === "consumer" ? "consumer members" : "franchise partners"}...
+                        Loading franchise partners...
                       </Typography>
                     </TableCell>
                   </TableRow>
                 ) : usersList.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} sx={{ py: 3, textAlign: "center", color: "#64748B", fontSize: 12.5 }}>
-                      No {targetAudience === "consumer" ? "consumer members" : "franchise partners"} found for the selected filter.
+                      No franchise partners found for the selected filter.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -907,32 +862,6 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
               </Grid>
             </Paper>
 
-            {/* Consumer Indicator Banner */}
-            {targetAudience === "consumer" && (
-              <Box
-                sx={{
-                  mb: 2,
-                  p: 1.5,
-                  borderRadius: 2,
-                  bgcolor: "#EFF6FF",
-                  border: "1px solid #BFDBFE",
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 1.25,
-                }}
-              >
-                <Typography sx={{ fontSize: 18, lineHeight: 1 }}>🎓</Typography>
-                <Box>
-                  <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: "#1E40AF" }}>
-                    Consumer Academic Cycle Configuration
-                  </Typography>
-                  <Typography sx={{ fontSize: 11.5, color: "#3B82F6", mt: 0.25 }}>
-                    Standard Package: <b>₹50,000</b> (All 3 Tracks) • Layer Cap: <b>₹1,00,000</b> • Royalty Cap: <b>₹50,000</b> • Total Cap: <b>₹1,50,000</b> (+200% Yield).
-                    Earnings exceeding the total cap are automatically preserved into <i>Missing Blocks Income</i> until Cycle 2 renewal.
-                  </Typography>
-                </Box>
-              </Box>
-            )}
 
             {/* ── COMMISSION SETTING (MAIN VALIDATOR) ── */}
             <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A", mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>

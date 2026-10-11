@@ -1022,8 +1022,9 @@ class AutoPoolAccount(models.Model):
         except Exception:
             pass
 
-        # Global pool placement: ignore sponsor anchor
-        return GenericPlacement.place_account(
+        # THREE_150 is a pure global auto-pool (no sponsor or self-clustering anchor).
+        # Places in the next globally available slot from sentinel root.
+        res = GenericPlacement.place_account(
             owner=user,
             pool_type="THREE_150",
             amount=amt,
@@ -1031,6 +1032,7 @@ class AutoPoolAccount(models.Model):
             source_id=source_id or "",
             start_entry_id=None,
         )
+        return res
 
     @classmethod
     def create_three_50_for_user(cls, user, amount: Decimal | None = None):
@@ -1221,7 +1223,15 @@ class AutoPoolAccount(models.Model):
         from decimal import Decimal as D
         from business.services.placement import GenericPlacement
         amt = D(amount or 0)
-        start_id = None if str(pool_type) == "THREE_150" else cls._sponsor_start_entry_id_for(user, pool_type)
+        # THREE_150 is a pure global auto-pool: ignore sponsor and own_base, place globally from sentinel root
+        if pool_type == "THREE_150":
+            start_id = None
+        else:
+            own_base = cls._base_self_account(user, pool_type)
+            if own_base:
+                start_id = int(own_base.id)
+            else:
+                start_id = cls._sponsor_start_entry_id_for(user, pool_type)
         return GenericPlacement.place_account(
             owner=user,
             pool_type=pool_type,
@@ -2766,5 +2776,78 @@ def auto_sync_spp_gift_cards_on_approval(sender, instance: PromoPurchase, **kwar
             SPPService.sync_gift_cards_for_user(instance.user)
         except Exception:
             pass
+
+
+# ==============================
+# State SSV Voucher Architecture
+# ==============================
+class StateSSVPool(models.Model):
+    state = models.OneToOneField('locations.State', on_delete=models.CASCADE, related_name='ssv_pool')
+    accumulated_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
+    seed_amount = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
+    last_updated_at = models.DateTimeField(auto_now=True)
+
+    def total_accumulated(self):
+        return (self.accumulated_amount or Decimal('0.00')) + (self.seed_amount or Decimal('0.00'))
+
+    def __str__(self):
+        return f"{self.state.name} SSV Pool: ₹{self.total_accumulated()}"
+
+
+class SSVCycle(models.Model):
+    state = models.ForeignKey('locations.State', on_delete=models.CASCADE, related_name='ssv_cycles')
+    cycle_number = models.PositiveIntegerField(default=1, db_index=True)
+    cycle_label = models.CharField(max_length=100, default='Cycle 1')
+    start_date = models.DateField()
+    end_date = models.DateField()
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['cycle_number']
+        unique_together = (('state', 'cycle_number'),)
+
+    def __str__(self):
+        return f"{self.state.name} - {self.cycle_label} ({self.start_date} to {self.end_date})"
+
+
+class SSVVoucher(models.Model):
+    STATUS_CHOICES = (
+        ('CREATED', 'Created'),
+        ('REDEEMED', 'Redeemed'),
+        ('CANCELLED', 'Cancelled'),
+    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='ssv_issued_vouchers')
+    state = models.ForeignKey('locations.State', on_delete=models.CASCADE, related_name='ssv_issued_vouchers')
+    cycle = models.ForeignKey(SSVCycle, null=True, blank=True, on_delete=models.SET_NULL, related_name='vouchers')
+    cycle_number = models.PositiveIntegerField(default=1, db_index=True)
+    period_category = models.CharField(
+        max_length=20,
+        choices=(
+            ('1_MONTH', '1 Month'),
+            ('3_MONTHS', '3 Months'),
+            ('6_MONTHS', '6 Months'),
+            ('12_MONTHS', '12 Months'),
+        ),
+        db_index=True,
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('1000.00'))
+    voucher_code = models.CharField(max_length=64, unique=True, db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='CREATED', db_index=True)
+    remarks = models.TextField(blank=True)
+    issued_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='ssv_created_vouchers')
+    created_at = models.DateTimeField(auto_now_add=True)
+    redeemed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['state', 'cycle_number', 'period_category']),
+            models.Index(fields=['user', 'status']),
+        ]
+
+    def __str__(self):
+        return f"SSVVoucher<{self.voucher_code}:{self.status}> ({self.user_id} - ₹{self.amount})"
+
 
 

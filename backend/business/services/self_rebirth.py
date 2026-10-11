@@ -420,6 +420,33 @@ def distribute_self_rebirth_250(user: CustomUser, pack_index: Optional[int] = No
         except Exception as e:
             logger.warning(f"Company retention credit failed: {e}")
 
+    # 5b. Statewise SSV Voucher Contribution (Dynamic ₹1.00 from Rebirth)
+    ssv_rate = _q2(conf.get("statewise_ssv_voucher", 1.0))
+    user_state = getattr(user, "state", None)
+    if user_state and ssv_rate > 0:
+        try:
+            from business.models import StateSSVPool
+            pool, _ = StateSSVPool.objects.get_or_create(state=user_state)
+            pool.accumulated_amount = (pool.accumulated_amount or Decimal("0.00")) + ssv_rate
+            pool.save(update_fields=["accumulated_amount", "last_updated_at"])
+
+            WalletTransaction.objects.create(
+                user=user,
+                type="SSV_STATE_CONTRIBUTION",
+                amount=ssv_rate,
+                meta={
+                    "state_id": user_state.id,
+                    "state_name": user_state.name,
+                    "pack_index": pack_index,
+                    "auto_rule": "SELF_REBIRTH_250",
+                    "rate": float(ssv_rate),
+                },
+                source_type=src_type,
+                source_id=src_id,
+            )
+        except Exception as e:
+            logger.warning(f"State SSV pool contribution failed for state {user_state}: {e}")
+
     # 6. Audit Trail
     try:
         from coupons.models import AuditTrail

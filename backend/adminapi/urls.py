@@ -1,4 +1,15 @@
 from django.urls import path, include
+from business.views_ssv import (
+    AdminSSVStatesView,
+    AdminSSVDashboardView,
+    AdminSSVUsersListView,
+    AdminSSVCreateVoucherView,
+    AdminSSVRedeemVoucherView,
+    AdminSSVExportCSVView,
+    AdminSSVCyclesView,
+    AdminSSVActivateCycleView,
+    AdminSSVSaveCycleView,
+)
 from .views import (
     AdminMetricsView,
     AdminUserTreeRoot,
@@ -11,6 +22,7 @@ from .views import (
     AdminUserImpersonateView,
     AdminUserSetTempPasswordView,
     AdminUserWalletAdjustView,
+    AdminUserGrowthResetView,
     AdminWalletListView,
     AdminWalletDetailView,
     AdminCompanyWalletDetailView,
@@ -109,6 +121,7 @@ urlpatterns = [
     path("users/<int:pk>/impersonate/", AdminUserImpersonateView.as_view()),
     path("users/<int:pk>/set-temp-password/", AdminUserSetTempPasswordView.as_view()),
     path("users/<int:pk>/wallet-adjust/", AdminUserWalletAdjustView.as_view()),
+    path("users/<int:pk>/growth-reset/", AdminUserGrowthResetView.as_view()),
     path("wallets/", AdminWalletListView.as_view()),
     path("wallets/reconcile/", AdminWalletReconcileView.as_view()),
     path("wallets/user-audit/", AdminUserAuditView.as_view()),
@@ -190,6 +203,17 @@ urlpatterns = [
     path("role-permissions/", RolePermissionsListView.as_view()),
     path("role-permissions/bulk-assign/", RolePermissionsBulkAssignView.as_view()),
     path("roles/<int:pk>/permissions/", RolePermissionsForRoleView.as_view()),
+
+    # Admin SSV Vouchers Board Endpoints
+    path("ssv/states/", AdminSSVStatesView.as_view()),
+    path("ssv/dashboard/", AdminSSVDashboardView.as_view()),
+    path("ssv/users/", AdminSSVUsersListView.as_view()),
+    path("ssv/create-voucher/", AdminSSVCreateVoucherView.as_view()),
+    path("ssv/redeem-voucher/", AdminSSVRedeemVoucherView.as_view()),
+    path("ssv/export-csv/", AdminSSVExportCSVView.as_view()),
+    path("ssv/cycles/", AdminSSVCyclesView.as_view()),
+    path("ssv/cycles/activate/", AdminSSVActivateCycleView.as_view()),
+    path("ssv/cycles/save/", AdminSSVSaveCycleView.as_view()),
 
     # Dynamic admin models (auto-discovered)
     path("", include(dynamic_router.urls)),

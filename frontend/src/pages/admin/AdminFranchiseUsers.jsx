@@ -458,6 +458,50 @@ export default function AdminFranchiseUsers() {
         },
       },
       {
+        field: "__reset",
+        headerName: "Reset",
+        width: 90,
+        align: "center",
+        headerAlign: "center",
+        sortable: false,
+        filterable: false,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          return (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={async (e) => {
+                e?.stopPropagation?.();
+                if (!row?.id) return;
+                const ident = row.phone || row.username || `User #${row.id}`;
+                const ok = window.confirm(
+                  `⚠️ DANGER: RESET ALL WALLETS & DATA FOR ${ident}?\n\n` +
+                  `This will permanently:\n` +
+                  `• Reset all agency/franchise wallet pockets to ₹0.00\n` +
+                  `• Clear all matrix positions & packages\n` +
+                  `• Reset password to default '123456'\n` +
+                  `• Direct sponsor will be preserved.\n\n` +
+                  `Are you sure you want to proceed?`
+                );
+                if (!ok) return;
+                try {
+                  const res = await API.post(`/admin/users/${row.id}/growth-reset/`, {});
+                  window.alert(res?.data?.message || `Agency ${ident} reset successfully.`);
+                  setRefreshKey((k) => k + 1);
+                } catch (err) {
+                  const msg = err?.response?.data?.detail || err?.response?.data?.error || err?.message || "Failed to reset agency.";
+                  window.alert(String(msg));
+                }
+              }}
+              sx={{ minWidth: 62, color: "#b91c1c", borderColor: "#fca5a5", bgcolor: "#fee2e2", textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#fecaca", borderColor: "#f87171" } }}
+            >
+              Reset
+            </Button>
+          );
+        },
+      },
+      {
         field: "category",
         headerName: "Franchise Layer",
         minWidth: 210,
@@ -606,7 +650,34 @@ export default function AdminFranchiseUsers() {
             ))}
           </Stack>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ px: 3, py: 1.5, justifyContent: "space-between" }}>
+          <Button
+            color="error"
+            variant="outlined"
+            onClick={async () => {
+              if (!selected?.id) return;
+              const ident = selected.phone || selected.username || `User #${selected.id}`;
+              const ok = window.confirm(
+                `⚠️ DANGER: RESET ALL WALLETS & DATA FOR ${ident}?\n\n` +
+                `This will permanently reset all franchise wallets, matrix positions & packages to ₹0.00 and restore password to '123456'.\n\n` +
+                `Proceed?`
+              );
+              if (!ok) return;
+              try {
+                const res = await API.post(`/admin/users/${selected.id}/growth-reset/`, {});
+                window.alert(res?.data?.message || `Agency ${ident} reset successfully.`);
+                setViewOpen(false);
+                setSelected(null);
+                setRefreshKey((k) => k + 1);
+              } catch (err) {
+                const msg = err?.response?.data?.detail || err?.response?.data?.error || err?.message || "Failed to reset agency.";
+                window.alert(String(msg));
+              }
+            }}
+            sx={{ fontWeight: 700, borderColor: "#fca5a5", color: "#b91c1c", bgcolor: "#fee2e2", "&:hover": { bgcolor: "#fecaca" } }}
+          >
+            Reset Agency Wallet & Data
+          </Button>
           <Button onClick={() => setViewOpen(false)}>Close</Button>
         </DialogActions>
       </Dialog>

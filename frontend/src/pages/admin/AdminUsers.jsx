@@ -75,6 +75,8 @@ const CONSUMER_COLUMN_FIELDS = {
   basic: [
     "__slno",
     "__edit_view",
+    "__reset",
+    "__cycle_status",
     "__login",
     "is_active",
     "system_serial_number",
@@ -327,8 +329,99 @@ function UplinePathViewer({ user }) {
   );
 }
 
-function UserProfileDrawer({ open, loading, user, onClose, onEdit }) {
+function UserProfileDrawer({ open, loading, user, onClose, onEdit, onReset }) {
   const [drawerTab, setDrawerTab] = useState("overview"); // 'overview' (Image 2) | 'package_status' (Image 3) | 'upline'
+  const [cycleLoading, setCycleLoading] = useState(false);
+  const [cycleMsg, setCycleMsg] = useState("");
+  const [userCycleInfo, setUserCycleInfo] = useState(() => {
+    if (!user?.id) return { cycle: "Cycle 1", status: "active", layer_limit: 100000, royalty_limit: 50000, total_limit: 150000 };
+    try {
+      const raw = localStorage.getItem(`trikonekt_cycle_user_${user.id}`) ||
+                  localStorage.getItem(`trikonekt_cycle_user_${user.phone}`);
+      if (raw) return JSON.parse(raw);
+    } catch (_) {}
+    return { cycle: "Cycle 1", status: "active", layer_limit: 100000, royalty_limit: 50000, total_limit: 150000 };
+  });
+
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const raw = localStorage.getItem(`trikonekt_cycle_user_${user.id}`) ||
+                  localStorage.getItem(`trikonekt_cycle_user_${user.phone}`);
+      if (raw) setUserCycleInfo(JSON.parse(raw));
+      else setUserCycleInfo({ cycle: "Cycle 1", status: "active", layer_limit: 100000, royalty_limit: 50000, total_limit: 150000 });
+    } catch (_) {}
+  }, [user?.id, user?.phone]);
+
+  const handleAdminUpdateCycle = async (actionType) => {
+    if (!user?.id) return;
+    setCycleLoading(true);
+    setCycleMsg("");
+    try {
+      let nextCycle = userCycleInfo?.cycle || "Cycle 1";
+      let nextStatus = "active";
+      let adminAuth = false;
+
+      if (actionType === "authorize") {
+        nextStatus = "authorized";
+        adminAuth = true;
+      } else if (actionType === "activate") {
+        nextCycle = "Cycle 2";
+        nextStatus = "active";
+        adminAuth = true;
+      } else if (actionType === "reset") {
+        nextCycle = "Cycle 1";
+        nextStatus = "active";
+        adminAuth = false;
+      }
+
+      const updated = {
+        ...userCycleInfo,
+        active_cycle: nextCycle,
+        cycle: nextCycle,
+        layer_limit: 100000,
+        royalty_limit: 50000,
+        total_limit: 150000,
+        status: nextStatus,
+        admin_authorized: adminAuth,
+        adminAuthorized: adminAuth,
+        cycle2_enabled: adminAuth,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(`trikonekt_cycle_user_${user.id}`, JSON.stringify(updated));
+        if (user.phone) localStorage.setItem(`trikonekt_cycle_user_${user.phone}`, JSON.stringify(updated));
+      }
+
+      setUserCycleInfo(updated);
+
+      try {
+        await API.post("/api/admin/validator/cycle-config", {
+          userId: user.id,
+          userCode: user.user_code || user.phone,
+          phone: user.phone,
+          role: "CONSUMER",
+          cycle: nextCycle,
+          baseAmount: 2000,
+          status: actionType === "activate" ? "ACTIVE" : actionType === "authorize" ? "AUTHORIZED" : "RESET",
+        });
+      } catch (_) {}
+
+      setCycleMsg(
+        actionType === "authorize"
+          ? "✅ Cycle 2 Authorized! User can now enter Cycle 2 in-app."
+          : actionType === "activate"
+          ? "🚀 Cycle 2 Force Activated! Active cycle updated."
+          : "🔄 User reset to Cycle 1."
+      );
+    } catch (err) {
+      setCycleMsg("❌ Failed to update cycle: " + (err?.message || "Unknown error"));
+    } finally {
+      setCycleLoading(false);
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -361,6 +454,40 @@ function UserProfileDrawer({ open, loading, user, onClose, onEdit }) {
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              type="button"
+              onClick={async () => {
+                if (!user?.id) return;
+                const ident = user.phone || user.username || `User #${user.id}`;
+                const ok = window.confirm(
+                  `⚠️ DANGER: RESET ALL DATA FOR ${ident}?\n\n` +
+                  `This will wipe matrix positions, packages, ranks, and wallet balances to ₹0.00, and reset password to 123456.\n\n` +
+                  `Proceed?`
+                );
+                if (!ok) return;
+                try {
+                  const res = await API.post(`/admin/users/${user.id}/growth-reset/`, {});
+                  window.alert(res?.data?.message || `User ${ident} reset successfully.`);
+                  onClose();
+                  if (onReset) onReset();
+                } catch (err) {
+                  const msg = err?.response?.data?.detail || err?.message || "Failed to reset user.";
+                  window.alert(String(msg));
+                }
+              }}
+              style={{
+                borderRadius: 8,
+                padding: "7px 12px",
+                background: "#fee2e2",
+                color: "#b91c1c",
+                border: "1px solid #fca5a5",
+                cursor: "pointer",
+                fontWeight: 700,
+                fontSize: 12,
+              }}
+            >
+              Reset Data
+            </button>
             <button type="button" onClick={onEdit} style={{ borderRadius: 8, padding: "7px 12px", background: "#0ea5e9", color: "#fff", border: "1px solid #0284c7", cursor: "pointer", fontWeight: 700, fontSize: 12 }}>Edit</button>
             <button type="button" onClick={onClose} style={{ borderRadius: 8, padding: "7px 12px", background: "#fff", color: "#0f172a", border: "1px solid #cbd5e1", cursor: "pointer", fontWeight: 700, fontSize: 12 }}>Close</button>
           </div>
@@ -455,6 +582,127 @@ function UserProfileDrawer({ open, loading, user, onClose, onEdit }) {
                 <DetailRow label="Company Manual Payment" value={`₹${moneyValue(user?.manual_payments_total || 0)}`} />
                 <DetailRow label="Active Payment Mode" value={user?.payment_mode || "Wallet / Online"} />
                 <DetailRow label="Approved / Reject Status" value={user?.account_active ? "Approved / Active" : "Pending / Blocked"} />
+              </div>
+
+              {/* Consumer Multi-Cycle & Earning Cap Management */}
+              <div style={{ background: "#fff", padding: 16, borderRadius: 12, border: "1px solid #e2e8f0" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <h4 style={{ margin: 0, fontSize: 14, fontWeight: 900, color: "#0f172a" }}>
+                    ♾️ Consumer Multi-Cycle & Earning Cap Control
+                  </h4>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      padding: "2px 8px",
+                      borderRadius: 999,
+                      background: (userCycleInfo?.cycle === "Cycle 2" || userCycleInfo?.active_cycle === "Cycle 2") ? "#dbeafe" : "#dcfce7",
+                      color: (userCycleInfo?.cycle === "Cycle 2" || userCycleInfo?.active_cycle === "Cycle 2") ? "#1e40af" : "#166534",
+                      border: "1px solid",
+                      borderColor: (userCycleInfo?.cycle === "Cycle 2" || userCycleInfo?.active_cycle === "Cycle 2") ? "#93c5fd" : "#86efac",
+                    }}
+                  >
+                    {userCycleInfo?.cycle || userCycleInfo?.active_cycle || "Cycle 1"}
+                  </span>
+                </div>
+
+                <DetailRow label="Active Cycle" value={userCycleInfo?.cycle || userCycleInfo?.active_cycle || "Cycle 1"} />
+                <DetailRow label="Layer Cap Limit" value={`₹${moneyValue(userCycleInfo?.layer_limit || 100000)}`} />
+                <DetailRow label="Royalty Cap Limit" value={`₹${moneyValue(userCycleInfo?.royalty_limit || 50000)}`} />
+                <DetailRow label="Total Cycle Cap" value={`₹${moneyValue(userCycleInfo?.total_limit || 150000)}`} />
+                <DetailRow
+                  label="Cycle Earning Status"
+                  value={
+                    Number(user?.total_earning || 0) >= 150000
+                      ? "🏆 ₹1.5L Limit Reached (Earning Stopped)"
+                      : `Active (₹${moneyValue(user?.total_earning || 0)} / ₹1,50,000 - ${((Number(user?.total_earning || 0) / 150000) * 100).toFixed(1)}%)`
+                  }
+                />
+                <DetailRow
+                  label="Admin Gate Authorization"
+                  value={
+                    userCycleInfo?.admin_authorized || userCycleInfo?.status === "authorized"
+                      ? "🔓 Cycle 2 Authorized by Admin"
+                      : (userCycleInfo?.cycle === "Cycle 2" || userCycleInfo?.active_cycle === "Cycle 2")
+                      ? "🚀 Cycle 2 Active"
+                      : "🔒 Locked until ₹1.5L reached or Admin authorized"
+                  }
+                />
+
+                {cycleMsg && (
+                  <div
+                    style={{
+                      margin: "10px 0",
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      background: cycleMsg.startsWith("❌") ? "#fee2e2" : "#f0fdf4",
+                      color: cycleMsg.startsWith("❌") ? "#991b1b" : "#166534",
+                      border: `1px solid ${cycleMsg.startsWith("❌") ? "#fca5a5" : "#bbf7d0"}`,
+                    }}
+                  >
+                    {cycleMsg}
+                  </div>
+                )}
+
+                <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    disabled={cycleLoading}
+                    onClick={() => handleAdminUpdateCycle("authorize")}
+                    style={{
+                      flex: 1,
+                      minWidth: 140,
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      background: "#2563eb",
+                      color: "#fff",
+                      border: "none",
+                      fontWeight: 800,
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    🔓 Authorize Cycle 2
+                  </button>
+                  <button
+                    type="button"
+                    disabled={cycleLoading}
+                    onClick={() => handleAdminUpdateCycle("activate")}
+                    style={{
+                      flex: 1,
+                      minWidth: 140,
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      background: "#059669",
+                      color: "#fff",
+                      border: "none",
+                      fontWeight: 800,
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    🚀 Force Activate Cycle 2
+                  </button>
+                  <button
+                    type="button"
+                    disabled={cycleLoading}
+                    onClick={() => handleAdminUpdateCycle("reset")}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      background: "#f1f5f9",
+                      color: "#475569",
+                      border: "1px solid #cbd5e1",
+                      fontWeight: 700,
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    🔄 Reset Cycle 1
+                  </button>
+                </div>
               </div>
             </div>
           ) : drawerTab === "package_status" ? (
@@ -1608,6 +1856,126 @@ export default function AdminUsers() {
               >
                 View
               </button>
+            </div>
+          );
+        },
+      },
+      {
+        field: "__reset",
+        headerName: "Reset",
+        minWidth: 75,
+        width: 75,
+        align: "center",
+        headerAlign: "center",
+        sortable: false,
+        filterable: false,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          const onReset = async (e) => {
+            e?.stopPropagation?.();
+            if (!row?.id) return;
+            const ident = row.phone || row.username || `User #${row.id}`;
+            const ok = window.confirm(
+              `⚠️ DANGER: RESET ALL DATA FOR ${ident}?\n\n` +
+              `This will permanently:\n` +
+              `• Clear all 5-Matrix and 3-Matrix positions\n` +
+              `• Clear all packages and SPP monthly box subscriptions\n` +
+              `• Clear all digital LMS rank upgrades\n` +
+              `• Reset all wallets & pockets to ₹0.00\n` +
+              `• Reset password to default '123456'\n` +
+              `• Direct sponsor will be preserved.\n\n` +
+              `Are you sure you want to proceed with full reset?`
+            );
+            if (!ok) return;
+            try {
+              const res = await API.post(`/admin/users/${row.id}/growth-reset/`, {});
+              window.alert(res?.data?.message || `User ${ident} reset successfully.`);
+              setReloadKey((k) => k + 1);
+            } catch (err) {
+              const msg = err?.response?.data?.detail || err?.response?.data?.error || err?.message || "Failed to reset user data.";
+              window.alert(String(msg));
+            }
+          };
+
+          return (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <button
+                type="button"
+                onClick={onReset}
+                title="Reset user matrix, packages, wallets & password to fresh state"
+                style={{
+                  width: 58,
+                  height: 28,
+                  borderRadius: 6,
+                  background: "#fee2e2",
+                  color: "#b91c1c",
+                  border: "1px solid #fca5a5",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                  transition: "all 150ms ease",
+                }}
+              >
+                Reset
+              </button>
+            </div>
+          );
+        },
+      },
+      {
+        field: "__cycle_status",
+        headerName: "Cycle",
+        minWidth: 110,
+        width: 110,
+        align: "center",
+        headerAlign: "center",
+        sortable: false,
+        filterable: false,
+        renderCell: (params) => {
+          const row = params?.row || {};
+          let cycleData = null;
+          try {
+            const raw = localStorage.getItem(`trikonekt_cycle_user_${row.id}`) ||
+                        localStorage.getItem(`trikonekt_cycle_user_${row.phone}`);
+            if (raw) cycleData = JSON.parse(raw);
+          } catch (_) {}
+
+          const cycleName = cycleData?.cycle || cycleData?.active_cycle || "Cycle 1";
+          const isCycle2 = cycleName === "Cycle 2";
+          const isAuthorized = cycleData?.admin_authorized || cycleData?.status === "authorized";
+          const isCapped = Number(row?.total_earning || 0) >= 150000;
+
+          return (
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span
+                onClick={(e) => {
+                  e?.stopPropagation?.();
+                  openUserProfile(row);
+                }}
+                title={
+                  isCapped
+                    ? "Limit ₹1.5L reached! Earning stopped. Click to authorize Cycle 2."
+                    : isAuthorized
+                    ? "Cycle 2 Authorized by Admin."
+                    : `${cycleName}: Earning towards ₹1.5L cap.`
+                }
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  padding: "3px 8px",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  background: isCycle2 ? "#dbeafe" : isCapped ? "#fef3c7" : isAuthorized ? "#e0e7ff" : "#f0fdf4",
+                  color: isCycle2 ? "#1e40af" : isCapped ? "#b45309" : isAuthorized ? "#4338ca" : "#166534",
+                  border: `1px solid ${isCycle2 ? "#93c5fd" : isCapped ? "#fde68a" : isAuthorized ? "#c7d2fe" : "#bbf7d0"}`,
+                }}
+              >
+                {isCapped ? "⚠️ Capped (₹1.5L)" : isAuthorized ? "🔓 Cycle 2 Auth" : isCycle2 ? "🚀 Cycle 2" : "Cycle 1"}
+              </span>
             </div>
           );
         },
@@ -2797,6 +3165,7 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
           setProfileOpen(false);
           openEdit(row);
         }}
+        onReset={() => setReloadKey((k) => k + 1)}
       />
     </div>
   );

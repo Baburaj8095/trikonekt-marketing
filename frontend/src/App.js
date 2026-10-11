@@ -103,6 +103,8 @@ import AdminLevelCommission from "./pages/admin/AdminLevelCommission";
 import AdminMatrixCommission from "./pages/admin/AdminMatrixCommission";
 import AdminCommissionHistory from "./pages/admin/AdminCommissionHistory";
 import AdminCommissionDistribute from "./pages/admin/AdminCommissionDistribute";
+import AdminSSVVouchers from "./pages/admin/AdminSSVVouchers";
+import AdminCycleManagement from "./pages/admin/AdminCycleManagement";
 import AdminValidatorCommission from "./pages/admin/AdminValidatorCommission";
 import AdminWalletDebugger from "./pages/admin/AdminWalletDebugger";
 import AdminDailySalesReport from "./pages/admin/AdminDailySalesReport";
@@ -1807,6 +1809,26 @@ function App() {
             <AdminProtectedRoute>
               <AdminShell>
                 <AdminECoupons />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/ssv-vouchers"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminSSVVouchers />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/cycle-management"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminCycleManagement />
               </AdminShell>
             </AdminProtectedRoute>
           }

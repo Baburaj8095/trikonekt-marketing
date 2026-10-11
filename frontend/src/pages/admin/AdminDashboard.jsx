@@ -1446,9 +1446,9 @@ export default function AdminDashboard() {
               <ReceiptLongRoundedIcon sx={{ fontSize: 20, color: "#2563eb" }} />
             </div>
 
-            {/* Card 16: Validator Commission & Multi-Cycle Activator */}
+            {/* Card 16: SSV Cycle Management & Activator */}
             <div
-              onClick={() => navigate("/admin/validator-commission")}
+              onClick={() => navigate("/admin/cycle-management")}
               style={{
                 background: "linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)",
                 border: "1.5px solid #a7f3d0",
@@ -1465,8 +1465,8 @@ export default function AdminDashboard() {
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ width: 22, height: 22, borderRadius: 6, background: "#059669", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>16</span>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 900, color: "#065f46" }}>Validator Commission & Cycles</div>
-                  <div style={{ fontSize: 11, color: "#047857", fontWeight: 700 }}>Set Amounts, Profit % & Cycle Activator</div>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: "#065f46" }}>SSV Cycle Management & Activator</div>
+                  <div style={{ fontSize: 11, color: "#047857", fontWeight: 700 }}>Enable Cycles, Target Pools & User Tracking</div>
                 </div>
               </div>
               <AccountTreeRoundedIcon sx={{ fontSize: 20, color: "#059669" }} />

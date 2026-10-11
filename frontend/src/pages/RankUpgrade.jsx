@@ -978,6 +978,28 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
 
   const royaltyInfo = elig?.royalty_info;
   const earnedRoyalty = Number(royaltyInfo?.total_earned ?? 0);
+
+  const isPackageActive = Boolean(hasApprovedBase || currentLevel >= 1 || elig?.has_prime || elig?.is_prime);
+
+  const isCapReached = Boolean(
+    (totalEarnings >= maxLayerCap && earnedRoyalty >= maxRoyaltyCap) ||
+    (totalEarnings + earnedRoyalty) >= totalCycleCap ||
+    userConsumerCycle?.status === "completed" ||
+    userConsumerCycle?.status === "capped" ||
+    userConsumerCycle?.isCapped === true
+  );
+
+  const isAdminAuthorized = Boolean(
+    userConsumerCycle?.admin_authorized ||
+    userConsumerCycle?.adminAuthorized ||
+    userConsumerCycle?.cycle2_enabled ||
+    userConsumerCycle?.status === "authorized" ||
+    Number(String(consumerActiveCycle || "").replace(/\D/g, "") || 1) >= 2
+  );
+
+  // Cycle 2 is ONLY unlocked if package is active AND (earning limit of 1L layer + 50k royalty = 1.5L reached OR admin authorized)
+  const isCycle2Unlocked = isPackageActive && (isCapReached || isAdminAuthorized);
+
   const totalEligibleRoyaltyCap = useMemo(() => {
     if (royaltyInfo?.total_cap !== undefined && Number(royaltyInfo.total_cap) > 0) {
       return Number(royaltyInfo.total_cap);
@@ -1259,20 +1281,24 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                     <Chip
                       label={consumerCycleState.cycle || "Cycle 1 Active"}
                       size="small"
-                      onClick={() => setCycleRenewalOpen(true)}
+                      onClick={() => {
+                        if (isCycle2Unlocked) {
+                          setCycleRenewalOpen(true);
+                        }
+                      }}
                       sx={{
                         bgcolor: "rgba(16, 185, 129, 0.25)",
                         color: "#34D399",
                         fontWeight: 900,
                         fontSize: 10,
                         height: 20,
-                        cursor: "pointer",
+                        cursor: isCycle2Unlocked ? "pointer" : "default",
                         border: "1px solid rgba(52, 211, 153, 0.4)",
-                        "&:hover": { bgcolor: "rgba(16, 185, 129, 0.4)" },
+                        "&:hover": { bgcolor: isCycle2Unlocked ? "rgba(16, 185, 129, 0.4)" : "rgba(16, 185, 129, 0.25)" },
                       }}
                     />
                     <Chip
-                      label="Max Cap ₹1,00,000"
+                      label={`Max Cap ₹${fmt(totalCycleCap)}`}
                       size="small"
                       sx={{
                         bgcolor: "rgba(255, 255, 255, 0.12)",
@@ -1341,8 +1367,8 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                         : "Upgrade Now"}
                     </Button>
 
-                    {/* Cycle 2 Renewal Button when Layer 10 completed or Limit Reached */}
-                    {(currentLevel >= 10 || isLimitReached) && (
+                    {/* Cycle 2 Renewal Button only when Cycle 2 is unlocked */}
+                    {isCycle2Unlocked && (
                       <Button
                         fullWidth
                         variant="contained"
@@ -1407,11 +1433,11 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             <Grid item xs={12} sm={4}>
               <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff" }}>
                 <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>NEXT CYCLE</Typography>
-                <Typography sx={{ fontSize: 14, fontWeight: 900, color: !isLayerActive ? "#dc2626" : isLimitReached ? "#d97706" : "#15803d", my: 0.5 }}>
-                  {!isLayerActive ? "Activation Required" : isLimitReached ? "Re-Top Up Required" : "Active"}
+                <Typography sx={{ fontSize: 14, fontWeight: 900, color: !isPackageActive ? "#dc2626" : isCycle2Unlocked ? "#15803d" : "#d97706", my: 0.5 }}>
+                  {!isPackageActive ? "Package Inactive" : isCycle2Unlocked ? "Cycle 2 Unlocked" : "Cycle 2 Locked"}
                 </Typography>
                 <Typography sx={{ fontSize: 11, color: "#94a3b8" }}>
-                  {!isLayerActive ? "(Unlock on Layer 1 Purchase)" : "(Same Benefits Continue)"}
+                  {!isPackageActive ? "(Activate Package First)" : isCycle2Unlocked ? "(Eligible for Cycle 2)" : "(Earn ₹1.5L Cap to Unlock)"}
                 </Typography>
               </Paper>
             </Grid>
@@ -1426,26 +1452,30 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           p: 2,
           mb: 2,
           borderRadius: 3,
-          background: (totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap)
+          background: isCycle2Unlocked
             ? "linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)"
+            : !isPackageActive
+            ? "linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)"
             : "linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)",
           border: "1.5px solid",
-          borderColor: (totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap) ? "#F59E0B" : "#86EFAC",
+          borderColor: isCycle2Unlocked ? "#F59E0B" : !isPackageActive ? "#F87171" : "#86EFAC",
         }}
       >
         <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1.5}>
           <Box>
             <Stack direction="row" spacing={1} alignItems="center">
-              <Typography sx={{ fontSize: 14.5, fontWeight: 950, color: (totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap) ? "#92400E" : "#14532D" }}>
-                {(totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap)
-                  ? `🏆 ${consumerActiveCycle} Cap Reached (₹${fmt(totalCycleCap)} Total Limit)!`
+              <Typography sx={{ fontSize: 14.5, fontWeight: 950, color: isCycle2Unlocked ? "#92400E" : !isPackageActive ? "#991B1B" : "#14532D" }}>
+                {!isPackageActive
+                  ? `🔒 ${consumerActiveCycle} Locked: Package Inactive`
+                  : isCycle2Unlocked
+                  ? `🏆 ${consumerActiveCycle} Cap Reached (₹${fmt(totalCycleCap)} Limit Met)!`
                   : `♾️ ${consumerActiveCycle} Earning Limit: ₹${fmt(totalCycleCap)} (Layer ₹${fmt(maxLayerCap)} + Royalty ₹${fmt(maxRoyaltyCap)})`}
               </Typography>
               <Chip
-                label={(totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap) ? "Earning Stopped" : "Active"}
+                label={!isPackageActive ? "Inactive" : isCycle2Unlocked ? "Earning Stopped / Unlocked" : "Active"}
                 size="small"
                 sx={{
-                  bgcolor: (totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap) ? "#DC2626" : "#16A34A",
+                  bgcolor: !isPackageActive ? "#DC2626" : isCycle2Unlocked ? "#D97706" : "#16A34A",
                   color: "#FFF",
                   fontWeight: 900,
                   fontSize: 10,
@@ -1453,17 +1483,24 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                 }}
               />
             </Stack>
-            <Typography sx={{ fontSize: 11.5, color: (totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap) ? "#78350F" : "#166534", mt: 0.5 }}>
-              {(totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap)
-                ? `You have reached the cycle cap! Additional earnings are held in Missing Blocks Income. You are eligible to activate Cycle 2 by purchasing all ₹50,000 Academy Courses.`
-                : `Total Cycle Earned: ₹${fmt(totalEarnings + earnedRoyalty)} / ₹${fmt(totalCycleCap)} (${(((totalEarnings + earnedRoyalty) / totalCycleCap) * 100).toFixed(1)}%). Once ₹${fmt(totalCycleCap)} is reached, Cycle 2 activates.`}
+            <Typography sx={{ fontSize: 11.5, color: isCycle2Unlocked ? "#78350F" : !isPackageActive ? "#7F1D1D" : "#166534", mt: 0.5 }}>
+              {!isPackageActive
+                ? `Your package is inactive. Activate the ₹2,000 Starter Package on asiyapp.com to start receiving layer & royalty earnings toward the ₹${fmt(totalCycleCap)} Cycle 1 cap.`
+                : isCycle2Unlocked
+                ? `You have reached the ₹${fmt(totalCycleCap)} total earning cap (Layer ₹${fmt(maxLayerCap)} + Royalty ₹${fmt(maxRoyaltyCap)}). Earnings have stopped. You are eligible to activate Cycle 2 by purchasing ₹50,000 Academy Courses or via Renewal Hub.`
+                : `Total Cycle Earned: ₹${fmt(totalEarnings + earnedRoyalty)} / ₹${fmt(totalCycleCap)} (Layer ₹${fmt(totalEarnings)}/₹${fmt(maxLayerCap)} + Royalty ₹${fmt(earnedRoyalty)}/₹${fmt(maxRoyaltyCap)} • ${(((totalEarnings + earnedRoyalty) / totalCycleCap) * 100).toFixed(1)}%). Once ₹${fmt(totalCycleCap)} is reached or authorized by Admin, Cycle 2 will unlock.`}
             </Typography>
           </Box>
           <Button
             variant="contained"
-            onClick={() => navigate("/user/team-dashboard?action=cycle-bulk-buy")}
+            disabled={!isCycle2Unlocked}
+            onClick={() => {
+              if (isCycle2Unlocked) {
+                navigate("/user/team-dashboard?action=cycle-bulk-buy");
+              }
+            }}
             sx={{
-              bgcolor: (totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap) ? "#D97706" : "#2563EB",
+              bgcolor: isCycle2Unlocked ? "#D97706" : "#94A3B8",
               color: "#FFF",
               fontWeight: 900,
               fontSize: 11.5,
@@ -1472,12 +1509,16 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
               py: 0.8,
               borderRadius: "10px",
               whiteSpace: "nowrap",
-              "&:hover": { bgcolor: (totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap) ? "#B45309" : "#1D4ED8" },
+              cursor: isCycle2Unlocked ? "pointer" : "not-allowed",
+              "&.Mui-disabled": { bgcolor: "#CBD5E1", color: "#64748B" },
+              "&:hover": { bgcolor: isCycle2Unlocked ? "#B45309" : "#94A3B8" },
             }}
           >
-            {(totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap)
+            {!isPackageActive
+              ? "🔒 Package Inactive"
+              : isCycle2Unlocked
               ? "🚀 Activate Cycle 2 (Bulk ₹50k Purchase)"
-              : "📚 Purchase ₹50k All Courses"}
+              : `🔒 Cycle 2 Locked (Earn ₹${fmt(totalCycleCap)} Cap to Unlock)`}
           </Button>
         </Stack>
       </Paper>

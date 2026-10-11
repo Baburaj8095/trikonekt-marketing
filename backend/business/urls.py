@@ -5,6 +5,15 @@ from .views_ssv import (
     P2PCouponHistoryView,
     TotalAdminChargesListView,
     PlatformTaxConfigView,
+    AdminSSVStatesView,
+    AdminSSVDashboardView,
+    AdminSSVUsersListView,
+    AdminSSVCreateVoucherView,
+    AdminSSVRedeemVoucherView,
+    AdminSSVExportCSVView,
+    AdminSSVCyclesView,
+    AdminSSVActivateCycleView,
+    AdminSSVSaveCycleView,
 )
 from .views import (
     BusinessRegistrationCreateView,
@@ -203,5 +212,16 @@ urlpatterns = [
     path('coupons/p2p-history/', P2PCouponHistoryView.as_view(), name='p2p_coupon_history'),
     path('admin/total-admin-charges/', TotalAdminChargesListView.as_view(), name='total_admin_charges_list'),
     path('platform-taxes/', PlatformTaxConfigView.as_view(), name='platform_taxes'),
+
+    # Admin SSV Vouchers Board Endpoints
+    path('admin/ssv/states/', AdminSSVStatesView.as_view(), name='admin_ssv_states'),
+    path('admin/ssv/dashboard/', AdminSSVDashboardView.as_view(), name='admin_ssv_dashboard'),
+    path('admin/ssv/users/', AdminSSVUsersListView.as_view(), name='admin_ssv_users'),
+    path('admin/ssv/create-voucher/', AdminSSVCreateVoucherView.as_view(), name='admin_ssv_create_voucher'),
+    path('admin/ssv/redeem-voucher/', AdminSSVRedeemVoucherView.as_view(), name='admin_ssv_redeem_voucher'),
+    path('admin/ssv/export-csv/', AdminSSVExportCSVView.as_view(), name='admin_ssv_export_csv'),
+    path('admin/ssv/cycles/', AdminSSVCyclesView.as_view(), name='admin_ssv_cycles'),
+    path('admin/ssv/cycles/activate/', AdminSSVActivateCycleView.as_view(), name='admin_ssv_cycle_activate'),
+    path('admin/ssv/cycles/save/', AdminSSVSaveCycleView.as_view(), name='admin_ssv_cycle_save'),
 ]
 

@@ -179,6 +179,20 @@ def reset_or_delete_user(identifier, action="reset", default_password="123456"):
                 w.self_account_balance = Decimal("0.00")
             if hasattr(w, "bonus_wallet"):
                 w.bonus_wallet = Decimal("0.00")
+            if hasattr(w, "franchise_total_earning"):
+                w.franchise_total_earning = Decimal("0.00")
+            if hasattr(w, "franchise_active_work"):
+                w.franchise_active_work = Decimal("0.00")
+            if hasattr(w, "franchise_inactive_work"):
+                w.franchise_inactive_work = Decimal("0.00")
+            if hasattr(w, "franchise_self_rebirth"):
+                w.franchise_self_rebirth = Decimal("0.00")
+            if hasattr(w, "franchise_company_marketing"):
+                w.franchise_company_marketing = Decimal("0.00")
+            if hasattr(w, "franchise_reward_points"):
+                w.franchise_reward_points = Decimal("0.00")
+            if hasattr(w, "franchise_shopping_scanner"):
+                w.franchise_shopping_scanner = Decimal("0.00")
             w.save()
 
         # Reset WalletAccount pockets

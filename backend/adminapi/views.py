@@ -56,12 +56,12 @@ class AdminMetricsView(APIView):
         # Users (condensed into a single aggregate where possible)
         users_agg = CustomUser.objects.aggregate(
             total=Count("id"),
-            active=Count("id", filter=Q(account_active=True)),
+            active=Count("id", filter=Q(is_active=True)),
             blocked=Count("id", filter=Q(is_active=False)),
             todayNew=Count("id", filter=Q(date_joined__date=today)),
             consumers_without_kyc=Count("id", filter=Q(category="consumer") & Q(kyc__isnull=True)),
             total_consumer=Count("id", filter=Q(category="consumer")),
-            active_consumer=Count("id", filter=Q(account_active=True, category="consumer")),
+            active_consumer=Count("id", filter=Q(is_active=True, category="consumer")),
             total_agency=Count("id", filter=Q(category__startswith="agency_")),
             active_agency=Count("id", filter=Q(account_active=True, category__startswith="agency_")),
             total_admin=Count("id", filter=Q(category="admin")),
@@ -327,7 +327,6 @@ class AdminMetricsView(APIView):
         }
 
         # Cash Flow & Inflow/Outflow Rollup
-        from accounts.models import WalletUploadRequest, WithdrawalRequest
         total_inflow_promo = PromoPurchase.objects.filter(status="APPROVED").aggregate(s=Sum("amount_paid"))["s"] or Decimal("0.00")
         total_inflow_ranks = RankUpgrade.objects.filter(payment_status=RankUpgrade.STATUS_SUCCESS).aggregate(s=Sum("upgrade_amount"))["s"] or Decimal("0.00")
         total_inflow_upload = WalletUploadRequest.objects.filter(status="APPROVED").aggregate(s=Sum("amount"))["s"] or Decimal("0.00")
@@ -6779,5 +6778,217 @@ class AdminDailyPoolTriggerView(APIView):
 
         res = execute_daily_pool_distribution(target_date=date, dry_run=dry_run, force=force)
         return Response(res)
+
+
+class AdminUserGrowthResetView(APIView):
+    """
+    Admin-only: Safely resets a consumer's growth data across all 11 tables:
+    - AutoPoolAccount (matrix seats)
+    - UserMatrixProgress
+    - PromoMonthlyBox (SPP boxes)
+    - PromoPurchase
+    - UpgradeCommission
+    - RankUpgrade & RankMatrixNode
+    - RewardPointsAccount & RewardPointsTransaction
+    - WalletTransaction
+    - Wallets & Pockets -> 0.00
+    - Password -> 123456
+    - Preserves registered_by (sponsor)
+    """
+    permission_classes = [IsAdminOrStaff]
+
+    def post(self, request, pk: int):
+        user = CustomUser.objects.filter(pk=pk).first()
+        if not user:
+            return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if user.is_staff or user.is_superuser or user.username == "admin" or getattr(user, "category", "") == "admin":
+            return Response({"detail": "Cannot reset an admin or staff user."}, status=status.HTTP_400_BAD_REQUEST)
+
+        default_password = str(request.data.get("password") or "123456").strip()
+        uid = user.id
+        uname = user.username or user.phone
+
+        try:
+            with transaction.atomic():
+                # 1. Safely Delete AutoPoolAccount (Matrix entries)
+                while True:
+                    user_leaves = AutoPoolAccount.objects.filter(owner=user).exclude(
+                        id__in=AutoPoolAccount.objects.exclude(parent_account__isnull=True).values_list("parent_account_id", flat=True)
+                    )
+                    count = user_leaves.count()
+                    if count == 0:
+                        break
+                    user_leaves.delete()
+
+                remaining_pools = list(AutoPoolAccount.objects.filter(owner=user))
+                for pool in remaining_pools:
+                    fallback = pool.parent_account
+                    if not fallback:
+                        fallback = AutoPoolAccount.objects.filter(
+                            pool_type=pool.pool_type, parent_account__isnull=True
+                        ).exclude(id=pool.id).first()
+                    children = list(AutoPoolAccount.objects.filter(parent_account=pool))
+                    for child in children:
+                        if fallback:
+                            taken_positions = set(
+                                AutoPoolAccount.objects.filter(parent_account=fallback, pool_type=child.pool_type)
+                                .values_list("position", flat=True)
+                            )
+                            next_pos = 1
+                            while next_pos in taken_positions:
+                                next_pos += 1
+                            child.parent_account = fallback
+                            child.position = next_pos
+                            child.save(update_fields=["parent_account", "position"])
+                        else:
+                            child.delete()
+                    pool.delete()
+
+                # UserMatrixProgress
+                try:
+                    from business.models import UserMatrixProgress
+                    UserMatrixProgress.objects.filter(user=user).delete()
+                except Exception:
+                    pass
+
+                # 2. PromoMonthlyBox
+                try:
+                    from business.models import PromoMonthlyBox
+                    PromoMonthlyBox.objects.filter(user=user).delete()
+                except Exception:
+                    pass
+
+                # 3. PromoPurchase
+                try:
+                    from business.models import PromoPurchase
+                    PromoPurchase.objects.filter(user=user).delete()
+                except Exception:
+                    pass
+
+                # 4. UpgradeCommission
+                try:
+                    from mlm_ranks.models import UpgradeCommission
+                    UpgradeCommission.objects.filter(
+                        Q(to_user=user) | Q(from_user=user) | Q(upgrade__user=user)
+                    ).delete()
+                except Exception:
+                    pass
+
+                # 5. RankUpgrade, RankMatrixNode, RankUpgradePayment
+                try:
+                    from mlm_ranks.models import RankUpgrade, RankMatrixNode, RankUpgradePayment
+                    RankUpgrade.objects.filter(user=user).delete()
+                    RankMatrixNode.objects.filter(
+                        Q(root_user_id=uid) | Q(placed_user_id=uid) | Q(parent_user_id=uid)
+                    ).delete()
+                    RankUpgradePayment.objects.filter(upgrade__user=user).delete()
+                except Exception:
+                    pass
+
+                # 5d. RewardPoints
+                try:
+                    from accounts.models import RewardPointsAccount, RewardPointsTransaction
+                    RewardPointsTransaction.objects.filter(user=user).delete()
+                    RewardPointsAccount.objects.filter(user=user).update(
+                        balance_points=Decimal("0.00")
+                    )
+                except Exception:
+                    pass
+
+                # 6. WalletTransaction
+                try:
+                    from accounts.models import WalletTransaction
+                    WalletTransaction.objects.filter(user=user).delete()
+                    WalletTransaction.objects.filter(
+                        Q(meta__from_user_id=uid) | Q(meta__from_user=uname)
+                    ).delete()
+                except Exception:
+                    pass
+
+                # 7. Wallet & Pockets
+                try:
+                    from accounts.models import Wallet
+                    w = Wallet.objects.filter(user=user).first()
+                    if w:
+                        w.balance = Decimal("0.00")
+                        w.main_balance = Decimal("0.00")
+                        w.withdrawable_balance = Decimal("0.00")
+                        w.total_earnings = Decimal("0.00")
+                        w.total_withdrawn = Decimal("0.00")
+                        if hasattr(w, "self_account_balance"):
+                            w.self_account_balance = Decimal("0.00")
+                        if hasattr(w, "bonus_wallet"):
+                            w.bonus_wallet = Decimal("0.00")
+                        if hasattr(w, "franchise_total_earning"):
+                            w.franchise_total_earning = Decimal("0.00")
+                        if hasattr(w, "franchise_active_work"):
+                            w.franchise_active_work = Decimal("0.00")
+                        if hasattr(w, "franchise_inactive_work"):
+                            w.franchise_inactive_work = Decimal("0.00")
+                        if hasattr(w, "franchise_self_rebirth"):
+                            w.franchise_self_rebirth = Decimal("0.00")
+                        if hasattr(w, "franchise_company_marketing"):
+                            w.franchise_company_marketing = Decimal("0.00")
+                        if hasattr(w, "franchise_reward_points"):
+                            w.franchise_reward_points = Decimal("0.00")
+                        if hasattr(w, "franchise_shopping_scanner"):
+                            w.franchise_shopping_scanner = Decimal("0.00")
+                        w.save()
+                except Exception:
+                    pass
+
+                try:
+                    from accounts.models import WalletAccount, LedgerEntry, FinancialTransaction
+                    WalletAccount.objects.filter(user=user).update(
+                        current_balance=Decimal("0.00"),
+                        available_balance=Decimal("0.00"),
+                        pending_balance=Decimal("0.00"),
+                        locked_balance=Decimal("0.00")
+                    )
+                    LedgerEntry.objects.filter(Q(user=user) | Q(financial_transaction__user=user)).delete()
+                    FinancialTransaction.objects.filter(user=user).delete()
+                except Exception:
+                    pass
+
+                # 8. ConsumerVoucher
+                try:
+                    from accounts.models import ConsumerVoucher
+                    ConsumerVoucher.objects.filter(user=user).delete()
+                except Exception:
+                    pass
+
+                # 9. CouponCode
+                try:
+                    from coupons.models import CouponCode
+                    CouponCode.objects.filter(owner=user).delete()
+                except Exception:
+                    pass
+
+                # 10. AuditTrail
+                try:
+                    from coupons.models import AuditTrail
+                    AuditTrail.objects.filter(actor=user).delete()
+                except Exception:
+                    pass
+
+                # 11. CustomUser
+                user.account_active = False
+                user.is_active = True
+                if hasattr(user, "current_rank"):
+                    user.current_rank = None
+                if hasattr(user, "current_rank_id"):
+                    user.current_rank_id = None
+                user.set_password(default_password)
+                user.save()
+
+            return Response({
+                "success": True,
+                "message": f"User {uname} successfully reset. Wallets, matrices, and packages cleared.",
+                "user_id": uid,
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"detail": f"Reset failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
