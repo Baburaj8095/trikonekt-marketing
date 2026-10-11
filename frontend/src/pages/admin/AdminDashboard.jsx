@@ -94,7 +94,9 @@ export default function AdminDashboard() {
     const rawUsers = data?.users || {};
     const totalCommunity = Number(catCounts?.consumer ?? rawUsers?.total_consumer ?? rawUsers?.total ?? 996);
     const activeCommunity = Number(rawUsers?.active_consumer ?? 0);
-    const inactiveCommunity = Math.max(0, totalCommunity - activeCommunity);
+    const inactiveCommunity = rawUsers?.inactive_consumer !== undefined
+      ? Number(rawUsers?.inactive_consumer)
+      : Math.max(0, totalCommunity - activeCommunity);
     const blockedCommunity = Number(rawUsers?.blocked ?? 0);
     const todayCommunity = Number(rawUsers?.todayNew ?? 0);
     const kyc = data?.kyc || {};

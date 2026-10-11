@@ -41,7 +41,7 @@ class AdminMetricsView(APIView):
             refresh = str(request.query_params.get("refresh") or "").lower()
         except Exception:
             refresh = ""
-        cache_key = "admin_metrics_v3"
+        cache_key = "admin_metrics_v4"
         if refresh not in ("1", "true", "yes"):
             cached = cache.get(cache_key)
             if cached is not None:
@@ -61,7 +61,8 @@ class AdminMetricsView(APIView):
             todayNew=Count("id", filter=Q(date_joined__date=today)),
             consumers_without_kyc=Count("id", filter=Q(category="consumer") & Q(kyc__isnull=True)),
             total_consumer=Count("id", filter=Q(category="consumer")),
-            active_consumer=Count("id", filter=Q(is_active=True, category="consumer")),
+            active_consumer=Count("id", filter=Q(account_active=True, category="consumer")),
+            inactive_consumer=Count("id", filter=Q(account_active=False, category="consumer")),
             total_agency=Count("id", filter=Q(category__startswith="agency_")),
             active_agency=Count("id", filter=Q(account_active=True, category__startswith="agency_")),
             total_admin=Count("id", filter=Q(category="admin")),
@@ -81,6 +82,7 @@ class AdminMetricsView(APIView):
             "kycPending": int(kyc_pending),
             "total_consumer": users_agg.get("total_consumer") or 0,
             "active_consumer": users_agg.get("active_consumer") or 0,
+            "inactive_consumer": users_agg.get("inactive_consumer") or 0,
             "total_agency": users_agg.get("total_agency") or 0,
             "active_agency": users_agg.get("active_agency") or 0,
             "total_admin": users_agg.get("total_admin") or 0,
