@@ -5363,7 +5363,8 @@ class AdminMasterCommissionConfig(APIView):
                 # 2. Sync monthly_759 direct sponsor amounts
                 m759 = dict(master.get("monthly_759", {}) or {})
                 m759["direct_first_month"] = sp_val
-                m759["direct_monthly"] = sp_val
+                rec_val = float(spp_c.get("direct_bonus_sponsor_recurring") if spp_c.get("direct_bonus_sponsor_recurring") is not None else (spp_c.get("direct_recurring_sponsor") if spp_c.get("direct_recurring_sponsor") is not None else m759.get("direct_monthly", 50)))
+                m759["direct_monthly"] = rec_val
                 m759["base_amount"] = float(spp_c.get("product_price", 1000) or 1000)
                 master["monthly_759"] = m759
 

@@ -319,6 +319,7 @@ export default function AdminCommissionDistribute() {
   const defaultSpp1000Config = {
     product_price: 1000,
     direct_bonus_sponsor: 150,
+    direct_bonus_sponsor_recurring: 50,
     direct_bonus_self: 50,
     // 5-Block Pool (Layers, Amounts CSV, Percents CSV)
     five_levels: 10,
@@ -643,6 +644,7 @@ export default function AdminCommissionDistribute() {
         self_cashback: Number(sppConfig.direct_bonus_self ?? sppConfig.self_cashback ?? 50),
         direct_bonus_self: Number(sppConfig.direct_bonus_self ?? sppConfig.self_cashback ?? 50),
         direct_bonus_sponsor: Number(sppConfig.direct_bonus_sponsor ?? 150),
+        direct_bonus_sponsor_recurring: Number(sppConfig.direct_bonus_sponsor_recurring ?? 50),
       };
       localStorage.setItem("tri_spp_1000_config", JSON.stringify(payloadSpp));
       localStorage.setItem("tri_custom_module_tax", JSON.stringify(customModuleTax));
@@ -5439,7 +5441,7 @@ right={
               </div>
               <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
-                  <span style={{ fontSize: 11, color: "#7e22ce", fontWeight: 700 }}>Sponsor:</span>
+                  <span style={{ fontSize: 11, color: "#7e22ce", fontWeight: 700 }}>1st Box:</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
                     <span style={{ fontSize: 11, color: "#7e22ce", fontWeight: 800 }}>₹</span>
                     <LedgerNumberInput
@@ -5449,6 +5451,23 @@ right={
                       value={sppConfig.direct_bonus_sponsor ?? 150}
                       onChange={(val) => {
                         setSppConfig((prev) => ({ ...prev, direct_bonus_sponsor: val }));
+                        setSppDirty(true);
+                      }}
+                      style={{ width: 75, padding: "2px 4px", fontSize: 11, fontWeight: 800, borderRadius: 4, border: "1px solid #d8b4fe", background: "#fff", color: "#6b21a8", textAlign: "right" }}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 4 }}>
+                  <span style={{ fontSize: 11, color: "#7e22ce", fontWeight: 700 }}>2nd Box+:</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <span style={{ fontSize: 11, color: "#7e22ce", fontWeight: 800 }}>₹</span>
+                    <LedgerNumberInput
+                      step="1"
+                      min={0}
+                      max={sppPrice}
+                      value={sppConfig.direct_bonus_sponsor_recurring ?? 50}
+                      onChange={(val) => {
+                        setSppConfig((prev) => ({ ...prev, direct_bonus_sponsor_recurring: val }));
                         setSppDirty(true);
                       }}
                       style={{ width: 75, padding: "2px 4px", fontSize: 11, fontWeight: 800, borderRadius: 4, border: "1px solid #d8b4fe", background: "#fff", color: "#6b21a8", textAlign: "right" }}
@@ -5625,10 +5644,18 @@ right={
         >
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
             <Input
-              label="Sponsor (₹)"
+              label="1st Box Sponsor (₹)"
               value={sppConfig.direct_bonus_sponsor ?? 150}
               onChange={(v) => {
                 setSppConfig((prev) => ({ ...prev, direct_bonus_sponsor: Number(v) || 0 }));
+                setSppDirty(true);
+              }}
+            />
+            <Input
+              label="2nd Box Onwards Sponsor (₹)"
+              value={sppConfig.direct_bonus_sponsor_recurring ?? 50}
+              onChange={(v) => {
+                setSppConfig((prev) => ({ ...prev, direct_bonus_sponsor_recurring: Number(v) || 0 }));
                 setSppDirty(true);
               }}
             />

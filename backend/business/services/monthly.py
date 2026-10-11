@@ -283,11 +283,24 @@ def distribute_monthly_759_payouts(
     spp_cfg_live = dict(master_solo.get("spp_1000_config", {}) or {})
 
     direct_amt = None
-    if spp_cfg_live.get("direct_bonus_sponsor") is not None:
-        try:
-            direct_amt = _q2(spp_cfg_live["direct_bonus_sponsor"])
-        except Exception:
-            pass
+    if is_first_month:
+        if spp_cfg_live.get("direct_bonus_sponsor") is not None:
+            try:
+                direct_amt = _q2(spp_cfg_live["direct_bonus_sponsor"])
+            except Exception:
+                pass
+    else:
+        # 2nd box onwards: use recurring sponsor bonus (defaults to ₹50 or admin configured)
+        if spp_cfg_live.get("direct_bonus_sponsor_recurring") is not None:
+            try:
+                direct_amt = _q2(spp_cfg_live["direct_bonus_sponsor_recurring"])
+            except Exception:
+                pass
+        elif spp_cfg_live.get("direct_recurring_sponsor") is not None:
+            try:
+                direct_amt = _q2(spp_cfg_live["direct_recurring_sponsor"])
+            except Exception:
+                pass
     if direct_amt is None:
         direct_amt = _q2(box_cfg.direct_sponsor)
 
@@ -389,14 +402,8 @@ def distribute_monthly_759_payouts(
         # Even with base_amt==0 (payouts disabled/misconfigured), the user still expects
         # the Smart SSP season root to appear in genealogy.
         should_open = False
-        if not already_for_purchase:
-            if cfg_mode == "NEVER":
-                should_open = False
-            elif cfg_mode == "FIRST_MONTH_ONLY":
-                should_open = bool(is_first_month)
-            elif cfg_mode == "EVERY_PURCHASE":
-                # treat every purchase as first-month for matrix part only
-                should_open = True
+        if not already_for_purchase and bool(is_first_month) and cfg_mode != "NEVER":
+            should_open = True
 
         opened_any = False
         if should_open:
