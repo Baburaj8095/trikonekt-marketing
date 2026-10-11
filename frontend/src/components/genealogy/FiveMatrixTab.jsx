@@ -577,14 +577,59 @@ export default function FiveMatrixTab({
       {/* ── Tree section ── */}
       <div
         style={{
-          fontSize: 14,
-          fontWeight: 800,
-          color: C.text,
-          letterSpacing: "-0.2px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 8,
           marginBottom: 8,
         }}
       >
-        5‑Blocks View
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 800,
+            color: C.text,
+            letterSpacing: "-0.2px",
+          }}
+        >
+          5‑Blocks View
+        </div>
+        {fiveRootsList.length > 1 && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: C.textSec }}>Switch Account:</span>
+            {fiveRootsList.map((acc) => {
+              const isSelected = Number(selectedRoot) === Number(acc.id);
+              const isSpp = String(acc.source_type || "").toUpperCase().includes("MONTHLY") ||
+                            String(acc.source_type || "").toUpperCase().includes("SSP");
+              const label = isSpp ? `SPP (#${acc.id})` : `Prime (#${acc.id})`;
+              return (
+                <button
+                  key={acc.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedRoot(acc.id);
+                    const cat = categoryForRow(acc);
+                    if (setFiveCategory) setFiveCategory(cat);
+                  }}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 999,
+                    border: `1.5px solid ${isSelected ? C.primary : C.border}`,
+                    background: isSelected ? C.primary : C.surface,
+                    color: isSelected ? "#ffffff" : C.text,
+                    fontSize: 11,
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    boxShadow: isSelected ? "0 2px 6px rgba(79,70,229,0.25)" : "none",
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
       <div
         style={{
