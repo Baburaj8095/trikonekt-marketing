@@ -1702,6 +1702,8 @@ function SPPMonthlyCadenceWidget() {
 function ConsumerCycleRenewalWidget({ onOpenPurchase, cycleState }) {
   const currentCycleNum = cycleState?.currentCycle || 1;
   const isCapped = cycleState?.isCapped || false;
+  const isAuthorized = cycleState?.adminAuthorized === true || cycleState?.currentCycle >= 2;
+  const isUnlocked = isCapped || isAuthorized;
 
   return (
     <Paper
@@ -1741,29 +1743,32 @@ function ConsumerCycleRenewalWidget({ onOpenPurchase, cycleState }) {
             🔄 Cycle 2+ Academy All Courses Bulk Purchase
           </Typography>
           <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.85)", mt: 0.5, maxWidth: 540 }}>
-            Unlock all 3 academic tracks at once (Foundation ₹2,000 + Leadership ₹8,000 + Promoter DAP ₹40,000 = ₹50,000) using Main Wallet or Coupon Pocket. Grants fresh ₹1,00,000 Layer Cap & ₹50,000 Royalty Cap.
+            {isUnlocked
+              ? "Cycle 1 earning cap achieved! Unlock all 3 tracks for Cycle 2 at once (₹50,000) using Main Wallet or Coupon Pocket for fresh ₹1.5L earning cap."
+              : "Current Cycle: Cycle 1. Layer Cap: ₹1,00,000 • Royalty Cap: ₹50,000 (Total ₹1,50,000). Cycle 2 renewal unlocks automatically once earning limits are reached."}
           </Typography>
         </Box>
 
         <Button
           variant="contained"
-          onClick={onOpenPurchase}
+          onClick={isUnlocked ? onOpenPurchase : undefined}
+          disabled={!isUnlocked}
           sx={{
-            bgcolor: "#F59E0B",
-            color: "#0F172A",
+            bgcolor: isUnlocked ? "#F59E0B" : "rgba(255,255,255,0.18)",
+            color: isUnlocked ? "#0F172A" : "rgba(255,255,255,0.6)",
             fontWeight: 950,
             fontSize: 12.5,
             textTransform: "none",
             px: 3,
             py: 1.2,
             borderRadius: "14px",
-            boxShadow: "0 4px 14px rgba(245, 158, 11, 0.4)",
+            boxShadow: isUnlocked ? "0 4px 14px rgba(245, 158, 11, 0.4)" : "none",
             whiteSpace: "nowrap",
             width: { xs: "100%", sm: "auto" },
-            "&:hover": { bgcolor: "#D97706", color: "#FFF" },
+            "&:hover": { bgcolor: isUnlocked ? "#D97706" : "rgba(255,255,255,0.18)" },
           }}
         >
-          🚀 Buy All Courses (₹50k)
+          {isUnlocked ? "🚀 Buy All Courses (₹50k)" : "🔒 Cycle 2 Locked (Cap: ₹1.5L)"}
         </Button>
       </Stack>
     </Paper>
