@@ -844,13 +844,41 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
     };
   }, [walletHistory]);
 
-  // MUST NOT CROSS EARNING LIMIT: Capped at user's current earning limit
+  // Consumer Multi-Cycle State (Layer Cap: ₹1,00,000, Royalty Cap: ₹50,000, Total Cycle: ₹1,50,000)
+  const userConsumerCycle = useMemo(() => {
+    try {
+      const myId = (typeof localStorage !== "undefined" && (localStorage.getItem("user_id") || JSON.parse(localStorage.getItem("user_user") || localStorage.getItem("user") || "{}")?.id));
+      const myPhone = (typeof localStorage !== "undefined" && JSON.parse(localStorage.getItem("user_user") || localStorage.getItem("user") || "{}")?.phone);
+      if (myId) {
+        const raw = localStorage.getItem(`trikonekt_cycle_user_${myId}`);
+        if (raw) return JSON.parse(raw);
+      }
+      if (myPhone) {
+        const raw = localStorage.getItem(`trikonekt_cycle_user_${myPhone}`);
+        if (raw) return JSON.parse(raw);
+      }
+      const general = localStorage.getItem("trikonekt_consumer_cycle_state");
+      if (general) return JSON.parse(general);
+    } catch (_) {}
+    return {
+      active_cycle: "Cycle 1",
+      layer_limit: 100000,
+      royalty_limit: 50000,
+      total_limit: 150000,
+      status: "active",
+    };
+  }, []);
+
+  const consumerActiveCycle = userConsumerCycle?.active_cycle || userConsumerCycle?.cycle || "Cycle 1";
+  const maxLayerCap = Number(userConsumerCycle?.layer_limit || userConsumerCycle?.eEduLayerLimit || 100000);
+  const maxRoyaltyCap = Number(userConsumerCycle?.royalty_limit || userConsumerCycle?.royaltyLimit || 50000);
+  const totalCycleCap = maxLayerCap + maxRoyaltyCap; // 1,50,000
+
+  // MUST NOT CROSS EARNING LIMIT: Capped at user's current earning limit & max cycle layer cap (₹1L)
   const totalEarnings = useMemo(() => {
-    if (currentLimit > 0) {
-      return Math.min(rawLayerIncome, currentLimit);
-    }
-    return rawLayerIncome;
-  }, [rawLayerIncome, currentLimit]);
+    const effectiveCap = currentLimit > 0 ? Math.min(currentLimit, maxLayerCap) : maxLayerCap;
+    return Math.min(rawLayerIncome, effectiveCap);
+  }, [rawLayerIncome, currentLimit, maxLayerCap]);
 
   const isLimitReached =
     walletHistory?.is_limit_reached ?? (currentLimit > 0 && rawLayerIncome >= currentLimit);
@@ -862,17 +890,20 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
 
   const layerMatrixEligible = useMemo(() => {
     return Number(
-      walletHistory?.layer_matrix_eligible || Math.max(currentLimit, 100000)
+      walletHistory?.layer_matrix_eligible || Math.max(currentLimit, maxLayerCap)
     );
-  }, [walletHistory, currentLimit]);
+  }, [walletHistory, currentLimit, maxLayerCap]);
 
   // Income generated after limit reached will be shown in Missing Blocks Income
   const missingIncome = useMemo(() => {
+    if (rawLayerIncome > maxLayerCap) {
+      return Number((rawLayerIncome - maxLayerCap).toFixed(2));
+    }
     if (currentLimit > 0 && rawLayerIncome > currentLimit) {
       return Number((rawLayerIncome - currentLimit).toFixed(2));
     }
     return Number(walletHistory?.missing_income || 0);
-  }, [rawLayerIncome, currentLimit, walletHistory]);
+  }, [rawLayerIncome, currentLimit, maxLayerCap, walletHistory]);
 
   const layerMatrixPercent = useMemo(() => {
     const denom = currentLimit > 0 ? currentLimit : layerMatrixEligible;
@@ -1387,6 +1418,69 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           </Grid>
         </>
       )}
+
+      {/* ── Multi-Cycle Status & Earning Cap Banner (Layer 1L + Royalty 50k = 1.5L) ── */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2,
+          mb: 2,
+          borderRadius: 3,
+          background: (totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap)
+            ? "linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)"
+            : "linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)",
+          border: "1.5px solid",
+          borderColor: (totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap) ? "#F59E0B" : "#86EFAC",
+        }}
+      >
+        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1.5}>
+          <Box>
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Typography sx={{ fontSize: 14.5, fontWeight: 950, color: (totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap) ? "#92400E" : "#14532D" }}>
+                {(totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap)
+                  ? `🏆 ${consumerActiveCycle} Cap Reached (₹${fmt(totalCycleCap)} Total Limit)!`
+                  : `♾️ ${consumerActiveCycle} Earning Limit: ₹${fmt(totalCycleCap)} (Layer ₹${fmt(maxLayerCap)} + Royalty ₹${fmt(maxRoyaltyCap)})`}
+              </Typography>
+              <Chip
+                label={(totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap) ? "Earning Stopped" : "Active"}
+                size="small"
+                sx={{
+                  bgcolor: (totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap) ? "#DC2626" : "#16A34A",
+                  color: "#FFF",
+                  fontWeight: 900,
+                  fontSize: 10,
+                  height: 20,
+                }}
+              />
+            </Stack>
+            <Typography sx={{ fontSize: 11.5, color: (totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap) ? "#78350F" : "#166534", mt: 0.5 }}>
+              {(totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap)
+                ? `You have reached the cycle cap! Additional earnings are held in Missing Blocks Income. You are eligible to activate Cycle 2 by purchasing all ₹50,000 Academy Courses.`
+                : `Total Cycle Earned: ₹${fmt(totalEarnings + earnedRoyalty)} / ₹${fmt(totalCycleCap)} (${(((totalEarnings + earnedRoyalty) / totalCycleCap) * 100).toFixed(1)}%). Once ₹${fmt(totalCycleCap)} is reached, Cycle 2 activates.`}
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            onClick={() => navigate("/user/team-dashboard?action=cycle-bulk-buy")}
+            sx={{
+              bgcolor: (totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap) ? "#D97706" : "#2563EB",
+              color: "#FFF",
+              fontWeight: 900,
+              fontSize: 11.5,
+              textTransform: "none",
+              px: 2.2,
+              py: 0.8,
+              borderRadius: "10px",
+              whiteSpace: "nowrap",
+              "&:hover": { bgcolor: (totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap) ? "#B45309" : "#1D4ED8" },
+            }}
+          >
+            {(totalEarnings >= maxLayerCap || (totalEarnings + earnedRoyalty) >= totalCycleCap)
+              ? "🚀 Activate Cycle 2 (Bulk ₹50k Purchase)"
+              : "📚 Purchase ₹50k All Courses"}
+          </Button>
+        </Stack>
+      </Paper>
 
       {/* ── Royalty Income, Layer Blocks & Missing Income Grid ── */}
       <Grid container spacing={2} sx={{ mb: 2 }}>

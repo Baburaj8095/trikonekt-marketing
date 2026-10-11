@@ -191,10 +191,12 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
   const selectUserForEdit = (user) => {
     setSelectedUser(user);
     setActiveStep(4);
+    const defaultBase = targetAudience === "consumer" ? 50000 : 200000;
+    const defaultProfit = targetAudience === "consumer" ? 200 : 75;
     setUserCycleConfig({
       cycle: user.activeCycle || "Cycle 1",
-      baseAmount: user.baseAmount != null ? Number(user.baseAmount) : 200000,
-      profitPercent: user.profitPercent != null ? Number(user.profitPercent) : 75,
+      baseAmount: user.baseAmount != null ? Number(user.baseAmount) : defaultBase,
+      profitPercent: user.profitPercent != null ? Number(user.profitPercent) : defaultProfit,
       gstPercent: 18,
       adminChargePercent: 7,
       status: user.cycleStatus || "active",
@@ -904,6 +906,33 @@ export default function AdminValidatorCommission({ audience = "franchise" }) {
                 </Grid>
               </Grid>
             </Paper>
+
+            {/* Consumer Indicator Banner */}
+            {targetAudience === "consumer" && (
+              <Box
+                sx={{
+                  mb: 2,
+                  p: 1.5,
+                  borderRadius: 2,
+                  bgcolor: "#EFF6FF",
+                  border: "1px solid #BFDBFE",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 1.25,
+                }}
+              >
+                <Typography sx={{ fontSize: 18, lineHeight: 1 }}>🎓</Typography>
+                <Box>
+                  <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: "#1E40AF" }}>
+                    Consumer Academic Cycle Configuration
+                  </Typography>
+                  <Typography sx={{ fontSize: 11.5, color: "#3B82F6", mt: 0.25 }}>
+                    Standard Package: <b>₹50,000</b> (All 3 Tracks) • Layer Cap: <b>₹1,00,000</b> • Royalty Cap: <b>₹50,000</b> • Total Cap: <b>₹1,50,000</b> (+200% Yield).
+                    Earnings exceeding the total cap are automatically preserved into <i>Missing Blocks Income</i> until Cycle 2 renewal.
+                  </Typography>
+                </Box>
+              </Box>
+            )}
 
             {/* ── COMMISSION SETTING (MAIN VALIDATOR) ── */}
             <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A", mb: 1.5, display: "flex", alignItems: "center", gap: 1 }}>

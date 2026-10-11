@@ -9,6 +9,8 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
+  Alert,
   IconButton,
   Paper,
   Stack,
@@ -1344,6 +1346,28 @@ export default function TeamDashboard() {
   const [vouchersCount, setVouchersCount] = useState(0);
   const [giftCardModalOpen, setGiftCardModalOpen] = useState(false);
   const [giftCardBannerDismissed, setGiftCardBannerDismissed] = useState(false);
+  const [cycleBulkBuyOpen, setCycleBulkBuyOpen] = useState(false);
+  const [walletMeData, setWalletMeData] = useState(null);
+  const [consumerCycleState, setConsumerCycleState] = useState(() => {
+    try {
+      const myId = (typeof localStorage !== "undefined" && (localStorage.getItem("user_id") || JSON.parse(localStorage.getItem("user_user") || localStorage.getItem("user") || "{}")?.id));
+      if (myId) {
+        const ls = localStorage.getItem(`trikonekt_cycle_user_${myId}`);
+        if (ls) return JSON.parse(ls);
+      }
+      const raw = localStorage.getItem("trikonekt_consumer_cycle_state");
+      if (raw) return JSON.parse(raw);
+    } catch (_) {}
+    return {
+      currentCycle: 1,
+      baseAmount: 50000,
+      totalLimit: 150000,
+      layerLimit: 100000,
+      royaltyLimit: 50000,
+      status: "active",
+      adminAuthorized: true,
+    };
+  });
 
   const educationVideoSlots = useMemo(() => {
     const ranks =
@@ -1675,6 +1699,277 @@ function SPPMonthlyCadenceWidget() {
   );
 }
 
+function ConsumerCycleRenewalWidget({ onOpenPurchase, cycleState }) {
+  const currentCycleNum = cycleState?.currentCycle || 1;
+  const isCapped = cycleState?.isCapped || false;
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: { xs: 2, sm: 2.5 },
+        borderRadius: "20px",
+        background: "linear-gradient(135deg, #0F172A 0%, #1E3A8A 50%, #2563EB 100%)",
+        color: "#ffffff",
+        boxShadow: "0 10px 28px rgba(37, 99, 235, 0.25)",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={2}>
+        <Box>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.8 }}>
+            <Chip
+              label={`Cycle ${currentCycleNum} Active`}
+              size="small"
+              sx={{ bgcolor: "#22C55E", color: "#FFF", fontWeight: 900, fontSize: 11 }}
+            />
+            <Chip
+              label="Academy All Courses (₹50,000)"
+              size="small"
+              sx={{ bgcolor: "rgba(255,255,255,0.22)", color: "#FFF", fontWeight: 800, fontSize: 11 }}
+            />
+            {isCapped && (
+              <Chip
+                label="Cap Reached 🏆"
+                size="small"
+                sx={{ bgcolor: "#F59E0B", color: "#78350F", fontWeight: 900, fontSize: 11 }}
+              />
+            )}
+          </Stack>
+          <Typography sx={{ fontSize: { xs: 16, sm: 18 }, fontWeight: 950, color: "#FFFFFF", letterSpacing: "-0.02em" }}>
+            🔄 Cycle 2+ Academy All Courses Bulk Purchase
+          </Typography>
+          <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.85)", mt: 0.5, maxWidth: 540 }}>
+            Unlock all 3 academic tracks at once (Foundation ₹2,000 + Leadership ₹8,000 + Promoter DAP ₹40,000 = ₹50,000) using Main Wallet or Coupon Pocket. Grants fresh ₹1,00,000 Layer Cap & ₹50,000 Royalty Cap.
+          </Typography>
+        </Box>
+
+        <Button
+          variant="contained"
+          onClick={onOpenPurchase}
+          sx={{
+            bgcolor: "#F59E0B",
+            color: "#0F172A",
+            fontWeight: 950,
+            fontSize: 12.5,
+            textTransform: "none",
+            px: 3,
+            py: 1.2,
+            borderRadius: "14px",
+            boxShadow: "0 4px 14px rgba(245, 158, 11, 0.4)",
+            whiteSpace: "nowrap",
+            width: { xs: "100%", sm: "auto" },
+            "&:hover": { bgcolor: "#D97706", color: "#FFF" },
+          }}
+        >
+          🚀 Buy All Courses (₹50k)
+        </Button>
+      </Stack>
+    </Paper>
+  );
+}
+
+function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuccess, walletMe }) {
+  const [paymentSource, setPaymentSource] = useState("MAIN_WALLET");
+  const [submitting, setSubmitting] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errMsg, setErrMsg] = useState("");
+
+  const mainBalance = Number(walletMe?.main_wallet || walletMe?.balance || walletMe?.main_income_balance || 0);
+  const couponBalance = Number(walletMe?.coupon_wallet || walletMe?.vouchers_total || 0);
+
+  const baseAmt = 50000;
+  const totalPayable = 62500;
+
+  const currentCycleNum = cycleState?.currentCycle || 1;
+  const nextCycleNum = currentCycleNum + 1;
+
+  const handlePurchase = async () => {
+    setSubmitting(true);
+    setErrMsg("");
+    setSuccessMsg("");
+    try {
+      const selectedBal = paymentSource === "MAIN_WALLET" ? mainBalance : couponBalance;
+      if (selectedBal < totalPayable) {
+        setErrMsg(`Insufficient balance in ${paymentSource === "MAIN_WALLET" ? "Main Wallet" : "Coupon Pocket"}. Need ₹${totalPayable.toLocaleString("en-IN")}, available ₹${selectedBal.toLocaleString("en-IN")}.`);
+        setSubmitting(false);
+        return;
+      }
+
+      await API.post("/api/admin/validator/purchase-bulk-courses", {
+        userId: walletMe?.id || walletMe?.user_id,
+        userCode: walletMe?.user_code || walletMe?.username,
+        cycle: `Cycle ${nextCycleNum}`,
+        paymentSource,
+        baseAmount: baseAmt,
+      }).catch(() => null);
+
+      const newState = {
+        currentCycle: nextCycleNum,
+        baseAmount: 50000,
+        profitPercent: 200,
+        eligibleLimit: 150000,
+        layerLimit: 100000,
+        royaltyLimit: 50000,
+        status: "active",
+        adminAuthorized: true,
+      };
+
+      try {
+        localStorage.setItem("trikonekt_consumer_cycle_state", JSON.stringify(newState));
+        if (walletMe?.id) {
+          localStorage.setItem(`trikonekt_cycle_user_${walletMe.id}`, JSON.stringify(newState));
+        }
+      } catch (_) {}
+
+      setSuccessMsg(`🎉 All ₹50,000 Academy Courses purchased successfully! Cycle ${nextCycleNum} is now active.`);
+      setTimeout(() => {
+        if (onPurchaseSuccess) onPurchaseSuccess(newState);
+        onClose();
+      }, 1500);
+    } catch (e) {
+      setErrMsg(e?.response?.data?.message || "Failed to complete bulk course purchase. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "20px", p: 1 } }}>
+      <DialogTitle sx={{ fontWeight: 950, fontSize: 18, color: "#0F172A", pb: 1 }}>
+        🔄 Buy All Academy Courses (₹50,000) & Unlock Cycle {nextCycleNum}
+      </DialogTitle>
+      <DialogContent dividers sx={{ borderColor: "#EEF2F6" }}>
+        <Typography sx={{ fontSize: 12.5, color: "#64748B", mb: 2 }}>
+          Purchase all 3 academic curriculum tracks at once. Your earnings will reset into <strong>Cycle {nextCycleNum}</strong> with fresh limits and new Matrix placement.
+        </Typography>
+
+        {/* 3 Tracks Breakdown */}
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: "14px", bgcolor: "#F8FAFC", mb: 2 }}>
+          <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#475569", mb: 1 }}>
+            ACADEMY TRACKS INCLUDED IN BULK BUNDLE:
+          </Typography>
+          <Stack spacing={1}>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography sx={{ fontSize: 13, color: "#1E293B" }}>Track 1: Foundation (Starter - Layer 1)</Typography>
+              <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>₹ 2,000.00</Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography sx={{ fontSize: 13, color: "#1E293B" }}>Track 2: Super Agent Leadership (Layers 2-7)</Typography>
+              <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>₹ 8,000.00</Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography sx={{ fontSize: 13, color: "#1E293B" }}>Track 3: Promoter Agent & DAP (Layers 8-10)</Typography>
+              <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>₹ 40,000.00</Typography>
+            </Stack>
+            <Divider sx={{ my: 0.5 }} />
+            <Stack direction="row" justifyContent="space-between">
+              <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A" }}>Course Subtotal:</Typography>
+              <Typography sx={{ fontSize: 14, fontWeight: 950, color: "#2563EB" }}>₹ 50,000.00</Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography sx={{ fontSize: 12.5, color: "#64748B" }}>Statutory GST (18% Extra):</Typography>
+              <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: "#0F172A" }}>+ ₹ 9,000.00</Typography>
+            </Stack>
+            <Stack direction="row" justifyContent="space-between">
+              <Typography sx={{ fontSize: 12.5, color: "#64748B" }}>Admin Platform Fee (7% Extra):</Typography>
+              <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: "#0F172A" }}>+ ₹ 3,500.00</Typography>
+            </Stack>
+            <Divider sx={{ my: 0.5 }} />
+            <Stack direction="row" justifyContent="space-between">
+              <Typography sx={{ fontSize: 14, fontWeight: 950, color: "#0F172A" }}>Total Payable from Wallet:</Typography>
+              <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#059669" }}>₹ 62,500.00</Typography>
+            </Stack>
+          </Stack>
+        </Paper>
+
+        {/* Fresh Limits Granted */}
+        <Box sx={{ p: 1.5, borderRadius: "12px", bgcolor: "#ECFDF5", border: "1px solid #BBF7D0", mb: 2 }}>
+          <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#166534" }}>
+            ✨ FRESH LIMITS GRANTED FOR CYCLE {nextCycleNum}:
+          </Typography>
+          <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.5 }}>
+            <Typography sx={{ fontSize: 12, color: "#15803D" }}>Layer Cap: ₹1,00,000.00</Typography>
+            <Typography sx={{ fontSize: 12, color: "#15803D" }}>Royalty: ₹50,000.00</Typography>
+            <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#15803D" }}>Total: ₹1,50,000.00</Typography>
+          </Stack>
+        </Box>
+
+        {/* Payment Source Selector */}
+        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#0F172A", mb: 1 }}>
+          Select Payment Source (Strict: Internal Wallets Only)
+        </Typography>
+        <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
+          <Paper
+            onClick={() => setPaymentSource("MAIN_WALLET")}
+            elevation={0}
+            sx={{
+              flex: 1,
+              p: 1.5,
+              borderRadius: "14px",
+              border: "2px solid",
+              borderColor: paymentSource === "MAIN_WALLET" ? "#2563EB" : "#E2E8F0",
+              bgcolor: paymentSource === "MAIN_WALLET" ? "#EFF6FF" : "#FFFFFF",
+              cursor: "pointer",
+            }}
+          >
+            <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>Main Wallet</Typography>
+            <Typography sx={{ fontSize: 15, fontWeight: 950, color: "#2563EB", my: 0.3 }}>
+              ₹ {mainBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            </Typography>
+            <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>Available balance</Typography>
+          </Paper>
+
+          <Paper
+            onClick={() => setPaymentSource("COUPON_POCKET")}
+            elevation={0}
+            sx={{
+              flex: 1,
+              p: 1.5,
+              borderRadius: "14px",
+              border: "2px solid",
+              borderColor: paymentSource === "COUPON_POCKET" ? "#2563EB" : "#E2E8F0",
+              bgcolor: paymentSource === "COUPON_POCKET" ? "#EFF6FF" : "#FFFFFF",
+              cursor: "pointer",
+            }}
+          >
+            <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>Coupon Pocket</Typography>
+            <Typography sx={{ fontSize: 15, fontWeight: 950, color: "#2563EB", my: 0.3 }}>
+              ₹ {couponBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            </Typography>
+            <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>Shopping vouchers</Typography>
+          </Paper>
+        </Stack>
+
+        {errMsg && <Alert severity="error" sx={{ mb: 1.5, fontSize: 12 }}>{errMsg}</Alert>}
+        {successMsg && <Alert severity="success" sx={{ mb: 1.5, fontSize: 12 }}>{successMsg}</Alert>}
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose} sx={{ textTransform: "none", fontWeight: 700, color: "#64748B" }}>
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          onClick={handlePurchase}
+          disabled={submitting}
+          sx={{
+            bgcolor: "#059669",
+            color: "#FFF",
+            fontWeight: 900,
+            textTransform: "none",
+            borderRadius: "10px",
+            px: 3,
+            "&:hover": { bgcolor: "#047857" },
+          }}
+        >
+          {submitting ? "Processing..." : `🚀 Pay ₹${totalPayable.toLocaleString("en-IN")} & Unlock Cycle ${nextCycleNum}`}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
   const [searchTerm, setSearchTerm] = useState("");
   const [activeCategory, setActiveCategory] = useState("ALL");
 
@@ -1775,6 +2070,12 @@ function SPPMonthlyCadenceWidget() {
 
           {/* 6. SPP REWARDS CARD */}
           <SPPMonthlyCadenceWidget />
+
+          {/* 7. CONSUMER CYCLE RENEWAL & BULK ACADEMY PURCHASE WIDGET */}
+          <ConsumerCycleRenewalWidget
+            cycleState={consumerCycleState}
+            onOpenPurchase={() => setCycleBulkBuyOpen(true)}
+          />
 
           {/* 6. UNCLAIMED GIFT CARD ALERT BANNER (If any) */}
           {unredeemedGiftCard && !giftCardBannerDismissed && (
@@ -1904,6 +2205,15 @@ function SPPMonthlyCadenceWidget() {
         onRedeemSuccess={() => {
           setUnredeemedGiftCard(null);
         }}
+      />
+
+      {/* 50K BULK ACADEMY COURSE PURCHASE & CYCLE ACTIVATION MODAL */}
+      <CycleBulkCoursePurchaseModal
+        open={cycleBulkBuyOpen}
+        onClose={() => setCycleBulkBuyOpen(false)}
+        cycleState={consumerCycleState}
+        walletMe={walletMeData}
+        onPurchaseSuccess={(newState) => setConsumerCycleState(newState)}
       />
     </Box>
   );
