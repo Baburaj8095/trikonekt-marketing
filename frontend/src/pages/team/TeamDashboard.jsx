@@ -1534,6 +1534,7 @@ export default function TeamDashboard() {
     if (action === "id-card") setIdCardOpen(true);
     if (action === "pdf") openLatestDocument("PDF");
     if (action === "certificate") openLatestDocument("CERTIFICATE");
+    if (action === "cycle-bulk-buy" || action === "cycle-purchase") setCycleBulkBuyOpen(true);
   }, [location.search, openLatestDocument]);
 
 function SPPMonthlyCadenceWidget() {
@@ -2215,7 +2216,10 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
       {/* 50K BULK ACADEMY COURSE PURCHASE & CYCLE ACTIVATION MODAL */}
       <CycleBulkCoursePurchaseModal
         open={cycleBulkBuyOpen}
-        onClose={() => setCycleBulkBuyOpen(false)}
+        onClose={() => {
+          setCycleBulkBuyOpen(false);
+          navigate("/user/team-dashboard", { replace: true });
+        }}
         cycleState={consumerCycleState}
         walletMe={walletMeData}
         onPurchaseSuccess={(newState) => setConsumerCycleState(newState)}

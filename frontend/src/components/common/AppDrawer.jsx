@@ -216,7 +216,9 @@ export default function AppDrawer({
                     target={isExt ? "_blank" : undefined}
                     rel={isExt ? "noopener noreferrer" : undefined}
                     to={isExt ? undefined : item.to}
-                    onClick={onClose}
+                    onClick={() => {
+                      if (typeof onClose === "function") onClose();
+                    }}
                     sx={{
                       display: "flex",
                       alignItems: "center",
