@@ -28,6 +28,7 @@ import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import ShieldOutlinedIcon from "@mui/icons-material/ShieldOutlined";
 import ConfirmationNumberOutlinedIcon from "@mui/icons-material/ConfirmationNumberOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
+import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import AccountTreeRoundedIcon from "@mui/icons-material/AccountTreeRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { C, R, S } from "../../theme/tokens";
@@ -62,6 +63,7 @@ export default function AppDrawer({
       title: "PACKAGES",
       items: [
         { label: "E-edu Agent Academy", to: "/user/rank-upgrade", icon: SchoolOutlinedIcon },
+        { label: "Academic Cycles & Caps", to: "/user/team-dashboard?action=cycle-bulk-buy", icon: AutorenewRoundedIcon },
         { label: "E-edu Purchase History", to: "/user/prime-invoices", icon: ReceiptLongOutlinedIcon },
         { label: "Smart Shopping Voucher", to: "/user/spp-gift-cards", icon: CardGiftcardOutlinedIcon },
         { label: "Tri Holiday Packages", to: "/user/tri/tri-holidays", icon: FlightTakeoffOutlinedIcon },
