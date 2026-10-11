@@ -17,3 +17,8 @@
   - **Commission Payout Flow**: All commissions are released **100% instantly** (split 75% to Main Wallet and 25% to Self Account Pocket for the ₹250 Self-Rebirth loop). There is **no hold** period anywhere in the system.
   - **Royalty Engine**: ₹50.00 from every ₹250 Rebirth ID (₹20 Tier 1 + ₹30 Tier 2) + platform daily turnover pool is distributed **daily at 11:59 PM** to qualified ₹50k Promoters.
   - **Payment & Onboarding Flow**: Digital education packages and prime subscriptions are purchased through `trieducation.in` (and supported wallet pockets).
+  - **Strict Tree Placement Invariants (Permanently Locked)**:
+    - **3-Matrix (`THREE_150`) is 100% Pure Global Auto-Pool**: Must ALWAYS use `start_entry_id = None`. NEVER use sponsor anchoring and NEVER use self-clustering (`own_base`) in 3-Matrix. Every single entry (Prime 750, SPP 1000, Rebirth 250) fills the global company pool level-by-level (BFS) from Sentinel root (`admin`).
+    - **5-Matrix (`FIVE_150`) is Sponsor-Anchored + Self-Clustered**: 1st entry anchors to sponsor's subtree; 2nd+ entries (SPP, Rebirth) cluster under the user's own base entry (`own_base`).
+    - **Zero Self-Commission on Matrix Levels**: Matrix level commissions are strictly paid to upline ancestors (`recipient != consumer`). A user purchasing a package receives only their designated Personal Cashback / Self Bonus, NEVER matrix level commissions on their own purchase.
+    - **SPP 2nd Box Gating**: Matrix accounts are opened ONLY on the 1st SPP purchase (`is_first_month=True`). 2nd box onwards creates 0 matrix accounts and 0 matrix commissions; it triggers only the recurring direct sponsor bonus.
