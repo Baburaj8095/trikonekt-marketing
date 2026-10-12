@@ -1022,15 +1022,20 @@ class AutoPoolAccount(models.Model):
         except Exception:
             pass
 
-        # THREE_150 is a pure global auto-pool (no sponsor or self-clustering anchor).
-        # Places in the next globally available slot from sentinel root.
+        # 1st entry: anchors to sponsor's subtree (when available) else global sentinel root.
+        # 2nd+ entries (SPP, Rebirth): cluster under user's own base entry so SPP is downline from root user.
+        own_base = cls._base_self_account(user, "THREE_150")
+        if own_base:
+            start_id = int(own_base.id)
+        else:
+            start_id = cls._sponsor_start_entry_id_for(user, "THREE_150")
         res = GenericPlacement.place_account(
             owner=user,
             pool_type="THREE_150",
             amount=amt,
             source_type=source_type or "SYSTEM",
             source_id=source_id or "",
-            start_entry_id=None,
+            start_entry_id=start_id,
         )
         return res
 
@@ -1224,15 +1229,14 @@ class AutoPoolAccount(models.Model):
         from decimal import Decimal as D
         from business.services.placement import GenericPlacement
         amt = D(amount or 0)
-        # THREE_150 is a pure global auto-pool: ignore sponsor and own_base, place globally from sentinel root
-        if pool_type == "THREE_150":
-            start_id = None
+        # THREE_150 / 3× pools placement:
+        # - 1st entry: anchors to sponsor's primary entry in that pool (when available) else global sentinel root
+        # - 2nd+ entries (SPP, Rebirth): cluster under user's own base entry (start_id=own_base.id) so SPP is downline from root user.
+        own_base = cls._base_self_account(user, pool_type)
+        if own_base:
+            start_id = int(own_base.id)
         else:
-            own_base = cls._base_self_account(user, pool_type)
-            if own_base:
-                start_id = int(own_base.id)
-            else:
-                start_id = cls._sponsor_start_entry_id_for(user, pool_type)
+            start_id = cls._sponsor_start_entry_id_for(user, pool_type)
         return GenericPlacement.place_account(
             owner=user,
             pool_type=pool_type,

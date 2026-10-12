@@ -14,17 +14,17 @@ def run_tests():
     from accounts.models import CustomUser
     from business.models import AutoPoolAccount, CommissionConfig
     from business.services.placement import GenericPlacement
-
-    print("[TEST 1] Verifying 3-Matrix (THREE_150) Placement Engine is 100% Pure Global...")
     import inspect
-    src = inspect.getsource(AutoPoolAccount.place_in_three_pool)
-    assert 'if pool_type == "THREE_150":' in src or "start_id = None" in src, "Invariant broken: place_in_three_pool must set start_id=None for THREE_150!"
-    print("  -> PASSED: place_in_three_pool sets start_id=None for THREE_150.")
 
-    print("[TEST 2] Verifying create_three_150_for_user uses start_entry_id=None...")
+    print("[TEST 1] Verifying 3-Matrix (THREE_150) Placement Engine clusters SPP under user base entry...")
+    src = inspect.getsource(AutoPoolAccount.place_in_three_pool)
+    assert "own_base" in src and "start_id = int(own_base.id)" in src, "Invariant broken: place_in_three_pool must cluster 2nd+ entries under own_base so SPP is downline from root user!"
+    print("  -> PASSED: place_in_three_pool clusters SPP under own_base so SPP is downline from root user.")
+
+    print("[TEST 2] Verifying create_three_150_for_user clusters 2nd+ entries under own_base...")
     src2 = inspect.getsource(AutoPoolAccount.create_three_150_for_user)
-    assert "start_entry_id=None" in src2, "Invariant broken: create_three_150_for_user must use start_entry_id=None!"
-    print("  -> PASSED: create_three_150_for_user sets start_entry_id=None.")
+    assert "own_base" in src2 and "start_id = int(own_base.id)" in src2, "Invariant broken: create_three_150_for_user must cluster 2nd+ entries under own_base!"
+    print("  -> PASSED: create_three_150_for_user clusters 2nd+ entries under own_base.")
 
     print("[TEST 3] Verifying 5-Matrix (FIVE_150) Placement Engine uses own_base clustering...")
     src3 = inspect.getsource(AutoPoolAccount.place_in_five_pool)
@@ -35,7 +35,12 @@ def run_tests():
     from business.services import monthly
     monthly_src = inspect.getsource(monthly.distribute_monthly_759_payouts)
     assert 'getattr(recipient, "id", None) == getattr(consumer, "id", None)' in monthly_src, "Invariant broken: monthly commissions must skip self-payout on matrix levels!"
-    print("  -> PASSED: distribute_monthly_759_commissions skips recipient == consumer.")
+    print("  -> PASSED: distribute_monthly_759_payouts skips recipient == consumer.")
+
+    print("[TEST 5] Verifying 3-Matrix (THREE_150) anchors 1st entry to sponsor subtree...")
+    assert "start_id = cls._sponsor_start_entry_id_for(user, \"THREE_150\")" in src2, "Invariant broken: create_three_150_for_user must anchor 1st entry to sponsor!"
+    assert "start_id = cls._sponsor_start_entry_id_for(user, pool_type)" in src, "Invariant broken: place_in_three_pool must anchor 1st entry to sponsor!"
+    print("  -> PASSED: 3-matrix anchors 1st entry to sponsor subtree.")
 
     print("\n=======================================================")
     print("ALL INVARIANTS VERIFIED SUCCESSFULLY! SYSTEM IS 100% HEALTHY.")
