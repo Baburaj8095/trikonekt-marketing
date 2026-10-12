@@ -303,6 +303,29 @@ class GenericPlacement:
             width = w if width is None else width
             max_depth = d if max_depth is None else max_depth
 
+        # If no root exists yet in this pool, the first purchase creates the apex root account at level 0
+        existing_root = AutoPoolAccount.objects.filter(pool_type=pool_type, parent_account__isnull=True).order_by("id").first()
+        if not existing_root:
+            cur_max = (
+                AutoPoolAccount.objects.filter(owner=owner, pool_type=pool_type)
+                .aggregate(m=Max("user_entry_index")) or {}
+            ).get("m") or 0
+            uname = AutoPoolAccount._next_username_key(owner, pool_type)
+            acc = AutoPoolAccount.objects.create(
+                owner=owner,
+                username_key=uname,
+                entry_amount=_q2(amount or 0),
+                pool_type=pool_type,
+                status="ACTIVE",
+                parent_account=None,
+                level=0,
+                position=None,
+                user_entry_index=int(cur_max) + 1,
+                source_type=str(source_type or "PRIME_750"),
+                source_id=str(source_id or ""),
+            )
+            return acc
+
         # Find the slot (locks parent row)
         try:
             parent, position, child_level = find_next_placement_slot(

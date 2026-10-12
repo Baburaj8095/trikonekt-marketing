@@ -23,34 +23,61 @@ from business.models import AutoPoolAccount
 
 u_root = CustomUser.objects.filter(username="9999999999").first()
 u_cand = CustomUser.objects.filter(username="8095918105").first()
+u_third = CustomUser.objects.exclude(username__in=["9999999999", "8095918105"]).first()
 
-print("=== TESTING 3-MATRIX AUTO POOL PLACEMENT (DRY-RUN / TRANSACTION ROLLBACK) ===")
+print("=== TESTING EMPTY TREE & PROGRESSIVE PLACEMENT (DRY-RUN / ROLLBACK) ===")
 
 with transaction.atomic():
-    # 1. Root buys Prime -> Account 3
-    a1 = AutoPoolAccount.place_in_three_pool(u_root, "THREE_150", Decimal("150.00"), source_type="PRIME_750", source_id="TEST_ROOT_PRIME")
-    print(f"1. 9999999999 Prime placed: ID={a1.id}, parent_id={a1.parent_account_id}, pos={a1.position}, level={a1.level}")
+    # Ensure empty tree in transaction
+    AutoPoolAccount.objects.all().delete()
 
-    # 2. Root buys SPP -> Account 4
-    a2 = AutoPoolAccount.place_in_three_pool(u_root, "THREE_150", Decimal("150.00"), source_type="SPP_1000", source_id="TEST_ROOT_SPP")
-    print(f"2. 9999999999 SPP placed: ID={a2.id}, parent_id={a2.parent_account_id}, pos={a2.position}, level={a2.level}")
+    print("\n--- STEP 1: Tree is EMPTY ---")
+    print("AutoPoolAccount count:", AutoPoolAccount.objects.count())
 
-    # 3. 8095918105 buys Prime -> Account 5
-    a3 = AutoPoolAccount.place_in_three_pool(u_cand, "THREE_150", Decimal("150.00"), source_type="PRIME_750", source_id="TEST_CAND_PRIME")
-    print(f"3. 8095918105 Prime placed: ID={a3.id}, parent_id={a3.parent_account_id}, pos={a3.position}, level={a3.level}")
+    print("\n--- STEP 2: First user 9999999999 buys 2k ---")
+    # 2.1 Prime 750 (5-Matrix & 3-Matrix)
+    p5_root = AutoPoolAccount.place_in_five_pool(u_root, "FIVE_150", Decimal("750.00"), source_type="PRIME_750", source_id="COUPON_1")
+    p3_root = AutoPoolAccount.place_in_three_pool(u_root, "THREE_150", Decimal("750.00"), source_type="PRIME_750", source_id="COUPON_1")
+    print(f"5-Matrix Root: ID={p5_root.id}, owner={p5_root.owner.username}, parent={p5_root.parent_account_id}, level={p5_root.level}, pos={p5_root.position}, entry_idx={p5_root.user_entry_index}")
+    print(f"3-Matrix Root: ID={p3_root.id}, owner={p3_root.owner.username}, parent={p3_root.parent_account_id}, level={p3_root.level}, pos={p3_root.position}, entry_idx={p3_root.user_entry_index}")
 
-    # Level 1 under Sentinel Root (ID 2) is now FULL with 3 children: [a1.id, a2.id, a3.id]
+    assert p5_root.parent_account is None and p5_root.level == 0 and p5_root.position is None, "5-Matrix root must be level 0 parent=None"
+    assert p3_root.parent_account is None and p3_root.level == 0 and p3_root.position is None, "3-Matrix root must be level 0 parent=None"
 
-    # 4. 8095918105 buys SPP (2nd entry of 8095918105)
-    a4 = AutoPoolAccount.place_in_three_pool(u_cand, "THREE_150", Decimal("150.00"), source_type="SPP_1000", source_id="TEST_CAND_SPP")
-    print(f"4. 8095918105 SPP placed: ID={a4.id}, parent_id={a4.parent_account_id} (owner={a4.parent_account.owner.username}), pos={a4.position}, level={a4.level}")
+    # 2.2 SPP 1000
+    spp5_root = AutoPoolAccount.place_in_five_pool(u_root, "FIVE_150", Decimal("1000.00"), source_type="SPP_1000", source_id="SPP_1")
+    spp3_root = AutoPoolAccount.place_in_three_pool(u_root, "THREE_150", Decimal("1000.00"), source_type="SPP_1000", source_id="SPP_1")
+    print(f"5-Matrix SPP (9999999999): ID={spp5_root.id}, parent={spp5_root.parent_account_id} (owner={spp5_root.parent_account.owner.username}), level={spp5_root.level}, pos={spp5_root.position}, entry_idx={spp5_root.user_entry_index}")
+    print(f"3-Matrix SPP (9999999999): ID={spp3_root.id}, parent={spp3_root.parent_account_id} (owner={spp3_root.parent_account.owner.username}), level={spp3_root.level}, pos={spp3_root.position}, entry_idx={spp3_root.user_entry_index}")
 
-    # Verification: Did a4 go under a1 (Slot 1 of Level 1) instead of under a3 (8095918105's own entry)?
-    if a4.parent_account_id == a1.id and a4.position == 1 and a4.level == 2:
-        print("SUCCESS! Entry 4 went strictly under first Level-1 node (left-to-right BFS auto pool rule), NOT under 8095918105!")
-    else:
-        print(f"FAILURE: Parent was {a4.parent_account_id}, expected {a1.id}!")
+    assert spp5_root.parent_account_id == p5_root.id and spp5_root.position == 1, "5-Matrix SPP must be sub ID under 9999999999 prime root"
+    assert spp3_root.parent_account_id == p3_root.id and spp3_root.position == 1, "3-Matrix SPP must fill slot 1 under 3-matrix root"
 
-    # Roll back transaction so database remains pristine
+    print("\n--- STEP 3: Second user 8095918105 buys 2k ---")
+    p5_u2 = AutoPoolAccount.place_in_five_pool(u_cand, "FIVE_150", Decimal("750.00"), source_type="PRIME_750", source_id="COUPON_2")
+    p3_u2 = AutoPoolAccount.place_in_three_pool(u_cand, "THREE_150", Decimal("750.00"), source_type="PRIME_750", source_id="COUPON_2")
+    print(f"5-Matrix Prime (8095918105): ID={p5_u2.id}, parent={p5_u2.parent_account_id} (owner={p5_u2.parent_account.owner.username}), level={p5_u2.level}, pos={p5_u2.position}")
+    print(f"3-Matrix Prime (8095918105): ID={p3_u2.id}, parent={p3_u2.parent_account_id} (owner={p3_u2.parent_account.owner.username}), level={p3_u2.level}, pos={p3_u2.position}")
+
+    assert p5_u2.parent_account_id == p5_root.id and p5_u2.position == 2, "5-Matrix Prime for user 2 must fill position 2 under 9999999999 root"
+    assert p3_u2.parent_account_id == p3_root.id and p3_u2.position == 2, "3-Matrix Prime for user 2 must fill position 2 under 9999999999 root"
+
+    spp5_u2 = AutoPoolAccount.place_in_five_pool(u_cand, "FIVE_150", Decimal("1000.00"), source_type="SPP_1000", source_id="SPP_2")
+    spp3_u2 = AutoPoolAccount.place_in_three_pool(u_cand, "THREE_150", Decimal("1000.00"), source_type="SPP_1000", source_id="SPP_2")
+    print(f"5-Matrix SPP (8095918105): ID={spp5_u2.id}, parent={spp5_u2.parent_account_id} (owner={spp5_u2.parent_account.owner.username}), level={spp5_u2.level}, pos={spp5_u2.position}")
+    print(f"3-Matrix SPP (8095918105): ID={spp3_u2.id}, parent={spp3_u2.parent_account_id} (owner={spp3_u2.parent_account.owner.username}), level={spp3_u2.level}, pos={spp3_u2.position}")
+
+    assert spp5_u2.parent_account_id == p5_u2.id and spp5_u2.position == 1, "5-Matrix SPP for user 2 MUST be sub ID under 8095918105's own prime entry!"
+    assert spp3_u2.parent_account_id == p3_root.id and spp3_u2.position == 3, "3-Matrix SPP for user 2 MUST fill position 3 under Root (NOT under parent)!"
+
+    print("\n--- STEP 4: Third user 9999999998 buys 2k ---")
+    p3_u3 = AutoPoolAccount.place_in_three_pool(u_third, "THREE_150", Decimal("750.00"), source_type="PRIME_750", source_id="COUPON_3")
+    spp3_u3 = AutoPoolAccount.place_in_three_pool(u_third, "THREE_150", Decimal("1000.00"), source_type="SPP_1000", source_id="SPP_3")
+    print(f"3-Matrix Prime (User 3): ID={p3_u3.id}, parent={p3_u3.parent_account_id} (owner={p3_u3.parent_account.owner.username}), level={p3_u3.level}, pos={p3_u3.position}")
+    print(f"3-Matrix SPP   (User 3): ID={spp3_u3.id}, parent={spp3_u3.parent_account_id} (owner={spp3_u3.parent_account.owner.username}), level={spp3_u3.level}, pos={spp3_u3.position}")
+
+    assert p3_u3.parent_account_id == spp3_root.id and p3_u3.position == 1, "Level 1 is full, User 3 Prime must go to Level 2 (Pos 1 under node 1)!"
+    assert spp3_u3.parent_account_id == spp3_root.id and spp3_u3.position == 2, "User 3 SPP must go to Level 2 (Pos 2 under node 1)!"
+
+    print("\n=== ALL ASSERTIONS PASSED PERFECTLY! ===")
     transaction.set_rollback(True)
-    print("Transaction rolled back successfully. Database remains pristine.")
