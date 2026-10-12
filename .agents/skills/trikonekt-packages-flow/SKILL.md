@@ -18,7 +18,10 @@ description: Canonical specifications for Trikonekt package purchasing on triedu
 When a user buys the **₹2,000 Starter Track**, `execute_starter_bundle` in `growth_bridge_exec.py` executes 3 dynamic sub-engines:
 
 1. **₹750 Prime Joining Package (`PRIME750`)**:
-   - Anchors the user in **5-Matrix (5-Directs tree)** and **3-Matrix (3-Autopool tree)**.
+   - Places the user in **5-Matrix (5-Directs tree)** and **3-Matrix (3-Autopool tree)**:
+     - **Initial Empty Tree**: Tree starts 100% empty. When `9999999999` buys, their ₹750 Prime creates the **Apex Root entry** (`level=0`, `parent_account=None`, `position=None`, `entry_idx=1`) for both matrices.
+     - **5-Matrix (`FIVE_150`)**: 1st entry anchors to sponsor's subtree (or Apex Root if sponsored by `9999999999`).
+     - **3-Matrix (`THREE_150`)**: Pure global BFS (`start_id=None`). Fills next available slot level-by-level, left-to-right from Apex Root `9999999999`.
    - **Payouts Derived Dynamically from Admin Config (`CommissionConfig`)**:
      - *Direct Sponsor Bonus*: Read from admin setting (e.g., currently configured as ₹0.00).
      - *Direct Self Bonus*: Read from admin setting (e.g., currently configured as ₹0.00).
@@ -28,7 +31,9 @@ When a user buys the **₹2,000 Starter Track**, `execute_starter_bundle` in `gr
      - *Retained Company Margin*: Dynamic residual balance.
 
 2. **₹1,000 Smart Product Package (`MONTHLY759` / SPP)**:
-   - Anchors the user in **SPP 5-Matrix & 3-Matrix** and queues the 1st physical product box.
+   - Places the user's 2nd entry (sub ID):
+     - **5-Matrix**: Clusters under user's own base entry (`own_base`) as sub ID at Position 1 of their own subtree.
+     - **3-Matrix**: Pure global BFS (`start_id=None`). Fills next available slot in global tree, **NEVER inside their parent**.
    - Automatically issues a **₹1,000 Shopping Rebate Voucher** (`ConsumerVoucher`).
    - **Payouts Derived Dynamically from Admin Config (`CommissionConfig`)**:
      - *Direct Sponsor Bonus*: Read from admin setting (e.g., currently configured as ₹600.00).
