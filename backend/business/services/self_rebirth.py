@@ -428,15 +428,15 @@ def distribute_self_rebirth_250(user: CustomUser, pack_index: Optional[int] = No
             from business.models import StateSSVPool
             pool, _ = StateSSVPool.objects.get_or_create(state=user_state)
             pool.accumulated_amount = (pool.accumulated_amount or Decimal("0.00")) + ssv_rate
-            pool.save(update_fields=["accumulated_amount", "last_updated_at"])
-
+            uw = Wallet.get_or_create_for_user(user)
             WalletTransaction.objects.create(
                 user=user,
                 type="SSV_STATE_CONTRIBUTION",
                 amount=ssv_rate,
+                balance_after=getattr(uw, "balance", Decimal("0.00")),
                 meta={
                     "state_id": user_state.id,
-                    "state_name": user_state.name,
+                    "state_name": getattr(user_state, "name", ""),
                     "pack_index": pack_index,
                     "auto_rule": "SELF_REBIRTH_250",
                     "rate": float(ssv_rate),
@@ -445,7 +445,7 @@ def distribute_self_rebirth_250(user: CustomUser, pack_index: Optional[int] = No
                 source_id=src_id,
             )
         except Exception as e:
-            logger.warning(f"State SSV pool contribution failed for state {user_state}: {e}")
+            logger.warning(f"State SSV pool contribution failed for state {getattr(user_state, 'name', '')}: {e}")
 
     # 6. Audit Trail
     try:
