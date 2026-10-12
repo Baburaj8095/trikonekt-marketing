@@ -1784,9 +1784,19 @@ class AdminCompanyWalletDetailView(APIView):
 
     def get(self, request):
         from business.models import CommissionConfig
+        from django.utils import timezone
         user = CommissionConfig.get_solo().get_company_user() or CustomUser.objects.filter(category="company").first()
         if not user:
             return Response({"detail": "Company overhead user not found."}, status=404)
+
+        # 24-hour Washout: Delete overhead transactions older than 24 hours
+        try:
+            cutoff = timezone.now() - timezone.timedelta(hours=24)
+            WalletTransaction.objects.filter(user=user, created_at__lt=cutoff).delete()
+            FinancialTransaction.objects.filter(user=user, created_at__lt=cutoff).delete()
+        except Exception:
+            pass
+
         return AdminWalletDetailView().get(request, user_id=user.id)
 
 
@@ -1795,9 +1805,19 @@ class AdminCompanyWalletLedgerView(APIView):
 
     def get(self, request):
         from business.models import CommissionConfig
+        from django.utils import timezone
         user = CommissionConfig.get_solo().get_company_user() or CustomUser.objects.filter(category="company").first()
         if not user:
             return Response({"detail": "Company overhead user not found."}, status=404)
+
+        # 24-hour Washout: Delete overhead transactions older than 24 hours
+        try:
+            cutoff = timezone.now() - timezone.timedelta(hours=24)
+            WalletTransaction.objects.filter(user=user, created_at__lt=cutoff).delete()
+            FinancialTransaction.objects.filter(user=user, created_at__lt=cutoff).delete()
+        except Exception:
+            pass
+
         return AdminWalletLedgerView().get(request, user_id=user.id)
 
 

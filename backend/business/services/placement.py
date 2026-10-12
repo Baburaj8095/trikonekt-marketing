@@ -61,16 +61,12 @@ def _ensure_sentinel_root(pool_type: str) -> AutoPoolAccount:
     except Exception:
         owner = None
     if owner is None:
+        from accounts.models import CustomUser
+        owner = CustomUser.objects.filter(username="9999999999").first()
+    if owner is None:
         owner = cfg.get_company_user()
     if owner is None:
-        # Fallback: pick any superuser or staff as root owner (required due to NOT NULL FK)
-        from accounts.models import CustomUser
-        owner = CustomUser.objects.filter(is_superuser=True).first() or CustomUser.objects.filter(is_staff=True).first()
-        if owner is None:
-            # As a last resort pick any user; should never happen in real deployments
-            owner = CustomUser.objects.order_by("id").first()
-            if owner is None:
-                raise PlacementError("No eligible owner user found for sentinel root")
+        raise PlacementError("No eligible owner user (9999999999) found for sentinel root")
 
     # Try fetch fast path
     root = AutoPoolAccount.objects.filter(pool_type=pool_type, parent_account__isnull=True).order_by("id").first()
