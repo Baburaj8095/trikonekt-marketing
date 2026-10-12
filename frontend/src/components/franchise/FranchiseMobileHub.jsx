@@ -1511,13 +1511,14 @@ export default function FranchiseMobileHub({
   });
 
   const adminRebirthConfig = useMemo(() => {
-    let cfg = liveAdminMasterConfig?.rank_upgrade_config?.rebirth_allocation || {};
+    let cfg = liveAdminMasterConfig?.rank_upgrade_config?.franchise_rebirth_allocation || liveAdminMasterConfig?.rank_upgrade_config?.rebirth_allocation || {};
     if (!cfg || Object.keys(cfg).length === 0) {
       try {
         const raw = localStorage.getItem("tri_rank_upgrade_config");
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (parsed?.rebirth_allocation) cfg = parsed.rebirth_allocation;
+          if (parsed?.franchise_rebirth_allocation) cfg = parsed.franchise_rebirth_allocation;
+          else if (parsed?.rebirth_allocation) cfg = parsed.rebirth_allocation;
         }
       } catch {}
     }

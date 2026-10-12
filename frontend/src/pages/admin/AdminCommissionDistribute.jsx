@@ -239,6 +239,33 @@ export default function AdminCommissionDistribute() {
     } catch (_) {}
   }, [location.search, isFranchiseWorkspace]);
 
+  const defaultRebirthAllocation = {
+    total_amount: 250,
+    direct_sponsor: 40,
+    matrix_5: 80,
+    matrix_3: 20,
+    pincode_royalty: 15,
+    district_royalty: 10,
+    state_royalty: 15,
+    district_royalty_l1_l7: 15,
+    district_royalty_l1_l10_30d: 10,
+    districtwise_royalty_l8_l10: 15,
+    statewise_royalty_l8_l10: 10,
+    district_captain_royalty: 5,
+    state_captain_royalty: 5,
+    statewise_ssv_voucher: 1,
+    statewise_zonal_head: 1,
+    statewise_rewards: 1,
+    company_admin: 7,
+    district_pool: 50,
+    company_gross: 7,
+    matrix_5_levels: Array.from({ length: 10 }, (_, i) => ({ level: i + 1, amount: 8 })),
+    matrix_3_levels: Array.from({ length: 15 }, (_, i) => ({ level: i + 1, amount: i === 14 ? 1.38 : 1.33 })),
+    pincode_roles_pct: { pincode: 45, pincode_coord: 15, district: 15, district_coord: 10, state: 10, state_coord: 5 },
+    district_roles_pct: { pincode: 15, pincode_coord: 10, district: 35, district_coord: 20, state: 12, state_coord: 8 },
+    state_roles_pct: { pincode: 10, pincode_coord: 5, district: 15, district_coord: 10, state: 40, state_coord: 20 },
+  };
+
   const [rankConfig, setRankConfig] = useState(() => {
     try {
       const raw = localStorage.getItem("tri_rank_upgrade_config");
@@ -250,37 +277,27 @@ export default function AdminCommissionDistribute() {
           parsed.levels[4].team_count = "3125";
           parsed.levels[5].team_count = "15625";
           parsed.levels[6].team_count = "78125";
-          localStorage.setItem("tri_rank_upgrade_config", JSON.stringify(parsed));
         }
+        if (!parsed.consumer_rebirth_allocation) {
+          parsed.consumer_rebirth_allocation = JSON.parse(JSON.stringify(parsed.rebirth_allocation || defaultRebirthAllocation));
+        }
+        if (!parsed.rebirth_allocation) {
+          parsed.rebirth_allocation = parsed.consumer_rebirth_allocation;
+        }
+        if (!parsed.franchise_rebirth_allocation) {
+          parsed.franchise_rebirth_allocation = JSON.parse(JSON.stringify(parsed.rebirth_allocation || defaultRebirthAllocation));
+        }
+        localStorage.setItem("tri_rank_upgrade_config", JSON.stringify(parsed));
         return parsed;
       }
     } catch {}
+    const baseRebirth = JSON.parse(JSON.stringify(defaultRebirthAllocation));
     return {
       upgrade_window_l1_l7: 7,
       upgrade_window_l8_l10: 15,
-      rebirth_allocation: {
-        total_amount: 250,
-        direct_sponsor: 40,
-        matrix_5: 80,
-        matrix_3: 20,
-        pincode_royalty: 15,
-        district_royalty: 10,
-        state_royalty: 15,
-        district_royalty_l1_l7: 15,
-        district_royalty_l1_l10_30d: 10,
-        districtwise_royalty_l8_l10: 15,
-        statewise_royalty_l8_l10: 10,
-        district_captain_royalty: 5,
-        state_captain_royalty: 5,
-        statewise_ssv_voucher: 1,
-        statewise_zonal_head: 1,
-        statewise_rewards: 1,
-        company_admin: 7,
-        district_pool: 50,
-        company_gross: 7,
-        matrix_5_levels: Array.from({ length: 10 }, (_, i) => ({ level: i + 1, amount: 8 })),
-        matrix_3_levels: Array.from({ length: 15 }, (_, i) => ({ level: i + 1, amount: i === 14 ? 1.38 : 1.33 })),
-      },
+      rebirth_allocation: baseRebirth,
+      consumer_rebirth_allocation: JSON.parse(JSON.stringify(baseRebirth)),
+      franchise_rebirth_allocation: JSON.parse(JSON.stringify(baseRebirth)),
       levels: [
         { level: 1, name: "Layer 1", upgrade_amount: 250, earning_limit: 1750, team_count: "5" },
         { level: 2, name: "Layer 2", upgrade_amount: 500, earning_limit: 2000, team_count: "25" },
@@ -303,14 +320,21 @@ export default function AdminCommissionDistribute() {
     setErr("");
     setOk("");
     try {
-      localStorage.setItem("tri_rank_upgrade_config", JSON.stringify(rankConfig));
+      const cfgToSave = {
+        ...rankConfig,
+        consumer_rebirth_allocation: rankConfig.consumer_rebirth_allocation || rankConfig.rebirth_allocation,
+        rebirth_allocation: rankConfig.consumer_rebirth_allocation || rankConfig.rebirth_allocation,
+        franchise_rebirth_allocation: rankConfig.franchise_rebirth_allocation || rankConfig.rebirth_allocation,
+      };
+      localStorage.setItem("tri_rank_upgrade_config", JSON.stringify(cfgToSave));
       localStorage.setItem("tri_custom_module_tax", JSON.stringify(customModuleTax));
-      await adminUpdateMasterCommission({ rank_upgrade_config: rankConfig, custom_module_tax: customModuleTax });
+      await adminUpdateMasterCommission({ rank_upgrade_config: cfgToSave, custom_module_tax: customModuleTax });
+      setRankConfig(cfgToSave);
       setRankDirty(false);
-      setOk("Rank Upgrade & Rebirth configuration saved successfully!");
+      setOk(isFranchiseWorkspace ? "Franchise Self-Rebirth configuration saved successfully!" : "Consumer Rank Upgrade & Rebirth configuration saved successfully!");
     } catch (e) {
       setRankDirty(false);
-      setOk("Rank Upgrade & Rebirth configuration saved successfully!");
+      setOk(isFranchiseWorkspace ? "Franchise Self-Rebirth configuration saved successfully!" : "Consumer Rank Upgrade & Rebirth configuration saved successfully!");
     } finally {
       setRankSaving(false);
     }
@@ -824,9 +848,19 @@ export default function AdminCommissionDistribute() {
         });
         setMForm(vals);
         if (data?.rank_upgrade_config) {
-          setRankConfig(data.rank_upgrade_config);
+          const cfg = { ...data.rank_upgrade_config };
+          if (!cfg.consumer_rebirth_allocation && cfg.rebirth_allocation) {
+            cfg.consumer_rebirth_allocation = JSON.parse(JSON.stringify(cfg.rebirth_allocation));
+          }
+          if (!cfg.franchise_rebirth_allocation) {
+            cfg.franchise_rebirth_allocation = JSON.parse(JSON.stringify(cfg.rebirth_allocation || defaultRebirthAllocation));
+          }
+          if (!cfg.rebirth_allocation) {
+            cfg.rebirth_allocation = cfg.consumer_rebirth_allocation;
+          }
+          setRankConfig(cfg);
           try {
-            localStorage.setItem("tri_rank_upgrade_config", JSON.stringify(data.rank_upgrade_config));
+            localStorage.setItem("tri_rank_upgrade_config", JSON.stringify(cfg));
           } catch {}
         }
         if (data?.spp_1000_config) {
@@ -4592,7 +4626,8 @@ right={
   }
 
   function renderTabRankUpgrade() {
-    const reb = rankConfig.rebirth_allocation || {};
+    const activeRebirthKey = isFranchiseWorkspace ? "franchise_rebirth_allocation" : "consumer_rebirth_allocation";
+    const reb = rankConfig[activeRebirthKey] || (isFranchiseWorkspace ? rankConfig.franchise_rebirth_allocation : rankConfig.rebirth_allocation) || {};
     const totalIn = Number(reb.total_amount ?? 250);
     const ds = Number(reb.direct_sponsor ?? 40);
     const m5 = Number(reb.matrix_5 ?? 80);
@@ -4618,46 +4653,63 @@ right={
     const dRoles = reb.district_roles_pct || { pincode: 15, pincode_coord: 10, district: 35, district_coord: 20, state: 12, state_coord: 8 };
     const sRoles = reb.state_roles_pct || { pincode: 10, pincode_coord: 5, district: 15, district_coord: 10, state: 40, state_coord: 20 };
 
-    const updateRolePct = (poolKey, roleKey, val) => {
-      const numVal = Number(val);
+    const updateActiveRebirth = (updater) => {
       setRankConfig((prev) => {
-        const currentReb = prev.rebirth_allocation || {};
-        const currentRoles = { ...(currentReb[poolKey] || {}) };
-        currentRoles[roleKey] = numVal;
-        const updated = {
+        const curTarget = { ...(prev[activeRebirthKey] || (isFranchiseWorkspace ? prev.franchise_rebirth_allocation : prev.rebirth_allocation) || {}) };
+        const nextTarget = typeof updater === "function" ? updater(curTarget) : { ...curTarget, ...updater };
+        const nextState = {
           ...prev,
-          rebirth_allocation: {
-            ...currentReb,
-            [poolKey]: currentRoles,
-          },
+          [activeRebirthKey]: nextTarget,
         };
-        // keep aliases in sync
-        if (poolKey === "pincode_roles_pct") {
-          updated.rebirth_allocation.franchise_roles_pct = currentRoles;
-        } else if (poolKey === "franchise_roles_pct") {
-          updated.rebirth_allocation.pincode_roles_pct = currentRoles;
+        if (!isFranchiseWorkspace) {
+          nextState.consumer_rebirth_allocation = nextTarget;
+          nextState.rebirth_allocation = nextTarget;
+        } else {
+          nextState.franchise_rebirth_allocation = nextTarget;
         }
-        return updated;
+        return nextState;
       });
       setRankDirty(true);
     };
-    const configuredTaxPctRebirth = customModuleTax.tax_rebirth !== undefined ? Number(customModuleTax.tax_rebirth) : 18;
+
+    const updateRolePct = (poolKey, roleKey, val) => {
+      const numVal = Number(val);
+      updateActiveRebirth((currentReb) => {
+        const currentRoles = { ...(currentReb[poolKey] || {}) };
+        currentRoles[roleKey] = numVal;
+        const updated = {
+          ...currentReb,
+          [poolKey]: currentRoles,
+        };
+        if (poolKey === "pincode_roles_pct") {
+          updated.franchise_roles_pct = currentRoles;
+        } else if (poolKey === "franchise_roles_pct") {
+          updated.pincode_roles_pct = currentRoles;
+        }
+        return updated;
+      });
+    };
+
+    const taxKey = isFranchiseWorkspace ? "tax_rebirth_franchise" : "tax_rebirth";
+    const configuredTaxPctRebirth = customModuleTax[taxKey] !== undefined
+      ? Number(customModuleTax[taxKey])
+      : (customModuleTax.tax_rebirth !== undefined ? Number(customModuleTax.tax_rebirth) : 18);
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <Section
-          title="Self Rebirth ID (₹250) Allocation & Company Side Capture"
-          subtitle="Configure how the ₹250 Rebirth ID entry amount is split across Direct Sponsor, Matrix Blocks, Geo Royalties, Rank Royalties, Captains, and Company Admin"
+          title={isFranchiseWorkspace ? "Franchise Self Rebirth ID (₹250) Allocation & Company Side Capture" : "Consumer Self Rebirth ID (₹250) Allocation & Company Side Capture"}
+          subtitle={isFranchiseWorkspace ? "Configure how the Franchise ₹250 Rebirth ID entry amount is split across Direct Sponsor, Matrix Blocks, Geo Royalties, Captains, and Company Admin" : "Configure how the Consumer ₹250 Rebirth ID entry amount is split across Direct Sponsor, Matrix Blocks, Geo Royalties, Rank Royalties, Captains, and Company Admin"}
           right={
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#f8fafc", padding: "6px 12px", borderRadius: 8, border: "1px solid #cbd5e1" }}>
-              <span style={{ fontSize: 12, fontWeight: 800, color: "#1e293b" }}>Rebirth Tax:</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: "#1e293b" }}>{isFranchiseWorkspace ? "Franchise Rebirth Tax:" : "Rebirth Tax:"}</span>
               <input
                 type="number"
                 step="0.1"
                 min="0"
                 max="100"
                 value={configuredTaxPctRebirth}
-                onChange={(e) => updateModuleTax("tax_rebirth", e.target.value)}
+                onChange={(e) => updateModuleTax(taxKey, e.target.value)}
                 style={{ width: 55, padding: "2px 4px", fontSize: 11, fontWeight: 800, borderRadius: 4, border: "1px solid #94a3b8", background: "#fff", color: "#0f172a" }}
               />
               <span style={{ fontSize: 12, fontWeight: 800, color: "#475569" }}>%</span>
@@ -4669,53 +4721,28 @@ right={
               label="Rebirth ID Amount (₹)"
               type="number"
               value={totalIn}
-              onChange={(val) => {
-                const tot = Number(val);
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), total_amount: tot },
-                }));
-                setRankDirty(true);
-              }}
+              onChange={(val) => updateActiveRebirth({ total_amount: Number(val) })}
               placeholder="250"
             />
             <Input
               label="Direct Sponsor Bonus (₹)"
               type="number"
               value={ds}
-              onChange={(val) => {
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), direct_sponsor: Number(val) },
-                }));
-                setRankDirty(true);
-              }}
+              onChange={(val) => updateActiveRebirth({ direct_sponsor: Number(val) })}
               placeholder="40"
             />
             <Input
               label="5-Block Pool Share (₹)"
               type="number"
               value={m5}
-              onChange={(val) => {
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), matrix_5: Number(val) },
-                }));
-                setRankDirty(true);
-              }}
+              onChange={(val) => updateActiveRebirth({ matrix_5: Number(val) })}
               placeholder="80"
             />
             <Input
               label="3-Block Pool Share (₹)"
               type="number"
               value={m3}
-              onChange={(val) => {
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), matrix_3: Number(val) },
-                }));
-                setRankDirty(true);
-              }}
+              onChange={(val) => updateActiveRebirth({ matrix_3: Number(val) })}
               placeholder="20"
             />
             <Input
@@ -4724,11 +4751,7 @@ right={
               value={pinRoy}
               onChange={(val) => {
                 const n = Number(val);
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), pincode_royalty: n, franchise_pool: n },
-                }));
-                setRankDirty(true);
+                updateActiveRebirth({ pincode_royalty: n, franchise_pool: n });
               }}
               placeholder="15"
             />
@@ -4738,11 +4761,7 @@ right={
               value={distRoy}
               onChange={(val) => {
                 const n = Number(val);
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), district_royalty: n, district_pool: n },
-                }));
-                setRankDirty(true);
+                updateActiveRebirth({ district_royalty: n, district_pool: n });
               }}
               placeholder="10"
             />
@@ -4752,11 +4771,7 @@ right={
               value={stateRoy}
               onChange={(val) => {
                 const n = Number(val);
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), state_royalty: n, state_pool: n },
-                }));
-                setRankDirty(true);
+                updateActiveRebirth({ state_royalty: n, state_pool: n });
               }}
               placeholder="15"
             />
@@ -4766,11 +4781,7 @@ right={
               value={distRoyL1L7}
               onChange={(val) => {
                 const n = Number(val);
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), district_royalty_l1_l7: n, district_royalty_t1: n },
-                }));
-                setRankDirty(true);
+                updateActiveRebirth({ district_royalty_l1_l7: n, district_royalty_t1: n });
               }}
               placeholder="15"
             />
@@ -4780,11 +4791,7 @@ right={
               value={distRoyL1L10}
               onChange={(val) => {
                 const n = Number(val);
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), district_royalty_l1_l10_30d: n },
-                }));
-                setRankDirty(true);
+                updateActiveRebirth({ district_royalty_l1_l10_30d: n });
               }}
               placeholder="10"
             />
@@ -4794,11 +4801,7 @@ right={
               value={distWiseL8L10}
               onChange={(val) => {
                 const n = Number(val);
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), districtwise_royalty_l8_l10: n, district_royalty_t2: n },
-                }));
-                setRankDirty(true);
+                updateActiveRebirth({ districtwise_royalty_l8_l10: n, district_royalty_t2: n });
               }}
               placeholder="15"
             />
@@ -4808,11 +4811,7 @@ right={
               value={stateWiseL8L10}
               onChange={(val) => {
                 const n = Number(val);
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), statewise_royalty_l8_l10: n },
-                }));
-                setRankDirty(true);
+                updateActiveRebirth({ statewise_royalty_l8_l10: n });
               }}
               placeholder="10"
             />
@@ -4822,11 +4821,7 @@ right={
               value={distCaptRoy}
               onChange={(val) => {
                 const n = Number(val);
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), district_captain_royalty: n },
-                }));
-                setRankDirty(true);
+                updateActiveRebirth({ district_captain_royalty: n });
               }}
               placeholder="5"
             />
@@ -4836,11 +4831,7 @@ right={
               value={stateCaptRoy}
               onChange={(val) => {
                 const n = Number(val);
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), state_captain_royalty: n },
-                }));
-                setRankDirty(true);
+                updateActiveRebirth({ state_captain_royalty: n });
               }}
               placeholder="5"
             />
@@ -4850,11 +4841,7 @@ right={
               value={stateWiseSsv}
               onChange={(val) => {
                 const n = Number(val);
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), statewise_ssv_voucher: n },
-                }));
-                setRankDirty(true);
+                updateActiveRebirth({ statewise_ssv_voucher: n });
               }}
               placeholder="1"
             />
@@ -4864,11 +4851,7 @@ right={
               value={stateWiseZonal}
               onChange={(val) => {
                 const n = Number(val);
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), statewise_zonal_head: n },
-                }));
-                setRankDirty(true);
+                updateActiveRebirth({ statewise_zonal_head: n });
               }}
               placeholder="1"
             />
@@ -4878,11 +4861,7 @@ right={
               value={stateWiseRewards}
               onChange={(val) => {
                 const n = Number(val);
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), statewise_rewards: n },
-                }));
-                setRankDirty(true);
+                updateActiveRebirth({ statewise_rewards: n });
               }}
               placeholder="1"
             />
@@ -4892,11 +4871,7 @@ right={
               value={compAdmin}
               onChange={(val) => {
                 const n = Number(val);
-                setRankConfig((prev) => ({
-                  ...prev,
-                  rebirth_allocation: { ...(prev.rebirth_allocation || {}), company_admin: n, company_gross: n },
-                }));
-                setRankDirty(true);
+                updateActiveRebirth({ company_admin: n, company_gross: n });
               }}
               placeholder="7"
             />
@@ -4916,8 +4891,8 @@ right={
           >
             <span style={{ fontSize: 13, fontWeight: 800, color: isBalanced ? "#166534" : "#991b1b" }}>
               {isBalanced
-                ? `✓ Balanced Financial Accounting: Total Inflow ₹${totalIn} = Outflow (Sponsor ₹${ds} + 5-Block ₹${m5} + 3-Block ₹${m3} + Pincode ₹${pinRoy} + District ₹${distRoy} + State ₹${stateRoy} + L1-L7 ₹${distRoyL1L7} + L1-L10 ₹${distRoyL1L10} + Dist L8-L10 ₹${distWiseL8L10} + State L8-L10 ₹${stateWiseL8L10} + Dist Capt ₹${distCaptRoy} + State Capt ₹${stateCaptRoy} + State SSV ₹${stateWiseSsv} + State Zonal ₹${stateWiseZonal} + State Rewards ₹${stateWiseRewards}) + Company Admin ₹${compAdmin}`
-                : `⚠ Imbalance Alert: Total Inflow (₹${totalIn}) != Allocated Sum (₹${sumOut}). Difference: ₹${totalIn - sumOut}`}
+                ? `✓ Balanced Financial Accounting (${isFranchiseWorkspace ? "Franchise" : "Consumer"}): Total Inflow ₹${totalIn} = Outflow (Sponsor ₹${ds} + 5-Block ₹${m5} + 3-Block ₹${m3} + Pincode ₹${pinRoy} + District ₹${distRoy} + State ₹${stateRoy} + L1-L7 ₹${distRoyL1L7} + L1-L10 ₹${distRoyL1L10} + Dist L8-L10 ₹${distWiseL8L10} + State L8-L10 ₹${stateWiseL8L10} + Dist Capt ₹${distCaptRoy} + State Capt ₹${stateCaptRoy} + State SSV ₹${stateWiseSsv} + State Zonal ₹${stateWiseZonal} + State Rewards ₹${stateWiseRewards}) + Company Admin ₹${compAdmin}`
+                : `⚠ Imbalance Alert (${isFranchiseWorkspace ? "Franchise" : "Consumer"}): Total Inflow (₹${totalIn}) != Allocated Sum (₹${sumOut}). Difference: ₹${totalIn - sumOut}`}
             </span>
           </div>
         </Section>
@@ -4967,8 +4942,8 @@ right={
 
         {/* ── 5-Block Layer Distribution Breakdown (L1 to L10) ── */}
         <Section
-          title="Self Rebirth: 5-Block Layer Distribution (Layers L1 to L10)"
-          subtitle="Configure per-layer payout for 5-Block uplines (Total Pool = ₹80)"
+          title={`Self Rebirth (${isFranchiseWorkspace ? "Franchise" : "Consumer"}): 5-Block Layer Distribution (Layers L1 to L10)`}
+          subtitle={`Configure per-layer payout for 5-Block uplines (Total Pool = ₹${m5})`}
         >
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -4980,7 +4955,7 @@ right={
                 </tr>
               </thead>
               <tbody>
-                {(rankConfig.rebirth_allocation?.matrix_5_levels || Array.from({ length: 10 }, (_, i) => ({ level: i + 1, amount: 8 }))).map((lvl, idx) => (
+                {(reb.matrix_5_levels || Array.from({ length: 10 }, (_, i) => ({ level: i + 1, amount: 8 }))).map((lvl, idx) => (
                   <tr key={lvl.level} style={{ borderBottom: "1px solid #e2e8f0" }}>
                     <td style={{ padding: "6px 12px", fontWeight: 800 }}>Layer {lvl.level}</td>
                     <td style={{ padding: "6px 12px", color: "#64748b" }}>5-Block Layer {lvl.level} Upline</td>
@@ -4991,21 +4966,16 @@ right={
                         value={lvl.amount}
                         onChange={(e) => {
                           const val = Number(e.target.value);
-                          setRankConfig((prev) => {
-                            const reb = prev.rebirth_allocation || {};
-                            const m5Lvls = [...(reb.matrix_5_levels || Array.from({ length: 10 }, (_, i) => ({ level: i + 1, amount: 8 })))];
+                          updateActiveRebirth((currentReb) => {
+                            const m5Lvls = [...(currentReb.matrix_5_levels || Array.from({ length: 10 }, (_, i) => ({ level: i + 1, amount: 8 })))];
                             m5Lvls[idx] = { ...m5Lvls[idx], amount: val };
                             const sumM5 = m5Lvls.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
                             return {
-                              ...prev,
-                              rebirth_allocation: {
-                                ...reb,
-                                matrix_5: sumM5,
-                                matrix_5_levels: m5Lvls,
-                              },
+                              ...currentReb,
+                              matrix_5: sumM5,
+                              matrix_5_levels: m5Lvls,
                             };
                           });
-                          setRankDirty(true);
                         }}
                         style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 110, fontWeight: 700 }}
                       />
@@ -5019,8 +4989,8 @@ right={
 
         {/* ── 3-Block Layer Distribution Breakdown (L1 to L15) ── */}
         <Section
-          title="Self Rebirth: 3-Block Layer Distribution (Layers L1 to L15)"
-          subtitle="Configure per-layer payout for 3-Block uplines (Total Pool = ₹20)"
+          title={`Self Rebirth (${isFranchiseWorkspace ? "Franchise" : "Consumer"}): 3-Block Layer Distribution (Layers L1 to L15)`}
+          subtitle={`Configure per-layer payout for 3-Block uplines (Total Pool = ₹${m3})`}
         >
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -5032,7 +5002,7 @@ right={
                 </tr>
               </thead>
               <tbody>
-                {(rankConfig.rebirth_allocation?.matrix_3_levels || Array.from({ length: 15 }, (_, i) => ({ level: i + 1, amount: i === 14 ? 1.38 : 1.33 }))).map((lvl, idx) => (
+                {(reb.matrix_3_levels || Array.from({ length: 15 }, (_, i) => ({ level: i + 1, amount: i === 14 ? 1.38 : 1.33 }))).map((lvl, idx) => (
                   <tr key={lvl.level} style={{ borderBottom: "1px solid #e2e8f0" }}>
                     <td style={{ padding: "6px 12px", fontWeight: 800 }}>Layer {lvl.level}</td>
                     <td style={{ padding: "6px 12px", color: "#64748b" }}>3-Block Layer {lvl.level} Upline</td>
@@ -5043,21 +5013,16 @@ right={
                         value={lvl.amount}
                         onChange={(e) => {
                           const val = Number(e.target.value);
-                          setRankConfig((prev) => {
-                            const reb = prev.rebirth_allocation || {};
-                            const m3Lvls = [...(reb.matrix_3_levels || Array.from({ length: 15 }, (_, i) => ({ level: i + 1, amount: i === 14 ? 1.38 : 1.33 })))];
+                          updateActiveRebirth((currentReb) => {
+                            const m3Lvls = [...(currentReb.matrix_3_levels || Array.from({ length: 15 }, (_, i) => ({ level: i + 1, amount: i === 14 ? 1.38 : 1.33 })))];
                             m3Lvls[idx] = { ...m3Lvls[idx], amount: val };
                             const sumM3 = m3Lvls.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
                             return {
-                              ...prev,
-                              rebirth_allocation: {
-                                ...reb,
-                                matrix_3: sumM3,
-                                matrix_3_levels: m3Lvls,
-                              },
+                              ...currentReb,
+                              matrix_3: sumM3,
+                              matrix_3_levels: m3Lvls,
                             };
                           });
-                          setRankDirty(true);
                         }}
                         style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", width: 110, fontWeight: 700 }}
                       />
@@ -5996,7 +5961,7 @@ right={
 
           {/* Dynamic Live Pots Grid */}
           {(() => {
-            const rebRates = mon.rebirth_rates || rankConfig?.rebirth_allocation || {};
+            const rebRates = mon.rebirth_rates || (isFranchiseWorkspace ? (rankConfig?.franchise_rebirth_allocation || rankConfig?.rebirth_allocation) : (rankConfig?.consumer_rebirth_allocation || rankConfig?.rebirth_allocation)) || {};
             const pinRate = Number(rebRates.pincode ?? rebRates.franchise ?? rebRates.pincode_royalty ?? rebRates.franchise_pool ?? 15);
             const distRate = Number(rebRates.district ?? rebRates.district_royalty ?? rebRates.district_pool ?? 10);
             const stateRate = Number(rebRates.state ?? rebRates.state_royalty ?? rebRates.state_pool ?? 15);

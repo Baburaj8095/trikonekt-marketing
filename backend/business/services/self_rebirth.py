@@ -35,12 +35,15 @@ def _matrix_ancestor_accounts(acc: AutoPoolAccount, depth: int = 15) -> List[Aut
     return chain
 
 
-def get_rebirth_config() -> Dict[str, Any]:
+def get_rebirth_config(is_franchise: bool = False) -> Dict[str, Any]:
     """Load admin-configured Self Rebirth ID (₹250) Allocation or balanced defaults."""
     cfg = CommissionConfig.get_solo()
     master = dict(getattr(cfg, "master_commission_json", {}) or {})
     rank_cfg = dict(master.get("rank_upgrade_config", {}) or {})
-    reb = dict(rank_cfg.get("rebirth_allocation", {}) or {})
+    if is_franchise:
+        reb = dict(rank_cfg.get("franchise_rebirth_allocation") or rank_cfg.get("rebirth_allocation", {}) or {})
+    else:
+        reb = dict(rank_cfg.get("consumer_rebirth_allocation") or rank_cfg.get("rebirth_allocation", {}) or {})
 
     # Defaults matching admin screen with 0 imbalance (total ₹250)
     defaults = {
@@ -277,7 +280,8 @@ def distribute_self_rebirth_250(user: CustomUser, pack_index: Optional[int] = No
     if not user:
         return {"success": False, "error": "User required"}
 
-    conf = get_rebirth_config()
+    is_franchise = _is_agency_or_employee(user)
+    conf = get_rebirth_config(is_franchise=is_franchise)
     src_type = "SELF_REBIRTH_250"
     src_id = str(pack_index) if pack_index is not None else ""
 

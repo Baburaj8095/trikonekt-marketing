@@ -6631,7 +6631,10 @@ class AdminDailyPoolMonitorView(APIView):
         cfg = CommissionConfig.get_solo()
         master = dict(getattr(cfg, "master_commission_json", {}) or {})
         rank_cfg = dict(master.get("rank_upgrade_config", {}) or {})
-        reb = dict(rank_cfg.get("rebirth_allocation", {}) or {})
+        if is_franchise:
+            reb = dict(rank_cfg.get("franchise_rebirth_allocation") or rank_cfg.get("rebirth_allocation", {}) or {})
+        else:
+            reb = dict(rank_cfg.get("consumer_rebirth_allocation") or rank_cfg.get("rebirth_allocation", {}) or {})
 
         reb_pin = Decimal(str(reb.get("pincode_royalty", reb.get("franchise_pool", 15.0))))
         reb_d = Decimal(str(reb.get("district_royalty", reb.get("district_pool", 10.0))))
