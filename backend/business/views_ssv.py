@@ -258,8 +258,17 @@ class AdminSSVStatesView(APIView):
         if not (request.user.is_staff or request.user.is_superuser or getattr(request.user, 'admin_role', None)):
             return Response({"detail": "Admin authorization required."}, status=status.HTTP_403_FORBIDDEN)
 
-        states = list(State.objects.all())
-        states.sort(key=lambda s: (0 if s.name.lower() == "karnataka" else 1, s.name.lower()))
+        all_states = list(State.objects.all())
+        # Deduplicate states by name, ensuring no duplicate entries in dropdown
+        seen_names = set()
+        states = []
+        for s in all_states:
+            s_name = s.name.strip().title()
+            if s_name.lower() in seen_names:
+                continue
+            seen_names.add(s_name.lower())
+            states.append(s)
+        states.sort(key=lambda s: (0 if "karnataka" in s.name.lower() else 1, s.name.lower()))
         if not states:
             karnataka, _ = State.objects.get_or_create(name="Karnataka", country_id=1)
             states = [karnataka]
@@ -285,12 +294,15 @@ class AdminSSVStatesView(APIView):
                     "is_active": c["is_active"],
                 })
 
-            pool, _ = StateSSVPool.objects.get_or_create(state=s)
+            matching_states = State.objects.filter(Q(id=s.id) | Q(name__iexact=s.name))
+            matching_pools = StateSSVPool.objects.filter(state__in=matching_states)
+            tot_amt = float(sum(p.total_accumulated() for p in matching_pools))
+
             res_states.append({
                 "id": s.id,
                 "name": s.name,
                 "cycles": formatted_cycles,
-                "accumulated_amount": float(pool.total_accumulated()),
+                "accumulated_amount": tot_amt,
             })
 
         return Response({"states": res_states}, status=status.HTTP_200_OK)
@@ -323,9 +335,10 @@ class AdminSSVDashboardView(APIView):
         current_cycle = SSVCycle.objects.filter(state=state, cycle_number=cycle_num).first()
         cycle_duration_str = _format_cycle_duration(current_cycle.start_date if current_cycle else None, current_cycle.end_date if current_cycle else None)
 
-        # 1. State Real Accumulated Total Amount
-        pool, _ = StateSSVPool.objects.get_or_create(state=state)
-        total_voucher_amount = float(pool.total_accumulated())
+        # 1. State Real Accumulated Total Amount (aggregating across state variations)
+        matching_states = State.objects.filter(Q(id=state.id) | Q(name__iexact=state.name))
+        matching_pools = StateSSVPool.objects.filter(state__in=matching_states)
+        total_voucher_amount = float(sum(p.total_accumulated() for p in matching_pools))
 
         # 2. Users in state
         user_qs = CustomUser.objects.filter(

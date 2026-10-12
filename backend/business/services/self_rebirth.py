@@ -423,6 +423,9 @@ def distribute_self_rebirth_250(user: CustomUser, pack_index: Optional[int] = No
     # 5b. Statewise SSV Voucher Contribution (Dynamic ₹1.00 from Rebirth into State Pool)
     ssv_rate = _q2(conf.get("statewise_ssv_voucher", 1.0))
     user_state = getattr(user, "state", None)
+    if not user_state:
+        from locations.models import State
+        user_state = State.objects.filter(name__icontains="Karnataka").first()
     if user_state and ssv_rate > 0:
         try:
             from business.models import StateSSVPool
