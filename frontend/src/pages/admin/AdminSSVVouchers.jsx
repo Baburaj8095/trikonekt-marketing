@@ -114,10 +114,8 @@ export default function AdminSSVVouchers() {
   const cyclesList = useMemo(() => {
     return (
       currentStateObj?.cycles || [
-        { cycle_number: 1, label: "Cycle 1 (01-08-2025 to 31-07-2026)", duration: "01-08-2025 to 31-07-2026" },
-        { cycle_number: 2, label: "Cycle 2 (01-08-2026 to 31-07-2027)", duration: "01-08-2026 to 31-07-2027" },
-        { cycle_number: 3, label: "Cycle 3 (01-08-2027 to 31-07-2028)", duration: "01-08-2027 to 31-07-2028" },
-        { cycle_number: 4, label: "Cycle 4 (01-08-2028 to 31-07-2029)", duration: "01-08-2028 to 31-07-2029" },
+        { cycle_number: 1, label: "Cycle 1 (Active / Open)", duration: "Active / Open" },
+        { cycle_number: 2, label: "Cycle 2", duration: "Active / Open" },
       ]
     );
   }, [currentStateObj]);
@@ -408,7 +406,7 @@ export default function AdminSSVVouchers() {
             <Box sx={{ display: "flex", flexDirection: "column", bgcolor: "#f1f5f9", px: 1.5, py: 0.5, borderRadius: 2 }}>
               <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>Cycle Duration</Typography>
               <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>
-                {currentCycleObj?.duration || "01-08-2025 to 31-07-2026"}
+                {currentCycleObj?.duration || "Active / Open"}
               </Typography>
             </Box>
 

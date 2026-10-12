@@ -2803,8 +2803,8 @@ class SSVCycle(models.Model):
     state = models.ForeignKey('locations.State', on_delete=models.CASCADE, related_name='ssv_cycles')
     cycle_number = models.PositiveIntegerField(default=1, db_index=True)
     cycle_label = models.CharField(max_length=100, default='Cycle 1')
-    start_date = models.DateField()
-    end_date = models.DateField()
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -2813,7 +2813,9 @@ class SSVCycle(models.Model):
         unique_together = (('state', 'cycle_number'),)
 
     def __str__(self):
-        return f"{self.state.name} - {self.cycle_label} ({self.start_date} to {self.end_date})"
+        s = f"from {self.start_date}" if self.start_date else "Open"
+        e = f" to {self.end_date}" if self.end_date else ""
+        return f"{self.state.name} - {self.cycle_label} ({s}{e})"
 
 
 class SSVVoucher(models.Model):

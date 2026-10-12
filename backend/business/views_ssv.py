@@ -213,25 +213,41 @@ from locations.models import State
 from business.models import StateSSVPool, SSVCycle, SSVVoucher, PromoMonthlyBox
 
 
+def _format_cycle_duration(start_date, end_date):
+    s_str = start_date.strftime("%d-%m-%Y") if start_date else ""
+    e_str = end_date.strftime("%d-%m-%Y") if end_date else ""
+    if s_str and e_str:
+        return f"{s_str} to {e_str}"
+    elif s_str:
+        return f"From {s_str} (Active)"
+    return "Active / Open"
+
+
 def _ensure_default_cycles_for_state(state):
-    """Ensure Cycles 1 through 4 exist for the selected State."""
-    cycles_data = [
-        (1, "Cycle 1", date(2025, 8, 1), date(2026, 7, 31)),
-        (2, "Cycle 2", date(2026, 8, 1), date(2027, 7, 31)),
-        (3, "Cycle 3", date(2027, 8, 1), date(2028, 7, 31)),
-        (4, "Cycle 4", date(2028, 8, 1), date(2029, 7, 31)),
-    ]
-    for num, lbl, s_date, e_date in cycles_data:
-        SSVCycle.objects.get_or_create(
-            state=state,
-            cycle_number=num,
-            defaults={
-                "cycle_label": lbl,
-                "start_date": s_date,
-                "end_date": e_date,
-                "is_active": (num == 1),
-            }
-        )
+    """
+    Ensure Cycle 1 and Cycle 2 exist for the selected State.
+    Cycles do NOT have an end date. Admin enables cycles as users progress.
+    """
+    SSVCycle.objects.get_or_create(
+        state=state,
+        cycle_number=1,
+        defaults={
+            "cycle_label": "Cycle 1",
+            "start_date": None,
+            "end_date": None,
+            "is_active": True,
+        }
+    )
+    SSVCycle.objects.get_or_create(
+        state=state,
+        cycle_number=2,
+        defaults={
+            "cycle_label": "Cycle 2",
+            "start_date": None,
+            "end_date": None,
+            "is_active": False,
+        }
+    )
 
 
 class AdminSSVStatesView(APIView):
@@ -258,11 +274,12 @@ class AdminSSVStatesView(APIView):
             for c in cycles:
                 s_str = c["start_date"].strftime("%d-%m-%Y") if c["start_date"] else ""
                 e_str = c["end_date"].strftime("%d-%m-%Y") if c["end_date"] else ""
+                dur = _format_cycle_duration(c["start_date"], c["end_date"])
                 formatted_cycles.append({
                     "id": c["id"],
                     "cycle_number": c["cycle_number"],
-                    "label": f"{c['cycle_label']} ({s_str} to {e_str})",
-                    "duration": f"{s_str} to {e_str}",
+                    "label": f"{c['cycle_label']} ({dur})",
+                    "duration": dur,
                     "start_date": s_str,
                     "end_date": e_str,
                     "is_active": c["is_active"],
@@ -304,9 +321,7 @@ class AdminSSVDashboardView(APIView):
 
         _ensure_default_cycles_for_state(state)
         current_cycle = SSVCycle.objects.filter(state=state, cycle_number=cycle_num).first()
-        c_start = current_cycle.start_date.strftime("%d-%m-%Y") if current_cycle and current_cycle.start_date else "01-08-2025"
-        c_end = current_cycle.end_date.strftime("%d-%m-%Y") if current_cycle and current_cycle.end_date else "31-07-2026"
-        cycle_duration_str = f"{c_start} to {c_end}"
+        cycle_duration_str = _format_cycle_duration(current_cycle.start_date if current_cycle else None, current_cycle.end_date if current_cycle else None)
 
         # 1. State Real Accumulated Total Amount
         pool, _ = StateSSVPool.objects.get_or_create(state=state)
@@ -320,15 +335,8 @@ class AdminSSVDashboardView(APIView):
 
         user_ids = list(user_qs.values_list("id", flat=True))
 
-        # Filter monthly boxes that fall within the current cycle's date range or cycle package_number
-        cycle_box_filter = Q(user_id__in=user_ids)
-        if current_cycle and current_cycle.start_date and current_cycle.end_date:
-            cycle_box_filter &= (
-                Q(created_at__date__gte=current_cycle.start_date, created_at__date__lte=current_cycle.end_date) |
-                Q(package_number=cycle_num)
-            )
-        else:
-            cycle_box_filter &= Q(package_number=cycle_num)
+        # Filter monthly boxes that belong strictly to this cycle (package_number = cycle_num)
+        cycle_box_filter = Q(user_id__in=user_ids, package_number=cycle_num)
 
         box_records = PromoMonthlyBox.objects.filter(cycle_box_filter).values("user_id", "box_number")
         user_boxes = {}
@@ -375,17 +383,16 @@ class AdminSSVDashboardView(APIView):
         all_cycles = SSVCycle.objects.filter(state=state).order_by("cycle_number")
         cycle_summary = []
         for c in all_cycles:
-            c_p_str = f"{c.start_date.strftime('%d-%m-%Y')} to {c.end_date.strftime('%d-%m-%Y')}" if c.start_date and c.end_date else ""
+            c_p_str = _format_cycle_duration(c.start_date, c.end_date)
             c_vouchers = SSVVoucher.objects.filter(state=state, cycle_number=c.cycle_number)
             c_created = c_vouchers.count()
             c_redeemed = c_vouchers.filter(status="REDEEMED").count()
             c_pending = c_vouchers.filter(status="CREATED").count()
 
-            # Eligible users in cycle c
+            # Eligible users in cycle c (strictly based on package_number = c.cycle_number or existing voucher)
             c_box_users = set(PromoMonthlyBox.objects.filter(
                 user_id__in=user_ids,
-                created_at__date__gte=c.start_date,
-                created_at__date__lte=c.end_date
+                package_number=c.cycle_number
             ).values_list("user_id", flat=True))
             c_voucher_users = set(c_vouchers.values_list("user_id", flat=True))
             c_eligible = len(c_box_users | c_voucher_users)
@@ -502,15 +509,8 @@ class AdminSSVUsersListView(APIView):
 
         user_ids = list(user_qs.values_list("id", flat=True)[:1000])
 
-        # Filter monthly boxes that fall within the cycle's date range or package_number
-        cycle_box_filter = Q(user_id__in=user_ids)
-        if cycle and cycle.start_date and cycle.end_date:
-            cycle_box_filter &= (
-                Q(created_at__date__gte=cycle.start_date, created_at__date__lte=cycle.end_date) |
-                Q(package_number=cycle_num)
-            )
-        else:
-            cycle_box_filter &= Q(package_number=cycle_num)
+        # Filter monthly boxes belonging strictly to this cycle (package_number = cycle_num)
+        cycle_box_filter = Q(user_id__in=user_ids, package_number=cycle_num)
 
         box_records = PromoMonthlyBox.objects.filter(cycle_box_filter).values("user_id", "box_number")
         user_boxes = {}
@@ -641,17 +641,17 @@ class AdminSSVCyclesView(APIView):
             c_redeemed = c_vouchers.filter(status="REDEEMED").count()
             c_pending = c_vouchers.filter(status="CREATED").count()
 
-            # Eligible users in cycle c
+            # Eligible users in cycle c (strictly based on package_number = c.cycle_number or existing voucher)
             c_box_users = set(PromoMonthlyBox.objects.filter(
                 user_id__in=user_ids,
-                created_at__date__gte=c.start_date,
-                created_at__date__lte=c.end_date
+                package_number=c.cycle_number
             ).values_list("user_id", flat=True))
             c_voucher_users = set(c_vouchers.values_list("user_id", flat=True))
             c_eligible = len(c_box_users | c_voucher_users)
 
             s_str = c.start_date.strftime("%d-%m-%Y") if c.start_date else ""
             e_str = c.end_date.strftime("%d-%m-%Y") if c.end_date else ""
+            dur = _format_cycle_duration(c.start_date, c.end_date)
 
             results.append({
                 "id": c.id,
@@ -661,7 +661,7 @@ class AdminSSVCyclesView(APIView):
                 "end_date": c.end_date.strftime("%Y-%m-%d") if c.end_date else "",
                 "start_display": s_str,
                 "end_display": e_str,
-                "duration": f"{s_str} to {e_str}",
+                "duration": dur,
                 "is_active": c.is_active,
                 "eligible_users": c_eligible,
                 "vouchers_created": c_created,
@@ -712,7 +712,7 @@ class AdminSSVActivateCycleView(APIView):
                 "id": cycle.id,
                 "cycle_number": cycle.cycle_number,
                 "cycle_label": cycle.cycle_label,
-                "duration": f"{cycle.start_date.strftime('%d-%m-%Y')} to {cycle.end_date.strftime('%d-%m-%Y')}",
+                "duration": _format_cycle_duration(cycle.start_date, cycle.end_date),
                 "is_active": True,
             }
         }, status=status.HTTP_200_OK)
@@ -721,6 +721,7 @@ class AdminSSVActivateCycleView(APIView):
 class AdminSSVSaveCycleView(APIView):
     """
     Creates or updates an SSV Cycle for a state.
+    Cycles do not have end dates. Admin activates cycles as users reach their earning limits.
     """
     permission_classes = [IsAuthenticated]
 
@@ -740,20 +741,26 @@ class AdminSSVSaveCycleView(APIView):
             return Response({"detail": "state_id is required."}, status=status.HTTP_400_BAD_REQUEST)
         if not cycle_number:
             return Response({"detail": "cycle_number is required."}, status=status.HTTP_400_BAD_REQUEST)
-        if not start_date_str or not end_date_str:
-            return Response({"detail": "start_date and end_date are required."}, status=status.HTTP_400_BAD_REQUEST)
 
         state = State.objects.filter(id=state_id).first()
         if not state:
             return Response({"detail": "State not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        try:
-            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
-            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
-        except Exception:
-            return Response({"detail": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+        start_date = None
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+            except Exception:
+                return Response({"detail": "Invalid start_date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if end_date <= start_date:
+        end_date = None
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+            except Exception:
+                return Response({"detail": "Invalid end_date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if start_date and end_date and end_date <= start_date:
             return Response({"detail": "End date must be after start date."}, status=status.HTTP_400_BAD_REQUEST)
 
         if cycle_id:
@@ -789,8 +796,9 @@ class AdminSSVSaveCycleView(APIView):
                 "id": cycle.id,
                 "cycle_number": cycle.cycle_number,
                 "cycle_label": cycle.cycle_label,
-                "start_date": cycle.start_date.strftime("%Y-%m-%d"),
-                "end_date": cycle.end_date.strftime("%Y-%m-%d"),
+                "start_date": cycle.start_date.strftime("%Y-%m-%d") if cycle.start_date else "",
+                "end_date": cycle.end_date.strftime("%Y-%m-%d") if cycle.end_date else "",
+                "duration": _format_cycle_duration(cycle.start_date, cycle.end_date),
                 "is_active": cycle.is_active,
             }
         }, status=status.HTTP_200_OK)
@@ -942,14 +950,8 @@ class AdminSSVExportCSVView(APIView):
 
         user_ids = list(user_qs.values_list("id", flat=True))
 
-        cycle_box_filter = Q(user_id__in=user_ids)
-        if cycle and cycle.start_date and cycle.end_date:
-            cycle_box_filter &= (
-                Q(created_at__date__gte=cycle.start_date, created_at__date__lte=cycle.end_date) |
-                Q(package_number=cycle_num)
-            )
-        else:
-            cycle_box_filter &= Q(package_number=cycle_num)
+        # Filter monthly boxes that belong strictly to this cycle (package_number = cycle_num)
+        cycle_box_filter = Q(user_id__in=user_ids, package_number=cycle_num)
 
         box_records = PromoMonthlyBox.objects.filter(cycle_box_filter).values("user_id", "box_number")
         user_boxes = {}

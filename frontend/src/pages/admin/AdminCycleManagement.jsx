@@ -161,8 +161,8 @@ export default function AdminCycleManagement() {
 
   // Submit Save Cycle
   const handleSaveCycle = async () => {
-    if (!formCycleNum || !formStartDate || !formEndDate) {
-      setFeedback({ type: "error", message: "Cycle Number, Start Date, and End Date are required." });
+    if (!formCycleNum) {
+      setFeedback({ type: "error", message: "Cycle Number is required." });
       return;
     }
     setModalSubmitting(true);
@@ -173,8 +173,8 @@ export default function AdminCycleManagement() {
         state_id: selectedStateId,
         cycle_number: Number(formCycleNum),
         cycle_label: formCycleLabel || `Cycle ${formCycleNum}`,
-        start_date: formStartDate,
-        end_date: formEndDate,
+        start_date: formStartDate || undefined,
+        end_date: formEndDate || undefined,
         is_active: formSetActive,
       };
       const res = await API.post("/admin/ssv/cycles/save/", payload);
@@ -605,24 +605,24 @@ export default function AdminCycleManagement() {
               placeholder="E.g. Cycle 1"
             />
             <TextField
-              label="Start Date"
+              label="Start Date (Optional)"
               type="date"
               value={formStartDate}
               onChange={(e) => setFormStartDate(e.target.value)}
               fullWidth
               size="small"
               InputLabelProps={{ shrink: true }}
-              required
+              helperText="Optional cycle launch date"
             />
             <TextField
-              label="End Date"
+              label="End Date (Optional / Open)"
               type="date"
               value={formEndDate}
               onChange={(e) => setFormEndDate(e.target.value)}
               fullWidth
               size="small"
               InputLabelProps={{ shrink: true }}
-              required
+              helperText="Cycles do not have end dates. Leave empty for continuous open cycle."
             />
             <FormControlLabel
               control={
