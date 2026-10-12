@@ -1229,14 +1229,16 @@ class AutoPoolAccount(models.Model):
         from decimal import Decimal as D
         from business.services.placement import GenericPlacement
         amt = D(amount or 0)
-        # THREE_150 / 3× pools placement:
-        # - 1st entry: anchors to sponsor's primary entry in that pool (when available) else global sentinel root
-        # - 2nd+ entries (SPP, Rebirth): cluster under user's own base entry (start_id=own_base.id) so SPP is downline from root user.
-        own_base = cls._base_self_account(user, pool_type)
-        if own_base:
-            start_id = int(own_base.id)
+        # THREE_150: Pure global auto-pool (single company-wide tree from sentinel root, top-down left-right BFS)
+        # Other 3x pools: preserve self/sponsor-anchored behavior
+        if pool_type == "THREE_150":
+            start_id = None
         else:
-            start_id = cls._sponsor_start_entry_id_for(user, pool_type)
+            own_base = cls._base_self_account(user, pool_type)
+            if own_base:
+                start_id = int(own_base.id)
+            else:
+                start_id = cls._sponsor_start_entry_id_for(user, pool_type)
         return GenericPlacement.place_account(
             owner=user,
             pool_type=pool_type,
