@@ -74,15 +74,29 @@ class CommissionDistributor:
 
     @classmethod
     def _is_recipient_eligible_for_level(cls, user, level_idx: int) -> bool:
+        if not user:
+            return False
         if REQUIRE_PRIME750_FOR_RECIPIENT and not Prime750StatusAdapter.is_user_prime750_active(user):
             return False
-        # Rank threshold: current_rank.level_number >= level_idx
-        _, urank = RankEligibilityService.get_or_bootstrap_user_rank(user)
+        # Determine user's highest active rank level (UserRank or successful RankUpgrade)
+        max_lvl = 0
         try:
-            lvl = int(getattr(urank, "level_number", 0) or 0)
+            rp = getattr(user, "rank_profile", None)
+            if rp and getattr(rp, "current_rank", None):
+                max_lvl = max(max_lvl, int(getattr(rp.current_rank, "level_number", 0) or 0))
+            from ..models import UserRank, RankUpgrade
+            ur = UserRank.objects.select_related("current_rank").filter(user_id=getattr(user, "id", None)).first()
+            if ur and ur.current_rank:
+                max_lvl = max(max_lvl, int(getattr(ur.current_rank, "level_number", 0) or 0))
+            upg = RankUpgrade.objects.filter(
+                user_id=getattr(user, "id", None),
+                payment_status=RankUpgrade.STATUS_SUCCESS,
+            ).order_by("-to_rank__level_number").first()
+            if upg and upg.to_rank:
+                max_lvl = max(max_lvl, int(getattr(upg.to_rank, "level_number", 0) or 0))
         except Exception:
-            lvl = 0
-        return lvl >= int(level_idx or 0)
+            pass
+        return max_lvl >= int(level_idx or 0)
 
     @classmethod
     def _is_recipient_eligible_for_direct(cls, user) -> bool:
