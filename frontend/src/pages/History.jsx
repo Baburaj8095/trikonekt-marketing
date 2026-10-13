@@ -47,6 +47,7 @@ import ShoppingCartRoundedIcon from "@mui/icons-material/ShoppingCartRounded";
 import WorkspacePremiumRoundedIcon from "@mui/icons-material/WorkspacePremiumRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import LayersRoundedIcon from "@mui/icons-material/LayersRounded";
+import AccountTreeRoundedIcon from "@mui/icons-material/AccountTreeRounded";
 import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
 import PremiumScreenHeader from "../components/common/PremiumScreenHeader";
 import BottomNav from "../components/common/BottomNav";
@@ -305,6 +306,112 @@ function isSsvBonusTx(tx) {
     type === "MONTHLY_759_DIRECT" ||
     ((st.includes("MONTHLY") || src === "MONTHLY_759" || trig === "MONTHLY_759") &&
       (ot.includes("DIRECT") || type.includes("DIRECT")))
+  );
+}
+
+function isFiveLayerTx(tx) {
+  const meta = tx?.meta || {};
+  const ot = String(meta.orig_type || "").toUpperCase();
+  const type = String(tx?.type || "").toUpperCase();
+  const src = String(meta.source || "").toUpperCase();
+  const plan = String(meta.plan || meta.matrix_type || "").toUpperCase();
+  const kind = String(meta.kind || "").toUpperCase();
+  const trig = String(meta.trigger || "").toUpperCase();
+
+  return (
+    type === "AUTOPOOL_BONUS_FIVE" ||
+    ot === "AUTOPOOL_BONUS_FIVE" ||
+    plan === "FIVE_150" ||
+    src.includes("FIVE_MATRIX") ||
+    kind.includes("FIVE_MATRIX") ||
+    trig === "FIVE_150" ||
+    (type === "INCOME_CREDIT_75" && (
+      ot === "AUTOPOOL_BONUS_FIVE" ||
+      src.includes("FIVE_MATRIX") ||
+      plan === "FIVE_150" ||
+      kind.includes("FIVE_MATRIX")
+    ))
+  );
+}
+
+function isThreeLayerTx(tx) {
+  const meta = tx?.meta || {};
+  const ot = String(meta.orig_type || "").toUpperCase();
+  const type = String(tx?.type || "").toUpperCase();
+  const src = String(meta.source || "").toUpperCase();
+  const plan = String(meta.plan || meta.matrix_type || "").toUpperCase();
+  const kind = String(meta.kind || "").toUpperCase();
+  const trig = String(meta.trigger || "").toUpperCase();
+
+  return (
+    type === "AUTOPOOL_BONUS_THREE" ||
+    ot === "AUTOPOOL_BONUS_THREE" ||
+    plan === "THREE_150" ||
+    src.includes("THREE_MATRIX") ||
+    kind.includes("THREE_MATRIX") ||
+    trig === "THREE_150" ||
+    (type === "INCOME_CREDIT_75" && (
+      ot === "AUTOPOOL_BONUS_THREE" ||
+      src.includes("THREE_MATRIX") ||
+      plan === "THREE_150" ||
+      kind.includes("THREE_MATRIX")
+    ))
+  );
+}
+
+function isEEduLayerTx(tx) {
+  const meta = tx?.meta || {};
+  const ot = String(meta.orig_type || "").toUpperCase();
+  const type = String(tx?.type || "").toUpperCase();
+  const src = String(meta.source || "").toUpperCase();
+  const st = String(tx?.source_type || "").toUpperCase();
+  const kind = String(meta.kind || "").toUpperCase();
+
+  const isEEdu = (
+    st === "RANK_UPGRADE" ||
+    st.includes("E_EDU") ||
+    src.includes("E_EDU") ||
+    meta.source === "E_EDU" ||
+    kind.startsWith("RANK_UPGRADE") ||
+    ot.startsWith("RANK_UPGRADE") ||
+    type.includes("RANK_UPGRADE")
+  );
+
+  if (!isEEdu) return false;
+
+  return (
+    kind === "RANK_UPGRADE_LEVEL" ||
+    ot === "LEVEL_BONUS" ||
+    type === "LEVEL_BONUS" ||
+    (meta.level !== undefined && Number(meta.level) > 0)
+  );
+}
+
+function isEEduDirectTx(tx) {
+  const meta = tx?.meta || {};
+  const ot = String(meta.orig_type || "").toUpperCase();
+  const type = String(tx?.type || "").toUpperCase();
+  const src = String(meta.source || "").toUpperCase();
+  const st = String(tx?.source_type || "").toUpperCase();
+  const kind = String(meta.kind || "").toUpperCase();
+
+  const isEEdu = (
+    st === "RANK_UPGRADE" ||
+    st.includes("E_EDU") ||
+    src.includes("E_EDU") ||
+    meta.source === "E_EDU" ||
+    kind.startsWith("RANK_UPGRADE") ||
+    ot.startsWith("RANK_UPGRADE") ||
+    type.includes("RANK_UPGRADE")
+  );
+
+  if (!isEEdu) return false;
+
+  return (
+    kind === "RANK_UPGRADE_DIRECT" ||
+    ot === "DIRECT_REF_BONUS" ||
+    type === "DIRECT_REF_BONUS" ||
+    meta.level === 0
   );
 }
 
@@ -1245,15 +1352,18 @@ function PhonePeFilterDrawer({
 
   const sourceOptions = [
     { label: "All Sources", value: "ALL" },
-    { label: "E-Edu Agent", value: "E_EDU" },
+    { label: "5-Matrix Layer", value: "FIVE_LAYER" },
+    { label: "3-Matrix Layer", value: "THREE_LAYER" },
+    { label: "E-Edu Layer", value: "E_EDU_LAYER" },
+    { label: "E-Edu Agent (All)", value: "E_EDU" },
     { label: "Self Account / Self Block (25%)", value: "SAVE" },
     { label: "SSV Layer", value: "SSV_LAYER" },
     { label: "SSV Bonus", value: "SSV_BONUS" },
+    { label: "All Layers & Blocks", value: "LAYER" },
+    { label: "Direct Bonus", value: "DIRECT" },
     { label: "QR Scanner", value: "QR_SCANNER" },
     { label: "Trizone Shopping", value: "TRIZONE" },
     { label: "Royalty Bonus", value: "ROYALTY" },
-    { label: "Layer & Blocks", value: "LAYER" },
-    { label: "Direct Bonus", value: "DIRECT" },
     { label: "P2P Transfer", value: "P2P" },
     { label: "Merchant & Captain", value: "MERCHANT_CAPTAIN" },
     { label: "Withdrawals", value: "WITHDRAWAL" },
@@ -2014,6 +2124,9 @@ export default function History() {
   const categoryCounts = useMemo(() => {
     const counts = {
       ALL: dateFilteredTransactions.length,
+      FIVE_LAYER: 0,
+      THREE_LAYER: 0,
+      E_EDU_LAYER: 0,
       E_EDU: 0,
       SELF_ACCOUNT: 0,
       LAYER: 0,
@@ -2025,9 +2138,13 @@ export default function History() {
     };
     dateFilteredTransactions.forEach((tx) => {
       const cat = classifyTransaction(tx);
+      const isSelf = tx?.type === "SELF_ACCOUNT_CREDIT" || tx?.type === "SELF_ACCOUNT_DEBIT" || tx?.meta?.ledger === "SELF_ACCOUNT";
       if (counts[cat] !== undefined) {
         counts[cat] += 1;
       }
+      if (isFiveLayerTx(tx) && !isSelf) counts.FIVE_LAYER += 1;
+      if (isThreeLayerTx(tx) && !isSelf) counts.THREE_LAYER += 1;
+      if (isEEduLayerTx(tx) && !isSelf) counts.E_EDU_LAYER += 1;
     });
     return counts;
   }, [dateFilteredTransactions]);
@@ -2048,6 +2165,12 @@ export default function History() {
         const cat = classifyTransaction(tx);
         if (sourceFilter === "SAVE" || sourceFilter === "SELF_ACCOUNT") {
           if (cat !== "SELF_ACCOUNT" && cat !== "SAVE") return false;
+        } else if (sourceFilter === "FIVE_LAYER") {
+          if (!isFiveLayerTx(tx) || isSelf) return false;
+        } else if (sourceFilter === "THREE_LAYER") {
+          if (!isThreeLayerTx(tx) || isSelf) return false;
+        } else if (sourceFilter === "E_EDU_LAYER") {
+          if (!isEEduLayerTx(tx) || isSelf) return false;
         } else if (sourceFilter === "SSV_LAYER") {
           if (!isSsvLayerTx(tx)) return false;
         } else if (sourceFilter === "SSV_BONUS") {
@@ -2060,6 +2183,8 @@ export default function History() {
           if (cat !== "E_EDU") return false;
         } else if (sourceFilter === "ROYALTY") {
           if (cat !== "ROYALTY") return false;
+        } else if (sourceFilter === "LAYER") {
+          if ((!isFiveLayerTx(tx) && !isThreeLayerTx(tx) && !isEEduLayerTx(tx) && cat !== "LAYER") || isSelf) return false;
         } else if (cat !== sourceFilter) {
           return false;
         }
@@ -2153,6 +2278,9 @@ export default function History() {
   const categoryStats = useMemo(() => {
     const stats = {
       ALL: { count: 0, total: 0 },
+      FIVE_LAYER: { count: 0, total: 0 },
+      THREE_LAYER: { count: 0, total: 0 },
+      E_EDU_LAYER: { count: 0, total: 0 },
       E_EDU: { count: 0, total: 0 },
       SAVE: { count: 0, total: 0 },
       SSV_LAYER: { count: 0, total: 0 },
@@ -2173,6 +2301,19 @@ export default function History() {
 
       stats.ALL.count += 1;
       if (amt > 0) stats.ALL.total += amt;
+
+      if (isFiveLayerTx(tx) && !isSelf) {
+        stats.FIVE_LAYER.count += 1;
+        if (amt > 0) stats.FIVE_LAYER.total += amt;
+      }
+      if (isThreeLayerTx(tx) && !isSelf) {
+        stats.THREE_LAYER.count += 1;
+        if (amt > 0) stats.THREE_LAYER.total += amt;
+      }
+      if (isEEduLayerTx(tx) && !isSelf) {
+        stats.E_EDU_LAYER.count += 1;
+        if (amt > 0) stats.E_EDU_LAYER.total += amt;
+      }
 
       if (cat === "E_EDU") {
         stats.E_EDU.count += 1;
@@ -2229,6 +2370,9 @@ export default function History() {
   const sourceLabel = useMemo(() => {
     const map = {
       ALL: "All Sources",
+      FIVE_LAYER: "5-Matrix Layer",
+      THREE_LAYER: "3-Matrix Layer",
+      E_EDU_LAYER: "E-Edu Layer",
       E_EDU: "E-Edu Agent",
       SELF_ACCOUNT: "Self Account / Self Block (25%)",
       SAVE: "Self Account / Self Block (25%)",
@@ -2237,7 +2381,7 @@ export default function History() {
       QR_SCANNER: "QR Scanner",
       TRIZONE: "Trizone Shopping",
       ROYALTY: "Royalty Bonus",
-      LAYER: "Layer & Blocks",
+      LAYER: "All Layers & Blocks",
       DIRECT: "Direct Bonus",
       P2P: "P2P Transfer",
       MERCHANT_CAPTAIN: "Merchant & Captain",
@@ -3028,7 +3172,64 @@ export default function History() {
             }}
           />
 
-          {/* Chip 2: E-Edu Agent */}
+          {/* Chip 2: 5-Matrix Layer */}
+          <Chip
+            icon={<LayersRoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "FIVE_LAYER" ? "#FFFFFF !important" : "#2563EB !important" }} />}
+            label={`5 Layer (${categoryStats.FIVE_LAYER.count}) ₹${fmtAmount(categoryStats.FIVE_LAYER.total)}`}
+            onClick={() => setSourceFilter("FIVE_LAYER")}
+            sx={{
+              fontWeight: 800,
+              fontSize: 11.5,
+              height: 32,
+              borderRadius: "999px",
+              bgcolor: sourceFilter === "FIVE_LAYER" ? "#2563EB" : "#FFFFFF",
+              color: sourceFilter === "FIVE_LAYER" ? "#FFFFFF" : "#1D4ED8",
+              border: "1.5px solid",
+              borderColor: sourceFilter === "FIVE_LAYER" ? "#2563EB" : "#BFDBFE",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          />
+
+          {/* Chip 3: 3-Matrix Layer */}
+          <Chip
+            icon={<AccountTreeRoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "THREE_LAYER" ? "#FFFFFF !important" : "#0D9488 !important" }} />}
+            label={`3 Layer (${categoryStats.THREE_LAYER.count}) ₹${fmtAmount(categoryStats.THREE_LAYER.total)}`}
+            onClick={() => setSourceFilter("THREE_LAYER")}
+            sx={{
+              fontWeight: 800,
+              fontSize: 11.5,
+              height: 32,
+              borderRadius: "999px",
+              bgcolor: sourceFilter === "THREE_LAYER" ? "#0D9488" : "#FFFFFF",
+              color: sourceFilter === "THREE_LAYER" ? "#FFFFFF" : "#0F766E",
+              border: "1.5px solid",
+              borderColor: sourceFilter === "THREE_LAYER" ? "#0D9488" : "#99F6E4",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          />
+
+          {/* Chip 4: E-Edu Layer */}
+          <Chip
+            icon={<SchoolRoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "E_EDU_LAYER" ? "#FFFFFF !important" : "#7C3AED !important" }} />}
+            label={`E-Edu Layer (${categoryStats.E_EDU_LAYER.count}) ₹${fmtAmount(categoryStats.E_EDU_LAYER.total)}`}
+            onClick={() => setSourceFilter("E_EDU_LAYER")}
+            sx={{
+              fontWeight: 800,
+              fontSize: 11.5,
+              height: 32,
+              borderRadius: "999px",
+              bgcolor: sourceFilter === "E_EDU_LAYER" ? "#7C3AED" : "#FFFFFF",
+              color: sourceFilter === "E_EDU_LAYER" ? "#FFFFFF" : "#6D28D9",
+              border: "1.5px solid",
+              borderColor: sourceFilter === "E_EDU_LAYER" ? "#7C3AED" : "#DDD6FE",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          />
+
+          {/* Chip 5: E-Edu Agent */}
           <Chip
             icon={<SchoolRoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "E_EDU" ? "#FFFFFF !important" : "#2563EB !important" }} />}
             label={`E-Edu Agent (${categoryStats.E_EDU.count}) ₹${fmtAmount(categoryStats.E_EDU.total)}`}
@@ -3047,7 +3248,7 @@ export default function History() {
             }}
           />
 
-          {/* Chip 3: Self Account / Self Block (25%) */}
+          {/* Chip 6: Self Account / Self Block (25%) */}
           <Chip
             icon={<SavingsIcon sx={{ fontSize: "16px !important", color: (sourceFilter === "SAVE" || sourceFilter === "SELF_ACCOUNT") ? "#FFFFFF !important" : "#D97706 !important" }} />}
             label={`Self Account / Self Block (25%) (${categoryStats.SAVE.count}) ₹${fmtAmount(categoryStats.SAVE.total)}`}
@@ -3163,6 +3364,69 @@ export default function History() {
         </Box>
 
         {/* Dynamic Category Summary Banner Matching Image 2 */}
+        {sourceFilter === "FIVE_LAYER" && (
+          <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#EFF6FF", border: "1px solid #BFDBFE" }}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar sx={{ bgcolor: "#DBEAFE", color: "#1D4ED8", width: 38, height: 38 }}>
+                <LayersRoundedIcon sx={{ fontSize: 20 }} />
+              </Avatar>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#1E3A8A" }}>
+                  5-Matrix Layer AutoPool
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#1D4ED8", fontWeight: 700 }}>
+                  Total Transactions: {categoryStats.FIVE_LAYER.count} • Total Amount Received: ₹ {fmtAmount(categoryStats.FIVE_LAYER.total)}
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: "#1E40AF", opacity: 0.85, mt: 0.2 }}>
+                  5-Matrix level-based autopool income distributed across 5-team tree placements.
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        )}
+
+        {sourceFilter === "THREE_LAYER" && (
+          <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#F0FDFA", border: "1px solid #99F6E4" }}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar sx={{ bgcolor: "#CCFBF1", color: "#0F766E", width: 38, height: 38 }}>
+                <AccountTreeRoundedIcon sx={{ fontSize: 20 }} />
+              </Avatar>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#115E59" }}>
+                  3-Matrix Layer AutoPool
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#0F766E", fontWeight: 700 }}>
+                  Total Transactions: {categoryStats.THREE_LAYER.count} • Total Amount Received: ₹ {fmtAmount(categoryStats.THREE_LAYER.total)}
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: "#134E4A", opacity: 0.85, mt: 0.2 }}>
+                  3-Matrix global BFS autopool earnings filled left-to-right from platform purchases.
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        )}
+
+        {sourceFilter === "E_EDU_LAYER" && (
+          <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#FAF5FF", border: "1px solid #E9D5FF" }}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar sx={{ bgcolor: "#F3E8FF", color: "#7E22CE", width: 38, height: 38 }}>
+                <SchoolRoundedIcon sx={{ fontSize: 20 }} />
+              </Avatar>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#581C87" }}>
+                  E-Edu Layer Commissions
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#7E22CE", fontWeight: 700 }}>
+                  Total Transactions: {categoryStats.E_EDU_LAYER.count} • Total Amount Received: ₹ {fmtAmount(categoryStats.E_EDU_LAYER.total)}
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: "#6B21A8", opacity: 0.85, mt: 0.2 }}>
+                  Generation-matching layer bonus distributed across 10-rank E-Education upgrades.
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        )}
+
         {sourceFilter === "E_EDU" && (
           <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#EFF6FF", border: "1px solid #BFDBFE" }}>
             <Stack direction="row" spacing={1.5} alignItems="center">
