@@ -24,11 +24,12 @@ export default function DataTable({
   onColumnVisibilityModelChange,
   instanceKey,
   extraKey,
+  initialSortModel,
 }) {
   const [rows, setRows] = useState([]);
   const [rowCount, setRowCount] = useState(0);
   const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 25 });
-  const [sortModel, setSortModel] = useState([{ field: "id", sort: "asc" }]);
+  const [sortModel, setSortModel] = useState(initialSortModel || [{ field: "id", sort: "asc" }]);
   const [searchText, setSearchText] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);

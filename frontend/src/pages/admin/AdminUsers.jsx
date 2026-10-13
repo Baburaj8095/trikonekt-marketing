@@ -2409,32 +2409,40 @@ export default function AdminUsers() {
       {
         field: "package_buy_date",
         headerName: "2K Activation Time",
-        minWidth: 200,
+        minWidth: 210,
+        align: "center",
+        headerAlign: "center",
         renderCell: (p) => {
           const v = p?.row?.package_buy_date;
           if (!v) {
             return (
-              <span style={{ color: "#94a3b8", fontSize: "12px", fontStyle: "italic" }}>
-                Not Activated
-              </span>
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ color: "#94a3b8", fontSize: "12px", fontStyle: "italic" }}>
+                  Not Activated
+                </span>
+              </div>
             );
           }
           return (
-            <span
-              style={{
-                display: "inline-block",
-                fontWeight: 700,
-                fontSize: "12px",
-                color: "#0369a1",
-                background: "#e0f2fe",
-                padding: "3px 8px",
-                borderRadius: "6px",
-                whiteSpace: "nowrap",
-                border: "1px solid #bae6fd",
-              }}
-            >
-              ⚡ {formatDateTime(v)}
-            </span>
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: 700,
+                  fontSize: "12px",
+                  color: "#0369a1",
+                  background: "#e0f2fe",
+                  padding: "3px 10px",
+                  borderRadius: "6px",
+                  whiteSpace: "nowrap",
+                  border: "1px solid #bae6fd",
+                }}
+              >
+                ⚡ {formatDateTime(v)}
+              </span>
+            </div>
           );
         },
         valueFormatter: (v) => formatDateTime(v),
@@ -2446,10 +2454,16 @@ export default function AdminUsers() {
         field: "current_rank",
         headerName: "Rank Layer",
         minWidth: 120,
+        align: "center",
+        headerAlign: "center",
         renderCell: (p) => {
           const v = p?.row?.current_rank;
           if (!v || v === "-" || v === "None") {
-            return <span style={{ color: "#9ca3af", fontSize: "12px" }}>—</span>;
+            return (
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <span style={{ color: "#9ca3af", fontSize: "12px" }}>—</span>
+              </div>
+            );
           }
           let bg = "#f0fdf4";
           let color = "#15803d";
@@ -2468,23 +2482,26 @@ export default function AdminUsers() {
             border = "#fde68a";
           }
           return (
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                padding: "2px 8px",
-                fontSize: "12px",
-                fontWeight: 700,
-                backgroundColor: bg,
-                color: color,
-                borderRadius: "6px",
-                border: `1px solid ${border}`,
-                letterSpacing: "0.5px",
-                fontFamily: "monospace",
-              }}
-            >
-              ⚡ {v}
-            </span>
+            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "3px 10px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  backgroundColor: bg,
+                  color: color,
+                  borderRadius: "6px",
+                  border: `1px solid ${border}`,
+                  letterSpacing: "0.5px",
+                  fontFamily: "monospace",
+                }}
+              >
+                ⚡ {v}
+              </span>
+            </div>
           );
         },
       },
@@ -2632,11 +2649,11 @@ export default function AdminUsers() {
         "category",
       ]);
 
-      let cleanOrdering = "id";
+      let cleanOrdering = "first_purchase_activated_at";
       if (ordering && typeof ordering === "string") {
         const isDesc = ordering.startsWith("-");
         const rawField = isDesc ? ordering.substring(1) : ordering;
-        const mappedField = USER_SORT_FIELD_MAP[rawField] || (ALLOWED_DJANGO_ORDER_FIELDS.has(rawField) ? rawField : "id");
+        const mappedField = USER_SORT_FIELD_MAP[rawField] || (ALLOWED_DJANGO_ORDER_FIELDS.has(rawField) ? rawField : "first_purchase_activated_at");
         cleanOrdering = isDesc ? `-${mappedField}` : mappedField;
       }
 
@@ -3210,6 +3227,7 @@ const count = Number.isFinite(countNum) ? countNum : results.length;
         fetcher={fetcher}
         density={density}
         toolbar={toolbar}
+        initialSortModel={[{ field: "package_buy_date", sort: "asc" }]}
         extraKey={JSON.stringify(filters) + ":" + reloadKey}
         checkboxSelection={true}
         onSelectionChange={() => {}}
