@@ -771,74 +771,14 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
   }, [walletHistory]);
 
   // Total E Edu Income: All E Edu related money (E-Edu Layer Commissions + E-Edu Direct Sponsor/Referral Bonus)
+  // Strictly read from database-computed totals (Zero client-side array truncation)
   const { totalEEduIncome, eEduLayerIncome, eEduDirectBonus } = useMemo(() => {
-    const allTx = [
-      ...(walletHistory?.all_transactions || []),
-      ...(walletHistory?.main_wallet || []),
-    ];
-
-    let layerTotal = 0;
-    let directTotal = 0;
-    const seen = new Set();
-
-    for (const tx of allTx) {
-      if (!tx?.id || seen.has(tx.id)) continue;
-      seen.add(tx.id);
-
-      const type = String(tx?.type || "").toUpperCase();
-      const meta = tx?.meta || {};
-      const st = String(tx?.source_type || "").toUpperCase();
-      const ot = String(meta.orig_type || "").toUpperCase();
-      const kind = String(meta.kind || "").toUpperCase();
-      const amt = Number(tx?.amount || 0);
-
-      // Exclude self account and non-positive credits
-      if (
-        amt <= 0 ||
-        type.startsWith("SELF_ACCOUNT") ||
-        meta.ledger === "SELF_ACCOUNT" ||
-        type === "SELF_ACCOUNT_CREDIT" ||
-        type === "SELF_ACCOUNT_DEBIT"
-      ) {
-        continue;
-      }
-
-      // Check if transaction belongs to E-Education / Rank Upgrade
-      const isEEdu =
-        st === "RANK_UPGRADE" ||
-        st.includes("E_EDU") ||
-        meta.source === "E_EDU" ||
-        kind.includes("RANK_UPGRADE") ||
-        ot.includes("RANK_UPGRADE");
-
-      if (!isEEdu) continue;
-
-      const isDirect =
-        kind.includes("DIRECT") ||
-        ot.includes("DIRECT") ||
-        type.includes("DIRECT");
-
-      if (isDirect) {
-        directTotal += amt;
-      } else {
-        layerTotal += amt;
-      }
-    }
-
-    let netTotal = directTotal + layerTotal;
-
-    // Fallback if allTx list is empty or truncated
-    if (netTotal === 0 && walletHistory?.e_edu_total_earned) {
-      const fromApi = Number(walletHistory.e_edu_total_earned || 0);
-      if (fromApi > 0) {
-        netTotal = fromApi;
-        layerTotal = Number(walletHistory?.layer_edu_earned || 0);
-        directTotal = Number(walletHistory?.direct_edu_earned || 0);
-      }
-    }
+    const directTotal = Number(walletHistory?.direct_edu_earned ?? 0);
+    const layerTotal = Number(walletHistory?.layer_edu_earned ?? 0);
+    const total = Number(walletHistory?.e_edu_total_earned ?? (directTotal + layerTotal));
 
     return {
-      totalEEduIncome: Number(netTotal.toFixed(2)),
+      totalEEduIncome: Number(total.toFixed(2)),
       eEduLayerIncome: Number(layerTotal.toFixed(2)),
       eEduDirectBonus: Number(directTotal.toFixed(2)),
     };

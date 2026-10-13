@@ -4378,19 +4378,106 @@ def wallet_me_history(request):
         "COUPON_PURCHASE_CREDIT",
         "REDEEM_ECOUPON_CREDIT",
     ]
-    main_qs = WalletTransaction.objects.filter(
-        user=user,
-        type__in=main_types
-    ).exclude(
-        source_type="ADMIN_SERVICE_CHARGE"
-    ).order_by("-created_at")[:req_limit]
-    main_list = [txmap(x) for x in main_qs]
 
-    all_qs = WalletTransaction.objects.filter(
-        user=user
-    ).exclude(
-        source_type="ADMIN_SERVICE_CHARGE"
-    ).order_by("-created_at")[:req_limit]
+    cat_queries = {
+        "ALL": Q(),
+        "FIVE_LAYER": (
+            Q(type="AUTOPOOL_BONUS_FIVE") |
+            Q(meta__source__startswith="FIVE_MATRIX") |
+            (Q(type="INCOME_CREDIT_75") & (Q(meta__source__icontains="FIVE_MATRIX") | Q(meta__orig_type="AUTOPOOL_BONUS_FIVE") | Q(meta__trigger__in=["PRIME_750", "FIVE_150"])))
+        ) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT"),
+
+        "THREE_LAYER": (
+            Q(type="AUTOPOOL_BONUS_THREE") |
+            Q(meta__source__startswith="THREE_MATRIX") |
+            (Q(type="INCOME_CREDIT_75") & (Q(meta__source__icontains="THREE_MATRIX") | Q(meta__orig_type="AUTOPOOL_BONUS_THREE") | Q(meta__trigger__in=["PRIME_150", "THREE_150"])))
+        ) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT"),
+
+        "E_EDU_LAYER": (
+            Q(source_type="RANK_UPGRADE") &
+            (Q(meta__kind="RANK_UPGRADE_LEVEL") | Q(meta__orig_type="LEVEL_BONUS") | Q(type="LEVEL_BONUS"))
+        ) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT"),
+
+        "E_EDU_DIRECT": (
+            Q(source_type="RANK_UPGRADE") &
+            (Q(meta__kind="RANK_UPGRADE_DIRECT") | Q(meta__orig_type="DIRECT_REF_BONUS") | Q(type="DIRECT_REF_BONUS") | Q(meta__level=0))
+        ) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT"),
+
+        "E_EDU": (
+            Q(source_type="RANK_UPGRADE") |
+            Q(meta__source="E_EDU") |
+            Q(meta__kind__startswith="RANK_UPGRADE") |
+            Q(meta__orig_type__startswith="RANK_UPGRADE") |
+            Q(type__in=["LEVEL_BONUS", "DIRECT_REF_BONUS"])
+        ) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT"),
+
+        "SAVE": Q(type__in=["SELF_ACCOUNT_CREDIT", "SELF_ACCOUNT_DEBIT"]) | Q(meta__ledger="SELF_ACCOUNT"),
+        "SELF_ACCOUNT": Q(type__in=["SELF_ACCOUNT_CREDIT", "SELF_ACCOUNT_DEBIT"]) | Q(meta__ledger="SELF_ACCOUNT"),
+
+        "SSV_LAYER": (Q(type__icontains="SSV_LAYER") | Q(meta__source="SSV_LAYER") | Q(meta__orig_type__icontains="SSV_LAYER")) & ~Q(type__startswith="SELF_ACCOUNT"),
+
+        "SSV_BONUS": (Q(type__icontains="SSV_BONUS") | Q(type__icontains="SSV_DIRECT") | Q(meta__source="SSV_BONUS") | Q(meta__orig_type__icontains="SSV_BONUS")) & ~Q(type__startswith="SELF_ACCOUNT"),
+
+        "QR_SCANNER": (Q(type__in=["COMMISSION_CREDIT", "CAPTAIN_INCOME"]) | Q(source_type__in=["QR_SCANNER", "MERCHANT_CAPTAIN"]) | Q(meta__source__in=["QR_SCANNER", "MERCHANT_CAPTAIN"])) & ~Q(type__startswith="SELF_ACCOUNT"),
+
+        "TRIZONE": Q(type__in=["AUTO_ECOUPON_ISSUED", "AUTO_PURCHASE_DEBIT", "ECOUPON_WALLET_DEBIT", "COUPON_PURCHASE_CREDIT", "REDEEM_ECOUPON_CREDIT", "PRODUCT_WALLET_CREDIT", "PRODUCT_PURCHASE_DEBIT"]),
+
+        "ROYALTY": (Q(type="GLOBAL_ROYALTY") | Q(meta__source="GLOBAL_ROYALTY")) & ~Q(type__startswith="SELF_ACCOUNT"),
+    }
+
+    category_stats = {}
+    base_tx = WalletTransaction.objects.filter(user=user).exclude(source_type="ADMIN_SERVICE_CHARGE")
+    for cat_key, cat_q in cat_queries.items():
+        if cat_key == "ALL":
+            category_stats["ALL"] = {
+                "count": lifetime_credits_count or lifetime_total_count,
+                "total": lifetime_credits_total
+            }
+        elif cat_key in ("SAVE", "SELF_ACCOUNT"):
+            category_stats[cat_key] = {
+                "count": lifetime_self_credits_count or self_total_count,
+                "total": lifetime_self_credits_total
+            }
+        elif cat_key == "E_EDU_LAYER":
+            category_stats["E_EDU_LAYER"] = {
+                "count": base_tx.filter(cat_q).count(),
+                "total": layer_edu_earned
+            }
+        elif cat_key == "E_EDU_DIRECT":
+            category_stats["E_EDU_DIRECT"] = {
+                "count": base_tx.filter(cat_q).count(),
+                "total": direct_edu_earned
+            }
+        elif cat_key == "E_EDU":
+            category_stats["E_EDU"] = {
+                "count": base_tx.filter(cat_q).count(),
+                "total": e_edu_total_earned
+            }
+        else:
+            sub = base_tx.filter(cat_q)
+            cnt = sub.count()
+            tot = sub.filter(amount__gt=0).aggregate(s=Sum("amount"))["s"] or D("0.00")
+            category_stats[cat_key] = {"count": cnt, "total": str(tot)}
+
+    category_param = (request.GET.get("category") or "").strip().upper()
+    if category_param and category_param in cat_queries and category_param != "ALL":
+        cat_q = cat_queries[category_param]
+        all_qs = WalletTransaction.objects.filter(user=user).exclude(source_type="ADMIN_SERVICE_CHARGE").filter(cat_q).order_by("-created_at")[:req_limit]
+        main_qs = all_qs
+    else:
+        main_qs = WalletTransaction.objects.filter(
+            user=user,
+            type__in=main_types
+        ).exclude(
+            source_type="ADMIN_SERVICE_CHARGE"
+        ).order_by("-created_at")[:req_limit]
+        all_qs = WalletTransaction.objects.filter(
+            user=user
+        ).exclude(
+            source_type="ADMIN_SERVICE_CHARGE"
+        ).order_by("-created_at")[:req_limit]
+
+    main_list = [txmap(x) for x in main_qs]
     all_list = [txmap(x) for x in all_qs]
 
     data = {
@@ -4408,6 +4495,7 @@ def wallet_me_history(request):
         "direct_edu_earned": direct_edu_earned,
         "layer_edu_earned": layer_edu_earned,
         "e_edu_total_earned": e_edu_total_earned,
+        "category_stats": category_stats,
         "income": {
             "matrixLevel": layer_matrix_earned,
             "matrixFive": layer_matrix_earned,

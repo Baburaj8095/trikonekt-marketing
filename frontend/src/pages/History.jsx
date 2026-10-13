@@ -1355,7 +1355,8 @@ function PhonePeFilterDrawer({
     { label: "5-Matrix Layer", value: "FIVE_LAYER" },
     { label: "3-Matrix Layer", value: "THREE_LAYER" },
     { label: "E-Edu Layer", value: "E_EDU_LAYER" },
-    { label: "E-Edu Agent (All)", value: "E_EDU" },
+    { label: "E-Edu Direct Referral", value: "E_EDU_DIRECT" },
+    { label: "E-Edu All", value: "E_EDU" },
     { label: "Self Account / Self Block (25%)", value: "SAVE" },
     { label: "SSV Layer", value: "SSV_LAYER" },
     { label: "SSV Bonus", value: "SSV_BONUS" },
@@ -1892,11 +1893,21 @@ export default function History() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
-  const fetchHistory = async () => {
+  const [dbCategoryStats, setDbCategoryStats] = useState(null);
+
+  const fetchHistory = async (cat = sourceFilter) => {
     try {
       setErr("");
-      const res = await API.get("/accounts/wallet/me/history/?limit=2000");
+      const params = { limit: 2000 };
+      if (cat && cat !== "ALL") {
+        params.category = cat;
+      }
+      const res = await API.get("/accounts/wallet/me/history/", { params });
       const data = res?.data || {};
+
+      if (data?.category_stats) {
+        setDbCategoryStats(data.category_stats);
+      }
 
       setTop({
         main_income_balance: data?.top?.main_income_balance ?? "0.00",
@@ -1950,8 +1961,8 @@ export default function History() {
   };
 
   useEffect(() => {
-    fetchHistory();
-  }, []);
+    fetchHistory(sourceFilter);
+  }, [sourceFilter]);
 
   // Platform Tax Configuration
   const [taxConfig, setTaxConfig] = useState({
@@ -2171,6 +2182,8 @@ export default function History() {
           if (!isThreeLayerTx(tx) || isSelf) return false;
         } else if (sourceFilter === "E_EDU_LAYER") {
           if (!isEEduLayerTx(tx) || isSelf) return false;
+        } else if (sourceFilter === "E_EDU_DIRECT") {
+          if (!isEEduDirectTx(tx) || isSelf) return false;
         } else if (sourceFilter === "SSV_LAYER") {
           if (!isSsvLayerTx(tx)) return false;
         } else if (sourceFilter === "SSV_BONUS") {
@@ -2276,11 +2289,29 @@ export default function History() {
   }, [allTransactions, top]);
 
   const categoryStats = useMemo(() => {
+    if (dbCategoryStats && typeof dbCategoryStats === "object") {
+      return {
+        ALL: dbCategoryStats.ALL || { count: 0, total: 0 },
+        FIVE_LAYER: dbCategoryStats.FIVE_LAYER || { count: 0, total: 0 },
+        THREE_LAYER: dbCategoryStats.THREE_LAYER || { count: 0, total: 0 },
+        E_EDU_LAYER: dbCategoryStats.E_EDU_LAYER || { count: 0, total: 0 },
+        E_EDU_DIRECT: dbCategoryStats.E_EDU_DIRECT || { count: 0, total: 0 },
+        E_EDU: dbCategoryStats.E_EDU || { count: 0, total: 0 },
+        SAVE: dbCategoryStats.SAVE || { count: 0, total: 0 },
+        SSV_LAYER: dbCategoryStats.SSV_LAYER || { count: 0, total: 0 },
+        SSV_BONUS: dbCategoryStats.SSV_BONUS || { count: 0, total: 0 },
+        QR_SCANNER: dbCategoryStats.QR_SCANNER || { count: 0, total: 0 },
+        TRIZONE: dbCategoryStats.TRIZONE || { count: 0, total: 0 },
+        ROYALTY: dbCategoryStats.ROYALTY || { count: 0, total: 0 },
+      };
+    }
+
     const stats = {
       ALL: { count: 0, total: 0 },
       FIVE_LAYER: { count: 0, total: 0 },
       THREE_LAYER: { count: 0, total: 0 },
       E_EDU_LAYER: { count: 0, total: 0 },
+      E_EDU_DIRECT: { count: 0, total: 0 },
       E_EDU: { count: 0, total: 0 },
       SAVE: { count: 0, total: 0 },
       SSV_LAYER: { count: 0, total: 0 },
@@ -2344,7 +2375,7 @@ export default function History() {
     });
 
     return stats;
-  }, [allTransactions]);
+  }, [dbCategoryStats, allTransactions]);
 
   const dateLabel = useMemo(() => {
     if (datePreset === "all") return "All Time";
@@ -3229,10 +3260,29 @@ export default function History() {
             }}
           />
 
-          {/* Chip 5: E-Edu Agent */}
+          {/* Chip 5: E-Edu Direct Referral */}
+          <Chip
+            icon={<SchoolRoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "E_EDU_DIRECT" ? "#FFFFFF !important" : "#0284C7 !important" }} />}
+            label={`E-Edu Direct (${categoryStats.E_EDU_DIRECT.count}) ₹${fmtAmount(categoryStats.E_EDU_DIRECT.total)}`}
+            onClick={() => setSourceFilter("E_EDU_DIRECT")}
+            sx={{
+              fontWeight: 800,
+              fontSize: 11.5,
+              height: 32,
+              borderRadius: "999px",
+              bgcolor: sourceFilter === "E_EDU_DIRECT" ? "#0284C7" : "#FFFFFF",
+              color: sourceFilter === "E_EDU_DIRECT" ? "#FFFFFF" : "#0369A1",
+              border: "1.5px solid",
+              borderColor: sourceFilter === "E_EDU_DIRECT" ? "#0284C7" : "#BAE6FD",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          />
+
+          {/* Chip 6: E-Edu All */}
           <Chip
             icon={<SchoolRoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "E_EDU" ? "#FFFFFF !important" : "#2563EB !important" }} />}
-            label={`E-Edu Agent (${categoryStats.E_EDU.count}) ₹${fmtAmount(categoryStats.E_EDU.total)}`}
+            label={`E-Edu All (${categoryStats.E_EDU.count}) ₹${fmtAmount(categoryStats.E_EDU.total)}`}
             onClick={() => setSourceFilter("E_EDU")}
             sx={{
               fontWeight: 800,
@@ -3421,6 +3471,27 @@ export default function History() {
                 </Typography>
                 <Typography sx={{ fontSize: 11, color: "#6B21A8", opacity: 0.85, mt: 0.2 }}>
                   Generation-matching layer bonus distributed across 10-rank E-Education upgrades.
+                </Typography>
+              </Box>
+            </Stack>
+          </Paper>
+        )}
+
+        {sourceFilter === "E_EDU_DIRECT" && (
+          <Paper elevation={0} sx={{ p: 1.6, borderRadius: "16px", bgcolor: "#F0F9FF", border: "1px solid #BAE6FD" }}>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Avatar sx={{ bgcolor: "#E0F2FE", color: "#0284C7", width: 38, height: 38 }}>
+                <SchoolRoundedIcon sx={{ fontSize: 20 }} />
+              </Avatar>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0C4A6E" }}>
+                  E-Edu Direct Referral Bonus
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#0284C7", fontWeight: 700 }}>
+                  Total Transactions: {categoryStats.E_EDU_DIRECT.count} • Total Amount Received: ₹ {fmtAmount(categoryStats.E_EDU_DIRECT.total)}
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: "#0369A1", opacity: 0.85, mt: 0.2 }}>
+                  Direct sponsor referral bonus (50% net / 75% spendable wallet credit) on direct team upgrades.
                 </Typography>
               </Box>
             </Stack>
