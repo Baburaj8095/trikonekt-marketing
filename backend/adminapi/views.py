@@ -630,6 +630,8 @@ class AdminUsersList(ListAPIView):
         qs = (
             CustomUser.objects
             .select_related(*select_related)
+            .exclude(is_staff=True)
+            .exclude(identity_type=CustomUser.IDENTITY_ADMIN)
         )
         if prefetches:
             qs = qs.prefetch_related(*prefetches)

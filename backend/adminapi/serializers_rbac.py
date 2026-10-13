@@ -86,7 +86,8 @@ class AdminUserCreateSerializer(serializers.ModelSerializer):
         role_id = validated_data.pop("role_id", None)
         role_ids = validated_data.pop("role_ids", [])
         password = validated_data.pop("password")
-        # Always create as staff for admin access (not superuser)
+        # Always create as staff for admin access (not superuser), with category='admin'
+        validated_data.setdefault("category", "admin")
         user = CustomUser.objects.create(is_staff=True, identity_type=CustomUser.IDENTITY_ADMIN, **validated_data)
         user.set_password(password)
         user.save(update_fields=["password"])
