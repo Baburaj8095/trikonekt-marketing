@@ -676,96 +676,26 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
     return Number(walletHistory?.current_limit || tier?.limit || 1750);
   }, [currentLevel, walletHistory]);
 
-  // Pure Layer Income From All Sources (strictly matching History "Source: Layer & Blocks")
+  // Pure Layer Income From All Sources (strictly read from DB category aggregates, zero client-side slicing)
   const { rawLayerIncome, layerBreakdown } = useMemo(() => {
-    const allTx = [
-      ...(walletHistory?.all_transactions || []),
-      ...(walletHistory?.main_wallet || []),
-    ];
+    const stats = walletHistory?.category_stats || {};
+    const five = Number(stats.FIVE_LAYER?.total ?? 0);
+    const three = Number(stats.THREE_LAYER?.total ?? 0);
+    const eEdu = Number(stats.E_EDU_LAYER?.total ?? walletHistory?.layer_edu_earned ?? 0);
+    const spp = Number(walletHistory?.income?.sppLevel ?? 0);
 
-    let total = 0;
-    let fiveMatrix = 0;
-    let threeMatrix = 0;
-    let eEduSlabs = 0;
-    let otherLayers = 0;
-    const seen = new Set();
-
-    for (const tx of allTx) {
-      if (!tx?.id || seen.has(tx.id)) continue;
-      seen.add(tx.id);
-
-      const type = String(tx?.type || "").toUpperCase();
-      const meta = tx?.meta || {};
-      const src = String(meta.source || "").toUpperCase();
-      const st = String(tx?.source_type || "").toUpperCase();
-      const ot = String(meta.orig_type || "").toUpperCase();
-      const trig = String(meta.trigger || "").toUpperCase();
-      const kind = String(meta.kind || "").toUpperCase();
-      const amt = Number(tx?.amount || 0);
-
-      // Exclude self account and non-positive credits
-      if (
-        amt <= 0 ||
-        type.startsWith("SELF_ACCOUNT") ||
-        meta.ledger === "SELF_ACCOUNT" ||
-        type === "SELF_ACCOUNT_CREDIT" ||
-        type === "SELF_ACCOUNT_DEBIT"
-      ) {
-        continue;
-      }
-
-      // Pure Layer & Blocks classification (strictly matches History.jsx classifyTransaction === "LAYER")
-      const isLayer =
-        type === "LEVEL_BONUS" ||
-        type === "AUTOPOOL_BONUS_FIVE" ||
-        type === "AUTOPOOL_BONUS_THREE" ||
-        (st === "RANK_UPGRADE" && (ot.includes("LEVEL") || type.includes("LEVEL") || kind.includes("LEVEL"))) ||
-        type === "PRIME_150_SELF" ||
-        type === "PRIME_750_SELF" ||
-        type === "PRIME_759_SELF" ||
-        src.startsWith("THREE_MATRIX") ||
-        src.startsWith("FIVE_MATRIX") ||
-        (type === "INCOME_CREDIT_75" && (
-          ot.includes("LEVEL") ||
-          ot.includes("AUTOPOOL") ||
-          src.includes("MATRIX") ||
-          trig === "PRIME_150" ||
-          trig === "PRIME_750" ||
-          trig === "PRIME_759" ||
-          trig === "SELF_REBIRTH_250"
-        ));
-
-      if (isLayer) {
-        total += amt;
-        if (src.includes("FIVE") || ot === "AUTOPOOL_BONUS_FIVE" || st.includes("FIVE")) {
-          fiveMatrix += amt;
-        } else if (src.includes("THREE") || ot === "AUTOPOOL_BONUS_THREE" || st.includes("THREE")) {
-          threeMatrix += amt;
-        } else if (st === "RANK_UPGRADE" || kind.startsWith("RANK_UPGRADE") || st.includes("E_EDU") || meta.source === "E_EDU") {
-          eEduSlabs += amt;
-        } else {
-          otherLayers += amt;
-        }
-      }
-    }
-
-    if (total === 0) {
-      const fromApi = Number(
-        walletHistory?.layer_income_all_sources ||
-        walletHistory?.layer_matrix_earned ||
-        walletHistory?.level_earnings ||
-        0
-      );
-      if (fromApi > 0) total = fromApi;
-    }
+    const total = Number(
+      walletHistory?.layer_income_all_sources ??
+      (five + three + eEdu + spp)
+    );
 
     return {
       rawLayerIncome: Number(total.toFixed(2)),
       layerBreakdown: {
-        fiveMatrix: Number(fiveMatrix.toFixed(2)),
-        threeMatrix: Number(threeMatrix.toFixed(2)),
-        eEduSlabs: Number(eEduSlabs.toFixed(2)),
-        sppLevel: Number(otherLayers.toFixed(2)),
+        fiveMatrix: Number(five.toFixed(2)),
+        threeMatrix: Number(three.toFixed(2)),
+        eEduSlabs: Number(eEdu.toFixed(2)),
+        sppLevel: Number(spp.toFixed(2)),
       },
     };
   }, [walletHistory]);

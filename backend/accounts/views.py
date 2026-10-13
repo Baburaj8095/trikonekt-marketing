@@ -4384,14 +4384,22 @@ def wallet_me_history(request):
         "FIVE_LAYER": (
             Q(type="AUTOPOOL_BONUS_FIVE") |
             Q(meta__source__startswith="FIVE_MATRIX") |
-            (Q(type="INCOME_CREDIT_75") & (Q(meta__source__icontains="FIVE_MATRIX") | Q(meta__orig_type="AUTOPOOL_BONUS_FIVE") | Q(meta__trigger__in=["PRIME_750", "FIVE_150"])))
-        ) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT"),
+            (Q(type="INCOME_CREDIT_75") & (
+                Q(meta__source__icontains="FIVE_MATRIX") |
+                Q(meta__orig_type="AUTOPOOL_BONUS_FIVE") |
+                (Q(meta__trigger__in=["PRIME_750", "PRIME_759", "FIVE_150", "SELF_REBIRTH_250"]) & ~Q(meta__source__icontains="THREE_MATRIX") & ~Q(meta__orig_type="AUTOPOOL_BONUS_THREE"))
+            ))
+        ) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT") & ~Q(meta__source__icontains="THREE_MATRIX") & ~Q(meta__orig_type="AUTOPOOL_BONUS_THREE"),
 
         "THREE_LAYER": (
             Q(type="AUTOPOOL_BONUS_THREE") |
             Q(meta__source__startswith="THREE_MATRIX") |
-            (Q(type="INCOME_CREDIT_75") & (Q(meta__source__icontains="THREE_MATRIX") | Q(meta__orig_type="AUTOPOOL_BONUS_THREE") | Q(meta__trigger__in=["PRIME_150", "THREE_150"])))
-        ) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT"),
+            (Q(type="INCOME_CREDIT_75") & (
+                Q(meta__source__icontains="THREE_MATRIX") |
+                Q(meta__orig_type="AUTOPOOL_BONUS_THREE") |
+                (Q(meta__trigger__in=["PRIME_150", "THREE_150", "SELF_REBIRTH_250"]) & ~Q(meta__source__icontains="FIVE_MATRIX") & ~Q(meta__orig_type="AUTOPOOL_BONUS_FIVE"))
+            ))
+        ) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT") & ~Q(meta__source__icontains="FIVE_MATRIX") & ~Q(meta__orig_type="AUTOPOOL_BONUS_FIVE"),
 
         "E_EDU_LAYER": (
             Q(source_type="RANK_UPGRADE") &
@@ -4458,6 +4466,11 @@ def wallet_me_history(request):
             cnt = sub.count()
             tot = sub.filter(amount__gt=0).aggregate(s=Sum("amount"))["s"] or D("0.00")
             category_stats[cat_key] = {"count": cnt, "total": str(tot)}
+
+    five_layer_tot = D(category_stats.get("FIVE_LAYER", {}).get("total", "0.00"))
+    three_layer_tot = D(category_stats.get("THREE_LAYER", {}).get("total", "0.00"))
+    e_layer_tot = D(layer_edu_earned or "0.00")
+    layer_matrix_earned = str(five_layer_tot + three_layer_tot + e_layer_tot)
 
     category_param = (request.GET.get("category") or "").strip().upper()
     if category_param and category_param in cat_queries and category_param != "ALL":
