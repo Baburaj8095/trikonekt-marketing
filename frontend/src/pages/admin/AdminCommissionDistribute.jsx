@@ -266,6 +266,13 @@ export default function AdminCommissionDistribute() {
     state_roles_pct: { pincode: 10, pincode_coord: 5, district: 15, district_coord: 10, state: 40, state_coord: 20 },
   };
 
+  const defaultFranchiseRebirthAllocation = {
+    ...defaultRebirthAllocation,
+    direct_sponsor: 25,
+    company_admin: 22,
+    company_gross: 22,
+  };
+
   const [rankConfig, setRankConfig] = useState(() => {
     try {
       const raw = localStorage.getItem("tri_rank_upgrade_config");
@@ -285,7 +292,11 @@ export default function AdminCommissionDistribute() {
           parsed.rebirth_allocation = parsed.consumer_rebirth_allocation;
         }
         if (!parsed.franchise_rebirth_allocation) {
-          parsed.franchise_rebirth_allocation = JSON.parse(JSON.stringify(parsed.rebirth_allocation || defaultRebirthAllocation));
+          parsed.franchise_rebirth_allocation = JSON.parse(JSON.stringify(defaultFranchiseRebirthAllocation));
+        } else if (parsed.franchise_rebirth_allocation.direct_sponsor === 40 && parsed.franchise_rebirth_allocation.company_admin === 7) {
+          parsed.franchise_rebirth_allocation.direct_sponsor = 25;
+          parsed.franchise_rebirth_allocation.company_admin = 22;
+          parsed.franchise_rebirth_allocation.company_gross = 22;
         }
         localStorage.setItem("tri_rank_upgrade_config", JSON.stringify(parsed));
         return parsed;
@@ -297,7 +308,7 @@ export default function AdminCommissionDistribute() {
       upgrade_window_l8_l10: 15,
       rebirth_allocation: baseRebirth,
       consumer_rebirth_allocation: JSON.parse(JSON.stringify(baseRebirth)),
-      franchise_rebirth_allocation: JSON.parse(JSON.stringify(baseRebirth)),
+      franchise_rebirth_allocation: JSON.parse(JSON.stringify(defaultFranchiseRebirthAllocation)),
       levels: [
         { level: 1, name: "Layer 1", upgrade_amount: 250, earning_limit: 1750, team_count: "5" },
         { level: 2, name: "Layer 2", upgrade_amount: 500, earning_limit: 2000, team_count: "25" },
@@ -853,7 +864,11 @@ export default function AdminCommissionDistribute() {
             cfg.consumer_rebirth_allocation = JSON.parse(JSON.stringify(cfg.rebirth_allocation));
           }
           if (!cfg.franchise_rebirth_allocation) {
-            cfg.franchise_rebirth_allocation = JSON.parse(JSON.stringify(cfg.rebirth_allocation || defaultRebirthAllocation));
+            cfg.franchise_rebirth_allocation = JSON.parse(JSON.stringify(defaultFranchiseRebirthAllocation));
+          } else if (cfg.franchise_rebirth_allocation.direct_sponsor === 40 && cfg.franchise_rebirth_allocation.company_admin === 7) {
+            cfg.franchise_rebirth_allocation.direct_sponsor = 25;
+            cfg.franchise_rebirth_allocation.company_admin = 22;
+            cfg.franchise_rebirth_allocation.company_gross = 22;
           }
           if (!cfg.rebirth_allocation) {
             cfg.rebirth_allocation = cfg.consumer_rebirth_allocation;

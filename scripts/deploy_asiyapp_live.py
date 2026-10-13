@@ -1,14 +1,28 @@
 import subprocess
 import os
+import tarfile
 
 ssh_key = r"C:\Users\babur\Downloads\TRI_MARKETING.pem"
 ec2_ip = "65.0.40.184"
 ec2_user = "ubuntu"
 
+build_dir = r"frontend\build"
+tar_path = "build.tar.gz"
+
+if os.path.exists(build_dir):
+    print("0. Packaging frontend/build into build.tar.gz...")
+    with tarfile.open(tar_path, "w:gz") as tar:
+        for root, dirs, files in os.walk(build_dir):
+            for file in files:
+                full_path = os.path.join(root, file)
+                rel_path = os.path.relpath(full_path, build_dir)
+                tar.add(full_path, arcname=rel_path)
+    print(f"Packaged {tar_path} ({os.path.getsize(tar_path)} bytes)")
+
 print("1. Uploading frontend build.tar.gz to EC2...")
 subprocess.run([
     "scp", "-i", ssh_key, "-o", "StrictHostKeyChecking=no",
-    "build.tar.gz", f"{ec2_user}@{ec2_ip}:/tmp/build.tar.gz"
+    tar_path, f"{ec2_user}@{ec2_ip}:/tmp/build.tar.gz"
 ], check=True)
 
 print("2. Extracting build.tar.gz into /srv/trikonekt/staging/frontend/build...")
@@ -45,7 +59,7 @@ for local_f, remote_f in backend_files:
 
 print("4. Reloading Gunicorn backend and Nginx...")
 reload_cmd = (
-    "sudo systemctl restart trikonekt-backend || sudo systemctl restart gunicorn; "
+    "sudo systemctl restart trikonekt-staging-web.service trikonekt-staging-worker.service; "
     "sudo nginx -t && sudo systemctl reload nginx"
 )
 subprocess.run([

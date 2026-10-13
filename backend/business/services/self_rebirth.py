@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from django.db import models, transaction
 from accounts.models import CustomUser, Wallet, WalletTransaction
@@ -35,6 +35,114 @@ def _matrix_ancestor_accounts(acc: AutoPoolAccount, depth: int = 15) -> List[Aut
     return chain
 
 
+def check_consumer_2k_package_eligibility(consumer: CustomUser) -> bool:
+    """
+    Checks if consumer has purchased at least the ₹2,000 package.
+    Eligible if:
+      - Has AutoPoolAccount in FIVE_150 or THREE_150, OR
+      - Has approved/completed PromoPurchase >= 2000, OR
+      - Has first_purchase_activated_at set and account_active=True.
+    """
+    if not consumer:
+        return False
+    try:
+        if AutoPoolAccount.objects.filter(owner=consumer, pool_type__in=["FIVE_150", "THREE_150"]).exists():
+            return True
+    except Exception:
+        pass
+
+    try:
+        from business.models import PromoPurchase
+        paid = PromoPurchase.objects.filter(
+            user=consumer,
+            status__in=["APPROVED", "COMPLETED", "SUCCESS", "ACTIVE"]
+        ).aggregate(total=models.Sum("amount_paid"))["total"] or Decimal("0.00")
+        if paid >= Decimal("2000.00"):
+            return True
+    except Exception:
+        pass
+
+    if getattr(consumer, "first_purchase_activated_at", None) and getattr(consumer, "account_active", False):
+        return True
+
+    return False
+
+
+def _resolve_consumer_sponsor(consumer: CustomUser, company_user: Optional[CustomUser] = None) -> Optional[CustomUser]:
+    """
+    Resolves the consumer's sponsor. Can be root consumer id (9999999999) or any onboarded consumer.
+    """
+    if not consumer:
+        return company_user
+    sponsor = getattr(consumer, "registered_by", None)
+    if sponsor:
+        return sponsor
+    sid = str(getattr(consumer, "sponsor_id", "") or "").strip()
+    if sid:
+        sponsor = CustomUser.objects.filter(
+            models.Q(username__iexact=sid) |
+            models.Q(phone=sid) |
+            models.Q(prefixed_id__iexact=sid)
+        ).first()
+        if sponsor:
+            return sponsor
+    return company_user
+
+
+def _resolve_rebirth_target_user(
+    funding_user: CustomUser,
+    company_user: Optional[CustomUser] = None
+) -> Tuple[CustomUser, Optional[CustomUser], bool]:
+    """
+    Resolves:
+      (target_matrix_user, sponsor, is_franchise_flow)
+    Rules:
+      1. If funding_user is Consumer:
+         - target_matrix_user = funding_user
+         - sponsor = _resolve_consumer_sponsor(funding_user, company_user)
+         - is_franchise_flow = False
+      2. If funding_user is Franchise Agency / Employee:
+         - Match consumer via mobile number (`phone`)
+         - Consumer must have purchased at least ₹2,000 package
+         - If eligible:
+             * target_matrix_user = consumer
+             * sponsor = _resolve_consumer_sponsor(consumer, company_user)
+             * is_franchise_flow = True
+         - Fallback (sad case: no consumer account or <2k purchase):
+             * target_matrix_user = company_user or funding_user
+             * sponsor = company_user
+             * is_franchise_flow = True
+    """
+    is_franchise = _is_agency_or_employee(funding_user)
+    if not is_franchise:
+        sponsor = _resolve_consumer_sponsor(funding_user, company_user)
+        return funding_user, sponsor, False
+
+    phone = (getattr(funding_user, "phone", "") or "").strip()
+    consumer_user = None
+    if phone:
+        consumer_user = CustomUser.objects.filter(
+            phone=phone,
+            category="consumer"
+        ).order_by("id").first()
+        if not consumer_user:
+            consumer_user = CustomUser.objects.filter(
+                phone=phone
+            ).exclude(category__startswith="agency").exclude(role="agency").order_by("id").first()
+
+    if consumer_user and check_consumer_2k_package_eligibility(consumer_user):
+        sponsor = _resolve_consumer_sponsor(consumer_user, company_user)
+        return consumer_user, sponsor, True
+
+    logger.warning(
+        "Franchise rebirth: Agency %s (phone %s) has no active 2k consumer account. Routing matrix placement to company apex root.",
+        getattr(funding_user, "username", "unknown"),
+        phone
+    )
+    fallback_user = company_user or funding_user
+    return fallback_user, fallback_user, True
+
+
 def get_rebirth_config(is_franchise: bool = False) -> Dict[str, Any]:
     """Load admin-configured Self Rebirth ID (₹250) Allocation or balanced defaults."""
     cfg = CommissionConfig.get_solo()
@@ -48,7 +156,7 @@ def get_rebirth_config(is_franchise: bool = False) -> Dict[str, Any]:
     # Defaults matching admin screen with 0 imbalance (total ₹250)
     defaults = {
         "total_amount": 250.0,
-        "direct_sponsor": 40.0,
+        "direct_sponsor": 25.0 if is_franchise else 40.0,
         "matrix_5": 80.0,
         "matrix_3": 20.0,
         "pincode_royalty": 15.0,
@@ -60,14 +168,17 @@ def get_rebirth_config(is_franchise: bool = False) -> Dict[str, Any]:
         "statewise_royalty_l8_l10": 10.0,
         "district_captain_royalty": 5.0,
         "state_captain_royalty": 5.0,
-        "company_admin": 10.0,
+        "statewise_ssv_voucher": 1.0,
+        "statewise_zonal_head": 1.0,
+        "statewise_rewards": 1.0,
+        "company_admin": 22.0 if is_franchise else 7.0,
         # legacy fallback aliases
         "franchise_pool": 15.0,
         "district_pool": 10.0,
         "state_pool": 15.0,
         "district_royalty_t1": 15.0,
         "district_royalty_t2": 15.0,
-        "company_gross": 10.0,
+        "company_gross": 22.0 if is_franchise else 7.0,
         "matrix_5_levels": [{"level": i + 1, "amount": 8.0} for i in range(10)],
         "matrix_3_levels": [{"level": i + 1, "amount": 1.38 if i == 14 else 1.33} for i in range(15)],
         "pincode_roles_pct": {
@@ -269,25 +380,35 @@ def _distribute_pincode_royalty(user: CustomUser, pack_index: Optional[int], con
 def distribute_self_rebirth_250(user: CustomUser, pack_index: Optional[int] = None) -> Dict[str, Any]:
     """
     Executes a 100% Admin-Controlled ₹250 Self Rebirth:
-      1. Places 1 seat in 5-Matrix (5-Block tree)
-      2. Places 1 seat in 3-Matrix (3-Block tree)
-      3. Distributes 5-Matrix upline earnings (10 levels, ₹8/level default)
-      4. Distributes 3-Matrix upline earnings (15 levels, ₹1.33/level default)
-      5. Credits Direct Sponsor Bonus (₹40 default)
-      6. Credits Geo/Franchise, District, State, and Royalty pools
-      7. Credits Company Gross Retention (₹15 default)
+      1. Resolves target matrix user:
+         - Consumer Rebirth: places in consumer's own tree, sponsor bonus to consumer's sponsor (₹40 default).
+         - Franchise Rebirth: maps via mobile number to Consumer (requires active ₹2k package),
+           places seats under Consumer user (clusters in 5-matrix, global BFS in 3-matrix),
+           and credits Direct Sponsor Bonus to Consumer's Referrer (₹25 default).
+      2. Places 1 seat in 5-Matrix (5-Block tree)
+      3. Places 1 seat in 3-Matrix (3-Block tree)
+      4. Distributes 5-Matrix upline earnings (10 levels, ₹8/level default)
+      5. Distributes 3-Matrix upline earnings (15 levels, ₹1.33/level default)
+      6. Credits Direct Sponsor Bonus
+      7. Credits Geo/Franchise, District, State, and Royalty pools
+      8. Credits Company Gross Retention (₹7 default for consumer, ₹22 default for franchise)
     """
     if not user:
         return {"success": False, "error": "User required"}
 
-    is_franchise = _is_agency_or_employee(user)
-    conf = get_rebirth_config(is_franchise=is_franchise)
+    cfg = CommissionConfig.get_solo()
+    company_user = cfg.get_company_user()
+
+    # Resolve target matrix user and sponsor
+    target_matrix_user, sponsor, is_franchise_flow = _resolve_rebirth_target_user(user, company_user)
+
+    conf = get_rebirth_config(is_franchise=is_franchise_flow)
     src_type = "SELF_REBIRTH_250"
     src_id = str(pack_index) if pack_index is not None else ""
 
-    # Open matrix seats in both pools
+    # Open matrix seats in both pools under the target matrix user
     acc5 = AutoPoolAccount.place_in_five_pool(
-        user,
+        target_matrix_user,
         pool_type="FIVE_150",
         amount=_q2(conf.get("total_amount", 250)),
         source_type=src_type,
@@ -295,7 +416,7 @@ def distribute_self_rebirth_250(user: CustomUser, pack_index: Optional[int] = No
     )
 
     acc3 = AutoPoolAccount.place_in_three_pool(
-        user,
+        target_matrix_user,
         pool_type="THREE_150",
         amount=_q2(conf.get("total_amount", 250)),
         source_type=src_type,
@@ -324,8 +445,10 @@ def distribute_self_rebirth_250(user: CustomUser, pack_index: Optional[int] = No
                         "source": "FIVE_MATRIX_REBIRTH_250",
                         "level_index": idx + 1,
                         "fixed": True,
-                        "from_user_id": user.id,
-                        "from_user": getattr(user, "username", None),
+                        "from_user_id": target_matrix_user.id,
+                        "from_user": getattr(target_matrix_user, "username", None),
+                        "funding_agency_id": user.id if is_franchise_flow else None,
+                        "funding_agency_username": getattr(user, "username", None) if is_franchise_flow else None,
                         "trigger": "SELF_REBIRTH_250",
                         "matrix_root": {"account_id": node.id},
                     },
@@ -359,8 +482,10 @@ def distribute_self_rebirth_250(user: CustomUser, pack_index: Optional[int] = No
                         "source": "THREE_MATRIX_REBIRTH_250",
                         "level_index": idx + 1,
                         "fixed": True,
-                        "from_user_id": user.id,
-                        "from_user": getattr(user, "username", None),
+                        "from_user_id": target_matrix_user.id,
+                        "from_user": getattr(target_matrix_user, "username", None),
+                        "funding_agency_id": user.id if is_franchise_flow else None,
+                        "funding_agency_username": getattr(user, "username", None) if is_franchise_flow else None,
                         "trigger": "SELF_REBIRTH_250",
                         "matrix_root": {"account_id": node.id},
                     },
@@ -372,11 +497,8 @@ def distribute_self_rebirth_250(user: CustomUser, pack_index: Optional[int] = No
             except Exception as e:
                 logger.warning(f"3-Matrix credit failed for node {node.id}: {e}")
 
-    # 3. Direct Sponsor Bonus (default ₹40)
-    cfg = CommissionConfig.get_solo()
-    company_user = cfg.get_company_user()
-    sponsor = getattr(user, "registered_by", None) or company_user
-    sponsor_amt = _q2(conf.get("direct_sponsor", 40.0))
+    # 3. Direct Sponsor Bonus (Dynamic: ₹25 default for franchise, ₹40 for consumer)
+    sponsor_amt = _q2(conf.get("direct_sponsor", 25.0 if is_franchise_flow else 40.0))
     if sponsor and sponsor_amt > 0:
         try:
             sw = Wallet.get_or_create_for_user(sponsor)
@@ -384,10 +506,13 @@ def distribute_self_rebirth_250(user: CustomUser, pack_index: Optional[int] = No
                 sponsor_amt,
                 tx_type="DIRECT_REF_BONUS",
                 meta={
-                    "from_user_id": user.id,
-                    "from_user": getattr(user, "username", None),
-                    "auto_rule": "SELF_REBIRTH_250",
+                    "from_user_id": target_matrix_user.id,
+                    "from_user": getattr(target_matrix_user, "username", None),
+                    "funding_agency_id": user.id if is_franchise_flow else None,
+                    "funding_agency_username": getattr(user, "username", None) if is_franchise_flow else None,
+                    "auto_rule": "FRANCHISE_SELF_REBIRTH_250" if is_franchise_flow else "SELF_REBIRTH_250",
                     "pack_index": pack_index,
+                    "is_franchise": is_franchise_flow,
                 },
                 source_type=src_type,
                 source_id=src_id,
@@ -396,14 +521,15 @@ def distribute_self_rebirth_250(user: CustomUser, pack_index: Optional[int] = No
             logger.warning(f"Sponsor bonus credit failed: {e}")
 
     # 4. Pincode Royalty (default ₹15.00) to 6-role geo upline
+    geo_target = target_matrix_user if getattr(target_matrix_user, "pincode", None) else user
     pincode_paid = {}
     try:
-        pincode_paid = _distribute_pincode_royalty(user, pack_index, conf)
+        pincode_paid = _distribute_pincode_royalty(geo_target, pack_index, conf)
     except Exception as e:
         logger.warning(f"Pincode royalty distribution failed for rebirth pack #{pack_index}: {e}")
 
-    # 5. Company Admin Gross Retention (default ₹10.00 / dynamic)
-    company_amt = _q2(conf.get("company_admin", conf.get("company_gross", 10.0)))
+    # 5. Company Admin Gross Retention (Dynamic: ₹22 default for franchise, ₹7 for consumer)
+    company_amt = _q2(conf.get("company_admin", conf.get("company_gross", 22.0 if is_franchise_flow else 7.0)))
     if company_user and company_amt > 0:
         try:
             cw = Wallet.get_or_create_for_user(company_user)
@@ -411,10 +537,12 @@ def distribute_self_rebirth_250(user: CustomUser, pack_index: Optional[int] = No
                 company_amt,
                 tx_type="TAX_POOL_CREDIT",
                 meta={
-                    "from_user_id": user.id,
-                    "from_user": getattr(user, "username", None),
+                    "from_user_id": target_matrix_user.id,
+                    "from_user": getattr(target_matrix_user, "username", None),
+                    "funding_agency_id": user.id if is_franchise_flow else None,
+                    "funding_agency_username": getattr(user, "username", None) if is_franchise_flow else None,
                     "no_withhold": True,
-                    "auto_rule": "SELF_REBIRTH_250",
+                    "auto_rule": "FRANCHISE_SELF_REBIRTH_250" if is_franchise_flow else "SELF_REBIRTH_250",
                     "pack_index": pack_index,
                     "pool_name": "COMPANY_ADMIN_RETENTION",
                 },
@@ -426,7 +554,7 @@ def distribute_self_rebirth_250(user: CustomUser, pack_index: Optional[int] = No
 
     # 5b. Statewise SSV Voucher Contribution (Dynamic ₹1.00 from Rebirth into State Pool)
     ssv_rate = _q2(conf.get("statewise_ssv_voucher", 1.0))
-    user_state = getattr(user, "state", None)
+    user_state = getattr(geo_target, "state", None) or getattr(user, "state", None)
     if not user_state:
         from locations.models import State
         user_state = State.objects.filter(name__icontains="Karnataka").first()
@@ -442,22 +570,25 @@ def distribute_self_rebirth_250(user: CustomUser, pack_index: Optional[int] = No
     # 6. Audit Trail
     try:
         from coupons.models import AuditTrail
-        user_pin = (getattr(user, "pincode", "") or "").strip()
-        user_state_name = getattr(getattr(user, "state", None), "name", "")
-        user_city_name = getattr(getattr(user, "city", None), "name", "")
+        geo_pin = (getattr(geo_target, "pincode", "") or "").strip()
+        geo_state_name = getattr(getattr(geo_target, "state", None), "name", "")
+        geo_city_name = getattr(getattr(geo_target, "city", None), "name", "")
 
         AuditTrail.objects.create(
             action="self_rebirth_250_distributed",
             actor=user,
-            notes=f"Self Rebirth 250 (pack #{pack_index}) executed successfully",
+            notes=f"Self Rebirth 250 (pack #{pack_index}, is_franchise={is_franchise_flow}) executed successfully",
             metadata={
                 "pack_index": pack_index,
+                "is_franchise": is_franchise_flow,
+                "funding_user_id": user.id,
+                "target_matrix_user_id": target_matrix_user.id,
                 "acc5_id": getattr(acc5, "id", None),
                 "acc3_id": getattr(acc3, "id", None),
                 "sponsor_id": getattr(sponsor, "id", None),
-                "pincode": user_pin,
-                "city": user_city_name,
-                "state": user_state_name,
+                "pincode": geo_pin,
+                "city": geo_city_name,
+                "state": geo_state_name,
                 "pincode_royalty_paid": pincode_paid,
                 "company_admin_amt": float(company_amt),
             },
@@ -467,9 +598,12 @@ def distribute_self_rebirth_250(user: CustomUser, pack_index: Optional[int] = No
 
     return {
         "success": True,
+        "is_franchise": is_franchise_flow,
+        "target_matrix_user_id": target_matrix_user.id,
         "acc5_id": getattr(acc5, "id", None),
         "acc3_id": getattr(acc3, "id", None),
         "pack_index": pack_index,
         "pincode_royalty_paid": pincode_paid,
     }
+
 
