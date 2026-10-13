@@ -38,10 +38,14 @@ subprocess.run([
     f"{ec2_user}@{ec2_ip}", extract_cmd
 ], check=True)
 
-print("3. Uploading backend updates...")
 backend_files = [
     (r"backend\adminapi\views.py", "/srv/trikonekt/staging/backend/adminapi/views.py"),
     (r"backend\business\services\self_rebirth.py", "/srv/trikonekt/staging/backend/business/services/self_rebirth.py"),
+    (r"backend\business\views_agency_territory.py", "/srv/trikonekt/staging/backend/business/views_agency_territory.py"),
+    (r"backend\business\urls.py", "/srv/trikonekt/staging/backend/business/urls.py"),
+    (r"backend\core\urls.py", "/srv/trikonekt/staging/backend/core/urls.py"),
+    (r"backend\locations\views.py", "/srv/trikonekt/staging/backend/locations/views.py"),
+    (r"backend\locations\urls.py", "/srv/trikonekt/staging/backend/locations/urls.py"),
 ]
 
 for local_f, remote_f in backend_files:

@@ -164,6 +164,64 @@ export default function AdminFranchiseUsers() {
   const [pinResolving, setPinResolving] = useState(false);
   const [pinResolvedInfo, setPinResolvedInfo] = useState(null);
 
+  // Cascading Location Hierarchy State
+  const [districtOptions, setDistrictOptions] = useState(KARNATAKA_DISTRICTS);
+  const [pincodeOptions, setPincodeOptions] = useState([]);
+  const [loadingDistricts, setLoadingDistricts] = useState(false);
+  const [loadingPincodes, setLoadingPincodes] = useState(false);
+
+  // Fetch districts whenever stateName changes
+  useEffect(() => {
+    if (!registerForm.stateName) return;
+    let isMounted = true;
+    setLoadingDistricts(true);
+    API.get(`/location/districts/by-state/?state_name=${encodeURIComponent(registerForm.stateName)}`)
+      .then((res) => {
+        if (!isMounted) return;
+        const list = res?.data?.districts || [];
+        if (list.length > 0) {
+          setDistrictOptions(list);
+          if (!list.includes(registerForm.district)) {
+            setRegisterForm((f) => ({ ...f, district: list[0] || "" }));
+          }
+        } else {
+          setDistrictOptions(getDistrictsForState(registerForm.stateName));
+        }
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setDistrictOptions(getDistrictsForState(registerForm.stateName));
+      })
+      .finally(() => {
+        if (isMounted) setLoadingDistricts(false);
+      });
+    return () => { isMounted = false; };
+  }, [registerForm.stateName]);
+
+  // Fetch pincodes whenever district changes
+  useEffect(() => {
+    if (!registerForm.district) {
+      setPincodeOptions([]);
+      return;
+    }
+    let isMounted = true;
+    setLoadingPincodes(true);
+    API.get(`/location/pincodes/by-district/?district_name=${encodeURIComponent(registerForm.district)}&state_name=${encodeURIComponent(registerForm.stateName)}`)
+      .then((res) => {
+        if (!isMounted) return;
+        const pins = res?.data?.pincodes || [];
+        setPincodeOptions(pins);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setPincodeOptions([]);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingPincodes(false);
+      });
+    return () => { isMounted = false; };
+  }, [registerForm.district, registerForm.stateName]);
+
   // Auto-resolve Pincode when 6 digits are typed for agency_pincode
   const handlePincodeChange = useCallback(async (val) => {
     const cleaned = String(val || "").replace(/\D/g, "").slice(0, 6);
@@ -249,9 +307,9 @@ export default function AdminFranchiseUsers() {
         payload.selected_district = registerForm.district;
         payload.state = registerForm.state || 1;
       } else if (registerForm.category === "agency_pincode_coordinator") {
-        const pins = (registerForm.selectedPincodes || []).slice(0, 2);
+        const pins = (registerForm.selectedPincodes || []).slice(0, 4);
         if (pins.length === 0) {
-          window.alert("Please select at least 1 pincode (Max 2 pincodes allowed).");
+          window.alert("Please select at least 1 pincode (Max 4 pincodes allowed).");
           setRegisterSubmitting(false);
           return;
         }
@@ -840,8 +898,9 @@ export default function AdminFranchiseUsers() {
                   label="District *"
                   value={registerForm.district}
                   onChange={(e) => setRegisterForm((f) => ({ ...f, district: e.target.value }))}
+                  helperText={loadingDistricts ? "Loading districts..." : "Select district to populate available pincodes"}
                 >
-                  {getDistrictsForState(registerForm.stateName).map((d) => (
+                  {districtOptions.map((d) => (
                     <MenuItem key={d} value={d}>
                       {d}
                     </MenuItem>
@@ -852,11 +911,12 @@ export default function AdminFranchiseUsers() {
                   multiple
                   freeSolo
                   size="small"
-                  options={["572106", "572101", "572102", "572103", "572128", "572216"]}
+                  loading={loadingPincodes}
+                  options={pincodeOptions}
                   value={registerForm.selectedPincodes || []}
                   onChange={(event, newValue) => {
-                    if (newValue.length > 2) {
-                      window.alert("Maximum 2 pincodes allowed for Pincode Coordinator.");
+                    if (newValue.length > 4) {
+                      window.alert("Maximum 4 pincodes allowed for Pincode Coordinator.");
                       return;
                     }
                     const cleaned = newValue.map((p) => String(p).replace(/\D/g, "").slice(0, 6)).filter(Boolean);
@@ -877,9 +937,9 @@ export default function AdminFranchiseUsers() {
                   renderInput={(params) => (
                     <TextField
                       {...params}
-                      label="Assigned Pincodes (Strictly Max 2) *"
-                      placeholder={registerForm.selectedPincodes?.length >= 2 ? "Max 2 reached" : "Type/Select 6-digit PIN and press Enter"}
-                      helperText={`Selected: ${registerForm.selectedPincodes?.length || 0} / 2 pincodes. Pincode Coordinator has maximum 2 pincodes jurisdiction.`}
+                      label="Assigned Pincodes (Max 4) *"
+                      placeholder={registerForm.selectedPincodes?.length >= 4 ? "Max 4 reached" : (loadingPincodes ? "Loading pincodes..." : "Select or type 6-digit PIN")}
+                      helperText={`Selected: ${registerForm.selectedPincodes?.length || 0} / 4 pincodes in ${registerForm.district || 'district'}.`}
                     />
                   )}
                 />
@@ -902,7 +962,7 @@ export default function AdminFranchiseUsers() {
                       ...f,
                       stateName: e.target.value,
                       state: st ? String(st.id) : "1",
-                      district: getDistrictsForState(e.target.value)[0] || "Tumakuru",
+                      district: districtOptions[0] || "Tumakuru",
                     }));
                   }}
                 >
@@ -919,9 +979,9 @@ export default function AdminFranchiseUsers() {
                   label="Assigned District (Select 1 District) *"
                   value={registerForm.district}
                   onChange={(e) => setRegisterForm((f) => ({ ...f, district: e.target.value }))}
-                  helperText="District Franchise Partner has strictly 1 district jurisdiction."
+                  helperText={loadingDistricts ? "Loading districts..." : "District Franchise Partner has strictly 1 district jurisdiction."}
                 >
-                  {getDistrictsForState(registerForm.stateName).map((d) => (
+                  {districtOptions.map((d) => (
                     <MenuItem key={d} value={d}>
                       {d}
                     </MenuItem>
@@ -946,7 +1006,7 @@ export default function AdminFranchiseUsers() {
                       ...f,
                       stateName: e.target.value,
                       state: st ? String(st.id) : "1",
-                      selectedDistricts: [getDistrictsForState(e.target.value)[0] || "Tumakuru"],
+                      selectedDistricts: [districtOptions[0] || "Tumakuru"],
                     }));
                   }}
                 >
@@ -960,7 +1020,7 @@ export default function AdminFranchiseUsers() {
                 <Autocomplete
                   multiple
                   size="small"
-                  options={getDistrictsForState(registerForm.stateName)}
+                  options={districtOptions}
                   value={registerForm.selectedDistricts || []}
                   onChange={(event, newValue) => {
                     if (newValue.length > 2) {
@@ -984,9 +1044,9 @@ export default function AdminFranchiseUsers() {
                   renderInput={(params) => (
                     <TextField
                       {...params}
-                      label="Assigned Districts (Strictly Max 2) *"
-                      placeholder={registerForm.selectedDistricts?.length >= 2 ? "Max 2 reached" : "Select districts..."}
-                      helperText={`Selected: ${registerForm.selectedDistricts?.length || 0} / 2 districts. District Coordinator has maximum 2 districts jurisdiction.`}
+                      label="Assigned Districts (Max 2 Districts) *"
+                      placeholder={registerForm.selectedDistricts?.length >= 2 ? "Max 2 reached" : "Select districts"}
+                      helperText={loadingDistricts ? "Loading districts..." : `Selected: ${registerForm.selectedDistricts?.length || 0} / 2 districts.`}
                     />
                   )}
                 />

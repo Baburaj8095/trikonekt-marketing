@@ -47,16 +47,16 @@ import { useNavigate, useLocation } from "react-router-dom";
 import API, { getWalletMe } from "../../api/api";
 import QuickActionGrid from "../../components/common/QuickActionGrid";
 import IxigoHolidaySection from "../../components/travel/IxigoHolidaySection";
-import imgEcommerce from "../../assets/ecommerce.jpg";
+import imgEcommerce from "../../assets/ecommerce.webp";
 import imgGifts from "../../assets/gifts.jpg";
 import imgHolidays from "../../assets/holidays.jpg";
-import imgKerala from "../../assets/kerala.jpg";
-import imgThailand from "../../assets/thailand.jpg";
-import imgHimalayanTempleBg from "../../assets/himalayan_temple_bg.jpg";
+import imgKerala from "../../assets/kerala.webp";
+import imgThailand from "../../assets/thailand.webp";
+import imgHimalayanTempleBg from "../../assets/himalayan_temple_bg.webp";
 import topHeroWebp from "../../assets/top-hero-india-mountains.webp";
-import imgHomepageBanner from "../../assets/homepage_banner.png";
-import imgWishingGanesha from "../../assets/wishing_gowri_ganesha.png";
-import imgWishingGrow from "../../assets/wishing_connect_grow.png";
+import imgHomepageBanner from "../../assets/homepage_banner.webp";
+import imgWishingGanesha from "../../assets/wishing_gowri_ganesha.webp";
+import imgWishingGrow from "../../assets/wishing_connect_grow.webp";
 import GiftCardModal from "../../components/vouchers/GiftCardModal";
 
 function resolveApiMediaUrl(item, MEDIA_BASE) {
@@ -280,12 +280,17 @@ function PremiumHeader({ user, initials, vouchersCount = 0, notificationCount = 
           <Typography
             sx={{
               fontSize: 12,
-              fontWeight: 600,
-              color: "#64748B",
+              fontWeight: 700,
+              color: "#0284C7",
+              bgcolor: "rgba(2, 132, 199, 0.1)",
+              px: 1,
+              py: 0.2,
+              borderRadius: "6px",
+              display: "inline-block",
               letterSpacing: "0.2px",
             }}
           >
-            Community Consumer
+            Agent
           </Typography>
         </Box>
       </Stack>
@@ -1182,7 +1187,8 @@ function HorizontalScroller({ children }) {
 function IdCardDialog({ open, onClose, user, initials }) {
   const MEDIA_BASE = String(API?.defaults?.baseURL || "").replace(/\/api\/?$/, "");
   const avatar = resolveApiMediaUrl({ image_url: user?.avatar_url || user?.avatar || "" }, MEDIA_BASE);
-  const role = user?.role || user?.category || "Community Consumer";
+  const rawRole = user?.role || user?.category || "Agent";
+  const role = (rawRole === "user" || rawRole === "consumer" || rawRole === "customer" || rawRole === "Community Consumer") ? "Agent" : rawRole;
   const userId = user?.prefixed_id || user?.unique_id || user?.username || user?.id || "-";
 
   return (
@@ -1203,13 +1209,13 @@ function IdCardDialog({ open, onClose, user, initials }) {
         >
           <Box sx={{ p: 1.25, bgcolor: C.primary, color: "#fff", textAlign: "center" }}>
             <Typography sx={{ fontSize: 16, fontWeight: 1000 }}>ASIYAPP</Typography>
-            <Typography sx={{ fontSize: 11, fontWeight: 800, opacity: 0.9 }}>COMMUNITY CONSUMER ID CARD</Typography>
+            <Typography sx={{ fontSize: 11, fontWeight: 800, opacity: 0.9 }}>COMMUNITY AGENT ID CARD</Typography>
           </Box>
           <Box sx={{ p: 2, textAlign: "center" }}>
             <Avatar src={avatar || undefined} sx={{ width: 86, height: 86, mx: "auto", bgcolor: C.primaryDark, fontSize: 26, fontWeight: 1000 }}>
               {initials}
             </Avatar>
-            <Typography sx={{ mt: 1.25, fontSize: 18, fontWeight: 1000 }}>{user?.full_name || user?.name || "Community User"}</Typography>
+            <Typography sx={{ mt: 1.25, fontSize: 18, fontWeight: 1000 }}>{user?.full_name || user?.name || "Agent"}</Typography>
             <Typography sx={{ fontSize: 12, color: C.textSec, fontWeight: 800 }}>{role}</Typography>
             <Box sx={{ mt: 1.5, textAlign: "left", borderTop: `1px solid ${C.border}`, pt: 1.25 }}>
               <Typography sx={{ fontSize: 12, fontWeight: 800, color: C.textSec }}>User ID</Typography>
@@ -1294,248 +1300,6 @@ function MobileBottomNav({ value, onChange }) {
     </Paper>
   );
 }
-
-export default function TeamDashboard() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const isMobile = useMediaQuery("(max-width:600px)");
-
-  const storedUser = useMemo(() => {
-    try {
-      const ls = localStorage.getItem("user_user") || sessionStorage.getItem("user_user");
-      return ls ? JSON.parse(ls) : {};
-    } catch {
-      return {};
-    }
-  }, []);
-
-  const username = storedUser?.username || storedUser?.id || "";
-  const fullName = storedUser?.full_name || storedUser?.name || "Community User";
-  const status = storedUser?.status || storedUser?.profile_status || "Agent";
-  const [profileUser, setProfileUser] = useState(storedUser);
-  const [idCardOpen, setIdCardOpen] = useState(false);
-  const [docErr, setDocErr] = useState("");
-  const consumerPhone = useMemo(() => {
-    const value = profileUser?.phone || storedUser?.phone || "";
-    if (value) return value;
-    const usernameDigits = String(profileUser?.username || username || "").replace(/\D/g, "");
-    return usernameDigits.length >= 10 ? usernameDigits : "-";
-  }, [profileUser?.phone, profileUser?.username, storedUser?.phone, username]);
-  const initials = useMemo(() => {
-    const n = String(profileUser?.full_name || fullName || username || "T").trim();
-    const parts = n.split(" ").filter(Boolean);
-    return `${parts[0]?.[0] || "T"}${parts.length > 1 ? parts[parts.length - 1]?.[0] : ""}`.toUpperCase();
-  }, [profileUser?.full_name, fullName, username]);
-
-  const [banners, setBanners] = useState([]);
-  const [bannersLoading, setBannersLoading] = useState(false);
-  const [bannersErr, setBannersErr] = useState("");
-  const [achievers, setAchievers] = useState([]);
-  const [achieversLoading, setAchieversLoading] = useState(false);
-  const [achieversErr, setAchieversErr] = useState("");
-  const [videos, setVideos] = useState([]);
-  const [videosLoading, setVideosLoading] = useState(false);
-  const [primeRanks, setPrimeRanks] = useState([]);
-  const [achievedPrimeLevel, setAchievedPrimeLevel] = useState(0);
-  const [teamStats, setTeamStats] = useState({
-    direct_count: 0,
-    current_team_size: 0,
-    current_rank: "Prime 1",
-  });
-  const [unredeemedGiftCard, setUnredeemedGiftCard] = useState(null);
-  const [vouchersCount, setVouchersCount] = useState(0);
-  const [giftCardModalOpen, setGiftCardModalOpen] = useState(false);
-  const [giftCardBannerDismissed, setGiftCardBannerDismissed] = useState(false);
-  const [cycleBulkBuyOpen, setCycleBulkBuyOpen] = useState(false);
-  const [walletMeData, setWalletMeData] = useState(null);
-  const [consumerCycleState, setConsumerCycleState] = useState(() => {
-    try {
-      const myId = (typeof localStorage !== "undefined" && (localStorage.getItem("user_id") || JSON.parse(localStorage.getItem("user_user") || localStorage.getItem("user") || "{}")?.id));
-      if (myId) {
-        const ls = localStorage.getItem(`trikonekt_cycle_user_${myId}`);
-        if (ls) return JSON.parse(ls);
-      }
-      const raw = localStorage.getItem("trikonekt_consumer_cycle_state");
-      if (raw) return JSON.parse(raw);
-    } catch (_) {}
-    return {
-      currentCycle: 1,
-      baseAmount: 50000,
-      totalLimit: 150000,
-      layerLimit: 100000,
-      royaltyLimit: 50000,
-      status: "active",
-      adminAuthorized: true,
-    };
-  });
-
-  const educationVideoSlots = useMemo(() => {
-    const ranks =
-      Array.isArray(primeRanks) && primeRanks.length
-        ? primeRanks.slice(0, 10)
-        : Array.from({ length: 10 }).map((_, idx) => ({
-            id: null,
-            level_number: idx + 1,
-            rank_name: `Prime ${idx + 1}`,
-            upgrade_amount: "",
-          }));
-
-    const byLevel = new Map();
-    const unmapped = [];
-    (Array.isArray(videos) ? videos : []).forEach((video) => {
-      const level = Number(video?.required_rank_level || 0);
-      if (level) byLevel.set(level, video);
-      else unmapped.push(video);
-    });
-
-    return ranks.map((rank, idx) => {
-      const level = Number(rank?.level_number || idx + 1);
-      const mapped = byLevel.get(level) || unmapped[idx] || {};
-      const isPurchased = Number(achievedPrimeLevel || 0) >= level || !!mapped.can_access;
-      const rankId = mapped.required_rank || rank?.id || null;
-      return {
-        ...mapped,
-        id: mapped.id || `prime-slot-${level}`,
-        title: mapped.title || `Video ${level}`,
-        description: mapped.description || "Digital education",
-        required_rank: rankId,
-        required_rank_name: mapped.required_rank_name || rank?.rank_name || `Prime ${level}`,
-        required_rank_level: level,
-        required_rank_amount: mapped.required_rank_amount || rank?.upgrade_amount || "",
-        can_access: !!mapped.can_access || isPurchased,
-        is_purchased: isPurchased,
-      };
-    });
-  }, [achievedPrimeLevel, primeRanks, videos]);
-
-  useEffect(() => {
-    let alive = true;
-
-    const fetchBanners = async () => {
-      setBannersLoading(true);
-      setBannersErr("");
-      try {
-        const res = await API.get("/business/team-consumer/wishing-banners/", { cacheTTL: 2500, retryAttempts: 1 });
-        if (alive) setBanners(Array.isArray(res?.data?.results) ? res.data.results : []);
-      } catch {
-        if (alive) {
-          setBannersErr("Unable to load wishing banners.");
-          setBanners([]);
-        }
-      } finally {
-        if (alive) setBannersLoading(false);
-      }
-    };
-
-    const fetchAchievers = async () => {
-      setAchieversLoading(true);
-      setAchieversErr("");
-      try {
-        const res = await API.get("/business/team-consumer/top-achievers/", { cacheTTL: 2500, retryAttempts: 1 });
-        if (alive) setAchievers(Array.isArray(res?.data?.results) ? res.data.results : []);
-      } catch {
-        if (alive) {
-          setAchieversErr("Unable to load top achievers.");
-          setAchievers([]);
-        }
-      } finally {
-        if (alive) setAchieversLoading(false);
-      }
-    };
-
-    const fetchProfile = async () => {
-      try {
-        const res = await API.get("/accounts/profile/", { cacheTTL: 10000, retryAttempts: 1 });
-        if (alive && res?.data) setProfileUser({ ...storedUser, ...res.data });
-      } catch {
-        if (alive) setProfileUser(storedUser);
-      }
-    };
-
-    const fetchUnclaimedGiftCards = async () => {
-      try {
-        const res = await API.get("/accounts/wallet/vouchers/", { cacheTTL: 10000, retryAttempts: 1 });
-        const list = Array.isArray(res?.data?.results) ? res.data.results : [];
-        const currentUname = String(storedUser?.username || "").trim();
-        const activeVouchers = list.filter((v) => v.status === "ACTIVE");
-        if (alive) {
-          setVouchersCount(activeVouchers.length);
-        }
-        const unredeemed = list.find(
-          (v) =>
-            v.status === "ACTIVE" &&
-            String(v.creator_username || "").trim() !== currentUname
-        );
-        if (alive && unredeemed) {
-          setUnredeemedGiftCard(unredeemed);
-        }
-      } catch {}
-    };
-
-    fetchBanners();
-    fetchAchievers();
-    fetchProfile();
-    fetchUnclaimedGiftCards();
-    return () => {
-      alive = false;
-    };
-  }, [storedUser]);
-
-  const navIndex = useMemo(() => {
-    const p = location.pathname || "";
-    if (p.includes("/genealogy")) return 1;
-    if (p.includes("/wallet")) return 2;
-    if (p.includes("/refer-earn")) return 3;
-    if (p.includes("/profile")) return 4;
-    return 0;
-  }, [location.pathname]);
-
-  const handleNav = (idx) => {
-    if (idx === 0) navigate("/user/team-dashboard");
-    if (idx === 1) navigate("/user/genealogy-5");
-    if (idx === 2) navigate("/user/team-wallet");
-    if (idx === 3) navigate("/user/refer-earn");
-    if (idx === 4) {
-      try {
-        window.dispatchEvent(new CustomEvent("trikonekt:open-consumer-sidebar"));
-      } catch (_) {}
-    }
-  };
-
-  const resolveDocumentUrl = useCallback((raw) => {
-    if (!raw) return "";
-    const s = String(raw);
-    if (/^https?:\/\//i.test(s) || s.startsWith("data:")) return s;
-    const mediaBase = String(API?.defaults?.baseURL || "").replace(/\/api\/?$/, "");
-    return mediaBase ? `${mediaBase}${s.startsWith("/") ? "" : "/"}${s}` : s;
-  }, []);
-
-  const openLatestDocument = useCallback(async (kind) => {
-    setDocErr("");
-    try {
-      const res = await API.get(`/business/team-consumer/documents/${kind}/latest/`, { retryAttempts: 1 });
-      const url = resolveDocumentUrl(res?.data?.file_url || res?.data?.file);
-      if (!url) {
-        setDocErr("Document uploaded record has no file.");
-        return;
-      }
-      window.open(url, "_blank", "noopener,noreferrer");
-      navigate("/user/team-dashboard", { replace: true });
-    } catch (e) {
-      setDocErr(e?.response?.data?.detail || "Document is not uploaded yet.");
-      navigate("/user/team-dashboard", { replace: true });
-    }
-  }, [navigate, resolveDocumentUrl]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search || "");
-    const action = String(params.get("action") || "").toLowerCase();
-    if (!action) return;
-    if (action === "id-card") setIdCardOpen(true);
-    if (action === "pdf") openLatestDocument("PDF");
-    if (action === "certificate") openLatestDocument("CERTIFICATE");
-    if (action === "cycle-bulk-buy" || action === "cycle-purchase") setCycleBulkBuyOpen(true);
-  }, [location.search, openLatestDocument]);
 
 function SPPMonthlyCadenceWidget() {
   const navigate = useNavigate();
@@ -1976,8 +1740,252 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
   );
 }
 
+export default function TeamDashboard() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isMobile = useMediaQuery("(max-width:600px)");
+
+  const storedUser = useMemo(() => {
+    try {
+      const ls = localStorage.getItem("user_user") || sessionStorage.getItem("user_user");
+      return ls ? JSON.parse(ls) : {};
+    } catch {
+      return {};
+    }
+  }, []);
+
+  const username = storedUser?.username || storedUser?.id || "";
+  const fullName = storedUser?.full_name || storedUser?.name || "Community User";
+  const status = storedUser?.status || storedUser?.profile_status || "Agent";
+  const [profileUser, setProfileUser] = useState(storedUser);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeCategory, setActiveCategory] = useState("ALL");
+  const [idCardOpen, setIdCardOpen] = useState(false);
+  const [docErr, setDocErr] = useState("");
+  const consumerPhone = useMemo(() => {
+    const value = profileUser?.phone || storedUser?.phone || "";
+    if (value) return value;
+    const usernameDigits = String(profileUser?.username || username || "").replace(/\D/g, "");
+    return usernameDigits.length >= 10 ? usernameDigits : "-";
+  }, [profileUser?.phone, profileUser?.username, storedUser?.phone, username]);
+  const initials = useMemo(() => {
+    const n = String(profileUser?.full_name || fullName || username || "T").trim();
+    const parts = n.split(" ").filter(Boolean);
+    return `${parts[0]?.[0] || "T"}${parts.length > 1 ? parts[parts.length - 1]?.[0] : ""}`.toUpperCase();
+  }, [profileUser?.full_name, fullName, username]);
+
+  const [banners, setBanners] = useState([]);
+  const [bannersLoading, setBannersLoading] = useState(false);
+  const [bannersErr, setBannersErr] = useState("");
+  const [achievers, setAchievers] = useState([]);
+  const [achieversLoading, setAchieversLoading] = useState(false);
+  const [achieversErr, setAchieversErr] = useState("");
+  const [videos, setVideos] = useState([]);
+  const [videosLoading, setVideosLoading] = useState(false);
+  const [primeRanks, setPrimeRanks] = useState([]);
+  const [achievedPrimeLevel, setAchievedPrimeLevel] = useState(0);
+  const [teamStats, setTeamStats] = useState({
+    direct_count: 0,
+    current_team_size: 0,
+    current_rank: "Prime 1",
+  });
+  const [unredeemedGiftCard, setUnredeemedGiftCard] = useState(null);
+  const [vouchersCount, setVouchersCount] = useState(0);
+  const [giftCardModalOpen, setGiftCardModalOpen] = useState(false);
+  const [giftCardBannerDismissed, setGiftCardBannerDismissed] = useState(false);
+  const [cycleBulkBuyOpen, setCycleBulkBuyOpen] = useState(false);
+  const [walletMeData, setWalletMeData] = useState(null);
+  const [consumerCycleState, setConsumerCycleState] = useState(() => {
+    try {
+      const myId = (typeof localStorage !== "undefined" && (localStorage.getItem("user_id") || JSON.parse(localStorage.getItem("user_user") || localStorage.getItem("user") || "{}")?.id));
+      if (myId) {
+        const ls = localStorage.getItem(`trikonekt_cycle_user_${myId}`);
+        if (ls) return JSON.parse(ls);
+      }
+      const raw = localStorage.getItem("trikonekt_consumer_cycle_state");
+      if (raw) return JSON.parse(raw);
+    } catch (_) {}
+    return {
+      currentCycle: 1,
+      baseAmount: 50000,
+      totalLimit: 150000,
+      layerLimit: 100000,
+      royaltyLimit: 50000,
+      status: "active",
+      adminAuthorized: true,
+    };
+  });
+
+  const educationVideoSlots = useMemo(() => {
+    const ranks =
+      Array.isArray(primeRanks) && primeRanks.length
+        ? primeRanks.slice(0, 10)
+        : Array.from({ length: 10 }).map((_, idx) => ({
+            id: null,
+            level_number: idx + 1,
+            rank_name: `Prime ${idx + 1}`,
+            upgrade_amount: "",
+          }));
+
+    const byLevel = new Map();
+    const unmapped = [];
+    (Array.isArray(videos) ? videos : []).forEach((video) => {
+      const level = Number(video?.required_rank_level || 0);
+      if (level) byLevel.set(level, video);
+      else unmapped.push(video);
+    });
+
+    return ranks.map((rank, idx) => {
+      const level = Number(rank?.level_number || idx + 1);
+      const mapped = byLevel.get(level) || unmapped[idx] || {};
+      const isPurchased = Number(achievedPrimeLevel || 0) >= level || !!mapped.can_access;
+      const rankId = mapped.required_rank || rank?.id || null;
+      return {
+        ...mapped,
+        id: mapped.id || `prime-slot-${level}`,
+        title: mapped.title || `Video ${level}`,
+        description: mapped.description || "Digital education",
+        required_rank: rankId,
+        required_rank_name: mapped.required_rank_name || rank?.rank_name || `Prime ${level}`,
+        required_rank_level: level,
+        required_rank_amount: mapped.required_rank_amount || rank?.upgrade_amount || "",
+        can_access: !!mapped.can_access || isPurchased,
+        is_purchased: isPurchased,
+      };
+    });
+  }, [achievedPrimeLevel, primeRanks, videos]);
+
+  useEffect(() => {
+    let alive = true;
+
+    const fetchBanners = async () => {
+      setBannersLoading(true);
+      setBannersErr("");
+      try {
+        const res = await API.get("/business/team-consumer/wishing-banners/", { cacheTTL: 2500, retryAttempts: 1 });
+        if (alive) setBanners(Array.isArray(res?.data?.results) ? res.data.results : []);
+      } catch {
+        if (alive) {
+          setBannersErr("Unable to load wishing banners.");
+          setBanners([]);
+        }
+      } finally {
+        if (alive) setBannersLoading(false);
+      }
+    };
+
+    const fetchAchievers = async () => {
+      setAchieversLoading(true);
+      setAchieversErr("");
+      try {
+        const res = await API.get("/business/team-consumer/top-achievers/", { cacheTTL: 2500, retryAttempts: 1 });
+        if (alive) setAchievers(Array.isArray(res?.data?.results) ? res.data.results : []);
+      } catch {
+        if (alive) {
+          setAchieversErr("Unable to load top achievers.");
+          setAchievers([]);
+        }
+      } finally {
+        if (alive) setAchieversLoading(false);
+      }
+    };
+
+    const fetchProfile = async () => {
+      try {
+        const res = await API.get("/accounts/profile/", { cacheTTL: 10000, retryAttempts: 1 });
+        if (alive && res?.data) setProfileUser({ ...storedUser, ...res.data });
+      } catch {
+        if (alive) setProfileUser(storedUser);
+      }
+    };
+
+    const fetchUnclaimedGiftCards = async () => {
+      try {
+        const res = await API.get("/accounts/wallet/vouchers/", { cacheTTL: 10000, retryAttempts: 1 });
+        const list = Array.isArray(res?.data?.results) ? res.data.results : [];
+        const currentUname = String(storedUser?.username || "").trim();
+        const activeVouchers = list.filter((v) => v.status === "ACTIVE");
+        if (alive) {
+          setVouchersCount(activeVouchers.length);
+        }
+        const unredeemed = list.find(
+          (v) =>
+            v.status === "ACTIVE" &&
+            String(v.creator_username || "").trim() !== currentUname
+        );
+        if (alive && unredeemed) {
+          setUnredeemedGiftCard(unredeemed);
+        }
+      } catch {}
+    };
+
+    fetchBanners();
+    fetchAchievers();
+    fetchProfile();
+    fetchUnclaimedGiftCards();
+    return () => {
+      alive = false;
+    };
+  }, [storedUser]);
+
+  const navIndex = useMemo(() => {
+    const p = location.pathname || "";
+    if (p.includes("/genealogy")) return 1;
+    if (p.includes("/wallet")) return 2;
+    if (p.includes("/refer-earn")) return 3;
+    if (p.includes("/profile")) return 4;
+    return 0;
+  }, [location.pathname]);
+
+  const handleNav = (idx) => {
+    if (idx === 0) navigate("/user/team-dashboard");
+    if (idx === 1) navigate("/user/genealogy-5");
+    if (idx === 2) navigate("/user/team-wallet");
+    if (idx === 3) navigate("/user/refer-earn");
+    if (idx === 4) {
+      try {
+        window.dispatchEvent(new CustomEvent("trikonekt:open-consumer-sidebar"));
+      } catch (_) {}
+    }
+  };
+
+  const resolveDocumentUrl = useCallback((raw) => {
+    if (!raw) return "";
+    const s = String(raw);
+    if (/^https?:\/\//i.test(s) || s.startsWith("data:")) return s;
+    const mediaBase = String(API?.defaults?.baseURL || "").replace(/\/api\/?$/, "");
+    return mediaBase ? `${mediaBase}${s.startsWith("/") ? "" : "/"}${s}` : s;
+  }, []);
+
+  const openLatestDocument = useCallback(async (kind) => {
+    setDocErr("");
+    try {
+      const res = await API.get(`/business/team-consumer/documents/${kind}/latest/`, { retryAttempts: 1 });
+      const url = resolveDocumentUrl(res?.data?.file_url || res?.data?.file);
+      if (!url) {
+        setDocErr("Document uploaded record has no file.");
+        return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+      navigate("/user/team-dashboard", { replace: true });
+    } catch (e) {
+      setDocErr(e?.response?.data?.detail || "Document is not uploaded yet.");
+      navigate("/user/team-dashboard", { replace: true });
+    }
+  }, [navigate, resolveDocumentUrl]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search || "");
+    const action = String(params.get("action") || "").toLowerCase();
+    if (!action) return;
+    if (action === "id-card") setIdCardOpen(true);
+    if (action === "pdf") openLatestDocument("PDF");
+    if (action === "certificate") openLatestDocument("CERTIFICATE");
+    if (action === "cycle-bulk-buy" || action === "cycle-purchase") setCycleBulkBuyOpen(true);
+  }, [location.search, openLatestDocument]);
+
+
+
 
   return (
     <Box sx={{ minHeight: "100dvh", bgcolor: "#F4F7FC", pb: 5, position: "relative" }}>

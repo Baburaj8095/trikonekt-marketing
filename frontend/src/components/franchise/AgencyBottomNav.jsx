@@ -21,7 +21,21 @@ const NAV_ITEMS = [
  * - Proper Android safe-area padding
  * - Active indicator in Primary Blue (#2563EB)
  */
-export default function AgencyBottomNav({ activeScreen, onSelectScreen }) {
+export default function AgencyBottomNav({ activeScreen, onSelectScreen, role = "" }) {
+  const territoryLabel = String(role).includes("state")
+    ? "Districts"
+    : String(role).includes("district")
+    ? "Pincodes"
+    : "Pincode";
+
+  const navItems = [
+    { key: "home", label: "Home", icon: HomeRoundedIcon },
+    { key: "pincode", label: territoryLabel, icon: LocationOnRoundedIcon },
+    { key: "captains", label: "Captains", icon: ShieldRoundedIcon },
+    { key: "merchants", label: "Merchants", icon: StoreRoundedIcon },
+    { key: "command_center", label: "More", icon: MoreHorizRoundedIcon },
+  ];
+
   return (
     <Box
       component="nav"
@@ -51,7 +65,7 @@ export default function AgencyBottomNav({ activeScreen, onSelectScreen }) {
           px: 0.5,
         }}
       >
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const IconComponent = item.icon;
           const isActive =
             activeScreen === item.key ||

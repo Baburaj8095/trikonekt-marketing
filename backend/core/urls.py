@@ -6,6 +6,7 @@ from core.views import CompanyInfoView, CompanyPackagesView, HealthzView
 from coupons.views import CouponActivateView, CouponRedeemView
 from accounts.views import WalletMe, WalletTransactionsList, UserKYCMeView
 from business.views import DailyReportSubmitView, DailyReportMyView, DailyReportAllView
+from business.views_agency_territory import DistrictPincodesView, StateDistrictsView
 from jobs.views import BackgroundTaskStatusView
 
 urlpatterns = [
@@ -16,6 +17,8 @@ urlpatterns = [
     path('api/coupons/', include('coupons.urls')),
     path('api/location/', include('locations.urls')),
     path('api/business/', include('business.urls')),
+    path('api/agency/district-pincodes/', DistrictPincodesView.as_view(), name='core_agency_district_pincodes'),
+    path('api/agency/state-districts/', StateDistrictsView.as_view(), name='core_agency_state_districts'),
     # Public + Admin endpoints for Merchant Category/Subcategory
     path('api/merchant/', include('business.urls_merchant')),
     path('api/admin/', include('adminapi.urls')),

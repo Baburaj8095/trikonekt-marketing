@@ -1,4 +1,5 @@
 from django.urls import path
+from .views_agency_territory import DistrictPincodesView, StateDistrictsView
 from .views_ssv import (
     SSVSummaryView,
     P2PCouponTransferView,
@@ -223,5 +224,9 @@ urlpatterns = [
     path('admin/ssv/cycles/', AdminSSVCyclesView.as_view(), name='admin_ssv_cycles'),
     path('admin/ssv/cycles/activate/', AdminSSVActivateCycleView.as_view(), name='admin_ssv_cycle_activate'),
     path('admin/ssv/cycles/save/', AdminSSVSaveCycleView.as_view(), name='admin_ssv_cycle_save'),
+
+    # Agency / Franchise Territory Command Centers
+    path('agency/district-pincodes/', DistrictPincodesView.as_view(), name='agency_district_pincodes'),
+    path('agency/state-districts/', StateDistrictsView.as_view(), name='agency_state_districts'),
 ]
 

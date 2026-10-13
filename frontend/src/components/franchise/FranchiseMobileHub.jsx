@@ -99,6 +99,8 @@ import MerchantCard from "./MerchantCard";
 import CaptainCard from "./CaptainCard";
 import { AGENCY_TOKENS } from "./AgencyTokens";
 import API from "../../api/api";
+import DistrictPincodeCoverageCenter from "./DistrictPincodeCoverageCenter";
+import StateDistrictRollupCenter from "./StateDistrictRollupCenter";
 
 /**
  * DYNAMIC ADMIN-CONFIGURED COMMISSION ENGINE
@@ -1203,7 +1205,9 @@ export default function FranchiseMobileHub({
   const [selectedTxDetail, setSelectedTxDetail] = useState(null);
   const [sourceFilter, setSourceFilter] = useState("ALL"); // ALL, E_EDU, SELF_ACCOUNT, QR_SCANNER, TRIZONE, ROYALTY
   const [flowFilter, setFlowFilter] = useState("ALL"); // ALL, CREDIT, DEBIT
-  const [datePreset, setDatePreset] = useState("all");
+  const [datePreset, setDatePreset] = useState(
+    currentTierKey === "agency_pincode" ? "today" : "all"
+  );
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
@@ -1320,8 +1324,11 @@ export default function FranchiseMobileHub({
       });
     }
 
-    // 3. Date range filter
-    if (datePreset !== "all") {
+    // 3. Date range filter: Pincode franchise shows strictly today's transactions
+    if (currentTierKey === "agency_pincode") {
+      const todayStr = ymd(new Date());
+      rows = rows.filter((r) => r.created_at && ymd(r.created_at) === todayStr);
+    } else if (datePreset !== "all") {
       const now = new Date();
       if (datePreset === "today") {
         const todayStr = ymd(now);
@@ -2471,6 +2478,7 @@ export default function FranchiseMobileHub({
       onCartClick={() => navigate("/market")}
       userInitials={user?.username ? user.username.charAt(0).toUpperCase() : "A"}
       userName={user?.username || user?.full_name || currentTier.title}
+      role={currentTierKey}
       onAvatarClick={() => setProfileDrawerOpen(true)}
     >
       {/* =========================================================================
@@ -3110,16 +3118,22 @@ export default function FranchiseMobileHub({
         ========================================================================= */}
         {activeScreen === "pincode" && (
           <Box>
-            {/* Sub-tabs: Overview | Map (Only for Pincode Agencies) | Growth */}
-            {(() => {
-              const isPincodeAgency = currentTierKey === "agency_pincode" || currentTier.scopeType === "pincode";
-              const tabs = isPincodeAgency ? ["overview", "map", "growth"] : ["overview", "growth"];
-              return (
-                <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-                  {tabs.map((tab) => (
-                    <Button
-                      key={tab}
-                      size="small"
+            {(currentTierKey === "agency_district" || currentTierKey === "agency_district_coordinator") ? (
+              <DistrictPincodeCoverageCenter user={user} role={currentTierKey} />
+            ) : (currentTierKey === "agency_state" || currentTierKey === "agency_state_coordinator") ? (
+              <StateDistrictRollupCenter user={user} role={currentTierKey} />
+            ) : (
+              <>
+                {/* Sub-tabs: Overview | Map (Only for Pincode Agencies) | Growth */}
+                {(() => {
+                  const isPincodeAgency = currentTierKey === "agency_pincode" || currentTier.scopeType === "pincode";
+                  const tabs = isPincodeAgency ? ["overview", "map", "growth"] : ["overview", "growth"];
+                  return (
+                    <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+                      {tabs.map((tab) => (
+                        <Button
+                          key={tab}
+                          size="small"
                       onClick={() => setPincodeSubTab(tab)}
                       sx={{
                         flex: 1,
@@ -3471,6 +3485,8 @@ export default function FranchiseMobileHub({
                   </Typography>
                 </Paper>
               </Paper>
+            )}
+              </>
             )}
           </Box>
         )}
@@ -4611,9 +4627,12 @@ export default function FranchiseMobileHub({
                   </Typography>
                 </Stack>
                 <Chip
-                  label={`Cycle ${cycleState.currentCycle} Active`}
+                  label={`Term ${cycleState.currentCycle} Active`}
                   size="small"
-                  onClick={() => setCycleRenewalOpen(true)}
+                  onClick={() => {
+                    const isTerm1Done = Number(walletState?.mainWallet || 0) >= Number(cycleState?.eligibleLimit || 350000) || cycleState.currentCycle > 1;
+                    if (isTerm1Done) setCycleRenewalOpen(true);
+                  }}
                   sx={{
                     bgcolor: "rgba(16, 185, 129, 0.25)",
                     color: "#A7F3D0",
@@ -4702,24 +4721,26 @@ export default function FranchiseMobileHub({
                 >
                   Withdraw Funds
                 </Button>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  onClick={() => setCycleRenewalOpen(true)}
-                  startIcon={<AutorenewRoundedIcon sx={{ fontSize: 17 }} />}
-                  sx={{
-                    borderRadius: "14px",
-                    borderColor: "rgba(255,255,255,0.6)",
-                    color: "#FFFFFF",
-                    fontWeight: 900,
-                    fontSize: 12.5,
-                    textTransform: "none",
-                    py: 1,
-                    "&:hover": { bgcolor: "rgba(255,255,255,0.12)", borderColor: "#FFFFFF" },
-                  }}
-                >
-                  Cycle 2 Renewal
-                </Button>
+                {((Number(walletState?.mainWallet || 0) >= Number(cycleState?.eligibleLimit || 350000)) || cycleState.currentCycle > 1) && (
+                  <Button
+                    fullWidth
+                    variant="outlined"
+                    onClick={() => setCycleRenewalOpen(true)}
+                    startIcon={<AutorenewRoundedIcon sx={{ fontSize: 17 }} />}
+                    sx={{
+                      borderRadius: "14px",
+                      borderColor: "rgba(255,255,255,0.6)",
+                      color: "#FFFFFF",
+                      fontWeight: 900,
+                      fontSize: 12.5,
+                      textTransform: "none",
+                      py: 1,
+                      "&:hover": { bgcolor: "rgba(255,255,255,0.12)", borderColor: "#FFFFFF" },
+                    }}
+                  >
+                    Term 2 Renewal
+                  </Button>
+                )}
               </Stack>
             </Paper>
 
@@ -5699,7 +5720,7 @@ export default function FranchiseMobileHub({
               <Box sx={{ mb: 1.5 }}>
                 <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
                   <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#CBD5E1" }}>
-                    Cycle Progress to Next Rebirth
+                    Term Progress to Next Self Block
                   </Typography>
                   <Typography sx={{ fontSize: 11, fontWeight: 900, color: "#FDE68A" }}>
                     {Math.min(100, Math.round((walletState.selfWallet / (adminRebirthConfig.total_amount || 250)) * 100))}%
@@ -5721,7 +5742,7 @@ export default function FranchiseMobileHub({
               </Box>
 
               <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.75)", mb: 1.8, lineHeight: 1.4 }}>
-                Accumulates 25% of all regional commissions. When this pocket hits ₹{adminRebirthConfig.total_amount.toFixed(2)}, it automatically spawns a new Franchise Rebirth node into both 5-Matrix and 3-Matrix trees.
+                Accumulates 25% of all regional commissions. When this pocket hits ₹{adminRebirthConfig.total_amount.toFixed(2)}, it automatically spawns a new Franchise Self Block node into both 5-Matrix and 3-Matrix trees.
               </Typography>
 
               <Box
@@ -5738,10 +5759,10 @@ export default function FranchiseMobileHub({
                 <AutorenewRoundedIcon sx={{ color: "#FDE68A", fontSize: 24, flexShrink: 0 }} />
                 <Box>
                   <Typography sx={{ fontSize: 12, color: "#FFFFFF", fontWeight: 800, lineHeight: 1.3 }}>
-                    100% Autonomous Rebirth Engine
+                    100% Autonomous Self Block Engine
                   </Typography>
                   <Typography sx={{ fontSize: 11, color: "#CBD5E1", mt: 0.3, lineHeight: 1.35 }}>
-                    When balance reaches ₹{adminRebirthConfig.total_amount.toFixed(2)}, the engine automatically debits ₹{adminRebirthConfig.total_amount.toFixed(2)} and places a new Rebirth node into 5-Matrix & 3-Matrix per Admin Configuration.
+                    When balance reaches ₹{adminRebirthConfig.total_amount.toFixed(2)}, the engine automatically debits ₹{adminRebirthConfig.total_amount.toFixed(2)} and places a new Self Block node into 5-Matrix & 3-Matrix per Admin Configuration.
                   </Typography>
                 </Box>
               </Box>
@@ -5834,10 +5855,10 @@ export default function FranchiseMobileHub({
                     <Paper elevation={0} sx={{ p: 3, textAlign: "center", borderRadius: "14px", bgcolor: "#F8FAFC", border: "1px dashed #CBD5E1" }}>
                       <AccountTreeRoundedIcon sx={{ fontSize: 36, color: "#94A3B8", mb: 1 }} />
                       <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#334155" }}>
-                        No Rebirth Nodes Spawned Yet
+                        No Self Block Nodes Spawned Yet
                       </Typography>
                       <Typography sx={{ fontSize: 11, color: "#64748B", mt: 0.5, maxWidth: 320, mx: "auto" }}>
-                        Your Self Block Pocket currently has ₹{walletState.selfWallet.toFixed(2)}. When it reaches ₹{adminRebirthConfig.total_amount.toFixed(2)}, your first Rebirth ID will be automatically placed in the 5-Matrix tree.
+                        Your Self Block Pocket currently has ₹{walletState.selfWallet.toFixed(2)}. When it reaches ₹{adminRebirthConfig.total_amount.toFixed(2)}, your first Self Block ID will be automatically placed in the 5-Matrix tree.
                       </Typography>
                     </Paper>
                   )}

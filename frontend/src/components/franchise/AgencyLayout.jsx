@@ -22,6 +22,7 @@ export default function AgencyLayout({
   cartCount = 0,
   userInitials = "A",
   userName = "Franchise Partner",
+  role = "",
   onNotificationClick,
   onCartClick,
   onAvatarClick,
@@ -83,6 +84,7 @@ export default function AgencyLayout({
         <AgencyBottomNav
           activeScreen={activeScreen}
           onSelectScreen={onSelectScreen}
+          role={role}
         />
       </Box>
     </Box>

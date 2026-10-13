@@ -40,6 +40,17 @@ export default function AgencyHeader({
     return first ? first.charAt(0).toUpperCase() + first.slice(1) : "Partner";
   }, [userName]);
 
+  const resolvedRoleTitle = useMemo(() => {
+    const raw = String(subtitle || userName || "").toLowerCase();
+    if (raw.includes("state_coord") || raw.includes("state coordinator")) return "State Coordinator";
+    if (raw.includes("state_head") || raw.includes("state head") || raw.includes("agency_state")) return "State Head";
+    if (raw.includes("district_coord") || raw.includes("district coordinator")) return "District Coordinator";
+    if (raw.includes("district_head") || raw.includes("district head") || raw.includes("agency_district")) return "District Head";
+    if (raw.includes("pincode_coord") || raw.includes("pincode coordinator")) return "Pincode Coordinator";
+    if (raw.includes("pincode_head") || raw.includes("pincode head") || raw.includes("agency_pincode")) return "Pincode Head";
+    return subtitle || "Pincode Head";
+  }, [subtitle, userName]);
+
   return (
     <Box
       component="header"
@@ -123,21 +134,21 @@ export default function AgencyHeader({
                   fontFamily: "'Plus Jakarta Sans', sans-serif",
                 }}
               >
-                Hello, {displayName} 👋
+                Hello, Partner 👋
               </Typography>
               <Typography
                 noWrap
                 sx={{
                   fontSize: 11.5,
-                  fontWeight: 600,
-                  color: "rgba(255, 255, 255, 0.85)",
+                  fontWeight: 700,
+                  color: "#FDE68A",
                   letterSpacing: "0.2px",
                   lineHeight: 1.2,
                   mt: 0.2,
                   fontFamily: "'Plus Jakarta Sans', sans-serif",
                 }}
               >
-                {subtitle || "Franchise Partner"}
+                {resolvedRoleTitle}
               </Typography>
             </Box>
           </Stack>

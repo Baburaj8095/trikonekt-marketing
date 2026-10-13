@@ -744,6 +744,44 @@ def pincodes_by_district(request):
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
+def districts_by_state(request):
+    """
+    Return unique list of districts for a given state.
+    Query params:
+      - state_name: optional (string)
+      - state_id: optional (numeric, resolved to state_name)
+    """
+    state_name = (request.query_params.get("state_name") or "").strip()
+    state_id = (request.query_params.get("state_id") or "").strip()
+
+    if state_id and not state_name:
+        try:
+            st = State.objects.filter(pk=state_id).first()
+            if st:
+                state_name = st.name or ""
+        except Exception:
+            pass
+
+    if not state_name:
+        state_name = "Karnataka"
+
+    idx = _build_district_index()
+    skey = state_name.strip().lower()
+
+    districts = set()
+    for (s, d) in idx.keys():
+        if s == skey and d:
+            districts.add(d.title())
+
+    sorted_districts = sorted(list(districts))
+    return Response({
+        "state": state_name,
+        "districts": sorted_districts
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
 def postoffice_search(request):
     """
     Search India Post PostOffice directory by place name and optionally filter by pincode.
