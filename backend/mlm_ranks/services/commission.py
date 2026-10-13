@@ -76,6 +76,12 @@ class CommissionDistributor:
     def _is_recipient_eligible_for_level(cls, user, level_idx: int) -> bool:
         if not user:
             return False
+
+        # Apex Root user (9999999999 / id=1) has all 10 Layers active by platform design
+        u_phone = str(getattr(user, "phone", "") or getattr(user, "username", "") or "").strip()
+        if u_phone == "9999999999" or getattr(user, "id", None) == 1:
+            return True
+
         if REQUIRE_PRIME750_FOR_RECIPIENT and not Prime750StatusAdapter.is_user_prime750_active(user):
             return False
         # Determine user's highest active rank level (UserRank or successful RankUpgrade)
@@ -100,6 +106,9 @@ class CommissionDistributor:
 
     @classmethod
     def _is_recipient_eligible_for_direct(cls, user) -> bool:
+        u_phone = str(getattr(user, "phone", "") or getattr(user, "username", "") or "").strip()
+        if u_phone == "9999999999" or getattr(user, "id", None) == 1:
+            return True
         if REQUIRE_PRIME750_FOR_RECIPIENT and not Prime750StatusAdapter.is_user_prime750_active(user):
             return False
         return True

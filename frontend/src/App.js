@@ -262,6 +262,35 @@ function DomainRedirects() {
   return null;
 }
 
+function RankUpgradeSsoRedirect() {
+  React.useEffect(() => {
+    const token =
+      (typeof localStorage !== "undefined" && (localStorage.getItem("token_user") || localStorage.getItem("token"))) ||
+      (typeof sessionStorage !== "undefined" && (sessionStorage.getItem("token_user") || sessionStorage.getItem("token"))) ||
+      "";
+    const userRaw =
+      (typeof localStorage !== "undefined" && (localStorage.getItem("user_user") || localStorage.getItem("user"))) ||
+      (typeof sessionStorage !== "undefined" && (sessionStorage.getItem("user_user") || sessionStorage.getItem("user"))) ||
+      "{}";
+    let phone = "";
+    try {
+      const u = JSON.parse(userRaw);
+      phone = u.phone || u.username || "";
+    } catch (_) {}
+    const cleanPhone = String(phone || "").replace(/\D/g, "").slice(-10) || phone;
+    const url = `https://trieducation.in/sso?token=${encodeURIComponent(token)}&phone=${encodeURIComponent(cleanPhone)}`;
+    window.location.replace(url);
+  }, []);
+
+  return (
+    <Box sx={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#0B132B", color: "#ffffff", p: 3 }}>
+      <Typography variant="body2" sx={{ color: "#94a3b8" }}>
+        Navigating to E-edu Agent Academy (trieducation.in)...
+      </Typography>
+    </Box>
+  );
+}
+
 function App() {
   const hostname = window.location.hostname;
   const UNDER_MAINTENANCE = false;
@@ -700,6 +729,9 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route path="/user/rank-upgrade" element={<RankUpgradeSsoRedirect />} />
+        <Route path="/rank-upgrade" element={<RankUpgradeSsoRedirect />} />
 
         <Route
           path="/admin/rank-upgrades"

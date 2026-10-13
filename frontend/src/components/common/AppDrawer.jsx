@@ -52,6 +52,13 @@ export default function AppDrawer({
     return `${parts[0]?.[0] || "D"}${parts.length > 1 ? parts[parts.length - 1]?.[0] : ""}`.toUpperCase();
   })();
 
+  const userToken =
+    (typeof localStorage !== "undefined" && (localStorage.getItem("token_user") || localStorage.getItem("token"))) ||
+    (typeof sessionStorage !== "undefined" && (sessionStorage.getItem("token_user") || sessionStorage.getItem("token"))) ||
+    "";
+  const cleanPhone = String(userPhone || "").replace(/\D/g, "").slice(-10) || userPhone;
+  const academySsoUrl = `https://trieducation.in/sso?token=${encodeURIComponent(userToken)}&phone=${encodeURIComponent(cleanPhone)}`;
+
   const menuSections = [
     {
       title: "NAVIGATION",
@@ -62,7 +69,7 @@ export default function AppDrawer({
     {
       title: "PACKAGES",
       items: [
-        { label: "E-edu Agent Academy", to: "/user/rank-upgrade", icon: SchoolOutlinedIcon },
+        { label: "E-edu Agent Academy", to: academySsoUrl, external: true, icon: SchoolOutlinedIcon },
         { label: "Academic Cycles & Caps", to: "/user/team-dashboard?action=cycle-bulk-buy", icon: AutorenewRoundedIcon },
         { label: "E-edu Purchase History", to: "/user/prime-invoices", icon: ReceiptLongOutlinedIcon },
         { label: "Smart Shopping Voucher", to: "/user/spp-gift-cards", icon: CardGiftcardOutlinedIcon },
