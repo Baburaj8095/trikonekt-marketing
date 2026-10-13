@@ -469,41 +469,6 @@ export default function ThreeMatrixTab({
         >
           3‑Blocks View
         </div>
-        {threeRootsList.length > 1 && (
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: C.textSec }}>Switch Account:</span>
-            {threeRootsList.map((acc) => {
-              const isSelected = Number(selectedThreeRoot) === Number(acc.id);
-              const isSpp = String(acc.source_type || "").toUpperCase().includes("MONTHLY") ||
-                            String(acc.source_type || "").toUpperCase().includes("SSP");
-              const label = isSpp ? `SPP (#${acc.id})` : `Prime (#${acc.id})`;
-              return (
-                <button
-                  key={acc.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedThreeRoot(acc.id);
-                    const cat = categoryForRow(acc);
-                    if (setThreeCategory) setThreeCategory(cat);
-                  }}
-                  style={{
-                    padding: "4px 10px",
-                    borderRadius: 999,
-                    border: `1.5px solid ${isSelected ? C.primary : C.border}`,
-                    background: isSelected ? C.primary : C.surface,
-                    color: isSelected ? "#ffffff" : C.text,
-                    fontSize: 11,
-                    fontWeight: 800,
-                    cursor: "pointer",
-                    boxShadow: isSelected ? "0 2px 6px rgba(8,145,178,0.25)" : "none",
-                  }}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        )}
       </div>
       <div
         style={{
