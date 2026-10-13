@@ -6909,14 +6909,15 @@ class AdminUserGrowthResetView(APIView):
                 except Exception:
                     pass
 
-                # 5. RankUpgrade, RankMatrixNode, RankUpgradePayment
+                # 5. RankUpgrade, RankMatrixNode, RankUpgradePayment, UserRank
                 try:
-                    from mlm_ranks.models import RankUpgrade, RankMatrixNode, RankUpgradePayment
+                    from mlm_ranks.models import RankUpgrade, RankMatrixNode, RankUpgradePayment, UserRank
                     RankUpgrade.objects.filter(user=user).delete()
                     RankMatrixNode.objects.filter(
                         Q(root_user_id=uid) | Q(placed_user_id=uid) | Q(parent_user_id=uid)
                     ).delete()
                     RankUpgradePayment.objects.filter(upgrade__user=user).delete()
+                    UserRank.objects.filter(user=user).delete()
                 except Exception:
                     pass
 
@@ -7009,6 +7010,7 @@ class AdminUserGrowthResetView(APIView):
                 # 11. CustomUser
                 user.account_active = False
                 user.is_active = True
+                user.first_purchase_activated_at = None
                 if hasattr(user, "current_rank"):
                     user.current_rank = None
                 if hasattr(user, "current_rank_id"):

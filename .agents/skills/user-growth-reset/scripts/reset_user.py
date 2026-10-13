@@ -135,7 +135,7 @@ def reset_or_delete_user(identifier, action="reset", default_password="123456"):
         ).delete()
         print(f"4. UpgradeCommission deleted: {comm_deleted}")
 
-        # 5. Delete RankUpgrade, RankMatrixNode, RankUpgradePayment
+        # 5. Delete RankUpgrade, RankMatrixNode, RankUpgradePayment, UserRank
         ranks_deleted = RankUpgrade.objects.filter(user=user).delete()
         print(f"5. RankUpgrade deleted: {ranks_deleted}")
         rnodes_deleted = RankMatrixNode.objects.filter(
@@ -147,6 +147,12 @@ def reset_or_delete_user(identifier, action="reset", default_password="123456"):
             print(f"5c. RankUpgradePayment deleted: {rpay_deleted}")
         except Exception as e:
             print(f"5c. RankUpgradePayment reset note: {e}")
+        try:
+            from mlm_ranks.models import UserRank
+            ur_deleted = UserRank.objects.filter(user=user).delete()
+            print(f"5d. UserRank deleted: {ur_deleted}")
+        except Exception as e:
+            print(f"5d. UserRank reset note: {e}")
 
         # 5d. Reset RewardPointsAccount and Transactions
         try:
@@ -237,6 +243,7 @@ def reset_or_delete_user(identifier, action="reset", default_password="123456"):
         else:
             user.account_active = False
             user.is_active = True
+            user.first_purchase_activated_at = None
             if hasattr(user, "current_rank"):
                 user.current_rank = None
             if hasattr(user, "current_rank_id"):
