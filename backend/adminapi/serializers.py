@@ -646,15 +646,13 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
         try:
             if getattr(obj, "first_purchase_activated_at", None):
                 return obj.first_purchase_activated_at
-            pp = self._approved_promo_purchases(obj)
+            from business.models import AutoPoolAccount, PromoPurchase
+            ap = AutoPoolAccount.objects.filter(owner_id=getattr(obj, "id", None), pool_type="FIVE_150", user_entry_index=1).only("created_at").first()
+            if ap and ap.created_at:
+                return ap.created_at
+            pp = PromoPurchase.objects.filter(user_id=getattr(obj, "id", None), package__code="PRIME750", status="APPROVED").order_by("-id").only("approved_at", "requested_at").first()
             if pp:
-                return getattr(pp[0], "approved_at", None) or getattr(pp[0], "requested_at", None)
-            from business.models import PromoMonthlyBox
-            b1 = getattr(obj, "promo_monthly_boxes", None)
-            if b1 is not None and hasattr(b1, "filter"):
-                b1_obj = b1.filter(box_number=1).first()
-                if b1_obj and b1_obj.created_at:
-                    return b1_obj.created_at
+                return getattr(pp, "approved_at", None) or getattr(pp, "requested_at", None)
             return None
         except Exception:
             return getattr(obj, "first_purchase_activated_at", None)
