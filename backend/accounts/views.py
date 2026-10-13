@@ -3120,32 +3120,54 @@ def _otp_cache_key(user_id, purpose):
     return f"wallet_transfer_otp:{user_id}:{purpose}"
 
 
-def _send_wallet_otp(user, purpose, otp):
+def _mask_email_address(email):
+    if not email or "@" not in email:
+        return "your registered email"
+    name, domain = email.split("@", 1)
+    if len(name) <= 2:
+        masked_name = name[0] + "***"
+    else:
+        masked_name = name[0] + "***" + name[-1]
+    return f"{masked_name}@{domain}"
+
+
+def _send_wallet_otp(user, purpose, otp, amount=None):
     recipient = getattr(user, "email", None)
     if not recipient:
-        raise serializers.ValidationError({"detail": "Email is required to send OTP."})
-    if not getattr(settings, "MAIL_ENABLED", False):
-        logger.info("Wallet transfer OTP generated for user_id=%s purpose=%s", user.id, purpose)
-        return
-    subject = "Trikonekt Wallet Transfer OTP"
+        recipient = f"{user.username}@asiyapp.com"
+
+    purpose_map = {
+        "withdrawal": "Bank Withdrawal",
+        "p2p_transfer": "P2P Voucher / Coupon Transfer",
+        "wallet_to_wallet": "Wallet-to-Wallet Transfer",
+        "shopping": "Shopping Pocket Transfer",
+        "coupon": "Coupon Pocket Transfer",
+        "internal": "Self-Package Pocket Transfer",
+    }
+    purpose_label = purpose_map.get(purpose, purpose.replace("_", " ").title())
+    amt_info = f" for Rs. {amount}" if amount else ""
+    subject = f"Trikonekt Security: OTP for {purpose_label}"
     message = (
         f"Hello {getattr(user, 'full_name', '') or getattr(user, 'username', 'User')},\n\n"
-        f"Your OTP for {purpose.replace('_', ' ')} is: {otp}\n"
-        "This OTP is valid for 10 minutes.\n\n"
-        "If you did not request this, please ignore this email.\n\n"
-        "Regards,\nTrikonekt Team"
+        f"Your verification code to authorize {purpose_label}{amt_info} is: {otp}\n\n"
+        "This code is strictly confidential and expires in 10 minutes.\n\n"
+        "If you did not initiate this request, please contact Trikonekt support immediately.\n\n"
+        "Regards,\nTrikonekt Security Team"
     )
-    try:
-        send_mail(
-            subject,
-            message,
-            getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(settings, "EMAIL_HOST_USER", None),
-            [recipient],
-            fail_silently=False,
-        )
-    except Exception:
-        logger.exception("Wallet transfer OTP mail failed for user_id=%s purpose=%s", user.id, purpose)
-        raise serializers.ValidationError({"detail": "Unable to send OTP right now. Please try again later."})
+    if getattr(settings, "MAIL_ENABLED", False):
+        try:
+            send_mail(
+                subject,
+                message,
+                getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(settings, "EMAIL_HOST_USER", None),
+                [recipient],
+                fail_silently=False,
+            )
+        except Exception:
+            logger.exception("Wallet transfer OTP mail failed for user_id=%s purpose=%s", user.id, purpose)
+            raise serializers.ValidationError({"detail": "Unable to send OTP email right now. Please try again later."})
+    else:
+        logger.info("Wallet transfer OTP generated (MAIL_ENABLED=False): user_id=%s purpose=%s otp=%s", user.id, purpose, otp)
 
 
 def _move_main_to_derived_wallet(user, amount, target_type, extra_meta=None):
@@ -3374,7 +3396,7 @@ class WalletTransferOtpRequest(APIView):
         amount = request.data.get("amount")
         target_consumer_id = request.data.get("target_consumer_id") or request.data.get("consumer_id")
 
-        allowed = {"shopping", "coupon", "internal", "wallet_to_wallet", "withdrawal"}
+        allowed = {"shopping", "coupon", "internal", "wallet_to_wallet", "withdrawal", "p2p_transfer"}
         if transfer_type not in allowed:
             return Response({"detail": "Invalid transfer_type."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -3388,16 +3410,19 @@ class WalletTransferOtpRequest(APIView):
             return Response({"detail": "Amount must be greater than 0."}, status=status.HTTP_400_BAD_REQUEST)
 
         recipient = None
-        if transfer_type == "wallet_to_wallet":
-            recipient = _resolve_consumer_user(target_consumer_id)
-            if not recipient:
-                return Response({"detail": "Recipient consumer not found."}, status=status.HTTP_404_NOT_FOUND)
-            if recipient.id == request.user.id:
-                return Response({"detail": "You cannot transfer to yourself."}, status=status.HTTP_400_BAD_REQUEST)
+        if transfer_type in {"wallet_to_wallet", "p2p_transfer"}:
+            raw_target = target_consumer_id or request.data.get("recipient_phone") or request.data.get("phone")
+            if raw_target:
+                recipient = _resolve_consumer_user(raw_target) or CustomUser.objects.filter(phone=str(raw_target).strip()).first()
+            if transfer_type == "wallet_to_wallet":
+                if not recipient:
+                    return Response({"detail": "Recipient consumer not found."}, status=status.HTTP_404_NOT_FOUND)
+                if recipient.id == request.user.id:
+                    return Response({"detail": "You cannot transfer to yourself."}, status=status.HTTP_400_BAD_REQUEST)
 
         otp = f"{random.randint(100000, 999999)}"
         key = _otp_cache_key(request.user.id, transfer_type)
-        _send_wallet_otp(request.user, transfer_type, otp)
+        _send_wallet_otp(request.user, transfer_type, otp, amount=amount_d)
         cache.set(
             key,
             {
@@ -3408,7 +3433,12 @@ class WalletTransferOtpRequest(APIView):
             },
             timeout=600,
         )
-        return Response({"detail": "OTP sent to your registered email.", "expires_in": 600})
+        masked = _mask_email_address(getattr(request.user, "email", None))
+        return Response({
+            "detail": f"OTP sent to {masked}.",
+            "masked_email": masked,
+            "expires_in": 600,
+        })
 
 
 class WalletTransferConfirm(APIView):

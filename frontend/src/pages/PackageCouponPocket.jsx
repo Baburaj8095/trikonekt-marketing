@@ -31,6 +31,7 @@ import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceW
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import API from "../api/api";
+import EmailOtpModal from "../components/common/EmailOtpModal";
 
 function fmtAmount(value) {
   const num = Number(value || 0);
@@ -163,8 +164,10 @@ export default function PackageCouponPocket() {
   const transferTax = transferGross > 0 ? Number(((transferGross * taxPercent) / 100).toFixed(2)) : 0;
   const transferNet = transferGross > 0 ? Number((transferGross - transferTax).toFixed(2)) : 0;
 
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+
   // Handle P2P Transfer (Send)
-  const handleTransfer = async () => {
+  const handleTransfer = () => {
     if (!transferForm.recipient_phone.trim()) {
       setError("Please enter the recipient Consumer ID or mobile number.");
       return;
@@ -177,7 +180,10 @@ export default function PackageCouponPocket() {
       setError(`Insufficient withdrawable balance. Your available balance is ₹${fmtAmount(withdrawableBalance)}.`);
       return;
     }
+    setOtpModalOpen(true);
+  };
 
+  const handleConfirmP2pOtp = async (otpCode) => {
     try {
       setActionLoading(true);
       setError("");
@@ -187,6 +193,7 @@ export default function PackageCouponPocket() {
         recipient_phone: transferForm.recipient_phone.trim(),
         amount: transferGross,
         coupon_type: "PACKAGE_COUPON",
+        otp: otpCode,
       });
 
       const voucherCode = res.data?.voucher_code;
@@ -197,7 +204,9 @@ export default function PackageCouponPocket() {
       await load();
       setActiveTab(2); // View history
     } catch (err) {
-      setError(err?.response?.data?.detail || "Failed to transfer package coupon.");
+      const msg = err?.response?.data?.detail || "Failed to transfer package coupon.";
+      setError(msg);
+      throw err;
     } finally {
       setActionLoading(false);
     }
@@ -773,6 +782,24 @@ export default function PackageCouponPocket() {
           </Box>
         )}
       </Paper>
+
+      {/* Email OTP Verification Modal */}
+      <EmailOtpModal
+        open={otpModalOpen}
+        onClose={() => setOtpModalOpen(false)}
+        title="Authorize P2P Transfer"
+        actionLabel="Confirm & Transfer"
+        transferType="p2p_transfer"
+        amount={transferGross}
+        recipientPhone={transferForm.recipient_phone.trim()}
+        details={[
+          { label: "Transfer Amount", value: `₹${fmtAmount(transferGross)}` },
+          { label: "Recipient Phone / ID", value: transferForm.recipient_phone },
+          { label: `Tax / GST (${taxPercent}%)`, value: `- ₹${fmtAmount(transferTax)}`, color: "#DC2626" },
+          { label: "Net Voucher Amount", value: `₹${fmtAmount(transferNet)}`, color: "#16A34A" },
+        ]}
+        onConfirm={handleConfirmP2pOtp}
+      />
     </Box>
   );
 }

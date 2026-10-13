@@ -14,6 +14,7 @@ import API, {
   getRewardPointsSummary,
   getMyECouponSummary,
 } from "../../api/api";
+import EmailOtpModal from "../../components/common/EmailOtpModal";
 
 /**
  * AgencyWallet
@@ -511,9 +512,13 @@ export default function AgencyWallet() {
     })();
   }, []);
 
-  async function submitWithdrawal(e) {
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+  const [wdrSuccess, setWdrSuccess] = useState("");
+
+  function submitWithdrawal(e) {
     e.preventDefault();
     setWdrErr("");
+    setWdrSuccess("");
     if (disableReason) {
       setWdrErr(disableReason);
       return;
@@ -540,9 +545,15 @@ export default function AgencyWallet() {
       );
       return;
     }
+    setOtpModalOpen(true);
+  }
+
+  async function handleConfirmWithdrawal(otpCode) {
+    const amtNum = Number(wdrForm.amount);
     const payload = {
       amount: amtNum,
       method: "bank",
+      otp: otpCode,
     };
     try {
       setWdrSubmitting(true);
@@ -586,6 +597,7 @@ export default function AgencyWallet() {
         amount: "",
         method: wdrForm.method,
       });
+      setWdrSuccess(`Successfully submitted withdrawal request for ₹${fmtAmount(amtNum)}!`);
     } catch (e) {
       const msg =
         e?.response?.data?.detail ||
@@ -593,6 +605,7 @@ export default function AgencyWallet() {
           ? JSON.stringify(e.response.data)
           : "Failed to submit withdrawal.");
       setWdrErr(String(msg));
+      throw e;
     } finally {
       setWdrSubmitting(false);
     }
@@ -814,6 +827,11 @@ export default function AgencyWallet() {
                 {wdrErr}
               </Alert>
             ) : null}
+            {wdrSuccess ? (
+              <Alert severity="success" sx={{ mb: 1 }}>
+                {wdrSuccess}
+              </Alert>
+            ) : null}
             {!kyc?.verified ? (
               <Alert severity="error" sx={{ mb: 1 }}>
                 KYC verification required to request withdrawal. Please
@@ -885,6 +903,22 @@ export default function AgencyWallet() {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Email OTP Verification Modal */}
+      <EmailOtpModal
+        open={otpModalOpen}
+        onClose={() => setOtpModalOpen(false)}
+        title="Authorize Bank Withdrawal"
+        actionLabel="Confirm & Withdraw"
+        transferType="withdrawal"
+        amount={Number(wdrForm.amount) || 0}
+        details={[
+          { label: "Withdrawal Amount", value: `₹${fmtAmount(wdrForm.amount)}` },
+          { label: "Destination", value: kyc?.bank_name ? `${kyc.bank_name} (****${String(kyc.bank_account_number || "").slice(-4)})` : "Verified Bank Account" },
+          { label: "Applicable TDS", value: `${taxPercent}%`, color: "#DC2626" },
+        ]}
+        onConfirm={handleConfirmWithdrawal}
+      />
     </Box>
   );
 }

@@ -39,10 +39,15 @@ subprocess.run([
 ], check=True)
 
 backend_files = [
+    (r"backend\accounts\serializers.py", "/srv/trikonekt/staging/backend/accounts/serializers.py"),
+    (r"backend\accounts\views.py", "/srv/trikonekt/staging/backend/accounts/views.py"),
     (r"backend\adminapi\views.py", "/srv/trikonekt/staging/backend/adminapi/views.py"),
     (r"backend\business\services\self_rebirth.py", "/srv/trikonekt/staging/backend/business/services/self_rebirth.py"),
+    (r"backend\business\services\ssv_service.py", "/srv/trikonekt/staging/backend/business/services/ssv_service.py"),
     (r"backend\business\views_agency_territory.py", "/srv/trikonekt/staging/backend/business/views_agency_territory.py"),
+    (r"backend\business\views_ssv.py", "/srv/trikonekt/staging/backend/business/views_ssv.py"),
     (r"backend\business\urls.py", "/srv/trikonekt/staging/backend/business/urls.py"),
+    (r"backend\business\management\commands\send_ssv_due_reminders.py", "/srv/trikonekt/staging/backend/business/management/commands/send_ssv_due_reminders.py"),
     (r"backend\core\urls.py", "/srv/trikonekt/staging/backend/core/urls.py"),
     (r"backend\locations\views.py", "/srv/trikonekt/staging/backend/locations/views.py"),
     (r"backend\locations\urls.py", "/srv/trikonekt/staging/backend/locations/urls.py"),

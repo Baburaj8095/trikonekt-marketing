@@ -251,3 +251,141 @@ class SSVService:
             "voucher_code": voucher_code,
             "transferred_at": timezone.now().strftime("%d %b %Y, %I:%M %p"),
         }
+
+    @classmethod
+    def send_due_date_reminders(cls, dry_run: bool = False):
+        """
+        Automated SSV 2nd-month due-date reminder task:
+        Finds all users who purchased SSV / Smart Product Package Month 1 (box_number=1)
+        and have not yet purchased Month 2 (box_number=2).
+        Calculates Month 2 due date = box1.created_at.date() + 30 days.
+        Sends:
+          - 3 days before due date (days_remaining == 3)
+          - 1 day before due date (days_remaining == 1)
+          - Due today (days_remaining == 0)
+        Prevents duplicate sends on the same calendar day.
+        """
+        from datetime import timedelta
+        from django.core.cache import cache
+        from django.core.mail import send_mail
+        from business.models import PromoMonthlyBox
+        from notifications.models import Notification
+
+        today = timezone.localdate()
+        box1_records = PromoMonthlyBox.objects.filter(box_number=1).select_related("user")
+
+        processed = 0
+        reminders_3_days = 0
+        reminders_1_day = 0
+        reminders_due_today = 0
+        overdue_count = 0
+        dispatched = 0
+        user_results = []
+
+        for b1 in box1_records:
+            user = b1.user
+            processed += 1
+
+            # Check if user already purchased box 2
+            has_box2 = PromoMonthlyBox.objects.filter(user=user, box_number=2).exists()
+            if has_box2:
+                continue
+
+            b1_date = b1.created_at.date() if b1.created_at else today
+            due_date = b1_date + timedelta(days=30)
+            days_remaining = (due_date - today).days
+
+            event_type = None
+            title = None
+            body = None
+            priority = "normal"
+
+            user_display = getattr(user, "full_name", None) or getattr(user, "username", "Partner")
+            due_date_str = due_date.strftime("%d %b %Y")
+
+            if days_remaining == 3:
+                event_type = "3_DAYS_BEFORE"
+                reminders_3_days += 1
+                title = "SSV Box 2 Subscription Due in 3 Days 📦"
+                body = (
+                    f"Hello {user_display}, your Smart Product Package (SSV) Month 2 subscription box "
+                    f"of Rs. 1,000 is due in 3 days on {due_date_str}. Complete payment on trieducation.in "
+                    f"to maintain uninterrupted active benefits."
+                )
+            elif days_remaining == 1:
+                event_type = "1_DAY_BEFORE"
+                reminders_1_day += 1
+                priority = "high"
+                title = "Urgent: SSV Box 2 Due Tomorrow ⏳"
+                body = (
+                    f"Hello {user_display}, your SSV Month 2 subscription box of Rs. 1,000 is due tomorrow "
+                    f"({due_date_str}). Renew today on trieducation.in to secure your monthly product box "
+                    f"and loyalty rewards!"
+                )
+            elif days_remaining == 0:
+                event_type = "DUE_TODAY"
+                reminders_due_today += 1
+                priority = "high"
+                title = "Action Required: SSV Box 2 Due Today ⚠️"
+                body = (
+                    f"Hello {user_display}, your SSV Month 2 subscription box is due today ({due_date_str}). "
+                    f"Please complete your renewal on trieducation.in now to keep your rewards active."
+                )
+            elif days_remaining < 0:
+                overdue_count += 1
+
+            if event_type:
+                cache_key = f"ssv_reminder:{user.id}:box2:{event_type}:{today.isoformat()}"
+                already_sent = bool(cache.get(cache_key))
+
+                if not already_sent and not dry_run:
+                    # In-app notification
+                    try:
+                        Notification.objects.create(
+                            user=user,
+                            title=title,
+                            body=body,
+                            channel="in_app",
+                            priority=priority,
+                            deep_link="https://trieducation.in",
+                        )
+                    except Exception as ne:
+                        logger.warning(f"Notification create error: {ne}")
+
+                    # Email notification
+                    if user.email and getattr(settings, "MAIL_ENABLED", False):
+                        try:
+                            send_mail(
+                                title,
+                                f"{body}\n\nRenew directly on: https://trieducation.in\n\nRegards,\nTrikonekt Team",
+                                getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(settings, "EMAIL_HOST_USER", None),
+                                [user.email],
+                                fail_silently=True,
+                            )
+                        except Exception as me:
+                            logger.warning(f"Email dispatch error for {user.email}: {me}")
+
+                    cache.set(cache_key, True, timeout=86400 * 2)
+                    dispatched += 1
+
+                user_results.append({
+                    "user_id": user.id,
+                    "username": user.username,
+                    "phone": user.phone or "",
+                    "box1_date": b1_date.isoformat(),
+                    "due_date": due_date.isoformat(),
+                    "days_remaining": days_remaining,
+                    "event_type": event_type,
+                    "already_sent": already_sent,
+                })
+
+        return {
+            "processed_users": processed,
+            "reminders_3_days": reminders_3_days,
+            "reminders_1_day": reminders_1_day,
+            "reminders_due_today": reminders_due_today,
+            "overdue_count": overdue_count,
+            "dispatched_notifications": dispatched,
+            "dry_run": dry_run,
+            "results": user_results,
+        }

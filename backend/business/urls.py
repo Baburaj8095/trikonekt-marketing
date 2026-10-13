@@ -15,6 +15,7 @@ from .views_ssv import (
     AdminSSVCyclesView,
     AdminSSVActivateCycleView,
     AdminSSVSaveCycleView,
+    AdminSSVRemindersStatusView,
 )
 from .views import (
     BusinessRegistrationCreateView,
@@ -224,6 +225,7 @@ urlpatterns = [
     path('admin/ssv/cycles/', AdminSSVCyclesView.as_view(), name='admin_ssv_cycles'),
     path('admin/ssv/cycles/activate/', AdminSSVActivateCycleView.as_view(), name='admin_ssv_cycle_activate'),
     path('admin/ssv/cycles/save/', AdminSSVSaveCycleView.as_view(), name='admin_ssv_cycle_save'),
+    path('admin/ssv/reminders/', AdminSSVRemindersStatusView.as_view(), name='admin_ssv_reminders'),
 
     # Agency / Franchise Territory Command Centers
     path('agency/district-pincodes/', DistrictPincodesView.as_view(), name='agency_district_pincodes'),

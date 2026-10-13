@@ -1552,6 +1552,8 @@ class SupportTicketSerializer(serializers.ModelSerializer):
 
 
 class WithdrawalRequestSerializer(serializers.ModelSerializer):
+    otp = serializers.CharField(write_only=True, required=False, allow_blank=True)
+
     class Meta:
         model = WithdrawalRequest
         fields = [
@@ -1567,6 +1569,7 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
             "requested_at",
             "decided_at",
             "payout_ref",
+            "otp",
         ]
 
         # Existing withdrawal serializer behavior (read-only + server-side validations)
@@ -1593,6 +1596,7 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         """
         Create a withdrawal request with the following business rules:
         - KYC must be verified
+        - Email OTP must be verified
         - Requested amount must not exceed the user's withdrawal pocket balance
         - Window rules enforced by CommissionConfig.get_withdrawals_window()
         """
@@ -1600,12 +1604,24 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         from datetime import datetime, time, timedelta, timezone as dt_timezone
         from zoneinfo import ZoneInfo
         from django.utils import timezone
+        from django.core.cache import cache
         from .models import WithdrawalRequest, Wallet
 
         request = self.context.get("request")
         user = getattr(request, "user", None)
         if not user or not user.is_authenticated:
             raise serializers.ValidationError({"detail": "Authentication required."})
+
+        # Email OTP verification
+        otp = str(self.initial_data.get("otp") or validated_data.pop("otp", "") or "").strip()
+        key = f"wallet_transfer_otp:{user.id}:withdrawal"
+        cached_otp_data = cache.get(key)
+        if not cached_otp_data or str(cached_otp_data.get("otp") or "").strip() != otp:
+            raise serializers.ValidationError({
+                "detail": "Valid 6-digit Email OTP is required to submit a withdrawal request.",
+                "code": "OTP_REQUIRED"
+            })
+        cache.delete(key)
 
         # Normalize method + bank fields (will hydrate from KYC later if needed)
         method = (validated_data.get("method") or "bank").lower()

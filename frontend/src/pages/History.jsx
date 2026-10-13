@@ -25,6 +25,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import API from "../api/api";
+import EmailOtpModal from "../components/common/EmailOtpModal";
 
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
@@ -1524,7 +1525,9 @@ const P2PTransferPanel = React.memo(function P2PTransferPanel({
   const p2pFee = p2pGross > 0 ? Number(((p2pGross * p2pTaxPercent) / 100).toFixed(2)) : 0;
   const p2pNet = p2pGross > 0 ? Number((p2pGross - p2pFee).toFixed(2)) : 0;
 
-  const handleTransfer = async () => {
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+
+  const handleTransfer = () => {
     if (!recipientPhone.trim()) {
       setP2pError("Please enter recipient phone number.");
       return;
@@ -1537,6 +1540,10 @@ const P2PTransferPanel = React.memo(function P2PTransferPanel({
       setP2pError(`Insufficient balance. Your available balance is ₹${fmtAmount(availableBalance)}.`);
       return;
     }
+    setOtpModalOpen(true);
+  };
+
+  const handleConfirmP2pOtp = async (otpCode) => {
     try {
       setP2pBusy(true);
       setP2pError("");
@@ -1546,6 +1553,7 @@ const P2PTransferPanel = React.memo(function P2PTransferPanel({
         recipient_phone: recipientPhone.trim(),
         amount: p2pGross,
         coupon_type: "PACKAGE_COUPON",
+        otp: otpCode,
       });
 
       const vCode = res.data?.voucher_code;
@@ -1556,7 +1564,9 @@ const P2PTransferPanel = React.memo(function P2PTransferPanel({
       setRecipientInfo(null);
       if (onSuccess) onSuccess();
     } catch (err) {
-      setP2pError(err?.response?.data?.detail || err?.response?.data?.message || "Failed to complete P2P transfer.");
+      const msg = err?.response?.data?.detail || err?.response?.data?.message || "Failed to complete P2P transfer.";
+      setP2pError(msg);
+      throw err;
     } finally {
       setP2pBusy(false);
     }
@@ -1703,6 +1713,24 @@ const P2PTransferPanel = React.memo(function P2PTransferPanel({
           {p2pBusy ? "Processing Transfer..." : recipientValid === true ? `Transfer ₹${p2pGross > 0 ? fmtAmount(p2pGross) : "0.00"} (Net: ₹${fmtAmount(p2pNet)})` : "Verify Recipient to Transfer"}
         </Button>
       </Stack>
+
+      {/* Email OTP Verification Modal */}
+      <EmailOtpModal
+        open={otpModalOpen}
+        onClose={() => setOtpModalOpen(false)}
+        title="Authorize P2P Transfer"
+        actionLabel="Confirm & Transfer"
+        transferType="p2p_transfer"
+        amount={p2pGross}
+        recipientPhone={recipientPhone.trim()}
+        details={[
+          { label: "Transfer Amount", value: `₹${fmtAmount(p2pGross)}` },
+          { label: "Recipient", value: recipientInfo ? `${recipientInfo.name || recipientInfo.username} (${recipientPhone})` : recipientPhone },
+          { label: `P2P Fee / Tax (${p2pTaxPercent}%)`, value: `- ₹${fmtAmount(p2pFee)}`, color: "#DC2626" },
+          { label: "Net Credited to Recipient", value: `₹${fmtAmount(p2pNet)}`, color: "#16A34A" },
+        ]}
+        onConfirm={handleConfirmP2pOtp}
+      />
     </Box>
   );
 });

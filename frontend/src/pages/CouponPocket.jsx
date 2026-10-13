@@ -38,6 +38,7 @@ import API from "../api/api";
 import { S } from "../theme/tokens";
 import StatusBadge from "../components/common/StatusBadge";
 import GiftCardModal from "../components/vouchers/GiftCardModal";
+import EmailOtpModal from "../components/common/EmailOtpModal";
 import PremiumScreenHeader from "../components/common/PremiumScreenHeader";
 import BottomNav from "../components/common/BottomNav";
 
@@ -267,7 +268,9 @@ export default function CouponPocket() {
     }
   };
 
-  const handleP2pTransfer = async () => {
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+
+  const handleP2pTransfer = () => {
     setP2pModalError("");
     setP2pModalSuccess("");
     if (!p2pForm.recipient_phone.trim()) {
@@ -282,13 +285,17 @@ export default function CouponPocket() {
       setP2pModalError(`Insufficient balance. Your available balance is ₹${fmtAmount(availableBalance)}.`);
       return;
     }
+    setOtpModalOpen(true);
+  };
 
+  const handleConfirmP2pOtp = async (otpCode) => {
     try {
       setActionLoading(true);
       const res = await API.post("/business/coupons/p2p-transfer/", {
         recipient_phone: p2pForm.recipient_phone.trim(),
         amount: p2pGross,
         coupon_type: p2pForm.coupon_type,
+        otp: otpCode,
       });
 
       const vCode = res?.data?.voucher_code;
@@ -301,12 +308,13 @@ export default function CouponPocket() {
       setTimeout(() => {
         setP2pModalOpen(false);
         setP2pModalSuccess("");
-      }, 2500);
+      }, 1500);
       load();
     } catch (err) {
       const errMsg = err?.response?.data?.detail || err?.response?.data?.message || "Failed to process P2P transfer.";
       setP2pModalError(errMsg);
       setError(errMsg);
+      throw err;
     } finally {
       setActionLoading(false);
     }
@@ -1146,6 +1154,24 @@ export default function CouponPocket() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Email OTP Verification Modal */}
+      <EmailOtpModal
+        open={otpModalOpen}
+        onClose={() => setOtpModalOpen(false)}
+        title="Authorize P2P Transfer"
+        actionLabel="Confirm & Transfer"
+        transferType="p2p_transfer"
+        amount={p2pGross}
+        recipientPhone={p2pForm.recipient_phone.trim()}
+        details={[
+          { label: "Transfer Amount", value: `₹${fmtAmount(p2pGross)}` },
+          { label: "Recipient Phone", value: p2pForm.recipient_phone },
+          { label: "7% Transfer Fee", value: `- ₹${fmtAmount(p2pFee)}`, color: "#DC2626" },
+          { label: "Net to Recipient", value: `₹${fmtAmount(p2pNet)}`, color: "#16A34A" },
+        ]}
+        onConfirm={handleConfirmP2pOtp}
+      />
 
       {/* Redeem Coupon Modal */}
       <Dialog

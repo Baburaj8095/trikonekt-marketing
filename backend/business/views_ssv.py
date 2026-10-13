@@ -35,6 +35,18 @@ class P2PCouponTransferView(APIView):
         if not amount:
             return Response({"detail": "Amount is required."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Email OTP verification
+        from django.core.cache import cache
+        otp = str(request.data.get("otp") or "").strip()
+        key = f"wallet_transfer_otp:{request.user.id}:p2p_transfer"
+        cached_otp_data = cache.get(key)
+        if not cached_otp_data or str(cached_otp_data.get("otp") or "").strip() != otp:
+            return Response({
+                "detail": "Valid 6-digit Email OTP is required to authorize P2P transfer.",
+                "code": "OTP_REQUIRED",
+            }, status=status.HTTP_400_BAD_REQUEST)
+        cache.delete(key)
+
         try:
             amount_dec = Decimal(str(amount))
             if amount_dec <= Decimal("0.00"):
@@ -1033,4 +1045,23 @@ class AdminSSVExportCSVView(APIView):
         return response
 
 
+class AdminSSVRemindersStatusView(APIView):
+    """
+    Admin Endpoint: Returns status of users approaching or reaching SSV 2nd-month due dates.
+    GET: Returns simulation / counts (dry_run=True)
+    POST: Dispatches live reminders (or dry_run if flag passed)
+    """
+    permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        if not (request.user.is_staff or request.user.is_superuser or getattr(request.user, "admin_role", None)):
+            return Response({"detail": "Admin authorization required."}, status=status.HTTP_403_FORBIDDEN)
+        res = SSVService.send_due_date_reminders(dry_run=True)
+        return Response(res, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        if not (request.user.is_staff or request.user.is_superuser or getattr(request.user, "admin_role", None)):
+            return Response({"detail": "Admin authorization required."}, status=status.HTTP_403_FORBIDDEN)
+        dry_run = bool(request.data.get("dry_run", False))
+        res = SSVService.send_due_date_reminders(dry_run=dry_run)
+        return Response(res, status=status.HTTP_200_OK)
