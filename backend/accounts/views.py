@@ -4431,7 +4431,11 @@ def wallet_me_history(request):
         "TRIZONE": Q(type__in=["AUTO_ECOUPON_ISSUED", "AUTO_PURCHASE_DEBIT", "ECOUPON_WALLET_DEBIT", "COUPON_PURCHASE_CREDIT", "REDEEM_ECOUPON_CREDIT", "PRODUCT_WALLET_CREDIT", "PRODUCT_PURCHASE_DEBIT"]),
 
         "ROYALTY": (Q(type="GLOBAL_ROYALTY") | Q(meta__source="GLOBAL_ROYALTY")) & ~Q(type__startswith="SELF_ACCOUNT"),
+        "DIRECT": (Q(type="DIRECT_REF_BONUS") | Q(meta__orig_type="DIRECT_REF_BONUS") | (Q(source_type="RANK_UPGRADE") & (Q(meta__kind="RANK_UPGRADE_DIRECT") | Q(meta__level=0)))) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT"),
+        "WITHDRAWAL": (Q(type__in=["WITHDRAWAL_DEBIT", "WITHDRAWAL_REQUEST"]) | Q(source_type="WITHDRAWAL")),
+        "P2P": (Q(type__in=["P2P_PACKAGE_COUPON_SEND", "P2P_PACKAGE_COUPON_RECEIVE"]) | Q(source_type__icontains="P2P")),
     }
+    cat_queries["LAYER"] = cat_queries["FIVE_LAYER"] | cat_queries["THREE_LAYER"] | cat_queries["E_EDU_LAYER"]
 
     category_stats = {}
     base_tx = WalletTransaction.objects.filter(user=user).exclude(source_type="ADMIN_SERVICE_CHARGE")
@@ -4472,23 +4476,89 @@ def wallet_me_history(request):
     e_layer_tot = D(layer_edu_earned or "0.00")
     layer_matrix_earned = str(five_layer_tot + three_layer_tot + e_layer_tot)
 
+    # Server-Side Filter Processing (100% Database SQL Execution)
+    active_filter_q = Q()
     category_param = (request.GET.get("category") or "").strip().upper()
     if category_param and category_param in cat_queries and category_param != "ALL":
-        cat_q = cat_queries[category_param]
-        all_qs = WalletTransaction.objects.filter(user=user).exclude(source_type="ADMIN_SERVICE_CHARGE").filter(cat_q).order_by("-created_at")[:req_limit]
-        main_qs = all_qs
-    else:
-        main_qs = WalletTransaction.objects.filter(
-            user=user,
-            type__in=main_types
-        ).exclude(
-            source_type="ADMIN_SERVICE_CHARGE"
-        ).order_by("-created_at")[:req_limit]
-        all_qs = WalletTransaction.objects.filter(
-            user=user
-        ).exclude(
-            source_type="ADMIN_SERVICE_CHARGE"
-        ).order_by("-created_at")[:req_limit]
+        active_filter_q &= cat_queries[category_param]
+
+    flow_param = (request.GET.get("flow") or "").strip().upper()
+    if flow_param == "CREDIT":
+        active_filter_q &= Q(amount__gt=0) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT")
+    elif flow_param == "DEBIT":
+        active_filter_q &= Q(type__in=["SELF_ACCOUNT_CREDIT", "SELF_ACCOUNT_DEBIT"]) | Q(meta__ledger="SELF_ACCOUNT") | Q(amount__lt=0)
+
+    date_preset = (request.GET.get("date_preset") or "").strip().lower()
+    start_date_str = (request.GET.get("start_date") or "").strip()
+    end_date_str = (request.GET.get("end_date") or "").strip()
+
+    from django.utils import timezone
+    import zoneinfo
+    try:
+        ist = zoneinfo.ZoneInfo("Asia/Kolkata")
+    except Exception:
+        ist = timezone.get_current_timezone()
+    now_ist = timezone.now().astimezone(ist)
+
+    from datetime import timedelta
+    if date_preset == "today":
+        start_of_day = now_ist.replace(hour=0, minute=0, second=0, microsecond=0)
+        active_filter_q &= Q(created_at__gte=start_of_day)
+    elif date_preset == "yesterday":
+        start_of_today = now_ist.replace(hour=0, minute=0, second=0, microsecond=0)
+        start_of_yesterday = start_of_today - timedelta(days=1)
+        active_filter_q &= Q(created_at__gte=start_of_yesterday, created_at__lt=start_of_today)
+    elif date_preset == "this_week":
+        start_of_week = (now_ist - timedelta(days=now_ist.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+        active_filter_q &= Q(created_at__gte=start_of_week)
+    elif date_preset == "this_month":
+        start_of_month = now_ist.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        active_filter_q &= Q(created_at__gte=start_of_month)
+    elif date_preset == "last_month":
+        first_of_this_month = now_ist.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        last_day_of_prev = first_of_this_month - timedelta(days=1)
+        first_of_prev = last_day_of_prev.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        active_filter_q &= Q(created_at__gte=first_of_prev, created_at__lt=first_of_this_month)
+    elif date_preset == "30_days":
+        since_30 = now_ist - timedelta(days=30)
+        active_filter_q &= Q(created_at__gte=since_30)
+
+    if start_date_str:
+        try:
+            from datetime import datetime
+            sd = datetime.strptime(start_date_str, "%Y-%m-%d").replace(tzinfo=ist)
+            active_filter_q &= Q(created_at__gte=sd)
+        except Exception:
+            pass
+    if end_date_str:
+        try:
+            from datetime import datetime
+            ed = datetime.strptime(end_date_str, "%Y-%m-%d").replace(hour=23, minute=59, second=59, tzinfo=ist)
+            active_filter_q &= Q(created_at__lte=ed)
+        except Exception:
+            pass
+
+    search_param = (request.GET.get("search") or "").strip()
+    if search_param:
+        q_search = (
+            Q(source_type__icontains=search_param) |
+            Q(type__icontains=search_param) |
+            Q(meta__source__icontains=search_param) |
+            Q(meta__username__icontains=search_param) |
+            Q(meta__recipient_phone__icontains=search_param) |
+            Q(meta__sender_phone__icontains=search_param)
+        )
+        if search_param.isdigit():
+            q_search |= Q(id=int(search_param))
+        active_filter_q &= q_search
+
+    # Authoritative SQL calculations for the active filter
+    filtered_qs = base_tx.filter(active_filter_q)
+    filtered_count = filtered_qs.count()
+    filtered_total = filtered_qs.filter(amount__gt=0).aggregate(s=Sum("amount"))["s"] or D("0.00")
+
+    all_qs = filtered_qs.order_by("-created_at")[:req_limit]
+    main_qs = all_qs
 
     main_list = [txmap(x) for x in main_qs]
     all_list = [txmap(x) for x in all_qs]
@@ -4509,6 +4579,10 @@ def wallet_me_history(request):
         "layer_edu_earned": layer_edu_earned,
         "e_edu_total_earned": e_edu_total_earned,
         "category_stats": category_stats,
+        "filtered_stats": {
+            "count": filtered_count,
+            "total": str(filtered_total),
+        },
         "income": {
             "matrixLevel": layer_matrix_earned,
             "matrixFive": layer_matrix_earned,

@@ -1894,19 +1894,39 @@ export default function History() {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const [dbCategoryStats, setDbCategoryStats] = useState(null);
+  const [filteredStats, setFilteredStats] = useState({ count: 0, total: "0.00" });
 
-  const fetchHistory = async (cat = sourceFilter) => {
+  const fetchHistory = useCallback(async () => {
     try {
       setErr("");
       const params = { limit: 2000 };
-      if (cat && cat !== "ALL") {
-        params.category = cat;
+      if (sourceFilter && sourceFilter !== "ALL") {
+        params.category = sourceFilter;
       }
+      if (flowFilter && flowFilter !== "ALL") {
+        params.flow = flowFilter;
+      }
+      if (datePreset && datePreset !== "all") {
+        params.date_preset = datePreset;
+      }
+      if (customStartDate) {
+        params.start_date = customStartDate;
+      }
+      if (customEndDate) {
+        params.end_date = customEndDate;
+      }
+      if (searchQuery && searchQuery.trim()) {
+        params.search = searchQuery.trim();
+      }
+
       const res = await API.get("/accounts/wallet/me/history/", { params });
       const data = res?.data || {};
 
       if (data?.category_stats) {
         setDbCategoryStats(data.category_stats);
+      }
+      if (data?.filtered_stats) {
+        setFilteredStats(data.filtered_stats);
       }
 
       setTop({
@@ -1916,21 +1936,21 @@ export default function History() {
         shopping_rewards_points: data?.top?.shopping_rewards_points ?? "0.00",
         redeem_points: data?.top?.redeem_points ?? "0.00",
         all_earnings_total: data?.top?.all_earnings_total ?? "0.00",
-        today_bonus_100: data?.top?.today_bonus_100,
-        yesterday_bonus_100: data?.top?.yesterday_bonus_100,
-        today_main_75: data?.top?.today_main_75,
-        yesterday_main_75: data?.top?.yesterday_main_75,
-        today_self_25: data?.top?.today_self_25,
-        yesterday_self_25: data?.top?.yesterday_self_25,
-        lifetime_credits_total: data?.top?.lifetime_credits_total,
-        lifetime_credits_count: data?.top?.lifetime_credits_count,
-        lifetime_debits_total: data?.top?.lifetime_debits_total,
-        lifetime_debits_count: data?.top?.lifetime_debits_count,
-        lifetime_self_count: data?.top?.lifetime_self_count,
-        lifetime_self_debits_count: data?.top?.lifetime_self_debits_count,
-        lifetime_self_debits_total: data?.top?.lifetime_self_debits_total,
-        lifetime_self_credits_total: data?.top?.lifetime_self_credits_total,
-        lifetime_self_credits_count: data?.top?.lifetime_self_credits_count,
+        today_bonus_100: data?.top?.today_bonus_100 ?? "0.00",
+        yesterday_bonus_100: data?.top?.yesterday_bonus_100 ?? "0.00",
+        today_main_75: data?.top?.today_main_75 ?? "0.00",
+        yesterday_main_75: data?.top?.yesterday_main_75 ?? "0.00",
+        today_self_25: data?.top?.today_self_25 ?? "0.00",
+        yesterday_self_25: data?.top?.yesterday_self_25 ?? "0.00",
+        lifetime_credits_total: data?.top?.lifetime_credits_total ?? "0.00",
+        lifetime_credits_count: data?.top?.lifetime_credits_count ?? 0,
+        lifetime_debits_total: data?.top?.lifetime_debits_total ?? "0.00",
+        lifetime_debits_count: data?.top?.lifetime_debits_count ?? 0,
+        lifetime_self_count: data?.top?.lifetime_self_count ?? 0,
+        lifetime_self_debits_count: data?.top?.lifetime_self_debits_count ?? 0,
+        lifetime_self_debits_total: data?.top?.lifetime_self_debits_total ?? "0.00",
+        lifetime_self_credits_total: data?.top?.lifetime_self_credits_total ?? "0.00",
+        lifetime_self_credits_count: data?.top?.lifetime_self_credits_count ?? 0,
       });
 
       setAllTransactions(Array.isArray(data?.all_transactions) ? data.all_transactions : []);
@@ -1958,11 +1978,14 @@ export default function History() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [sourceFilter, flowFilter, datePreset, customStartDate, customEndDate, searchQuery]);
 
   useEffect(() => {
-    fetchHistory(sourceFilter);
-  }, [sourceFilter]);
+    const timer = setTimeout(() => {
+      fetchHistory();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [fetchHistory]);
 
   // Platform Tax Configuration
   const [taxConfig, setTaxConfig] = useState({
@@ -2067,246 +2090,30 @@ export default function History() {
     setSearchQuery("");
   };
 
-  const isTxInDateRange = (txDateStr) => {
-    if (!txDateStr) return false;
-    const txDate = new Date(txDateStr);
-
-    if (datePreset === "today") {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return txDate >= today;
-    }
-    if (datePreset === "this_month") {
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      return txDate >= startOfMonth;
-    }
-    if (datePreset === "last_month") {
-      const now = new Date();
-      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-      return txDate >= startOfLastMonth && txDate <= endOfLastMonth;
-    }
-    if (datePreset === "30_days") {
-      const d = new Date();
-      d.setDate(d.getDate() - 30);
-      d.setHours(0, 0, 0, 0);
-      return txDate >= d;
-    }
-    if (datePreset === "custom" || customStartDate || customEndDate) {
-      if (customStartDate) {
-        const start = new Date(customStartDate + "T00:00:00");
-        if (txDate < start) return false;
-      }
-      if (customEndDate) {
-        const end = new Date(customEndDate + "T23:59:59");
-        if (txDate > end) return false;
-      }
-      return true;
-    }
-    return true; // "all"
-  };
-
-  const rawTransactions = useMemo(() => {
-    const list = Array.isArray(allTransactions) && allTransactions.length > 0
-      ? allTransactions
-      : [...mainWallet, ...incoming, ...selfAccount, ...redeem];
-
-    const map = new Map();
-    list.forEach((tx) => {
-      if (!tx) return;
-      const key = `${tx.id || ""}_${tx.type || ""}_${tx.created_at || ""}`;
-      if (!map.has(key)) {
-        map.set(key, tx);
-      }
-    });
-
-    return Array.from(map.values()).sort((a, b) => {
-      const da = a?.created_at ? new Date(a.created_at).getTime() : 0;
-      const db = b?.created_at ? new Date(b.created_at).getTime() : 0;
-      return db - da;
-    });
-  }, [allTransactions, mainWallet, incoming, selfAccount, redeem]);
-
-  const dateFilteredTransactions = useMemo(() => {
-    return rawTransactions.filter((tx) => isTxInDateRange(tx?.created_at));
-  }, [rawTransactions, datePreset, customStartDate, customEndDate]);
-
-  const categoryCounts = useMemo(() => {
-    const counts = {
-      ALL: dateFilteredTransactions.length,
-      FIVE_LAYER: 0,
-      THREE_LAYER: 0,
-      E_EDU_LAYER: 0,
-      E_EDU: 0,
-      SELF_ACCOUNT: 0,
-      LAYER: 0,
-      DIRECT: 0,
-      P2P: 0,
-      ROYALTY: 0,
-      MERCHANT_CAPTAIN: 0,
-      WITHDRAWAL: 0,
-    };
-    dateFilteredTransactions.forEach((tx) => {
-      const cat = classifyTransaction(tx);
-      const isSelf = tx?.type === "SELF_ACCOUNT_CREDIT" || tx?.type === "SELF_ACCOUNT_DEBIT" || tx?.meta?.ledger === "SELF_ACCOUNT";
-      if (counts[cat] !== undefined) {
-        counts[cat] += 1;
-      }
-      if (isFiveLayerTx(tx) && !isSelf) counts.FIVE_LAYER += 1;
-      if (isThreeLayerTx(tx) && !isSelf) counts.THREE_LAYER += 1;
-      if (isEEduLayerTx(tx) && !isSelf) counts.E_EDU_LAYER += 1;
-    });
-    return counts;
-  }, [dateFilteredTransactions]);
-
+  // Strict Database-Side Filtering: All filtering is computed exclusively by PostgreSQL on the backend
   const filteredTransactions = useMemo(() => {
-    return dateFilteredTransactions.filter((tx) => {
-      const amt = Number(tx?.amount || 0);
-      const type = String(tx?.type || "");
-      const meta = tx?.meta || {};
-      const isSelf = type === "SELF_ACCOUNT_CREDIT" || type === "SELF_ACCOUNT_DEBIT" || meta?.ledger === "SELF_ACCOUNT";
-
-      // Flow filter
-      if (flowFilter === "CREDIT" && (isSelf || amt < 0)) return false;
-      if (flowFilter === "DEBIT" && !isSelf) return false;
-
-      // Source filter
-      if (sourceFilter !== "ALL") {
-        const cat = classifyTransaction(tx);
-        if (sourceFilter === "SAVE" || sourceFilter === "SELF_ACCOUNT") {
-          if (cat !== "SELF_ACCOUNT" && cat !== "SAVE") return false;
-        } else if (sourceFilter === "FIVE_LAYER") {
-          if (!isFiveLayerTx(tx) || isSelf) return false;
-        } else if (sourceFilter === "THREE_LAYER") {
-          if (!isThreeLayerTx(tx) || isSelf) return false;
-        } else if (sourceFilter === "E_EDU_LAYER") {
-          if (!isEEduLayerTx(tx) || isSelf) return false;
-        } else if (sourceFilter === "E_EDU_DIRECT") {
-          if (!isEEduDirectTx(tx) || isSelf) return false;
-        } else if (sourceFilter === "SSV_LAYER") {
-          if (!isSsvLayerTx(tx)) return false;
-        } else if (sourceFilter === "SSV_BONUS") {
-          if (!isSsvBonusTx(tx)) return false;
-        } else if (sourceFilter === "QR_SCANNER") {
-          if (cat !== "QR_SCANNER" && cat !== "MERCHANT_CAPTAIN") return false;
-        } else if (sourceFilter === "TRIZONE") {
-          if (cat !== "TRIZONE" && cat !== "REDEEM") return false;
-        } else if (sourceFilter === "E_EDU") {
-          if (cat !== "E_EDU") return false;
-        } else if (sourceFilter === "ROYALTY") {
-          if (cat !== "ROYALTY") return false;
-        } else if (sourceFilter === "LAYER") {
-          if ((!isFiveLayerTx(tx) && !isThreeLayerTx(tx) && !isEEduLayerTx(tx) && cat !== "LAYER") || isSelf) return false;
-        } else if (cat !== sourceFilter) {
-          return false;
-        }
-      }
-
-      // Search Query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const title = describeSource(tx).toLowerCase();
-        const counterparty = counterpartyLabel(tx).toLowerCase();
-        const idStr = String(tx?.id || "").toLowerCase();
-        const amtStr = String(Math.abs(amt));
-        const phoneMeta = String(tx?.meta?.recipient_phone || tx?.meta?.sender_phone || tx?.meta?.username || "").toLowerCase();
-        if (
-          !title.includes(q) &&
-          !counterparty.includes(q) &&
-          !idStr.includes(q) &&
-          !amtStr.includes(q) &&
-          !phoneMeta.includes(q)
-        ) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [dateFilteredTransactions, flowFilter, sourceFilter, searchQuery]);
+    return Array.isArray(allTransactions) ? allTransactions : [];
+  }, [allTransactions]);
 
   const sections = useMemo(() => groupByMonth(filteredTransactions), [filteredTransactions]);
 
   const ledgerSummary = useMemo(() => {
-    let mainCredits = 0;
-    let mainCount = 0;
-    let selfCredits = 0;
-    let selfDebits = 0;
-    let otherDebits = 0;
-    let debitCount = 0;
-    let selfCount = 0;
-    let creditCount = 0;
-
-    (allTransactions || []).forEach((tx) => {
-      const raw = Number(tx?.amount || 0);
-      const meta = tx?.meta || {};
-      const type = String(tx?.type || "");
-      const isSelf = type === "SELF_ACCOUNT_CREDIT" || type === "SELF_ACCOUNT_DEBIT" || meta?.ledger === "SELF_ACCOUNT";
-      const isP2pReceive = tx?.type === "P2P_PACKAGE_COUPON_RECEIVE";
-      const amt = isP2pReceive && raw === 0 ? Number(meta.net_amount ?? meta.gross_amount ?? 0) : raw;
-
-      if (isSelf) {
-        if (amt > 0) {
-          selfCredits += amt;
-          creditCount += 1;
-        } else {
-          selfDebits += Math.abs(amt);
-          debitCount += 1;
-        }
-        selfCount += 1;
-      } else if (amt > 0) {
-        mainCredits += amt;
-        mainCount += 1;
-        creditCount += 1;
-      } else if (amt < 0) {
-        otherDebits += Math.abs(amt);
-        debitCount += 1;
-      }
-    });
-
-    const totalCredits = top?.lifetime_credits_total != null ? Number(top.lifetime_credits_total) : (mainCredits + selfCredits);
-    const finalCreditCount = top?.lifetime_credits_count != null ? Number(top.lifetime_credits_count) : creditCount;
-    const totalDebits = top?.lifetime_debits_total != null ? Number(top.lifetime_debits_total) : (selfDebits + otherDebits);
-    const finalDebitCount = top?.lifetime_debits_count != null ? Number(top.lifetime_debits_count) : debitCount;
-    const selfBalance = Number(top?.self_account_balance || (selfCredits - selfDebits));
-    const finalSelfCount = top?.lifetime_self_count != null ? Number(top.lifetime_self_count) : selfCount;
-    const finalSelfDebits = top?.lifetime_self_debits_total != null ? Number(top.lifetime_self_debits_total) : selfDebits;
-    const finalSelfCredits = top?.lifetime_self_credits_total != null ? Number(top.lifetime_self_credits_total) : selfCredits;
-
     return {
-      totalCredits,
-      creditCount: finalCreditCount,
-      totalDebits,
-      debitCount: finalDebitCount,
-      mainCredits,
-      mainCount,
-      selfCredits: finalSelfCredits,
-      selfDebits: finalSelfDebits,
-      totalSelf: selfBalance,
-      selfCount: finalSelfCount,
+      totalCredits: Number(top?.lifetime_credits_total ?? 0),
+      creditCount: Number(top?.lifetime_credits_count ?? 0),
+      totalDebits: Number(top?.lifetime_debits_total ?? 0),
+      debitCount: Number(top?.lifetime_debits_count ?? 0),
+      mainCredits: Number(top?.main_income_balance ?? 0),
+      mainCount: Number(top?.lifetime_credits_count ?? 0),
+      selfCredits: Number(top?.lifetime_self_credits_total ?? 0),
+      selfDebits: Number(top?.lifetime_self_debits_total ?? 0),
+      totalSelf: Number(top?.self_account_balance ?? 0),
+      selfCount: Number(top?.lifetime_self_count ?? 0),
     };
-  }, [allTransactions, top]);
+  }, [top]);
 
   const categoryStats = useMemo(() => {
-    if (dbCategoryStats && typeof dbCategoryStats === "object") {
-      return {
-        ALL: dbCategoryStats.ALL || { count: 0, total: 0 },
-        FIVE_LAYER: dbCategoryStats.FIVE_LAYER || { count: 0, total: 0 },
-        THREE_LAYER: dbCategoryStats.THREE_LAYER || { count: 0, total: 0 },
-        E_EDU_LAYER: dbCategoryStats.E_EDU_LAYER || { count: 0, total: 0 },
-        E_EDU_DIRECT: dbCategoryStats.E_EDU_DIRECT || { count: 0, total: 0 },
-        E_EDU: dbCategoryStats.E_EDU || { count: 0, total: 0 },
-        SAVE: dbCategoryStats.SAVE || { count: 0, total: 0 },
-        SSV_LAYER: dbCategoryStats.SSV_LAYER || { count: 0, total: 0 },
-        SSV_BONUS: dbCategoryStats.SSV_BONUS || { count: 0, total: 0 },
-        QR_SCANNER: dbCategoryStats.QR_SCANNER || { count: 0, total: 0 },
-        TRIZONE: dbCategoryStats.TRIZONE || { count: 0, total: 0 },
-        ROYALTY: dbCategoryStats.ROYALTY || { count: 0, total: 0 },
-      };
-    }
-
-    const stats = {
+    const defaultStats = {
       ALL: { count: 0, total: 0 },
       FIVE_LAYER: { count: 0, total: 0 },
       THREE_LAYER: { count: 0, total: 0 },
@@ -2320,176 +2127,14 @@ export default function History() {
       TRIZONE: { count: 0, total: 0 },
       ROYALTY: { count: 0, total: 0 },
     };
-
-    (allTransactions || []).forEach((tx) => {
-      const raw = Number(tx?.amount || 0);
-      const meta = tx?.meta || {};
-      const isP2pReceive = tx?.type === "P2P_PACKAGE_COUPON_RECEIVE";
-      const amt = isP2pReceive && raw === 0 ? Number(meta.net_amount ?? meta.gross_amount ?? 0) : raw;
-      const cat = classifyTransaction(tx);
-      const type = String(tx?.type || "");
-      const isSelf = type === "SELF_ACCOUNT_CREDIT" || type === "SELF_ACCOUNT_DEBIT" || meta?.ledger === "SELF_ACCOUNT";
-
-      stats.ALL.count += 1;
-      if (amt > 0) stats.ALL.total += amt;
-
-      if (isFiveLayerTx(tx) && !isSelf) {
-        stats.FIVE_LAYER.count += 1;
-        if (amt > 0) stats.FIVE_LAYER.total += amt;
-      }
-      if (isThreeLayerTx(tx) && !isSelf) {
-        stats.THREE_LAYER.count += 1;
-        if (amt > 0) stats.THREE_LAYER.total += amt;
-      }
-      if (isEEduLayerTx(tx) && !isSelf) {
-        stats.E_EDU_LAYER.count += 1;
-        if (amt > 0) stats.E_EDU_LAYER.total += amt;
-      }
-
-      if (cat === "E_EDU") {
-        stats.E_EDU.count += 1;
-        if (amt > 0) stats.E_EDU.total += amt;
-      } else if (cat === "SELF_ACCOUNT" || cat === "SAVE") {
-        stats.SAVE.count += 1;
-        if (amt > 0) stats.SAVE.total += amt;
-      } else if (cat === "QR_SCANNER" || cat === "MERCHANT_CAPTAIN") {
-        stats.QR_SCANNER.count += 1;
-        if (amt > 0) stats.QR_SCANNER.total += amt;
-      } else if (cat === "TRIZONE" || cat === "REDEEM") {
-        stats.TRIZONE.count += 1;
-        if (amt > 0) stats.TRIZONE.total += amt;
-      } else if (cat === "ROYALTY") {
-        stats.ROYALTY.count += 1;
-        if (amt > 0) stats.ROYALTY.total += amt;
-      }
-
-      // SSV Layer & SSV Bonus (Main Wallet income)
-      if (isSsvLayerTx(tx) && !isSelf) {
-        stats.SSV_LAYER.count += 1;
-        if (amt > 0) stats.SSV_LAYER.total += amt;
-      }
-      if (isSsvBonusTx(tx) && !isSelf) {
-        stats.SSV_BONUS.count += 1;
-        if (amt > 0) stats.SSV_BONUS.total += amt;
-      }
-    });
-
-    return stats;
-  }, [dbCategoryStats, allTransactions]);
-
-  const dateLabel = useMemo(() => {
-    if (datePreset === "all") return "All Time";
-    if (datePreset === "today") return "Today";
-    if (datePreset === "this_month") return "This Month";
-    if (datePreset === "last_month") return "Last Month";
-    if (datePreset === "30_days") return "Last 30 Days";
-    if (datePreset === "custom") {
-      if (customStartDate && customEndDate) return `${customStartDate} to ${customEndDate}`;
-      if (customStartDate) return `From ${customStartDate}`;
-      if (customEndDate) return `Up to ${customEndDate}`;
-      return "Custom Range";
+    if (dbCategoryStats && typeof dbCategoryStats === "object") {
+      return {
+        ...defaultStats,
+        ...dbCategoryStats,
+      };
     }
-    return "All Time";
-  }, [datePreset, customStartDate, customEndDate]);
-
-  const flowLabel = useMemo(() => {
-    if (flowFilter === "CREDIT") return "Money Received (+)";
-    if (flowFilter === "DEBIT") return "Self Account";
-    return "All Flows";
-  }, [flowFilter]);
-
-  const sourceLabel = useMemo(() => {
-    const map = {
-      ALL: "All Sources",
-      FIVE_LAYER: "5-Matrix Layer",
-      THREE_LAYER: "3-Matrix Layer",
-      E_EDU_LAYER: "E-Edu Layer",
-      E_EDU: "E-Edu Agent",
-      SELF_ACCOUNT: "Self Account / Self Block (25%)",
-      SAVE: "Self Account / Self Block (25%)",
-      SSV_LAYER: "SSV Layer",
-      SSV_BONUS: "SSV Bonus",
-      QR_SCANNER: "QR Scanner",
-      TRIZONE: "Trizone Shopping",
-      ROYALTY: "Royalty Bonus",
-      LAYER: "All Layers & Blocks",
-      DIRECT: "Direct Bonus",
-      P2P: "P2P Transfer",
-      MERCHANT_CAPTAIN: "Merchant & Captain",
-      WITHDRAWAL: "Withdrawals",
-    };
-    return map[sourceFilter] || "All Sources";
-  }, [sourceFilter]);
-
-  const earningsBreakdown = useMemo(() => {
-    let direct_referral = 0;
-    let matrix_autopool = 0;
-    let franchise_captain = 0;
-    let royalty_total = 0;
-
-    rawTransactions.forEach((tx) => {
-      const cat = classifyTransaction(tx);
-      const amt = Number(tx?.amount || tx?.meta?.gross || 0);
-      if (amt <= 0) return;
-
-      if (cat === "DIRECT") {
-        direct_referral += amt;
-      } else if (cat === "LAYER") {
-        matrix_autopool += amt;
-      } else if (cat === "ROYALTY") {
-        royalty_total += amt;
-      } else if (cat === "MERCHANT_CAPTAIN") {
-        franchise_captain += amt;
-      }
-    });
-
-    const topLevel = Number(top.level_earnings_total || 0);
-    if (topLevel > matrix_autopool) {
-      matrix_autopool = topLevel;
-    }
-
-    return {
-      direct_referral,
-      matrix_autopool,
-      franchise_captain,
-      royalty_total,
-    };
-  }, [rawTransactions, top.level_earnings_total]);
-
-  const todaysEarnings = useMemo(() => {
-    if (top.today_bonus_100 !== undefined && top.today_bonus_100 !== null) {
-      return Number(top.today_bonus_100);
-    }
-    if (top.today_main_75 !== undefined && top.today_main_75 !== null) {
-      return Number(top.today_main_75);
-    }
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    return rawTransactions
-      .filter((tx) => new Date(tx.created_at) >= startOfToday && Number(tx.amount) > 0)
-      .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-  }, [top, rawTransactions]);
-
-  const yesterdaysEarnings = useMemo(() => {
-    if (top.yesterday_bonus_100 !== undefined && top.yesterday_bonus_100 !== null) {
-      return Number(top.yesterday_bonus_100);
-    }
-    if (top.yesterday_main_75 !== undefined && top.yesterday_main_75 !== null) {
-      return Number(top.yesterday_main_75);
-    }
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const startOfYesterday = new Date(startOfToday);
-    startOfYesterday.setDate(startOfYesterday.getDate() - 1);
-    const endOfYesterday = new Date(startOfToday);
-    endOfYesterday.setMilliseconds(-1);
-    return rawTransactions
-      .filter((tx) => {
-        const txDate = new Date(tx.created_at);
-        return txDate >= startOfYesterday && txDate <= endOfYesterday && Number(tx.amount) > 0;
-      })
-      .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
-  }, [top, rawTransactions]);
+    return defaultStats;
+  }, [dbCategoryStats]);
 
   return (
     <Box
@@ -3744,7 +3389,8 @@ export default function History() {
       >
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.2, px: 0.5 }}>
           <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A" }}>
-            Transactions ({filteredTransactions.length})
+            Transactions ({filteredStats?.count != null ? filteredStats.count : filteredTransactions.length})
+            {activeFilterCount > 0 && filteredStats?.total ? ` • ₹${fmtAmount(filteredStats.total)}` : ""}
           </Typography>
           {activeFilterCount > 0 && (
             <Chip
