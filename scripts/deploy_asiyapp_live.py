@@ -42,6 +42,7 @@ backend_files = [
     (r"backend\accounts\serializers.py", "/srv/trikonekt/staging/backend/accounts/serializers.py"),
     (r"backend\accounts\views.py", "/srv/trikonekt/staging/backend/accounts/views.py"),
     (r"backend\adminapi\views.py", "/srv/trikonekt/staging/backend/adminapi/views.py"),
+    (r"backend\adminapi\serializers.py", "/srv/trikonekt/staging/backend/adminapi/serializers.py"),
     (r"backend\business\services\self_rebirth.py", "/srv/trikonekt/staging/backend/business/services/self_rebirth.py"),
     (r"backend\business\services\ssv_service.py", "/srv/trikonekt/staging/backend/business/services/ssv_service.py"),
     (r"backend\business\views_agency_territory.py", "/srv/trikonekt/staging/backend/business/views_agency_territory.py"),

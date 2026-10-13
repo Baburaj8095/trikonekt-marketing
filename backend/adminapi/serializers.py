@@ -44,7 +44,7 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
     }
     CONSUMER_PRESET_FIELDS = {
         "basic": {
-            "system_serial_number", "user_code", "sponsor_name", "sponsor_number", "sponsor_display", "address_pincode",
+            "system_serial_number", "user_code", "sponsor_name", "sponsor_number", "sponsor_display", "address_pincode", "package_buy_date", "current_rank",
         },
         "package": {
             "user_code", "package_buy_date", "join_prime_750", "spp_months_boxes", "rank_upgrade_levels", "current_rank",
@@ -644,10 +644,18 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
 
     def get_package_buy_date(self, obj):
         try:
+            if getattr(obj, "first_purchase_activated_at", None):
+                return obj.first_purchase_activated_at
             pp = self._approved_promo_purchases(obj)
             if pp:
                 return getattr(pp[0], "approved_at", None) or getattr(pp[0], "requested_at", None)
-            return getattr(obj, "first_purchase_activated_at", None)
+            from business.models import PromoMonthlyBox
+            b1 = getattr(obj, "promo_monthly_boxes", None)
+            if b1 is not None and hasattr(b1, "filter"):
+                b1_obj = b1.filter(box_number=1).first()
+                if b1_obj and b1_obj.created_at:
+                    return b1_obj.created_at
+            return None
         except Exception:
             return getattr(obj, "first_purchase_activated_at", None)
 
@@ -1170,18 +1178,39 @@ class AdminUserNodeSerializer(serializers.ModelSerializer):
 
     def get_current_rank(self, obj) -> str:
         try:
+            # 1. Determine highest layer achieved via successful RankUpgrades
+            upgs = self._approved_rank_upgrades_list(obj)
+            max_lvl = 0
+            if upgs:
+                for u in upgs:
+                    to_rank = getattr(u, "to_rank", None)
+                    lvl = getattr(to_rank, "level_number", 0) or 0
+                    if lvl > max_lvl:
+                        max_lvl = lvl
+
+            # 2. Check UserRank profile
             rp = getattr(obj, "rank_profile", None)
-            if rp:
-                cr = getattr(rp, "current_rank", None)
-                if cr:
-                    return getattr(cr, "rank_name", "") or ""
-            from mlm_ranks.models import UserRank
-            ur = UserRank.objects.select_related("current_rank").filter(user_id=getattr(obj, "id", None)).first()
-            if ur and ur.current_rank:
-                return ur.current_rank.rank_name or ""
+            if rp and getattr(rp, "current_rank", None):
+                lvl = getattr(rp.current_rank, "level_number", 0) or 0
+                if lvl > max_lvl:
+                    max_lvl = lvl
+            else:
+                from mlm_ranks.models import UserRank
+                ur = UserRank.objects.select_related("current_rank").filter(user_id=getattr(obj, "id", None)).first()
+                if ur and ur.current_rank:
+                    lvl = getattr(ur.current_rank, "level_number", 0) or 0
+                    if lvl > max_lvl:
+                        max_lvl = lvl
+
+            if max_lvl > 0:
+                return f"L{max_lvl}"
+
+            # 3. Fallback: Any active consumer who bought the starter ₹2,000 package is Rank 1 / Layer 1
+            if getattr(obj, "account_active", False) or getattr(obj, "first_purchase_activated_at", None):
+                return "L1"
         except Exception:
             pass
-        return ""
+        return "-"
 
     def _monthly_summary(self, obj):
         """

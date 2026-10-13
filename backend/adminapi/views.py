@@ -713,9 +713,19 @@ class AdminUsersList(ListAPIView):
                 | Q(sponsor_id__icontains=search)
             )
 
-        ordering = (self.request.query_params.get("ordering") or "-date_joined").strip()
-        if ordering in ("-date_joined", "date_joined"):
-            qs = qs.order_by("-date_joined", "-id")
+        ordering = (self.request.query_params.get("ordering") or "").strip()
+        from django.db.models import F
+
+        # Default ordering for active users (account_active=1) or activated users is by 2K activation time
+        if not ordering or ordering in ("-date_joined", "date_joined"):
+            if account_active in ("1", "true", "yes", "active") or activated in ("1", "true", "yes", "activated"):
+                qs = qs.order_by(F("first_purchase_activated_at").asc(nulls_last=True), "id")
+            else:
+                qs = qs.order_by("-date_joined", "-id")
+        elif ordering in ("first_purchase_activated_at", "+first_purchase_activated_at", "package_buy_date", "+package_buy_date"):
+            qs = qs.order_by(F("first_purchase_activated_at").asc(nulls_last=True), "id")
+        elif ordering in ("-first_purchase_activated_at", "-package_buy_date"):
+            qs = qs.order_by(F("first_purchase_activated_at").desc(nulls_last=True), "-id")
         else:
             qs = qs.order_by(ordering)
         return qs

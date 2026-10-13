@@ -77,6 +77,8 @@ const CONSUMER_COLUMN_FIELDS = {
     "__edit_view",
     "__reset",
     "__cycle_status",
+    "current_rank",
+    "package_buy_date",
     "__login",
     "is_active",
     "system_serial_number",
@@ -2404,11 +2406,88 @@ export default function AdminUsers() {
           );
         },
       },
-      { field: "package_buy_date", headerName: "Package Buy Date", minWidth: 180, valueFormatter: (v) => formatDateTime(v) },
+      {
+        field: "package_buy_date",
+        headerName: "2K Activation Time",
+        minWidth: 200,
+        renderCell: (p) => {
+          const v = p?.row?.package_buy_date;
+          if (!v) {
+            return (
+              <span style={{ color: "#94a3b8", fontSize: "12px", fontStyle: "italic" }}>
+                Not Activated
+              </span>
+            );
+          }
+          return (
+            <span
+              style={{
+                display: "inline-block",
+                fontWeight: 700,
+                fontSize: "12px",
+                color: "#0369a1",
+                background: "#e0f2fe",
+                padding: "3px 8px",
+                borderRadius: "6px",
+                whiteSpace: "nowrap",
+                border: "1px solid #bae6fd",
+              }}
+            >
+              ⚡ {formatDateTime(v)}
+            </span>
+          );
+        },
+        valueFormatter: (v) => formatDateTime(v),
+      },
       { field: "join_prime_750", headerName: "Join Prime 750", minWidth: 140, renderCell: (p) => <ValueOrSource value={p?.row?.join_prime_750} empty="No" /> },
       { field: "spp_months_boxes", headerName: "SPP (Months / Boxes)", minWidth: 160, renderCell: (p) => <ValueOrSource value={p?.row?.spp_months_boxes} empty="0" /> },
       { field: "rank_upgrade_levels", headerName: "Rank Upgrade Layers", minWidth: 220, renderCell: (p) => <ValueOrSource value={p?.row?.rank_upgrade_levels} empty="0" /> },
-      { field: "current_rank", headerName: "Current Rank", minWidth: 160, renderCell: (p) => <ValueOrSource value={p?.row?.current_rank} empty="None" /> },
+      {
+        field: "current_rank",
+        headerName: "Rank Layer",
+        minWidth: 120,
+        renderCell: (p) => {
+          const v = p?.row?.current_rank;
+          if (!v || v === "-" || v === "None") {
+            return <span style={{ color: "#9ca3af", fontSize: "12px" }}>—</span>;
+          }
+          let bg = "#f0fdf4";
+          let color = "#15803d";
+          let border = "#bbf7d0";
+          if (v === "L1") {
+            bg = "#f0f9ff";
+            color = "#0369a1";
+            border = "#bae6fd";
+          } else if (["L2", "L3", "L4", "L5", "L6", "L7"].includes(v)) {
+            bg = "#faf5ff";
+            color = "#7e22ce";
+            border = "#e9d5ff";
+          } else if (["L8", "L9", "L10"].includes(v)) {
+            bg = "#fffbeb";
+            color = "#b45309";
+            border = "#fde68a";
+          }
+          return (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                padding: "2px 8px",
+                fontSize: "12px",
+                fontWeight: 700,
+                backgroundColor: bg,
+                color: color,
+                borderRadius: "6px",
+                border: `1px solid ${border}`,
+                letterSpacing: "0.5px",
+                fontFamily: "monospace",
+              }}
+            >
+              ⚡ {v}
+            </span>
+          );
+        },
+      },
       { field: "subscription_1", headerName: "Subscription 1", minWidth: 150, renderCell: (p) => <ValueOrSource value={p?.row?.subscription_1} empty={NEEDS_RULE_LABEL} /> },
       { field: "subscription_2", headerName: "Subscription 2", minWidth: 150, renderCell: (p) => <ValueOrSource value={p?.row?.subscription_2} empty={NEEDS_RULE_LABEL} /> },
       { field: "subscription_3", headerName: "Subscription 3", minWidth: 150, renderCell: (p) => <ValueOrSource value={p?.row?.subscription_3} empty={NEEDS_RULE_LABEL} /> },
