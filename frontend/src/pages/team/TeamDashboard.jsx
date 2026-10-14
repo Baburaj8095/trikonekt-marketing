@@ -44,7 +44,7 @@ import MilitaryTechRoundedIcon from "@mui/icons-material/MilitaryTechRounded";
 import WidgetsRoundedIcon from "@mui/icons-material/WidgetsRounded";
 import PublicRoundedIcon from "@mui/icons-material/PublicRounded";
 import { useNavigate, useLocation } from "react-router-dom";
-import API, { getWalletMe } from "../../api/api";
+import API, { getWalletMe, getWalletMeHistory } from "../../api/api";
 import QuickActionGrid from "../../components/common/QuickActionGrid";
 import IxigoHolidaySection from "../../components/travel/IxigoHolidaySection";
 import imgEcommerce from "../../assets/ecommerce.webp";
@@ -1464,11 +1464,16 @@ function SPPMonthlyCadenceWidget() {
   );
 }
 
-function ConsumerCycleRenewalWidget({ onOpenPurchase, cycleState }) {
+function ConsumerCycleRenewalWidget({ onOpenPurchase, cycleState, totalCycleEarned = 0 }) {
   const currentCycleNum = cycleState?.currentCycle || 1;
-  const isCapped = cycleState?.isCapped || false;
-  const isAuthorized = cycleState?.adminAuthorized === true || cycleState?.currentCycle >= 2;
-  const isUnlocked = isCapped || isAuthorized;
+  const totalLimit = Number(cycleState?.totalLimit || cycleState?.eligibleLimit || 150000);
+  const isCapped = Boolean(
+    cycleState?.isCapped === true ||
+    cycleState?.status === "completed" ||
+    cycleState?.status === "capped" ||
+    (totalCycleEarned > 0 && totalCycleEarned >= totalLimit)
+  );
+  const isUnlocked = isCapped;
 
   return (
     <Paper
@@ -1509,8 +1514,8 @@ function ConsumerCycleRenewalWidget({ onOpenPurchase, cycleState }) {
           </Typography>
           <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.85)", mt: 0.5, maxWidth: 540 }}>
             {isUnlocked
-              ? "Cycle 1 earning cap achieved! Unlock all 3 tracks for Cycle 2 at once (₹50,000) using Main Wallet or Coupon Pocket for fresh ₹1.5L earning cap."
-              : "Current Cycle: Cycle 1. Layer Cap: ₹1,00,000 • Royalty Cap: ₹50,000 (Total ₹1,50,000). Cycle 2 renewal unlocks automatically once earning limits are reached."}
+              ? `Cycle ${currentCycleNum} earning cap achieved! Unlock all 3 tracks for Cycle ${currentCycleNum + 1} at once (₹50,000) using Main Wallet or Coupon Pocket for fresh ₹1.5L earning cap.`
+              : `Current Cycle: Cycle ${currentCycleNum}. Total Earning Limit: ₹${totalLimit.toLocaleString("en-IN")}. Cycle ${currentCycleNum + 1} renewal unlocks automatically once earning limit is reached.`}
           </Typography>
         </Box>
 
@@ -1530,10 +1535,16 @@ function ConsumerCycleRenewalWidget({ onOpenPurchase, cycleState }) {
             boxShadow: isUnlocked ? "0 4px 14px rgba(245, 158, 11, 0.4)" : "none",
             whiteSpace: "nowrap",
             width: { xs: "100%", sm: "auto" },
+            "&.Mui-disabled": {
+              bgcolor: "rgba(255,255,255,0.18)",
+              color: "rgba(255,255,255,0.5)",
+              cursor: "not-allowed",
+              pointerEvents: "auto",
+            },
             "&:hover": { bgcolor: isUnlocked ? "#D97706" : "rgba(255,255,255,0.18)" },
           }}
         >
-          {isUnlocked ? "🚀 Buy All Courses (₹50k)" : "🔒 Cycle 2 Locked (Cap: ₹1.5L)"}
+          {isUnlocked ? "🚀 Buy All Courses (₹50k)" : `🔒 Cycle ${currentCycleNum + 1} Locked (Cap: ₹1.5L)`}
         </Button>
       </Stack>
     </Paper>
@@ -1795,6 +1806,7 @@ export default function TeamDashboard() {
   const [giftCardBannerDismissed, setGiftCardBannerDismissed] = useState(false);
   const [cycleBulkBuyOpen, setCycleBulkBuyOpen] = useState(false);
   const [walletMeData, setWalletMeData] = useState(null);
+  const [totalCycleEarned, setTotalCycleEarned] = useState(0);
   const [consumerCycleState, setConsumerCycleState] = useState(() => {
     try {
       const myId = (typeof localStorage !== "undefined" && (localStorage.getItem("user_id") || JSON.parse(localStorage.getItem("user_user") || localStorage.getItem("user") || "{}")?.id));
@@ -1812,7 +1824,7 @@ export default function TeamDashboard() {
       layerLimit: 100000,
       royaltyLimit: 50000,
       status: "active",
-      adminAuthorized: true,
+      adminAuthorized: false,
     };
   });
 
@@ -1919,10 +1931,30 @@ export default function TeamDashboard() {
       } catch {}
     };
 
+    const fetchWallet = async () => {
+      try {
+        const [meRes, histRes] = await Promise.allSettled([
+          getWalletMe(),
+          getWalletMeHistory(),
+        ]);
+        if (!alive) return;
+        if (meRes.status === "fulfilled" && meRes.value) {
+          setWalletMeData(meRes.value);
+        }
+        if (histRes.status === "fulfilled" && histRes.value) {
+          const hist = histRes.value;
+          const layerEarned = Number(hist?.layer_income_all_sources || hist?.layer_matrix_earned || hist?.income?.matrixLevel || 0);
+          const royaltyEarned = Number(hist?.income?.globalTri || 0);
+          setTotalCycleEarned(layerEarned + royaltyEarned);
+        }
+      } catch (_) {}
+    };
+
     fetchBanners();
     fetchAchievers();
     fetchProfile();
     fetchUnclaimedGiftCards();
+    fetchWallet();
     return () => {
       alive = false;
     };
@@ -2088,6 +2120,7 @@ export default function TeamDashboard() {
           {/* 7. CONSUMER CYCLE RENEWAL & BULK ACADEMY PURCHASE WIDGET */}
           <ConsumerCycleRenewalWidget
             cycleState={consumerCycleState}
+            totalCycleEarned={totalCycleEarned}
             onOpenPurchase={() => setCycleBulkBuyOpen(true)}
           />
 
