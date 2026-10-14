@@ -4432,7 +4432,13 @@ def wallet_me_history(request):
         "SAVE": Q(type__in=["SELF_ACCOUNT_CREDIT", "SELF_ACCOUNT_DEBIT"]) | Q(meta__ledger="SELF_ACCOUNT"),
         "SELF_ACCOUNT": Q(type__in=["SELF_ACCOUNT_CREDIT", "SELF_ACCOUNT_DEBIT"]) | Q(meta__ledger="SELF_ACCOUNT"),
 
-        "SSV_LAYER": (Q(type__icontains="SSV_LAYER") | Q(meta__source="SSV_LAYER") | Q(meta__orig_type__icontains="SSV_LAYER")) & ~Q(type__startswith="SELF_ACCOUNT"),
+        "SSV_LAYER": (
+            Q(type__icontains="SSV_LAYER") |
+            Q(meta__source="SSV_LAYER") |
+            Q(meta__orig_type__icontains="SSV_LAYER") |
+            Q(meta__orig_type__icontains="MONTHLY_759_LEVEL") |
+            (Q(source_type__startswith="MONTHLY") & Q(meta__orig_type="MONTHLY_759_LEVEL"))
+        ) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT"),
 
         "SSV_BONUS": (Q(type__icontains="SSV_BONUS") | Q(type__icontains="SSV_DIRECT") | Q(meta__source="SSV_BONUS") | Q(meta__orig_type__icontains="SSV_BONUS")) & ~Q(type__startswith="SELF_ACCOUNT"),
 
@@ -4445,7 +4451,7 @@ def wallet_me_history(request):
         "WITHDRAWAL": (Q(type__in=["WITHDRAWAL_DEBIT", "WITHDRAWAL_REQUEST"]) | Q(source_type="WITHDRAWAL")),
         "P2P": (Q(type__in=["P2P_PACKAGE_COUPON_SEND", "P2P_PACKAGE_COUPON_RECEIVE"]) | Q(source_type__icontains="P2P")),
     }
-    cat_queries["LAYER"] = cat_queries["FIVE_LAYER"] | cat_queries["THREE_LAYER"] | cat_queries["E_EDU_LAYER"]
+    cat_queries["LAYER"] = cat_queries["FIVE_LAYER"] | cat_queries["THREE_LAYER"] | cat_queries["E_EDU_LAYER"] | cat_queries["SSV_LAYER"]
 
     category_stats = {}
     base_tx = WalletTransaction.objects.filter(user=user).exclude(source_type="ADMIN_SERVICE_CHARGE")
@@ -4484,7 +4490,8 @@ def wallet_me_history(request):
     five_layer_tot = D(category_stats.get("FIVE_LAYER", {}).get("total", "0.00"))
     three_layer_tot = D(category_stats.get("THREE_LAYER", {}).get("total", "0.00"))
     e_layer_tot = D(layer_edu_earned or "0.00")
-    layer_matrix_earned = str(five_layer_tot + three_layer_tot + e_layer_tot)
+    ssv_layer_tot = D(category_stats.get("SSV_LAYER", {}).get("total", "0.00"))
+    layer_matrix_earned = str(five_layer_tot + three_layer_tot + e_layer_tot + ssv_layer_tot)
 
     # Server-Side Filter Processing (100% Database SQL Execution)
     active_filter_q = Q()
@@ -4596,6 +4603,8 @@ def wallet_me_history(request):
         "income": {
             "matrixLevel": layer_matrix_earned,
             "matrixFive": layer_matrix_earned,
+            "sppLevel": str(ssv_layer_tot),
+            "ssvLevel": str(ssv_layer_tot),
             "globalTri": str(WalletTransaction.objects.filter(user=user, type="GLOBAL_ROYALTY").aggregate(total=Sum("amount"))["total"] or D("0.00")),
         }
     }

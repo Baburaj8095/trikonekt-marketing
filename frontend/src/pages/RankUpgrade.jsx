@@ -682,7 +682,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
     const five = Number(stats.FIVE_LAYER?.total ?? 0);
     const three = Number(stats.THREE_LAYER?.total ?? 0);
     const eEdu = Number(stats.E_EDU_LAYER?.total ?? walletHistory?.layer_edu_earned ?? 0);
-    const spp = Number(walletHistory?.income?.sppLevel ?? 0);
+    const spp = Number(walletHistory?.income?.ssvLevel ?? walletHistory?.income?.sppLevel ?? stats.SSV_LAYER?.total ?? 0);
 
     const total = Number(
       walletHistory?.layer_income_all_sources ??
@@ -1522,7 +1522,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
               <span>5 Blocks: ₹{fmt(layerBreakdown.fiveMatrix)}</span>
               <span>3 Blocks: ₹{fmt(layerBreakdown.threeMatrix)}</span>
               <span>e-Edu: ₹{fmt(layerBreakdown.eEduSlabs)}</span>
-              {layerBreakdown.sppLevel > 0 && <span>SPP: ₹{fmt(layerBreakdown.sppLevel)}</span>}
+              {layerBreakdown.sppLevel > 0 && <span>SSV: ₹{fmt(layerBreakdown.sppLevel)}</span>}
             </Box>
             <LinearProgress variant="determinate" value={layerMatrixPercent} sx={{ height: 6, borderRadius: 3, mb: 1 }} />
             <Divider sx={{ my: 1 }} />
