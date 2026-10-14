@@ -196,23 +196,23 @@ export default function DistrictPincodeCoverageCenter({ user, role }) {
             </Typography>
           </Box>
 
-          <Box sx={{ p: 1.2, bgcolor: "#EFF6FF", borderRadius: "12px", border: "1px solid #BFDBFE" }}>
-            <Stack direction="row" spacing={0.6} alignItems="center">
-              <GroupsOutlinedIcon sx={{ fontSize: 15, color: "#2563EB" }} />
-              <Typography sx={{ fontSize: 10.5, fontWeight: 800, color: "#1E40AF" }}>Consumer Agents</Typography>
-            </Stack>
-            <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#1D4ED8", mt: 0.2 }}>
-              {summary.total_users.toLocaleString("en-IN")}
-            </Typography>
-          </Box>
-
           <Box sx={{ p: 1.2, bgcolor: "#ECFDF5", borderRadius: "12px", border: "1px solid #A7F3D0" }}>
             <Stack direction="row" spacing={0.6} alignItems="center">
               <StoreRoundedIcon sx={{ fontSize: 15, color: "#059669" }} />
-              <Typography sx={{ fontSize: 10.5, fontWeight: 800, color: "#065F46" }}>Merchants / Captains</Typography>
+              <Typography sx={{ fontSize: 10.5, fontWeight: 800, color: "#065F46" }}>Total Merchants</Typography>
             </Stack>
             <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#047857", mt: 0.2 }}>
-              {summary.total_merchants} / {summary.total_captains}
+              {summary.total_merchants} Shops
+            </Typography>
+          </Box>
+
+          <Box sx={{ p: 1.2, bgcolor: "#FAF5FF", borderRadius: "12px", border: "1px solid #E9D5FF" }}>
+            <Stack direction="row" spacing={0.6} alignItems="center">
+              <ShieldRoundedIcon sx={{ fontSize: 15, color: "#7C3AED" }} />
+              <Typography sx={{ fontSize: 10.5, fontWeight: 800, color: "#6B21A8" }}>Total Captains</Typography>
+            </Stack>
+            <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#7C3AED", mt: 0.2 }}>
+              {summary.total_captains} Field Captains
             </Typography>
           </Box>
         </Box>
@@ -335,16 +335,16 @@ export default function DistrictPincodeCoverageCenter({ user, role }) {
                     </Typography>
                   </Stack>
 
-                  {/* Clean User Headcount Pill */}
+                  {/* Clean Headcount Pill */}
                   <Chip
-                    icon={<GroupsOutlinedIcon sx={{ fontSize: "14px !important" }} />}
-                    label={`${p.user_count} Users`}
+                    icon={<StoreRoundedIcon sx={{ fontSize: "13px !important" }} />}
+                    label={`${p.merchant_count || 0} Shops • ${p.captain_count || 0} Captains`}
                     size="small"
                     sx={{
                       fontWeight: 800,
-                      fontSize: 11,
-                      bgcolor: p.user_count > 0 ? "#EFF6FF" : "#F8FAFC",
-                      color: p.user_count > 0 ? "#1D4ED8" : "#94A3B8",
+                      fontSize: 10.5,
+                      bgcolor: (p.merchant_count > 0 || p.captain_count > 0) ? "#ECFDF5" : "#F8FAFC",
+                      color: (p.merchant_count > 0 || p.captain_count > 0) ? "#065F46" : "#94A3B8",
                       borderRadius: "8px",
                       height: 24,
                     }}

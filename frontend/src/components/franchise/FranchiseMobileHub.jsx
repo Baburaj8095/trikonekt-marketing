@@ -1387,6 +1387,8 @@ export default function FranchiseMobileHub({
 
   // Jurisdiction selection inside the tier
   const [selectedSubZone, setSelectedSubZone] = useState("all");
+  const [districtPincodesList, setDistrictPincodesList] = useState([]);
+  const [districtSummary, setDistrictSummary] = useState(null);
 
   // Selected Entities for detail views
   const [selectedCaptain, setSelectedCaptain] = useState(null);
@@ -1723,15 +1725,26 @@ export default function FranchiseMobileHub({
         // keep as is
       }
 
-      try {
-        const pin = selectedSubZone !== "all" ? selectedSubZone : (user?.pincode || "572106");
-        const uRes = await API.get(`/accounts/users/?pincode=${pin}&role=user`);
-        const fetched = Array.isArray(uRes.data?.results) ? uRes.data.results : (Array.isArray(uRes.data) ? uRes.data : []);
-        if (isMounted) {
-          setCustomersList(fetched);
+      if (currentTierKey === "agency_district" || currentTierKey === "agency_district_coordinator") {
+        try {
+          const distParam = user?.city || "Tumakuru";
+          const dRes = await API.get(`/agency/district-pincodes/?district=${encodeURIComponent(distParam)}`);
+          if (isMounted && dRes?.data) {
+            if (Array.isArray(dRes.data.pincodes)) {
+              setDistrictPincodesList(dRes.data.pincodes);
+            }
+            if (dRes.data.summary) {
+              setDistrictSummary(dRes.data.summary);
+            }
+          }
+        } catch (e) {
+          console.warn("District pincodes load err:", e);
         }
-      } catch (e) {
-        console.warn("Customers load err:", e);
+      }
+
+      // Customer directories are removed across all agency tiers
+      if (isMounted) {
+        setCustomersList([]);
       }
     }
     loadLiveAgencyData();
@@ -2274,7 +2287,22 @@ export default function FranchiseMobileHub({
     let dispCustomers = customersList.length;
     let dispCaptains = scopedCaptains.length;
 
-    if (dashboardMetrics) {
+    if (districtSummary && isExecutiveTerritoryTier) {
+      if (selectedSubZone === "all") {
+        if (typeof districtSummary.total_merchants === "number") {
+          dispMerchants = districtSummary.total_merchants;
+        }
+        if (typeof districtSummary.total_captains === "number") {
+          dispCaptains = districtSummary.total_captains;
+        }
+      } else {
+        const pinObj = districtPincodesList?.find((p) => p.pincode === selectedSubZone);
+        if (pinObj) {
+          dispMerchants = pinObj.merchant_count ?? 0;
+          dispCaptains = pinObj.captain_count ?? 0;
+        }
+      }
+    } else if (dashboardMetrics) {
       if (selectedSubZone !== "all") {
         const cObj = dashboardMetrics.per_pincode?.consumers?.find((p) => p.pincode === selectedSubZone);
         const mObj = dashboardMetrics.per_pincode?.merchants?.find((p) => p.pincode === selectedSubZone);
@@ -2289,10 +2317,10 @@ export default function FranchiseMobileHub({
       }
     }
 
-    const dispActiveMerchants = activeMerchantsCount;
-    const dispInactiveMerchants = inactiveMerchantsCount;
-    const dispActiveCaptains = activeCaptainsCount;
-    const dispInactiveCaptains = inactiveCaptainsCount;
+    const dispActiveMerchants = isExecutiveTerritoryTier ? dispMerchants : activeMerchantsCount;
+    const dispInactiveMerchants = isExecutiveTerritoryTier ? 0 : inactiveMerchantsCount;
+    const dispActiveCaptains = isExecutiveTerritoryTier ? dispCaptains : activeCaptainsCount;
+    const dispInactiveCaptains = isExecutiveTerritoryTier ? 0 : inactiveCaptainsCount;
     const dispB2B = b2bCount;
     const dispB2C = b2cCount;
     const dispTriZone = trizoneCount;
@@ -2325,7 +2353,14 @@ export default function FranchiseMobileHub({
       dispEarnings,
       isExecutiveTerritoryTier,
     };
-  }, [merchantsList, captainsList, customersList, currentTier, selectedSubZone, currentTierKey, dashboardMetrics, walletState]);
+  }, [merchantsList, captainsList, customersList, currentTier, selectedSubZone, currentTierKey, dashboardMetrics, walletState, districtSummary, districtPincodesList]);
+
+  const effectivePincodes = useMemo(() => {
+    if (districtPincodesList && districtPincodesList.length > 0) {
+      return districtPincodesList;
+    }
+    return currentTier?.pincodes || [];
+  }, [districtPincodesList, currentTier]);
 
   // Filtered Registered Customers List
   const filteredCustomers = useMemo(() => {
@@ -2468,6 +2503,10 @@ export default function FranchiseMobileHub({
       onSelectScreen={(screen) => {
         if (screen === "more") {
           setActiveScreen("command_center");
+        } else if (screen === "users") {
+          setActiveScreen("home");
+        } else if (activeZoneMetrics.isExecutiveTerritoryTier && (screen === "merchants" || screen === "captains")) {
+          setActiveScreen("pincode");
         } else {
           setActiveScreen(screen);
         }
@@ -2533,7 +2572,7 @@ export default function FranchiseMobileHub({
               </Box>
             </Stack>
 
-            {currentTier.pincodes && currentTier.pincodes.length > 1 ? (
+            {effectivePincodes && effectivePincodes.length > 1 ? (
               <FormControl size="small" variant="standard" sx={{ flexShrink: 0 }}>
                 <Select
                   value={selectedSubZone}
@@ -2551,9 +2590,9 @@ export default function FranchiseMobileHub({
                   }}
                 >
                   <MenuItem value="all" sx={{ fontSize: 11.5, fontWeight: 800 }}>
-                    Combined (All {currentTier.pincodes.length} PINs)
+                    Combined (All {effectivePincodes.length} PINs)
                   </MenuItem>
-                  {currentTier.pincodes.map((p) => (
+                  {effectivePincodes.map((p) => (
                     <MenuItem key={p.pincode} value={p.pincode} sx={{ fontSize: 11.5, fontWeight: 700 }}>
                       PIN {p.pincode}
                     </MenuItem>
@@ -2613,7 +2652,16 @@ export default function FranchiseMobileHub({
                 mb: 1.5,
               }}
             >
-              <Box onClick={() => setActiveScreen("merchants")} sx={{ cursor: "pointer", minWidth: 0 }}>
+              <Box
+                onClick={() => {
+                  if (activeZoneMetrics.isExecutiveTerritoryTier) {
+                    setActiveScreen("pincode");
+                  } else {
+                    setActiveScreen("merchants");
+                  }
+                }}
+                sx={{ cursor: "pointer", minWidth: 0 }}
+              >
                 <MetricCard
                   label="Merchants"
                   value={String(activeZoneMetrics.dispMerchants ?? 0)}
@@ -2627,21 +2675,16 @@ export default function FranchiseMobileHub({
                 />
               </Box>
 
-              <Box onClick={() => setActiveScreen("users")} sx={{ cursor: "pointer", minWidth: 0 }}>
-                <MetricCard
-                  label="Customers"
-                  value={String(activeZoneMetrics.dispCustomers ?? 0)}
-                  subtext={activeZoneMetrics.dispCustomers > 0 ? `${activeZoneMetrics.dispCustomers} registered` : "0 registered"}
-                  dotColor="#2563EB"
-                  icon={<GroupsOutlinedIcon sx={{ fontSize: 18 }} />}
-                  iconColor="#2563EB"
-                  iconBg="#DBEAFE"
-                  cardBg="#EFF6FF"
-                  cardBorder="#DBEAFE"
-                />
-              </Box>
-
-              <Box onClick={() => setActiveScreen("captains")} sx={{ cursor: "pointer", minWidth: 0 }}>
+              <Box
+                onClick={() => {
+                  if (activeZoneMetrics.isExecutiveTerritoryTier) {
+                    setActiveScreen("pincode");
+                  } else {
+                    setActiveScreen("captains");
+                  }
+                }}
+                sx={{ cursor: "pointer", minWidth: 0 }}
+              >
                 <MetricCard
                   label="Captains"
                   value={String(activeZoneMetrics.dispCaptains ?? 0)}
@@ -2657,11 +2700,25 @@ export default function FranchiseMobileHub({
 
               <Box onClick={() => setActiveScreen("pincode")} sx={{ cursor: "pointer", minWidth: 0 }}>
                 <MetricCard
-                  label="Services"
-                  value="0"
-                  subtext="Regional"
+                  label={activeZoneMetrics.isExecutiveTerritoryTier ? (currentTierKey.includes("state") ? "Districts" : "Pincodes") : "Pincode Zone"}
+                  value={String(activeZoneMetrics.isExecutiveTerritoryTier ? (districtSummary?.total_pincodes || effectivePincodes.length) : (activePincode || "572106"))}
+                  subtext={activeZoneMetrics.isExecutiveTerritoryTier ? `${districtSummary?.active_agencies ?? effectivePincodes.filter((p) => p.status === "Active" || p.agency?.status === "ACTIVE").length} Active` : "Assigned Zone"}
+                  dotColor="#4F46E5"
+                  icon={<LocationOnRoundedIcon sx={{ fontSize: 18 }} />}
+                  iconColor="#4F46E5"
+                  iconBg="#EEF2FF"
+                  cardBg="#F5F3FF"
+                  cardBorder="#E0E7FF"
+                />
+              </Box>
+
+              <Box onClick={() => setActiveScreen("history")} sx={{ cursor: "pointer", minWidth: 0 }}>
+                <MetricCard
+                  label="Earnings"
+                  value={`₹${activeZoneMetrics.dispEarnings}`}
+                  subtext="Total Revenue"
                   dotColor="#D97706"
-                  icon={<BuildRoundedIcon sx={{ fontSize: 18 }} />}
+                  icon={<AccountBalanceWalletRoundedIcon sx={{ fontSize: 18 }} />}
                   iconColor="#D97706"
                   iconBg="#FEF3C7"
                   cardBg="#FFFBEB"
@@ -2724,16 +2781,25 @@ export default function FranchiseMobileHub({
                 boxSizing: "border-box",
               }}
             >
-              {[
-                { label: "Merchants", icon: StoreRoundedIcon, color: "#2563EB", bg: "#EFF6FF", action: () => setActiveScreen("merchants") },
-                { label: "Add User", icon: GroupsOutlinedIcon, color: "#059669", bg: "#ECFDF5", action: () => setAddUserOpen(true) },
-                { label: "Scan QR", icon: QrCodeScannerRoundedIcon, color: "#DC2626", bg: "#FEF2F2", action: () => setScanQrOpen(true) },
-                { label: "History", icon: AccountBalanceWalletRoundedIcon, color: "#0284C7", bg: "#F0F9FF", action: () => setActiveScreen("history") },
-                { label: "Captains", icon: ShieldRoundedIcon, color: "#9333EA", bg: "#FAF5FF", action: () => setActiveScreen("captains") },
-                { label: "My Team", icon: GroupsOutlinedIcon, color: "#4F46E5", bg: "#EEF2FF", action: () => setActiveScreen("users") },
-                { label: "Withdraw", icon: ArrowUpwardRoundedIcon, color: "#0284C7", bg: "#EFF6FF", action: () => setWithdrawDialogOpen(true) },
-                { label: "More", icon: MoreHorizRoundedIcon, color: "#475569", bg: "#F1F5F9", action: () => setActiveScreen("command_center") },
-              ].map((act) => {
+              {(activeZoneMetrics.isExecutiveTerritoryTier
+                ? [
+                    { label: "Pincodes", icon: LocationOnRoundedIcon, color: "#4F46E5", bg: "#EEF2FF", action: () => setActiveScreen("pincode") },
+                    { label: "Scan QR", icon: QrCodeScannerRoundedIcon, color: "#DC2626", bg: "#FEF2F2", action: () => setScanQrOpen(true) },
+                    { label: "History", icon: AccountBalanceWalletRoundedIcon, color: "#0284C7", bg: "#F0F9FF", action: () => setActiveScreen("history") },
+                    { label: "Withdraw", icon: ArrowUpwardRoundedIcon, color: "#059669", bg: "#ECFDF5", action: () => setWithdrawDialogOpen(true) },
+                    { label: "Support", icon: SupportAgentRoundedIcon, color: "#9333EA", bg: "#FAF5FF", action: () => setActiveScreen("support") },
+                    { label: "More", icon: MoreHorizRoundedIcon, color: "#475569", bg: "#F1F5F9", action: () => setActiveScreen("command_center") },
+                  ]
+                : [
+                    { label: "Merchants", icon: StoreRoundedIcon, color: "#2563EB", bg: "#EFF6FF", action: () => setActiveScreen("merchants") },
+                    { label: "Captains", icon: ShieldRoundedIcon, color: "#9333EA", bg: "#FAF5FF", action: () => setActiveScreen("captains") },
+                    { label: "Scan QR", icon: QrCodeScannerRoundedIcon, color: "#DC2626", bg: "#FEF2F2", action: () => setScanQrOpen(true) },
+                    { label: "History", icon: AccountBalanceWalletRoundedIcon, color: "#0284C7", bg: "#F0F9FF", action: () => setActiveScreen("history") },
+                    { label: "Withdraw", icon: ArrowUpwardRoundedIcon, color: "#059669", bg: "#ECFDF5", action: () => setWithdrawDialogOpen(true) },
+                    { label: "Support", icon: SupportAgentRoundedIcon, color: "#9333EA", bg: "#FAF5FF", action: () => setActiveScreen("support") },
+                    { label: "More", icon: MoreHorizRoundedIcon, color: "#475569", bg: "#F1F5F9", action: () => setActiveScreen("command_center") },
+                  ]
+              ).map((act) => {
                 const IconComp = act.icon;
                 return (
                   <Box
@@ -2865,7 +2931,7 @@ export default function FranchiseMobileHub({
                   icon: ShoppingCartRoundedIcon,
                   color: "#059669",
                   bg: "#ECFDF5",
-                  action: () => setActiveScreen("users"),
+                  action: () => setActiveScreen("pincode"),
                 },
                 {
                   label: "TriZone Local",
@@ -2997,12 +3063,12 @@ export default function FranchiseMobileHub({
                   action: () => setActiveScreen("history"),
                 },
                 {
-                  title: "Registered Customers",
-                  desc: "Direct consumers registered in territory",
-                  icon: <GroupsOutlinedIcon sx={{ fontSize: 22 }} />,
-                  color: "#D97706",
-                  bg: "#FFFBEB",
-                  action: () => setActiveScreen("users"),
+                  title: "Pincodes & Coverage Directory",
+                  desc: "Inspect live coverage, active agencies, coordinators and merchant density",
+                  icon: <LocationOnRoundedIcon sx={{ fontSize: 22 }} />,
+                  color: "#4F46E5",
+                  bg: "#EEF2FF",
+                  action: () => setActiveScreen("pincode"),
                 },
                 {
                   title: "Support & Grievances",
@@ -3221,29 +3287,46 @@ export default function FranchiseMobileHub({
                     </Typography>
                   </Paper>
 
-                  <Paper elevation={0} sx={{ p: 1.5, borderRadius: "18px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6", minWidth: 0 }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                      <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748B" }}>Customers</Typography>
-                      <GroupsOutlinedIcon sx={{ fontSize: 18, color: "#2563EB" }} />
-                    </Stack>
-                    <Typography sx={{ fontSize: 22, fontWeight: 950, color: "#0F172A", my: 0.4 }}>
-                      {activeZoneMetrics.dispCustomers}
-                    </Typography>
-                    <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: "#2563EB" }}>
-                      {activeZoneMetrics.dispCustomers > 0 ? `${activeZoneMetrics.dispCustomers} Registered consumers` : "0 consumers in region"}
-                    </Typography>
-                  </Paper>
+                  {activeZoneMetrics.isExecutiveTerritoryTier ? (
+                    <Paper elevation={0} sx={{ p: 1.5, borderRadius: "18px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6", minWidth: 0 }}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748B" }}>
+                          {currentTierKey.includes("state") ? "Districts" : "Pincodes"}
+                        </Typography>
+                        <LocationOnRoundedIcon sx={{ fontSize: 18, color: "#4F46E5" }} />
+                      </Stack>
+                      <Typography sx={{ fontSize: 22, fontWeight: 950, color: "#0F172A", my: 0.4 }}>
+                        {districtSummary?.total_pincodes || effectivePincodes.length}
+                      </Typography>
+                      <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: "#4F46E5" }}>
+                        {(districtSummary?.active_agencies ?? effectivePincodes.filter((p) => p.status === "Active" || p.agency?.status === "ACTIVE").length)} Active • {(districtSummary?.vacant_agencies ?? effectivePincodes.filter((p) => p.status !== "Active" && p.agency?.status !== "ACTIVE").length)} Vacant
+                      </Typography>
+                    </Paper>
+                  ) : (
+                    <Paper elevation={0} sx={{ p: 1.5, borderRadius: "18px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6", minWidth: 0 }}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748B" }}>Services</Typography>
+                        <BuildRoundedIcon sx={{ fontSize: 18, color: "#D97706" }} />
+                      </Stack>
+                      <Typography sx={{ fontSize: 22, fontWeight: 950, color: "#0F172A", my: 0.4 }}>
+                        {activeZoneMetrics.dispTriZone}
+                      </Typography>
+                      <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: "#D97706" }}>
+                        Regional Services
+                      </Typography>
+                    </Paper>
+                  )}
 
                   <Paper elevation={0} sx={{ p: 1.5, borderRadius: "18px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6", minWidth: 0 }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
-                      <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748B" }}>Services</Typography>
-                      <BuildRoundedIcon sx={{ fontSize: 18, color: "#D97706" }} />
+                      <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: "#64748B" }}>Commission</Typography>
+                      <AccountBalanceWalletRoundedIcon sx={{ fontSize: 18, color: "#0284C7" }} />
                     </Stack>
                     <Typography sx={{ fontSize: 22, fontWeight: 950, color: "#0F172A", my: 0.4 }}>
-                      {activeZoneMetrics.dispTriZone}
+                      ₹{activeZoneMetrics.dispEarnings}
                     </Typography>
-                    <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: "#D97706" }}>
-                      Regional Services
+                    <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: "#0284C7" }}>
+                      Earned to Date
                     </Typography>
                   </Paper>
                 </Box>
@@ -3331,7 +3414,7 @@ export default function FranchiseMobileHub({
                       <Box sx={{ p: 1.2, borderRadius: "14px", bgcolor: "#FFFBEB", textAlign: "center" }}>
                         <Typography sx={{ fontSize: 10.5, color: "#64748B", fontWeight: 700 }}>Total Nodes</Typography>
                         <Typography sx={{ fontSize: 17, fontWeight: 950, color: "#D97706", mt: 0.3 }}>
-                          {activeZoneMetrics.dispMerchants + activeZoneMetrics.dispCaptains + activeZoneMetrics.dispCustomers}
+                          {activeZoneMetrics.dispMerchants + activeZoneMetrics.dispCaptains}
                         </Typography>
                       </Box>
                     </Grid>
@@ -3452,20 +3535,13 @@ export default function FranchiseMobileHub({
                   />
                 </Stack>
 
-                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1.5, mb: 2 }}>
+                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 1.5, mb: 2 }}>
                   <Box sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#F8FAFC", textAlign: "center" }}>
                     <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>Merchants</Typography>
                     <Typography sx={{ fontSize: 20, fontWeight: 950, color: "#059669", my: 0.3 }}>
                       {activeZoneMetrics.dispMerchants}
                     </Typography>
                     <Typography sx={{ fontSize: 10, color: "#64748B" }}>Total Onboarded</Typography>
-                  </Box>
-                  <Box sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#F8FAFC", textAlign: "center" }}>
-                    <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>Consumers</Typography>
-                    <Typography sx={{ fontSize: 20, fontWeight: 950, color: "#2563EB", my: 0.3 }}>
-                      {activeZoneMetrics.dispCustomers}
-                    </Typography>
-                    <Typography sx={{ fontSize: 10, color: "#64748B" }}>Registered</Typography>
                   </Box>
                   <Box sx={{ p: 1.5, borderRadius: "14px", bgcolor: "#F8FAFC", textAlign: "center" }}>
                     <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>Captains</Typography>
@@ -3496,10 +3572,18 @@ export default function FranchiseMobileHub({
         ========================================================================= */}
         {activeScreen === "captains" && (
           <Box>
-            <PageHeader
-              title="Captains Management"
-              count={filteredCaptains.length}
-            />
+            {activeZoneMetrics.isExecutiveTerritoryTier ? (
+              (currentTierKey === "agency_state" || currentTierKey === "agency_state_coordinator") ? (
+                <StateDistrictRollupCenter user={user} role={currentTierKey} />
+              ) : (
+                <DistrictPincodeCoverageCenter user={user} role={currentTierKey} />
+              )
+            ) : (
+              <>
+                <PageHeader
+                  title="Captains Management"
+                  count={filteredCaptains.length}
+                />
 
             {/* Captain Headcount Overview Card */}
             <Paper
@@ -3634,6 +3718,8 @@ export default function FranchiseMobileHub({
                 ))
               )}
             </Stack>
+              </>
+            )}
           </Box>
         )}
 
@@ -3760,9 +3846,6 @@ export default function FranchiseMobileHub({
                 <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#065F46" }}>
                   Active Beat Route: Sector 4
                 </Typography>
-                <Typography sx={{ fontSize: 11, color: "#047857", fontWeight: 700 }}>
-                  42 Active Merchants • 12 Route Stops • 98% On-Time
-                </Typography>
               </Box>
             </Paper>
           </Box>
@@ -3773,637 +3856,18 @@ export default function FranchiseMobileHub({
         ========================================================================= */}
         {activeScreen === "merchants" && (
           <Box>
-            <PageHeader
-              title={activeZoneMetrics.isExecutiveTerritoryTier ? "Territory Commercial Ecosystem" : "Merchants Directory"}
-              count={activeZoneMetrics.isExecutiveTerritoryTier ? activeZoneMetrics.dispMerchants : filteredMerchants.length}
-            />
-
-            {/* Coordinator Territory / Pincode Filter */}
-            {currentTier.scopeCount > 1 && (
-              <Box sx={{ mb: 1.5, p: 1, borderRadius: "14px", bgcolor: "#EFF6FF", border: "1px solid #BFDBFE" }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <LocationOnRoundedIcon sx={{ color: "#2563EB", fontSize: 18 }} />
-                  <FormControl size="small" fullWidth variant="standard">
-                    <Select
-                      value={selectedSubZone}
-                      onChange={(e) => setSelectedSubZone(e.target.value)}
-                      disableUnderline
-                      sx={{ fontSize: 12.5, fontWeight: 800, color: "#1E40AF" }}
-                    >
-                      <MenuItem value="all" sx={{ fontSize: 12.5, fontWeight: 800 }}>
-                        All {currentTier.scopeCount} Assigned ({currentTier.defaultLocation})
-                      </MenuItem>
-                      {currentTier.pincodes && currentTier.pincodes.map((pin) => (
-                        <MenuItem key={pin.pincode} value={pin.pincode} sx={{ fontSize: 12.5, fontWeight: 700 }}>
-                          Pin: {pin.name}
-                        </MenuItem>
-                      ))}
-                      {currentTier.districts && currentTier.districts.map((d) => (
-                        <MenuItem key={d} value={d} sx={{ fontSize: 12.5, fontWeight: 700 }}>
-                          District: {d}
-                        </MenuItem>
-                      ))}
-                      {currentTier.states && currentTier.states.map((s) => (
-                        <MenuItem key={s} value={s} sx={{ fontSize: 12.5, fontWeight: 700 }}>
-                          State: {s}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Stack>
-              </Box>
-            )}
-
-            {/* IF EXECUTIVE TERRITORY TIER (District, Dist Coord, State, State Coord): ONLY SHOW SHOP COUNTS WITH B2B AND B2C BREAKDOWN (NO INDIVIDUAL SHOP CARDS) */}
             {activeZoneMetrics.isExecutiveTerritoryTier ? (
-              <Box>
-                {/* Executive Notice Banner */}
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 1.8,
-                    mb: 2,
-                    borderRadius: "18px",
-                    bgcolor: "#EFF6FF",
-                    border: "1px solid #BFDBFE",
-                  }}
-                >
-                  <Stack direction="row" spacing={1.2} alignItems="flex-start">
-                    <Avatar sx={{ bgcolor: "#DBEAFE", color: "#1D4ED8", width: 34, height: 34 }}>
-                      <DomainRoundedIcon sx={{ fontSize: 20 }} />
-                    </Avatar>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#1E40AF" }}>
-                        Executive Jurisdiction Overview
-                      </Typography>
-                      <Typography sx={{ fontSize: 11, color: "#2563EB", mt: 0.3, lineHeight: 1.4 }}>
-                        As <strong>{currentTier.title}</strong>, you receive aggregated commissions across all <strong>{activeZoneMetrics.dispMerchants.toLocaleString()} shops</strong> in {currentTier.defaultLocation}. Individual merchant terminal cards are managed locally by Pincode Franchise Partners & Field Captains.
-                      </Typography>
-                    </Box>
-                  </Stack>
-                </Paper>
-
-                {/* 2x2 Grid for Aggregated Commercial Overview */}
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                    gap: 1.5,
-                    mb: 2,
-                  }}
-                >
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      p: 1.6,
-                      borderRadius: "16px",
-                      bgcolor: "#FFFFFF",
-                      border: "1px solid #E2E8F0",
-                    }}
-                  >
-                    <Stack direction="row" alignItems="center" spacing={0.8} sx={{ mb: 0.5 }}>
-                      <StoreRoundedIcon sx={{ fontSize: 16, color: "#059669" }} />
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>
-                        Total Shops
-                      </Typography>
-                    </Stack>
-                    <Typography sx={{ fontSize: 22, fontWeight: 950, color: "#0F172A" }}>
-                      {activeZoneMetrics.dispMerchants.toLocaleString()}
-                    </Typography>
-                    <Typography sx={{ fontSize: 10, color: "#059669", fontWeight: 700, mt: 0.3 }}>
-                      {activeZoneMetrics.dispActiveMerchants.toLocaleString()} Active • {activeZoneMetrics.dispInactiveMerchants.toLocaleString()} Inactive
-                    </Typography>
-                  </Paper>
-
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      p: 1.6,
-                      borderRadius: "16px",
-                      bgcolor: "#FFFFFF",
-                      border: "1px solid #E2E8F0",
-                    }}
-                  >
-                    <Stack direction="row" alignItems="center" spacing={0.8} sx={{ mb: 0.5 }}>
-                      <BusinessRoundedIcon sx={{ fontSize: 16, color: "#2563EB" }} />
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>
-                        B2B Wholesalers
-                      </Typography>
-                    </Stack>
-                    <Typography sx={{ fontSize: 22, fontWeight: 950, color: "#0F172A" }}>
-                      {activeZoneMetrics.dispB2B.toLocaleString()}
-                    </Typography>
-                    <Typography sx={{ fontSize: 10, color: "#2563EB", fontWeight: 700, mt: 0.3 }}>
-                      FMCG & Bulk Supply
-                    </Typography>
-                  </Paper>
-
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      p: 1.6,
-                      borderRadius: "16px",
-                      bgcolor: "#FFFFFF",
-                      border: "1px solid #E2E8F0",
-                    }}
-                  >
-                    <Stack direction="row" alignItems="center" spacing={0.8} sx={{ mb: 0.5 }}>
-                      <ShoppingBagOutlinedIcon sx={{ fontSize: 16, color: "#D97706" }} />
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>
-                        B2C Retail & Kirana
-                      </Typography>
-                    </Stack>
-                    <Typography sx={{ fontSize: 22, fontWeight: 950, color: "#0F172A" }}>
-                      {activeZoneMetrics.dispB2C.toLocaleString()}
-                    </Typography>
-                    <Typography sx={{ fontSize: 10, color: "#D97706", fontWeight: 700, mt: 0.3 }}>
-                      Tri Basket & Tri Eat
-                    </Typography>
-                  </Paper>
-
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      p: 1.6,
-                      borderRadius: "16px",
-                      bgcolor: "#FFFFFF",
-                      border: "1px solid #E2E8F0",
-                    }}
-                  >
-                    <Stack direction="row" alignItems="center" spacing={0.8} sx={{ mb: 0.5 }}>
-                      <FlashOnRoundedIcon sx={{ fontSize: 16, color: "#7C3AED" }} />
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748B" }}>
-                        TriZone Stores
-                      </Typography>
-                    </Stack>
-                    <Typography sx={{ fontSize: 22, fontWeight: 950, color: "#0F172A" }}>
-                      {activeZoneMetrics.dispTriZone.toLocaleString()}
-                    </Typography>
-                    <Typography sx={{ fontSize: 10, color: "#7C3AED", fontWeight: 700, mt: 0.3 }}>
-                      Flagship Experience Hubs
-                    </Typography>
-                  </Paper>
-                </Box>
-
-                {/* Case A: DISTRICT FRANCHISE PARTNER (agency_district) */}
-                {currentTierKey === "agency_district" && (
-                  <Box sx={{ mb: 2 }}>
-                    <Paper elevation={0} sx={{ p: 2, borderRadius: "18px", bgcolor: "#FFFFFF", border: "1px solid #E2E8F0", mb: 2 }}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5, flexWrap: "wrap", gap: 1 }}>
-                        <Box>
-                          <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A" }}>
-                            District Pincode Network & Leadership
-                          </Typography>
-                          <Typography sx={{ fontSize: 11.5, color: "#64748B", mt: 0.3 }}>
-                            Tumakuru District Jurisdiction • Direct Partner Calling
-                          </Typography>
-                        </Box>
-                        <Chip
-                          label={`${activeZoneMetrics.dispCaptains} Captains in District`}
-                          size="small"
-                          sx={{ bgcolor: "#F3E8FF", color: "#7C3AED", fontWeight: 800, fontSize: 11 }}
-                        />
-                      </Stack>
-
-                      {/* Pincode Filter Chips */}
-                      <FilterChips
-                        filters={[
-                          { label: `All PINs (${currentTier.pincodes?.length || 6})`, value: "all" },
-                          { label: `Active (${currentTier.pincodes?.filter((p) => p.status === "Active").length || 4})`, value: "active" },
-                          { label: `Inactive (${currentTier.pincodes?.filter((p) => p.status === "Inactive").length || 2})`, value: "inactive" },
-                        ]}
-                        activeValue={districtPincodeFilter}
-                        onSelect={(val) => setDistrictPincodeFilter(val)}
-                      />
-
-                      {/* Pincode Directory with Active/Inactive Badges and 1-Tap Call Action */}
-                      <Stack spacing={1.2} sx={{ mt: 1.5 }}>
-                        {(currentTier.pincodes || [])
-                          .filter((p) => {
-                            if (districtPincodeFilter === "active") return p.status === "Active";
-                            if (districtPincodeFilter === "inactive") return p.status === "Inactive";
-                            return true;
-                          })
-                          .map((pin) => {
-                            const mCount = merchantsList.filter((m) => m.pincode === pin.pincode).length;
-                            const capCount = captainsList.filter((c) => c.pincode === pin.pincode).length;
-                            const isActive = pin.status === "Active";
-                            return (
-                              <Paper
-                                key={pin.pincode}
-                                elevation={0}
-                                sx={{
-                                  p: 1.4,
-                                  borderRadius: "14px",
-                                  bgcolor: isActive ? "#F8FAFC" : "#FFFBEB",
-                                  border: "1px solid",
-                                  borderColor: isActive ? "#E2E8F0" : "#FDE68A",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  gap: 1.2,
-                                }}
-                              >
-                                <Box sx={{ minWidth: 0, flex: 1 }}>
-                                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.3 }}>
-                                    <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A" }}>
-                                      PIN {pin.pincode}
-                                    </Typography>
-                                    <Chip
-                                      label={isActive ? "Active Partner" : "Inactive / Vacant"}
-                                      size="small"
-                                      sx={{
-                                        height: 18,
-                                        fontSize: 10,
-                                        fontWeight: 800,
-                                        bgcolor: isActive ? "#DCFCE7" : "#FEF3C7",
-                                        color: isActive ? "#15803D" : "#B45309",
-                                      }}
-                                    />
-                                  </Stack>
-                                  <Typography sx={{ fontSize: 11.5, color: "#475569", fontWeight: 600 }}>
-                                    {pin.name}
-                                  </Typography>
-                                  <Typography sx={{ fontSize: 11, color: "#64748B", mt: 0.2 }}>
-                                    {pin.partnerName ? `Partner: ${pin.partnerName}` : "No Partner Assigned"} • {mCount} Shops • {capCount} Captains
-                                  </Typography>
-                                </Box>
-
-                                {pin.partnerPhone ? (
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => window.location.href = `tel:${pin.partnerPhone.replace(/\s+/g, "")}`}
-                                    sx={{
-                                      bgcolor: "#EFF6FF",
-                                      color: "#2563EB",
-                                      border: "1px solid #BFDBFE",
-                                      p: 0.9,
-                                      flexShrink: 0,
-                                      "&:hover": { bgcolor: "#DBEAFE" },
-                                    }}
-                                    title={`Call ${pin.partnerName}`}
-                                  >
-                                    <CallRoundedIcon sx={{ fontSize: 18 }} />
-                                  </IconButton>
-                                ) : (
-                                  <Chip label="Vacant" size="small" sx={{ fontSize: 10, bgcolor: "#FEF3C7", color: "#B45309", fontWeight: 700 }} />
-                                )}
-                              </Paper>
-                            );
-                          })}
-                      </Stack>
-                    </Paper>
-                  </Box>
-                )}
-
-                {/* Case B: DISTRICT COORDINATOR (agency_district_coordinator) */}
-                {currentTierKey === "agency_district_coordinator" && (
-                  <Box sx={{ mb: 2 }}>
-                    <Paper elevation={0} sx={{ p: 2, borderRadius: "18px", bgcolor: "#FFFFFF", border: "1px solid #E2E8F0", mb: 2 }}>
-                      <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A", mb: 0.5 }}>
-                        District Coordinator Dual-Zone Matrix
-                      </Typography>
-                      <Typography sx={{ fontSize: 11.5, color: "#64748B", mb: 1.5 }}>
-                        Select Accumulative to view both districts combined or inspect each district individually.
-                      </Typography>
-
-                      {/* Dual District Selector Switcher */}
-                      <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-                        {[
-                          { label: "Accumulative (Both 2 Districts)", val: "all" },
-                          { label: "Tumakuru District", val: "Tumakuru" },
-                          { label: "Hassan District", val: "Hassan" },
-                        ].map((t) => (
-                          <Button
-                            key={t.val}
-                            size="small"
-                            onClick={() => setSelectedSubZone(t.val)}
-                            sx={{
-                              flex: 1,
-                              py: 0.7,
-                              borderRadius: "12px",
-                              fontWeight: 800,
-                              fontSize: 11.5,
-                              textTransform: "none",
-                              bgcolor: selectedSubZone === t.val ? "#0F172A" : "#F8FAFC",
-                              color: selectedSubZone === t.val ? "#FFFFFF" : "#64748B",
-                              border: "1px solid",
-                              borderColor: selectedSubZone === t.val ? "#0F172A" : "#E2E8F0",
-                            }}
-                          >
-                            {t.label}
-                          </Button>
-                        ))}
-                      </Stack>
-
-                      {/* Pincode & Hub List for Coordinator */}
-                      <Stack spacing={1.2}>
-                        {(currentTier.pincodes || [])
-                          .filter((p) => {
-                            if (selectedSubZone === "all") return true;
-                            return p.district?.toLowerCase() === selectedSubZone.toLowerCase();
-                          })
-                          .map((pin) => {
-                            const mCount = merchantsList.filter((m) => m.pincode === pin.pincode).length;
-                            const capCount = captainsList.filter((c) => c.pincode === pin.pincode).length;
-                            return (
-                              <Paper
-                                key={pin.pincode}
-                                elevation={0}
-                                sx={{
-                                  p: 1.4,
-                                  borderRadius: "14px",
-                                  bgcolor: "#F8FAFC",
-                                  border: "1px solid #E2E8F0",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  gap: 1.2,
-                                }}
-                              >
-                                <Box sx={{ minWidth: 0, flex: 1 }}>
-                                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.3 }}>
-                                    <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A" }}>
-                                      PIN {pin.pincode} • {pin.district}
-                                    </Typography>
-                                    <Chip label="Active" size="small" sx={{ height: 18, fontSize: 10, fontWeight: 800, bgcolor: "#DCFCE7", color: "#15803D" }} />
-                                  </Stack>
-                                  <Typography sx={{ fontSize: 11.5, color: "#475569", fontWeight: 600 }}>{pin.name}</Typography>
-                                  <Typography sx={{ fontSize: 11, color: "#64748B", mt: 0.2 }}>
-                                    Partner: {pin.partnerName} • {mCount} Shops • {capCount} Captains
-                                  </Typography>
-                                </Box>
-
-                                {pin.partnerPhone && (
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => window.location.href = `tel:${pin.partnerPhone.replace(/\s+/g, "")}`}
-                                    sx={{ bgcolor: "#EFF6FF", color: "#2563EB", border: "1px solid #BFDBFE", p: 0.9, flexShrink: 0 }}
-                                    title={`Call ${pin.partnerName}`}
-                                  >
-                                    <CallRoundedIcon sx={{ fontSize: 18 }} />
-                                  </IconButton>
-                                )}
-                              </Paper>
-                            );
-                          })}
-                      </Stack>
-                    </Paper>
-                  </Box>
-                )}
-
-                {/* Case C: STATE FRANCHISE PARTNER (agency_state) */}
-                {currentTierKey === "agency_state" && (
-                  <Box sx={{ mb: 2 }}>
-                    <Paper elevation={0} sx={{ p: 2, borderRadius: "18px", bgcolor: "#FFFFFF", border: "1px solid #E2E8F0", mb: 2 }}>
-                      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5, flexWrap: "wrap", gap: 1 }}>
-                        <Box>
-                          <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A" }}>
-                            Karnataka State — District Directory & Leadership
-                          </Typography>
-                          <Typography sx={{ fontSize: 11.5, color: "#64748B", mt: 0.3 }}>
-                            31 Districts Coverage • Call District Partners & Coordinators
-                          </Typography>
-                        </Box>
-                      </Stack>
-
-                      {/* District Filter Chips */}
-                      <FilterChips
-                        filters={[
-                          { label: `All (${(currentTier.districtsList || []).length})`, value: "all" },
-                          { label: `Active (${(currentTier.districtsList || []).filter((d) => d.status === "Active").length})`, value: "active" },
-                          { label: `Inactive (${(currentTier.districtsList || []).filter((d) => d.status === "Inactive").length})`, value: "inactive" },
-                        ]}
-                        activeValue={stateDistrictFilter}
-                        onSelect={(val) => setStateDistrictFilter(val)}
-                      />
-
-                      <Stack spacing={1.2} sx={{ mt: 1.5 }}>
-                        {(currentTier.districtsList || [])
-                          .filter((d) => {
-                            if (stateDistrictFilter === "active") return d.status === "Active";
-                            if (stateDistrictFilter === "inactive") return d.status === "Inactive";
-                            return true;
-                          })
-                          .map((dist) => {
-                            const isActive = dist.status === "Active";
-                            return (
-                              <Paper
-                                key={dist.name}
-                                elevation={0}
-                                sx={{
-                                  p: 1.4,
-                                  borderRadius: "14px",
-                                  bgcolor: isActive ? "#F8FAFC" : "#FFFBEB",
-                                  border: "1px solid",
-                                  borderColor: isActive ? "#E2E8F0" : "#FDE68A",
-                                }}
-                              >
-                                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.8 }}>
-                                  <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A" }}>
-                                    {dist.name} District
-                                  </Typography>
-                                  <Chip
-                                    label={isActive ? "Active District" : "Inactive / Open"}
-                                    size="small"
-                                    sx={{
-                                      height: 18,
-                                      fontSize: 10,
-                                      fontWeight: 800,
-                                      bgcolor: isActive ? "#DCFCE7" : "#FEF3C7",
-                                      color: isActive ? "#15803D" : "#B45309",
-                                    }}
-                                  />
-                                </Stack>
-
-                                <Stack spacing={0.6}>
-                                  <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                    <Typography sx={{ fontSize: 11.5, color: "#475569" }}>
-                                      <strong>District Partner:</strong> {dist.partnerName || "Vacant"}
-                                    </Typography>
-                                    {dist.partnerPhone && (
-                                      <Button
-                                        size="small"
-                                        startIcon={<CallRoundedIcon sx={{ fontSize: 14 }} />}
-                                        href={`tel:${dist.partnerPhone}`}
-                                        sx={{ fontSize: 11, fontWeight: 800, textTransform: "none", py: 0.2, px: 1 }}
-                                      >
-                                        Call
-                                      </Button>
-                                    )}
-                                  </Stack>
-
-                                  <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                    <Typography sx={{ fontSize: 11.5, color: "#475569" }}>
-                                      <strong>District Coord:</strong> {dist.coordName || "Vacant"}
-                                    </Typography>
-                                    {dist.coordPhone && (
-                                      <Button
-                                        size="small"
-                                        startIcon={<CallRoundedIcon sx={{ fontSize: 14 }} />}
-                                        href={`tel:${dist.coordPhone}`}
-                                        sx={{ fontSize: 11, fontWeight: 800, textTransform: "none", py: 0.2, px: 1, color: "#7C3AED" }}
-                                      >
-                                        Call
-                                      </Button>
-                                    )}
-                                  </Stack>
-                                </Stack>
-
-                                <Typography sx={{ fontSize: 10.5, color: "#64748B", mt: 0.8 }}>
-                                  Commercial Density: {dist.merchants || 0} Shops • {dist.captains || 0} Field Captains
-                                </Typography>
-                              </Paper>
-                            );
-                          })}
-                      </Stack>
-                    </Paper>
-                  </Box>
-                )}
-
-                {/* Case D: STATE COORDINATOR (agency_state_coordinator) */}
-                {currentTierKey === "agency_state_coordinator" && (
-                  <Box sx={{ mb: 2 }}>
-                    <Paper elevation={0} sx={{ p: 2, borderRadius: "18px", bgcolor: "#FFFFFF", border: "1px solid #E2E8F0", mb: 2 }}>
-                      <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A", mb: 0.5 }}>
-                        State Coordinator Dual-State Matrix
-                      </Typography>
-                      <Typography sx={{ fontSize: 11.5, color: "#64748B", mb: 1.5 }}>
-                        Select Accumulative to view both Karnataka & Goa combined, or inspect individual states.
-                      </Typography>
-
-                      {/* Dual State Switcher */}
-                      <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-                        {[
-                          { label: "Accumulative (Both States)", val: "all" },
-                          { label: "Karnataka State", val: "Karnataka" },
-                          { label: "Goa State", val: "Goa" },
-                        ].map((t) => (
-                          <Button
-                            key={t.val}
-                            size="small"
-                            onClick={() => setSelectedSubZone(t.val)}
-                            sx={{
-                              flex: 1,
-                              py: 0.7,
-                              borderRadius: "12px",
-                              fontWeight: 800,
-                              fontSize: 11.5,
-                              textTransform: "none",
-                              bgcolor: selectedSubZone === t.val ? "#0F172A" : "#F8FAFC",
-                              color: selectedSubZone === t.val ? "#FFFFFF" : "#64748B",
-                              border: "1px solid",
-                              borderColor: selectedSubZone === t.val ? "#0F172A" : "#E2E8F0",
-                            }}
-                          >
-                            {t.label}
-                          </Button>
-                        ))}
-                      </Stack>
-
-                      {/* State District Directory */}
-                      <Stack spacing={1.2}>
-                        {((selectedSubZone === "Goa"
-                          ? currentTier.stateDistricts?.Goa
-                          : (selectedSubZone === "Karnataka"
-                            ? currentTier.stateDistricts?.Karnataka
-                            : [...(currentTier.stateDistricts?.Karnataka || []), ...(currentTier.stateDistricts?.Goa || [])])) || []).map((dist) => {
-                          const isActive = dist.status === "Active";
-                          return (
-                            <Paper
-                              key={dist.name}
-                              elevation={0}
-                              sx={{
-                                p: 1.4,
-                                borderRadius: "14px",
-                                bgcolor: isActive ? "#F8FAFC" : "#FFFBEB",
-                                border: "1px solid",
-                                borderColor: isActive ? "#E2E8F0" : "#FDE68A",
-                              }}
-                            >
-                              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.8 }}>
-                                <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A" }}>
-                                  {dist.name} District
-                                </Typography>
-                                <Chip
-                                  label={isActive ? "Active District" : "Inactive / Open"}
-                                  size="small"
-                                  sx={{
-                                    height: 18,
-                                    fontSize: 10,
-                                    fontWeight: 800,
-                                    bgcolor: isActive ? "#DCFCE7" : "#FEF3C7",
-                                    color: isActive ? "#15803D" : "#B45309",
-                                  }}
-                                />
-                              </Stack>
-
-                              <Stack spacing={0.6}>
-                                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                  <Typography sx={{ fontSize: 11.5, color: "#475569" }}>
-                                    <strong>District Partner:</strong> {dist.partnerName || "Vacant"}
-                                  </Typography>
-                                  {dist.partnerPhone && (
-                                    <Button
-                                      size="small"
-                                      startIcon={<CallRoundedIcon sx={{ fontSize: 14 }} />}
-                                      href={`tel:${dist.partnerPhone}`}
-                                      sx={{ fontSize: 11, fontWeight: 800, textTransform: "none", py: 0.2, px: 1 }}
-                                    >
-                                      Call
-                                    </Button>
-                                  )}
-                                </Stack>
-                                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                  <Typography sx={{ fontSize: 11.5, color: "#475569" }}>
-                                    <strong>District Coord:</strong> {dist.coordName || "Vacant"}
-                                  </Typography>
-                                  {dist.coordPhone && (
-                                    <Button
-                                      size="small"
-                                      startIcon={<CallRoundedIcon sx={{ fontSize: 14 }} />}
-                                      href={`tel:${dist.coordPhone}`}
-                                      sx={{ fontSize: 11, fontWeight: 800, textTransform: "none", py: 0.2, px: 1, color: "#7C3AED" }}
-                                    >
-                                      Call
-                                    </Button>
-                                  )}
-                                </Stack>
-                              </Stack>
-
-                              <Typography sx={{ fontSize: 10.5, color: "#64748B", mt: 0.8 }}>
-                                Coverage: {dist.merchants || 0} Shops • {dist.captains || 0} Field Captains
-                              </Typography>
-                            </Paper>
-                          );
-                        })}
-                      </Stack>
-                    </Paper>
-                  </Box>
-                )}
-
-                {/* Quick Navigation to Captains */}
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  onClick={() => setActiveScreen("captains")}
-                  startIcon={<ShieldRoundedIcon />}
-                  sx={{
-                    borderRadius: "14px",
-                    fontWeight: 800,
-                    fontSize: 12,
-                    textTransform: "none",
-                    borderColor: "#BFDBFE",
-                    color: "#1D4ED8",
-                    bgcolor: "#FFFFFF",
-                  }}
-                >
-                  View Field Captains ({activeZoneMetrics.dispCaptains}) ➔
-                </Button>
-              </Box>
+            (currentTierKey === "agency_state" || currentTierKey === "agency_state_coordinator") ? (
+              <StateDistrictRollupCenter user={user} role={currentTierKey} />
             ) : (
-              /* PINCODE & PINCODE COORDINATOR TIERS: SHOW INDIVIDUAL MERCHANT CARDS LIST */
-              <Box>
+              <DistrictPincodeCoverageCenter user={user} role={currentTierKey} />
+            )
+          ) : (
+            <Box>
+              <PageHeader
+                title="Merchants Directory"
+                count={filteredMerchants.length}
+              />
                 {/* Merchant Headcount & Channel Breakdown Banner */}
                 <Paper
                   elevation={0}
@@ -6039,191 +5503,19 @@ export default function FranchiseMobileHub({
         ========================================================================= */}
         {activeScreen === "users" && (
           <Box>
-            <PageHeader
-              title="Registered Customers"
-              count={activeZoneMetrics.dispCustomers}
-            />
-
-            {/* Dynamic Zone KPI Summary */}
-            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 1.5, mb: 2 }}>
-              <Paper elevation={0} sx={{ p: 1.8, borderRadius: "18px", bgcolor: "#ECFDF5", border: "1px solid #A7F3D0", minWidth: 0 }}>
-                <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#065F46" }}>Active Customers</Typography>
-                <Typography sx={{ fontSize: 24, fontWeight: 950, color: "#047857", mt: 0.5 }}>
-                  {activeZoneMetrics.dispCustomers.toLocaleString()}
+            {activeZoneMetrics.isExecutiveTerritoryTier ? (
+              (currentTierKey === "agency_state" || currentTierKey === "agency_state_coordinator") ? (
+                <StateDistrictRollupCenter user={user} role={currentTierKey} />
+              ) : (
+                <DistrictPincodeCoverageCenter user={user} role={currentTierKey} />
+              )
+            ) : (
+              <Box sx={{ p: 4, textAlign: "center" }}>
+                <Typography sx={{ fontSize: 14, fontWeight: 700, color: "#64748B" }}>
+                  Direct customers are managed centrally via platform commerce.
                 </Typography>
-                <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#059669" }}>
-                  100% Active in Zone
-                </Typography>
-              </Paper>
-              <Paper elevation={0} sx={{ p: 1.8, borderRadius: "18px", bgcolor: "#F8FAFC", border: "1px solid #E2E8F0", minWidth: 0 }}>
-                <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>Inactive Customers</Typography>
-                <Typography sx={{ fontSize: 24, fontWeight: 950, color: "#0F172A", mt: 0.5 }}>0</Typography>
-                <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748B" }}>0.0% Inactive</Typography>
-              </Paper>
-            </Box>
-
-            {/* Territory / Pincode Filter for Coordinators */}
-            {currentTier.scopeCount > 1 && (
-              <Box sx={{ mb: 1.5, p: 1, borderRadius: "14px", bgcolor: "#EFF6FF", border: "1px solid #BFDBFE" }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <LocationOnRoundedIcon sx={{ color: "#2563EB", fontSize: 18 }} />
-                  <FormControl size="small" fullWidth variant="standard">
-                    <Select
-                      value={selectedSubZone}
-                      onChange={(e) => setSelectedSubZone(e.target.value)}
-                      disableUnderline
-                      sx={{ fontSize: 12.5, fontWeight: 800, color: "#1E40AF" }}
-                    >
-                      <MenuItem value="all" sx={{ fontSize: 12.5, fontWeight: 800 }}>
-                        All {currentTier.scopeCount} Assigned ({currentTier.defaultLocation})
-                      </MenuItem>
-                      {currentTier.pincodes && currentTier.pincodes.map((pin) => (
-                        <MenuItem key={pin.pincode} value={pin.pincode} sx={{ fontSize: 12.5, fontWeight: 700 }}>
-                          Pin: {pin.name}
-                        </MenuItem>
-                      ))}
-                      {currentTier.districts && currentTier.districts.map((d) => (
-                        <MenuItem key={d} value={d} sx={{ fontSize: 12.5, fontWeight: 700 }}>
-                          District: {d}
-                        </MenuItem>
-                      ))}
-                      {currentTier.states && currentTier.states.map((s) => (
-                        <MenuItem key={s} value={s} sx={{ fontSize: 12.5, fontWeight: 700 }}>
-                          State: {s}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Stack>
               </Box>
             )}
-
-            {/* Search Field */}
-            <SearchField
-              placeholder="Search customer by name or phone..."
-              value={customerSearch}
-              onChange={(e) => setCustomerSearch(e.target.value)}
-            />
-
-            {/* Filter Chips */}
-            <FilterChips
-              filters={[
-                { label: `All (${filteredCustomers.length})`, value: "all" },
-                { label: `Active (${filteredCustomers.length})`, value: "active" },
-                { label: `Inactive (0)`, value: "inactive" },
-              ]}
-              activeValue={customerFilter}
-              onSelect={(val) => setCustomerFilter(val)}
-            />
-
-            {/* Customers List (Zero Mockup Data - 100% Live DB State) */}
-            <Stack spacing={1.5} sx={{ mt: 1 }}>
-              {filteredCustomers.length === 0 ? (
-                <Paper
-                  elevation={0}
-                  sx={{
-                    p: 4,
-                    textAlign: "center",
-                    borderRadius: "20px",
-                    bgcolor: "#FFFFFF",
-                    border: "1px solid #EEF2F6",
-                    boxShadow: "0 2px 10px rgba(15,23,42,0.03)",
-                  }}
-                >
-                  <Avatar sx={{ width: 48, height: 48, bgcolor: "#EFF6FF", color: "#2563EB", mx: "auto", mb: 1.5 }}>
-                    <GroupsOutlinedIcon />
-                  </Avatar>
-                  <Typography sx={{ fontSize: 15, fontWeight: 800, color: "#0F172A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                    No Registered Customers Found
-                  </Typography>
-                  <Typography sx={{ fontSize: 12.5, color: "#64748B", mt: 0.5, fontWeight: 500, maxWidth: 320, mx: "auto" }}>
-                    Consumers registered under PIN {selectedSubZone !== "all" ? selectedSubZone : (user?.pincode || "572106")} will appear here in real-time.
-                  </Typography>
-                </Paper>
-              ) : (
-                filteredCustomers.map((cust, idx) => {
-                  const displayName = cust.full_name || cust.name || cust.username || "Customer";
-                  const displayPhone = cust.phone || cust.mobile || cust.username || "—";
-                  const dateJoined = cust.date_joined
-                    ? new Date(cust.date_joined).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
-                    : "5 Oct 2026";
-                  
-                  const initials = displayName.split(" ").map(w => w.charAt(0)).join("").slice(0, 2).toUpperCase() || "CU";
-                  const avatarColors = [
-                    { bg: "#F3E8FF", color: "#7C3AED" },
-                    { bg: "#EFF6FF", color: "#2563EB" },
-                    { bg: "#FEF3C7", color: "#D97706" },
-                  ];
-                  const col = avatarColors[idx % avatarColors.length];
-
-                  return (
-                    <Paper
-                      key={cust.id || cust.username || cust.phone || idx}
-                      elevation={0}
-                      sx={{
-                        p: 1.8,
-                        borderRadius: "18px",
-                        bgcolor: "#FFFFFF",
-                        border: "1px solid #EEF2F6",
-                        boxShadow: "0 2px 8px rgba(15,23,42,0.03)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        transition: "transform 0.12s ease",
-                        "&:active": { transform: "scale(0.98)" },
-                      }}
-                    >
-                      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flex: 1, pr: 1 }}>
-                        <Avatar
-                          sx={{
-                            width: 44,
-                            height: 44,
-                            borderRadius: "50%",
-                            bgcolor: col.bg,
-                            color: col.color,
-                            fontWeight: 800,
-                            fontSize: 15,
-                            fontFamily: "'Plus Jakarta Sans', sans-serif",
-                            flexShrink: 0,
-                          }}
-                        >
-                          {initials}
-                        </Avatar>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography noWrap sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                            {displayName}
-                          </Typography>
-                          <Typography sx={{ fontSize: 12, fontWeight: 600, color: "#64748B", mt: 0.1 }}>
-                            {displayPhone}
-                          </Typography>
-                          <Typography sx={{ fontSize: 11, color: "#94A3B8", mt: 0.2 }}>
-                            Registered on {dateJoined}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                      <Stack direction="row" alignItems="center" spacing={1} sx={{ flexShrink: 0 }}>
-                        <Box
-                          sx={{
-                            bgcolor: "#ECFDF5",
-                            color: "#059669",
-                            border: "1px solid #A7F3D0",
-                            borderRadius: "999px",
-                            px: 1.2,
-                            py: 0.3,
-                            fontSize: 11,
-                            fontWeight: 800,
-                            fontFamily: "'Plus Jakarta Sans', sans-serif",
-                          }}
-                        >
-                          Active
-                        </Box>
-                        <ChevronRightRoundedIcon sx={{ color: "#94A3B8", fontSize: 20 }} />
-                      </Stack>
-                    </Paper>
-                  );
-                })
-              )}
-            </Stack>
           </Box>
         )}
 
@@ -6538,7 +5830,6 @@ export default function FranchiseMobileHub({
           {[
             { label: "Wallet & History", screen: "history", icon: <AccountBalanceWalletRoundedIcon />, color: "#2563EB", bg: "#EFF6FF" },
             { label: "Territory Overview", screen: "pincode", icon: <LocationOnRoundedIcon />, color: "#4F46E5", bg: "#EEF2FF" },
-            { label: "Registered Customers", screen: "users", icon: <GroupsOutlinedIcon />, color: "#0284C7", bg: "#F0F9FF" },
             { label: "Support & Grievances", screen: "support", icon: <SupportAgentRoundedIcon />, color: "#9333EA", bg: "#FAF5FF" },
             { label: "Scan Merchant QR", screen: "qr", icon: <QrCodeScannerRoundedIcon />, color: "#DC2626", bg: "#FEF2F2", action: () => setScanQrOpen(true) },
             { label: "Withdraw Wallet", screen: "withdraw", icon: <ArrowUpwardRoundedIcon />, color: "#10B981", bg: "#ECFDF5", action: () => setWithdrawDialogOpen(true) },

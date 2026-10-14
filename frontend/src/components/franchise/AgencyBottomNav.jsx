@@ -4,37 +4,35 @@ import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
 import StoreRoundedIcon from "@mui/icons-material/StoreRounded";
+import AccountBalanceWalletRoundedIcon from "@mui/icons-material/AccountBalanceWalletRounded";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
 import { AGENCY_TOKENS } from "./AgencyTokens";
 
-const NAV_ITEMS = [
-  { key: "home", label: "Home", icon: HomeRoundedIcon },
-  { key: "pincode", label: "Pincode", icon: LocationOnRoundedIcon },
-  { key: "captains", label: "Captains", icon: ShieldRoundedIcon },
-  { key: "merchants", label: "Merchants", icon: StoreRoundedIcon },
-  { key: "command_center", label: "More", icon: MoreHorizRoundedIcon },
-];
-
-/**
- * Standard Agency Bottom Navigation (Phase 2B)
- * - Fixed 5 equal-width items: Home | Pincode | Captains | Merchants | More
- * - Proper Android safe-area padding
- * - Active indicator in Primary Blue (#2563EB)
- */
 export default function AgencyBottomNav({ activeScreen, onSelectScreen, role = "" }) {
-  const territoryLabel = String(role).includes("state")
-    ? "Districts"
-    : String(role).includes("district")
-    ? "Pincodes"
-    : "Pincode";
+  const isDistrictTier = String(role).includes("district");
+  const isStateTier = String(role).includes("state");
 
-  const navItems = [
-    { key: "home", label: "Home", icon: HomeRoundedIcon },
-    { key: "pincode", label: territoryLabel, icon: LocationOnRoundedIcon },
-    { key: "captains", label: "Captains", icon: ShieldRoundedIcon },
-    { key: "merchants", label: "Merchants", icon: StoreRoundedIcon },
-    { key: "command_center", label: "More", icon: MoreHorizRoundedIcon },
-  ];
+  const navItems = isDistrictTier
+    ? [
+        { key: "home", label: "Home", icon: HomeRoundedIcon },
+        { key: "pincode", label: "Pincodes", icon: LocationOnRoundedIcon },
+        { key: "earnings_wallet", label: "Wallet", icon: AccountBalanceWalletRoundedIcon },
+        { key: "command_center", label: "More", icon: MoreHorizRoundedIcon },
+      ]
+    : isStateTier
+    ? [
+        { key: "home", label: "Home", icon: HomeRoundedIcon },
+        { key: "pincode", label: "Districts", icon: LocationOnRoundedIcon },
+        { key: "earnings_wallet", label: "Wallet", icon: AccountBalanceWalletRoundedIcon },
+        { key: "command_center", label: "More", icon: MoreHorizRoundedIcon },
+      ]
+    : [
+        { key: "home", label: "Home", icon: HomeRoundedIcon },
+        { key: "pincode", label: "Pincode", icon: LocationOnRoundedIcon },
+        { key: "captains", label: "Captains", icon: ShieldRoundedIcon },
+        { key: "merchants", label: "Merchants", icon: StoreRoundedIcon },
+        { key: "command_center", label: "More", icon: MoreHorizRoundedIcon },
+      ];
 
   return (
     <Box
@@ -60,7 +58,7 @@ export default function AgencyBottomNav({ activeScreen, onSelectScreen, role = "
           maxWidth: 440,
           mx: "auto",
           display: "grid",
-          gridTemplateColumns: "repeat(5, 1fr)",
+          gridTemplateColumns: `repeat(${navItems.length}, 1fr)`,
           alignItems: "center",
           px: 0.5,
         }}
