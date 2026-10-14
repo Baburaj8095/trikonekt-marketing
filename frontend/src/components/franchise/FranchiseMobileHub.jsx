@@ -2424,12 +2424,12 @@ export default function FranchiseMobileHub({
     switch (activeScreen) {
       case "home":
         title = "Trikonekt Agency";
-        subtitle = "Pincode Franchise Partner";
+        subtitle = currentTier.title;
         onBack = undefined;
         break;
       case "pincode":
-        title = "Territory & Micro-Analytics";
-        subtitle = "Pincode Franchise Partner";
+        title = activeZoneMetrics.isExecutiveTerritoryTier ? (currentTierKey.includes("state") ? "State District Command" : "District Territory Command") : "Territory & Micro-Analytics";
+        subtitle = currentTier.title;
         onBack = () => setActiveScreen("home");
         break;
       case "captains":
@@ -2702,7 +2702,13 @@ export default function FranchiseMobileHub({
                 <MetricCard
                   label={activeZoneMetrics.isExecutiveTerritoryTier ? (currentTierKey.includes("state") ? "Districts" : "Pincodes") : "Pincode Zone"}
                   value={String(activeZoneMetrics.isExecutiveTerritoryTier ? (districtSummary?.total_pincodes || effectivePincodes.length) : (activePincode || "572106"))}
-                  subtext={activeZoneMetrics.isExecutiveTerritoryTier ? `${districtSummary?.active_agencies ?? effectivePincodes.filter((p) => p.status === "Active" || p.agency?.status === "ACTIVE").length} Active` : "Assigned Zone"}
+                  subtext={
+                    activeZoneMetrics.isExecutiveTerritoryTier
+                      ? districtSummary
+                        ? `${districtSummary.active_agencies} Agency • ${districtSummary.active_coordinators} Coord`
+                        : `${effectivePincodes.filter((p) => p.status === "Active" || p.agency?.status === "ACTIVE").length} Active`
+                      : "Assigned Zone"
+                  }
                   dotColor="#4F46E5"
                   icon={<LocationOnRoundedIcon sx={{ fontSize: 18 }} />}
                   iconColor="#4F46E5"
