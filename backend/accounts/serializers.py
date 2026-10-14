@@ -1714,17 +1714,37 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
                 "next_window_at_ist": next_window_start_local.isoformat(),
             })
 
-        # If bank method and missing fields, hydrate from KYC
-        if method == "bank" and (not bank_acc or not ifsc):
-            try:
-                if kyc:
-                    bank_name = bank_name or (kyc.bank_name or "")
-                    bank_acc = bank_acc or (kyc.bank_account_number or "")
-                    ifsc = ifsc or (kyc.ifsc_code or "")
-            except Exception:
-                pass
-            if not bank_acc or not ifsc:
-                raise serializers.ValidationError({"detail": "Bank account number and IFSC are required for bank withdrawals."})
+        # Authoritative Beneficiary Enforcement:
+        # Every bank withdrawal must derive the beneficiary account number and IFSC exclusively
+        # from the authenticated user's verified KYC record. Client-supplied account numbers or IFSCs
+        # must never override the verified KYC details.
+        kyc_bank_acc = (getattr(kyc, "bank_account_number", "") or "").strip()
+        kyc_ifsc = (getattr(kyc, "ifsc_code", "") or "").strip()
+        kyc_bank_name = (getattr(kyc, "bank_name", "") or "").strip()
+
+        if not kyc_bank_acc or not kyc_ifsc:
+            raise serializers.ValidationError({
+                "detail": "Verified bank account details are incomplete or missing on your KYC profile. Please complete KYC verification before requesting a withdrawal.",
+                "code": "INCOMPLETE_VERIFIED_BANK_DETAILS"
+            })
+
+        # Reject any attempt to substitute a different account number or IFSC
+        if bank_acc and bank_acc != kyc_bank_acc:
+            raise serializers.ValidationError({
+                "detail": "Client-supplied bank account does not match your verified KYC profile. Withdrawals can only be dispatched to your verified bank account.",
+                "code": "BANK_ACCOUNT_SUBSTITUTION_PROHIBITED"
+            })
+
+        if ifsc and ifsc.upper() != kyc_ifsc.upper():
+            raise serializers.ValidationError({
+                "detail": "Client-supplied IFSC does not match your verified KYC profile. Withdrawals can only be dispatched to your verified bank account.",
+                "code": "BANK_ACCOUNT_SUBSTITUTION_PROHIBITED"
+            })
+
+        # Force authoritative values
+        bank_acc = kyc_bank_acc
+        ifsc = kyc_ifsc
+        bank_name = kyc_bank_name or bank_name or "Bank"
 
         # Create pending withdrawal request and immediately hold/debit funds from WITHDRAWAL_WALLET
         wr = WithdrawalRequest.objects.create(
