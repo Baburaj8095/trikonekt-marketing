@@ -40,3 +40,17 @@
     - **Single-Trip Batch Upgrades**: Multi-tranche purchases (Stages 2, 3) must execute in a single roundtrip via `--tranche` lists (`'1,2,3'`), never sequential loops.
     - **Fast Overview (`fast=True`)**: Re-use `bridgeResult.overview` directly in `orderController.js` and skip recursive tree counting on purchase completions.
     - **Daemon Timeout Guard**: The bridge caller in `growthBridgeService.js` must maintain a minimum 45,000ms timeout to avoid premature CLI fallback.
+    - **Warm In-Memory Memoization (PERMANENTLY LOCKED)**: `_cached_get_solo()` and `_cached_get_company_user()` in `growth_bridge_exec.py` MUST NEVER be removed or bypassed. They eliminate 180+ repetitive PostgreSQL queries per activation.
+    - **Stage 1 (₹2k) Idempotency Guard (PERMANENTLY LOCKED)**: `has_prime and has_spp and has_rank1` check in `execute_starter_bundle` MUST NEVER be removed. It prevents duplicate matrix account creations and returns in <150ms.
+    - **Stage 2 (₹8k) & Stage 3 (₹40k) Bulk Prefetch & Idempotency (PERMANENTLY LOCKED)**: Bulk `Rank` / `RankUpgrade` queries and `set(target_levels).issubset(achieved_levels)` in `execute_stage_upgrade` MUST NEVER be converted back to sequential per-level loops.
+    - **Daemon Socket Resiliency (PERMANENTLY LOCKED)**: Exception handling for `(BrokenPipeError, ConnectionResetError)` in `growth_bridge_daemon.py` MUST be preserved to prevent thread lockups.
+
+- **Sensitive Core Files — DO NOT MODIFY OR REVERT WITHOUT EXPLICIT WRITTEN APPROVAL**:
+  - `tri-academy/backend/src/scripts/growth_bridge_exec.py` (Core Bridge Executor & Commission Caches)
+  - `tri-academy/backend/src/scripts/growth_bridge_daemon.py` (Persistent Python Daemon on port 5006)
+  - `tri-academy/backend/src/services/growthBridgeService.js` (Daemon Bridge Client with 45s Timeout)
+  - `tri-academy/backend/src/controllers/orderController.js` (Order Settlement & Single-Trip Batched Tranches)
+  - `tri-academy/frontend/src/index.css` & `frontend/index.html` (Light Theme `#F8FAFC`, slim scrollbars, `overflow-x: clip;`)
+  - `tri-academy/frontend/src/components/TopHeader.jsx` (`sticky top-0 z-40`, compact mobile avatar, no phone number)
+  - `tri-academy/frontend/src/pages/policies/*` (Terms, Privacy, Refund, Shipping, Contact Compliance Pages)
+
