@@ -117,9 +117,6 @@ def execute_daily_pool_distribution(
     rebirth_inflow = Decimal(rebirth_cnt) * Decimal("250.00")
 
     total_inflow = _q2(spp_inflow + rank_inflow + rebirth_inflow)
-    if total_inflow <= 0 and force:
-        total_inflow = Decimal("10000.00")
-        rebirth_cnt = max(1, rebirth_cnt)
 
     # Geographic grouping of today's rebirths
     rebirths_by_district: Dict[str, int] = {}
@@ -136,10 +133,11 @@ def execute_daily_pool_distribution(
         if u.state_id:
             rebirths_by_state[u.state_id] = rebirths_by_state.get(u.state_id, 0) + 1
 
-    # Pool amounts (combines percentage turnover and per-rebirth pool)
-    t1_pool = max(_q2(total_inflow * t1_pct), _q2(Decimal(rebirth_cnt) * l1_l7_rate))
-    t2_pool = max(_q2(total_inflow * t2_pct), _q2(Decimal(rebirth_cnt) * (dist_l8_l10_rate + state_l8_l10_rate)))
-    t3_pool = max(_q2(total_inflow * t3_pct), _q2(Decimal(rebirth_cnt) * l1_l10_30d_rate))
+    # Pool amounts strictly match Admin Monitor Cards calculation (100% Admin authority, zero phantom distributions)
+    # If Admin configures the rate as 0, the pool evaluates strictly to ₹0.00
+    t1_pool = _q2(Decimal(rebirth_cnt) * l1_l7_rate)
+    t2_pool = _q2(Decimal(rebirth_cnt) * (dist_l8_l10_rate + state_l8_l10_rate))
+    t3_pool = _q2(Decimal(rebirth_cnt) * l1_l10_30d_rate)
 
     # -------------------------------------------------------------
     # Identify Qualified Achievers
