@@ -112,6 +112,11 @@ All incoming user earnings are split dynamically:
 - **Trigger**: When `self_account_balance` reaches **₹250.00**, it debits ₹250 and spawns new tree nodes in the 5-Matrix (`FIVE_150`) and 3-Matrix (`THREE_150`).
 - **Dynamic Rebirth Pool Breakdown**:
   - Out of each ₹250 Rebirth ID, **₹50.00** feeds the District Royalty Pools (₹20 Tier 1 + ₹30 Tier 2), with remaining portions allocated across 5-Matrix levels, 3-Matrix levels, Direct Sponsor, Geo pools, and Company gross retention per admin config.
+- **Double-Entry Ledger Balancing Invariant (LOCKED)**:
+  - All system commission postings must maintain strict balance: $\text{Debit System } (₹500) = \text{Credit Main } (₹375) + \text{Credit Self } (₹125)$.
+  - Never add extra un-debited credits (e.g. `WITHDRAWAL_WALLET`) to the system debit slip, as this throws `ValueError: Ledger postings must balance.`
+  - In `reconcile_wallet_accounts`, balance calculation must always take `max(LedgerEntry, WalletTransaction)` to prevent historical clamping.
+  - Detailed staging operations and verification procedures are documented in [`staging-operations-sync`](file:///c:/Users/babur/OneDrive/Desktop/Trikonekt/trikonekt-marketing/.agents/skills/staging-operations-sync/SKILL.md).
 
 ---
 
