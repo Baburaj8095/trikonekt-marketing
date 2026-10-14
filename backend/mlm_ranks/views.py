@@ -348,7 +348,12 @@ class UserUpgradeEligibilityView(APIView):
 
             is_reached = total_layer_income >= running_cum_limit
             is_unlocked = (achieved_level or 0) >= lvl_num
-            is_active_step = (total_layer_income < running_cum_limit) and (total_layer_income >= prev_cum_limit)
+            team_cnt = int(level_team_counts.get(lvl_num, 0) or 0)
+            has_team_member = team_cnt > 0
+            prev_completed = (lvl_num == 1) or (total_layer_income >= prev_cum_limit)
+
+            # Active if: Layer 1, OR earlier layer limit completed, OR any member has reached this layer
+            is_active_step = (lvl_num == 1) or prev_completed or has_team_member
 
             if is_reached:
                 status = "COMPLETED"
@@ -361,10 +366,10 @@ class UserUpgradeEligibilityView(APIView):
                     status = "LOCKED"
                     status_label = "Upgrade to Unlock"
             else:
-                # Ladder step is in the future (earlier layer not completed yet)
+                # Ladder step is in the future and no team member has reached this layer yet
                 if is_unlocked:
                     status = "PENDING"
-                    status_label = f"Pending (Starts after Layer {lvl_num - 1})"
+                    status_label = f"Pending (Layer {lvl_num - 1} active)"
                 else:
                     status = "LOCKED"
                     status_label = "Upgrade to Unlock"
@@ -378,6 +383,7 @@ class UserUpgradeEligibilityView(APIView):
                 "cumulative_limit": float(running_cum_limit),
                 "cumulative_earned": min(float(running_cum_limit), total_layer_income_float),
                 "total_layer_income": total_layer_income_float,
+                "team_count": team_cnt,
                 "is_limit_reached": is_reached,
                 "is_unlocked": is_unlocked,
                 "is_active_step": is_active_step,
