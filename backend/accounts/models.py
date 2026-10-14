@@ -634,10 +634,6 @@ class Wallet(models.Model):
                     LedgerPosting(self.user, WalletTypes.MAIN, LedgerDirections.CREDIT, income),
                     LedgerPosting(self.user, WalletTypes.SELF_PACKAGE_POCKET, LedgerDirections.CREDIT, self_part),
                 ]
-                if not inactive and income > 0:
-                    postings.append(
-                        LedgerPosting(self.user, WalletTypes.WITHDRAWAL_WALLET, LedgerDirections.CREDIT, income)
-                    )
                 WalletEngine.post_transaction(
                     category=FinanceCategories.MLM_INCOME,
                     user=self.user,

@@ -376,24 +376,27 @@ class WalletEngine:
         try:
             main_acc = cls.get_account(user, WalletTypes.MAIN, lock=False)
             le_entries = LedgerEntry.objects.filter(wallet_account=main_acc, status="POSTED")
+            income_types = [
+                "INCOME_CREDIT_75", "DIRECT_REF_BONUS", "AUTOPOOL_BONUS_THREE",
+                "AUTOPOOL_BONUS_FIVE", "PINCODE_ROYALTY", "MONTHLY_759_DIRECT",
+                "MONTHLY_759_LEVEL", "PRIME_750_DIRECT", "COMMISSION_CREDIT",
+                "LEVEL_BONUS", "GLOBAL_ROYALTY", "FRANCHISE_INCOME", "WITHDRAWABLE_CREDIT"
+            ]
+            cr_wt = WalletTransaction.objects.filter(
+                user=user, amount__gt=0, type__in=income_types
+            ).exclude(meta__ledger="SELF_ACCOUNT").aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
+            db_wt = WalletTransaction.objects.filter(
+                user=user, amount__lt=0
+            ).exclude(type="SELF_ACCOUNT_DEBIT").aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
+            wt_main = max(Decimal("0.00"), cr_wt + db_wt)
+
             if le_entries.exists():
                 cr = le_entries.filter(direction=LedgerDirections.CREDIT).aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
                 db = le_entries.filter(direction=LedgerDirections.DEBIT).aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
-                true_main = max(Decimal("0.00"), cr - db)
+                le_main = max(Decimal("0.00"), cr - db)
+                true_main = max(le_main, wt_main)
             else:
-                income_types = [
-                    "INCOME_CREDIT_75", "DIRECT_REF_BONUS", "AUTOPOOL_BONUS_THREE",
-                    "AUTOPOOL_BONUS_FIVE", "PINCODE_ROYALTY", "MONTHLY_759_DIRECT",
-                    "MONTHLY_759_LEVEL", "PRIME_750_DIRECT", "COMMISSION_CREDIT",
-                    "LEVEL_BONUS", "GLOBAL_ROYALTY", "FRANCHISE_INCOME"
-                ]
-                cr = WalletTransaction.objects.filter(
-                    user=user, amount__gt=0, type__in=income_types
-                ).exclude(meta__ledger="SELF_ACCOUNT").aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
-                db = WalletTransaction.objects.filter(
-                    user=user, amount__lt=0
-                ).exclude(type="SELF_ACCOUNT_DEBIT").aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
-                true_main = max(Decimal("0.00"), cr + db)
+                true_main = wt_main
 
             if main_acc.current_balance != true_main:
                 main_acc.current_balance = true_main
@@ -406,19 +409,13 @@ class WalletEngine:
         # 2. SELF PACKAGE POCKET
         try:
             self_acc = cls.get_account(user, WalletTypes.SELF_PACKAGE_POCKET, lock=False)
-            le_self = LedgerEntry.objects.filter(wallet_account=self_acc, status="POSTED")
-            if le_self.exists():
-                cr_s = le_self.filter(direction=LedgerDirections.CREDIT).aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
-                db_s = le_self.filter(direction=LedgerDirections.DEBIT).aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
-                true_self = max(Decimal("0.00"), cr_s - db_s)
-            else:
-                cr_s = WalletTransaction.objects.filter(
-                    user=user, amount__gt=0, type="SELF_ACCOUNT_CREDIT"
-                ).aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
-                db_s = WalletTransaction.objects.filter(
-                    user=user, type="SELF_ACCOUNT_DEBIT"
-                ).aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
-                true_self = max(Decimal("0.00"), cr_s + db_s)
+            cr_s_wt = WalletTransaction.objects.filter(
+                user=user, amount__gt=0, type="SELF_ACCOUNT_CREDIT"
+            ).aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
+            db_s_wt = WalletTransaction.objects.filter(
+                user=user, type="SELF_ACCOUNT_DEBIT"
+            ).aggregate(models.Sum("amount"))["amount__sum"] or Decimal("0.00")
+            true_self = max(Decimal("0.00"), cr_s_wt + db_s_wt)
 
             if self_acc.current_balance != true_self:
                 self_acc.current_balance = true_self
