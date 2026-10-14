@@ -341,6 +341,16 @@ class ExternalOtpTokenView(APIView):
         role = str((request.data or {}).get("role") or "user").strip().lower()
         user_role = str(getattr(user, "role", "") or "").strip().lower()
         user_cat = str(getattr(user, "category", "") or "").strip().lower()
+        user_ident = str(getattr(user, "identity_type", "") or "").strip().upper()
+        is_admin_user = (
+            user_ident == "ADMIN"
+            or user_role == "admin"
+            or user_cat == "admin"
+            or bool(getattr(user, "is_staff", False) or getattr(user, "is_superuser", False))
+        )
+        if is_admin_user:
+            return Response({"detail": "Admin accounts are strictly restricted from consumer login."}, status=status.HTTP_403_FORBIDDEN)
+
         allowed = (
             role == user_role
             or (role in ("user", "consumer") and user_role == "user" and user_cat == "consumer")

@@ -189,7 +189,7 @@ function describeSource(tx = {}) {
     if (type === "PRIME_750_DIRECT" || ot === "PRIME_750_DIRECT" || tier === 750) return "Agent Subscription Referral Bonus";
     if (type === "PRIME_150_DIRECT" || ot === "PRIME_150_DIRECT" || tier === 150) return "Prime 150 Referral Bonus";
     if (tier) return `Referral Bonus ${tier} Prime`;
-    return "Referral Bonus";
+    return "Direct Referral Bonus";
   }
 
   // Prime self activations
@@ -908,7 +908,7 @@ const HistoryRow = React.memo(function HistoryRow({ tx, onClick }) {
   const rawSource = describeSource(tx) || humanizeType(tx?.type) || "Wallet Transfer";
   const typeName = isRankUpgradeRow
     ? rawSource
-    : `${rawSource}${Number.isFinite(levelVal) ? ` - Layer ${levelVal}` : ""}`;
+    : `${rawSource}${Number.isFinite(levelVal) && levelVal > 0 ? ` - Layer ${levelVal}` : ""}`;
 
   const cat = classifyTransaction(tx);
   const isCredit = amount >= 0;

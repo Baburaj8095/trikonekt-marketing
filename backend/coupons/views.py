@@ -2859,8 +2859,10 @@ class CouponActivateView(APIView):
                         pass
         except Exception:
             pass
-        if t not in ("150", "50", "750", "759"):
-            return Response({"detail": "type must be '150', '50', '750' or '759'."}, status=status.HTTP_400_BAD_REQUEST)
+        if t == "150":
+            return Response({"detail": "Legacy 150 coupon activation is decommissioned. Please activate via Prime 750 / ₹2,000 package."}, status=status.HTTP_400_BAD_REQUEST)
+        if t not in ("50", "750", "759"):
+            return Response({"detail": "type must be '50', '750' or '759'."}, status=status.HTTP_400_BAD_REQUEST)
         # Async: enqueue background activation unless forced sync (dev) via ?sync=1.
         # In dev (DEBUG=True), default is sync, but allow explicit override via ?async=1 to force queuing.
         use_async = True
@@ -2918,7 +2920,7 @@ class CouponActivateView(APIView):
                 pass
         t_act = time.time()
         if t == "150":
-            ok = activate_150_active(request.user, {"type": "coupon_150_activate", **source})
+            return Response({"detail": "Legacy 150 coupon activation is decommissioned."}, status=status.HTTP_400_BAD_REQUEST)
         elif t == "50":
             ok = activate_50(request.user, {"type": "coupon_50_activate", **source})
         else:

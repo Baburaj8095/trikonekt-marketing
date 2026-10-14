@@ -438,10 +438,9 @@ def handle_coupon_activate(task: BackgroundTask) -> None:
         )
         and (val == D("150") or is_150_fallback)
     )
-    if t == "150" and is_ecoupon_150:
-        ok = True  # defer to config-driven engine below; skip legacy path to avoid double credits
-    elif t == "150":
-        ok = activate_150_active(user, {"type": "coupon_150_activate", **source})
+    if t == "150":
+        # Legacy 150 is decommissioned; skip to prevent unintended matrix placements
+        return
     elif t == "50":
         ok = activate_50(user, {"type": "coupon_50_activate", **source})
     else:

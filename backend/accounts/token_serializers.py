@@ -55,7 +55,21 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 cond |= Q(username__iexact=c)
             if digits:
                 cond |= Q(phone__iexact=digits)
-            matches = list(User.objects.filter(cond).only("id", "username", "role", "category"))
+            matches = list(User.objects.filter(cond).only("id", "username", "role", "category", "identity_type", "is_staff", "is_superuser"))
+
+            def _is_admin_user(u):
+                return bool(
+                    str(getattr(u, "identity_type", "") or "").upper() == "ADMIN"
+                    or str(getattr(u, "role", "") or "").lower() == "admin"
+                    or str(getattr(u, "category", "") or "").lower() == "admin"
+                    or getattr(u, "is_staff", False)
+                    or getattr(u, "is_superuser", False)
+                )
+
+            if not self.require_admin_identity:
+                matches = [u for u in matches if not _is_admin_user(u)]
+            else:
+                matches = [u for u in matches if _is_admin_user(u)]
 
             if len(matches) == 1:
                 attrs["username"] = matches[0].username
@@ -104,12 +118,19 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data = super().validate(attrs)
 
         identity_type = str(getattr(self.user, "identity_type", "") or "").upper()
-        is_admin = identity_type == "ADMIN" or bool(getattr(self.user, "is_staff", False) or getattr(self.user, "is_superuser", False))
+        role = str(getattr(self.user, "role", "") or "").strip().lower()
+        category = str(getattr(self.user, "category", "") or "").strip().lower()
+        is_admin = (
+            identity_type == "ADMIN"
+            or role == "admin"
+            or category == "admin"
+            or bool(getattr(self.user, "is_staff", False) or getattr(self.user, "is_superuser", False))
+        )
         if self.require_admin_identity:
             if not is_admin:
                 raise serializers.ValidationError({"detail": "Not authorized for admin login."})
         elif is_admin:
-            raise serializers.ValidationError({"detail": "Admin accounts must use the admin login."})
+            raise serializers.ValidationError({"detail": "Admin accounts are strictly restricted from consumer login."})
 
         # Optional: if the client provides a role, ensure it matches the user's role.
         # Skip strict role check when the user explicitly typed an exact username (to allow TRBS########## even if UI role defaulted to "user").
