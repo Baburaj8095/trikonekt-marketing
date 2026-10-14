@@ -1635,6 +1635,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                 <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5, fontSize: 12 }}>Layer</TableCell>
                 <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5, fontSize: 12 }}>Upgrade (₹)</TableCell>
                 <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5, fontSize: 12 }}>Earning Limit (₹)</TableCell>
+                <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5, fontSize: 12, textAlign: "center" }}>Limit Status (Cumulative)</TableCell>
                 <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5, fontSize: 12, textAlign: "center" }}>Community Blocks</TableCell>
                 <TableCell sx={{ color: "#ffffff", bgcolor: "#1e1b4b", fontWeight: 800, py: 1.5, textAlign: "right", fontSize: 12 }}>Action / Status</TableCell>
               </TableRow>
@@ -1652,6 +1653,9 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                   const cfgLvl = savedRankConfig?.levels?.[idx];
                   const limitVal = cfgLvl?.earning_limit ? Number(cfgLvl.earning_limit) : (DEFAULT_LIMITS[idx] || (r.earning_limit ? Number(r.earning_limit) : 0));
                   
+                  // Server-computed cumulative limit progress directly from database
+                  const layerProgress = elig?.cumulative_layer_progress?.[idx];
+
                   // Compute exact real-time active community count for this layer from e-Education downline
                   const userTeamCount = Number(
                     elig?.level_team_counts?.[level] ??
@@ -1675,7 +1679,37 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                         {rankTitle}
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, fontSize: 12.5 }}>{amtVal.toLocaleString("en-IN")}</TableCell>
-                      <TableCell sx={{ fontWeight: 700, fontSize: 12.5 }}>{limitVal.toLocaleString("en-IN")}</TableCell>
+                      <TableCell sx={{ fontWeight: 700, fontSize: 12.5 }}>
+                        <div>{limitVal.toLocaleString("en-IN")}</div>
+                        {layerProgress?.cumulative_limit && (
+                          <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>
+                            Cum: ₹{Number(layerProgress.cumulative_limit).toLocaleString("en-IN")}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell align="center">
+                        {layerProgress?.is_limit_reached ? (
+                          <Chip
+                            icon={<CheckCircleRoundedIcon sx={{ fontSize: "14px !important" }} />}
+                            size="small"
+                            label="Completed"
+                            color="success"
+                            sx={{ fontWeight: 800, fontSize: 11, height: 22 }}
+                          />
+                        ) : layerProgress?.status === "IN_PROGRESS" ? (
+                          <Chip
+                            size="small"
+                            label={`₹${Number(layerProgress.total_layer_income || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })} / ₹${Number(layerProgress.cumulative_limit || 0).toLocaleString("en-IN")} In Progress`}
+                            color="info"
+                            variant="outlined"
+                            sx={{ fontWeight: 800, fontSize: 10.5, height: 22 }}
+                          />
+                        ) : (
+                          <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#94a3b8" }}>
+                            Locked
+                          </Typography>
+                        )}
+                      </TableCell>
                       <TableCell align="center">
                         <span style={{ fontWeight: 800, color: userTeamCount > 0 ? "#4f46e5" : "#64748b", fontSize: 12 }}>
                           {userTeamCount}

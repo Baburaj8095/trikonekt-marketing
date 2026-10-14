@@ -37,6 +37,44 @@ function money(v) {
   return Number.isFinite(n) ? "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "₹0.00";
 }
 
+function formatStreamLabel(stream, rawStream, source) {
+  if (stream && stream !== rawStream && !stream.includes("_")) return stream;
+  const s = String(rawStream || stream || "").toUpperCase();
+  const src = String(source || "").toUpperCase();
+  if (s === "DIRECT_REF_BONUS" && (src.includes("RANK_UPGRADE") || src.includes("EDUCATION"))) return "e-Edu Direct";
+  if (s === "LEVEL_BONUS" && (src.includes("RANK_UPGRADE") || src.includes("EDUCATION"))) return "e-Edu Layer";
+  if (s.includes("PRIME_750") || src.includes("PRIME_750") || src.includes("AGENT_750")) {
+    return s.includes("SELF") ? "Agent Subscription Fee ₹750 (Self Cashback)" : "Agent Subscription Fee ₹750";
+  }
+  if (s.includes("MONTHLY_759") || src.includes("759") || src.includes("SSV")) {
+    if (s.includes("DIRECT")) return "SSV Direct";
+    if (s.includes("LEVEL")) return "SSV Layer";
+    if (s.includes("SELF")) return "SSV Self (Cashback)";
+    return "SSV Layer";
+  }
+  if (src.includes("REBIRTH_250") || s.includes("REBIRTH_250")) {
+    if (s.includes("FIVE") || src.includes("FIVE")) return "Self Rebirth 5-Layer";
+    if (s.includes("THREE") || src.includes("THREE")) return "Self Rebirth 3-Layer";
+    if (s.includes("DIRECT")) return "Self Rebirth Direct Sponsor";
+    return "Self Rebirth Layer";
+  }
+  if (s === "AUTOPOOL_BONUS_FIVE" || src.includes("FIVE_MATRIX")) return "5-Layer";
+  if (s === "AUTOPOOL_BONUS_THREE" || src.includes("THREE_MATRIX")) return "3-Layer";
+  if (s === "GLOBAL_ROYALTY" || src.includes("ROYALTY") || src.includes("DAILY_POOL")) return "Royalty";
+  return stream || s.replace(/_/g, " ");
+}
+
+function getStreamBadgeColor(streamName) {
+  const s = String(streamName || "").toLowerCase();
+  if (s.includes("e-edu")) return { bg: "#e0f2fe", text: "#0369a1", border: "#bae6fd" };
+  if (s.includes("subscription") || s.includes("750")) return { bg: "#fef3c7", text: "#b45309", border: "#fde68a" };
+  if (s.includes("ssv")) return { bg: "#ede9fe", text: "#6d28d9", border: "#ddd6fe" };
+  if (s.includes("self rebirth")) return { bg: "#fce7f3", text: "#be185d", border: "#fbcfe8" };
+  if (s.includes("layer") || s.includes("matrix")) return { bg: "#ecfdf5", text: "#047857", border: "#a7f3d0" };
+  if (s.includes("royalty")) return { bg: "#fef9c3", text: "#a16207", border: "#fef08a" };
+  return { bg: "#f1f5f9", text: "#334155", border: "#cbd5e1" };
+}
+
 export default function AdminUserAudit() {
   const [query, setQuery] = useState("9999999999");
   const [loading, setLoading] = useState(false);
@@ -281,16 +319,40 @@ export default function AdminUserAudit() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {data.credits_by_stream?.map((c, i) => (
-                      <TableRow key={i} hover>
-                        <TableCell sx={{ fontWeight: 600 }}>{c.stream}</TableCell>
-                        <TableCell sx={{ color: "#64748b" }}>{c.source}</TableCell>
-                        <TableCell align="center">{c.count}</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700, color: "#059669" }}>
-                          {money(c.total)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {data.credits_by_stream?.map((c, i) => {
+                      const displayStream = formatStreamLabel(c.stream, c.raw_stream, c.source);
+                      const badge = getStreamBadgeColor(displayStream);
+                      return (
+                        <TableRow key={i} hover>
+                          <TableCell>
+                            <Box sx={{ display: "inline-flex", alignItems: "center" }}>
+                              <Chip
+                                label={displayStream}
+                                size="small"
+                                sx={{
+                                  fontWeight: 800,
+                                  fontSize: "0.8125rem",
+                                  bgcolor: badge.bg,
+                                  color: badge.text,
+                                  border: `1px solid ${badge.border}`,
+                                  borderRadius: "6px",
+                                  px: 0.5,
+                                }}
+                              />
+                            </Box>
+                          </TableCell>
+                          <TableCell sx={{ color: "#64748b", fontSize: "0.85rem", fontWeight: 500 }}>
+                            {c.source}
+                          </TableCell>
+                          <TableCell align="center" sx={{ fontWeight: 600 }}>
+                            {c.count}
+                          </TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 800, color: "#059669", fontSize: "0.95rem" }}>
+                            {money(c.total)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                     <TableRow sx={{ bgcolor: "#f8fafc" }}>
                       <TableCell colSpan={3} sx={{ fontWeight: 800 }}>TOTAL INFLOW CREDITS</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 900, color: "#059669", fontSize: 15 }}>
@@ -448,10 +510,27 @@ export default function AdminUserAudit() {
                   <TableBody>
                     {data.debits_by_stream?.map((d, i) => (
                       <TableRow key={i} hover>
-                        <TableCell sx={{ fontWeight: 600 }}>{d.type}</TableCell>
-                        <TableCell sx={{ color: "#64748b" }}>{d.source}</TableCell>
-                        <TableCell align="center">{d.count}</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 700, color: "#dc2626" }}>
+                        <TableCell>
+                          <Chip
+                            label={d.type}
+                            size="small"
+                            sx={{
+                              fontWeight: 700,
+                              fontSize: "0.8125rem",
+                              bgcolor: "#fef2f2",
+                              color: "#b91c1c",
+                              border: "1px solid #fecaca",
+                              borderRadius: "6px",
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ color: "#64748b", fontSize: "0.85rem", fontWeight: 500 }}>
+                          {d.source}
+                        </TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 600 }}>
+                          {d.count}
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800, color: "#dc2626", fontSize: "0.95rem" }}>
                           {money(d.total)}
                         </TableCell>
                       </TableRow>

@@ -2643,6 +2643,101 @@ class AdminWalletReconcileView(APIView):
         })
 
 
+def _humanize_audit_stream(orig: str, source: str, meta: dict = None) -> tuple:
+    """
+    Returns (human_stream_name, human_source_module) for clean, intuitive display
+    matching user requirements without breaking underlying data.
+    """
+    orig_u = str(orig or "").upper()
+    src_u = str(source or "").upper()
+    meta = meta if isinstance(meta, dict) else {}
+    kind = str(meta.get("kind") or "").upper()
+    tier = meta.get("tier")
+
+    # 1. E-Education (Rank Upgrade)
+    is_rank_upgrade = (
+        src_u == "RANK_UPGRADE"
+        or kind.startswith("RANK_UPGRADE_")
+        or "RANK_UPGRADE" in src_u
+    )
+    if is_rank_upgrade:
+        if orig_u == "DIRECT_REF_BONUS":
+            return "e-Edu Direct", "Digital Education (trieducation.in)"
+        if orig_u == "LEVEL_BONUS":
+            return "e-Edu Layer", "Generation Matching (Ranks 1–10)"
+
+    # 2. Agent Subscription Fee (Prime 750)
+    is_prime_750 = (
+        src_u in ("PRIME_750", "PRIME750", "AGENT_750")
+        or orig_u in ("PRIME_750_DIRECT", "PRIME_750_SELF")
+    )
+    if is_prime_750:
+        if orig_u in ("PRIME_750_SELF",):
+            return "Agent Subscription Fee ₹750 (Self Cashback)", "Prime Onboarding (₹750)"
+        return "Agent Subscription Fee ₹750", "Direct Referral Bonus"
+
+    # 3. SSV 1000 / Monthly 759 (Smart Subscription Voucher)
+    is_ssv = (
+        src_u in ("MONTHLY_759", "MONTHLY759", "SSV_1000", "SSV")
+        or orig_u in ("MONTHLY_759_DIRECT", "MONTHLY_759_LEVEL", "MONTHLY_759_SELF")
+        or "759" in src_u
+        or "759" in orig_u
+    )
+    if is_ssv:
+        if orig_u in ("MONTHLY_759_DIRECT", "DIRECT_REF_BONUS"):
+            return "SSV Direct", "Smart Subscription Voucher (₹1,000 Box)"
+        if orig_u in ("MONTHLY_759_LEVEL", "LEVEL_BONUS"):
+            return "SSV Layer", "Smart Subscription Voucher (₹1,000 Box)"
+        if orig_u in ("MONTHLY_759_SELF",):
+            return "SSV Self (Cashback)", "Smart Subscription Voucher (₹1,000 Box)"
+
+    # 4. Self Rebirth 250
+    is_rebirth = (
+        "REBIRTH_250" in src_u
+        or src_u == "SELF_REBIRTH_250"
+        or src_u == "SELF_250_PACK"
+        or meta.get("auto_rule") == "SELF_REBIRTH_250"
+    )
+    if is_rebirth:
+        if orig_u == "AUTOPOOL_BONUS_FIVE" or src_u.startswith("FIVE_MATRIX"):
+            return "Self Rebirth 5-Layer", "₹250 Self Rebirth 5-Matrix"
+        if orig_u == "AUTOPOOL_BONUS_THREE" or src_u.startswith("THREE_MATRIX"):
+            return "Self Rebirth 3-Layer", "₹250 Self Rebirth 3-Matrix"
+        if orig_u == "DIRECT_REF_BONUS":
+            return "Self Rebirth Direct Sponsor", "₹250 Self Rebirth Sponsor Bonus"
+        if orig_u in ("TAX_POOL_CREDIT", "FRANCHISE_INCOME"):
+            return "Self Rebirth - Franchise / Tax Share", "₹250 Rebirth Pool"
+
+    # 5. Base Matrix AutoPools (Prime 750 / SSV 1000 base entries)
+    if orig_u == "AUTOPOOL_BONUS_FIVE" or src_u.startswith("FIVE_MATRIX"):
+        return "5-Layer", "5-Block Matrix AutoPool"
+
+    if orig_u == "AUTOPOOL_BONUS_THREE" or src_u.startswith("THREE_MATRIX"):
+        return "3-Layer", "3-Block Matrix AutoPool"
+
+    # 6. Daily Royalty
+    if orig_u == "GLOBAL_ROYALTY" or src_u == "DAILY_POOL_DISTRIBUTION":
+        t_str = f" ({tier})" if tier else ""
+        return f"Royalty{t_str}", "Daily Midnight Royalty Pool"
+
+    # 7. Franchise / Captain
+    if orig_u == "CAPTAIN_INCOME":
+        return "Captain Royalty", "Franchise Regional Leadership"
+    if orig_u == "FRANCHISE_INCOME":
+        return "Franchise Royalty", "Franchise Regional Pool"
+
+    # 8. Debits
+    if orig_u == "SELF_ACCOUNT_DEBIT":
+        return "Self Rebirth ID Purchase (₹250)", "Self Account Pocket"
+    if orig_u in ("WITHDRAWAL", "WITHDRAWAL_REQUEST"):
+        return "Wallet Withdrawal", "Bank Transfer / Payout"
+
+    # Fallback to humanized string
+    stream_clean = orig.replace("_", " ").title()
+    source_clean = source.replace("_", " ").title()
+    return stream_clean, source_clean
+
+
 class AdminUserAuditView(APIView):
     """
     Comprehensive User Earnings, Wallet Balances, Matrix Breakdown, and Inflow/Outflow Audit.
@@ -2713,9 +2808,17 @@ class AdminUserAuditView(APIView):
             meta = c.meta if isinstance(c.meta, dict) else {}
             orig = meta.get("orig_type") or c.type
             source = meta.get("source") or c.source_type or "GENERAL"
-            key = f"{orig} [{source}]"
+            h_stream, h_source = _humanize_audit_stream(orig, source, meta)
+            key = f"{h_stream} [{h_source}]"
             if key not in orig_summary:
-                orig_summary[key] = {"stream": orig, "source": source, "count": 0, "total": Decimal("0.00")}
+                orig_summary[key] = {
+                    "stream": h_stream,
+                    "source": h_source,
+                    "raw_stream": orig,
+                    "raw_source": source,
+                    "count": 0,
+                    "total": Decimal("0.00"),
+                }
             orig_summary[key]["count"] += 1
             orig_summary[key]["total"] += c.amount
 
@@ -2724,6 +2827,8 @@ class AdminUserAuditView(APIView):
                 "key": k,
                 "stream": v["stream"],
                 "source": v["source"],
+                "raw_stream": v.get("raw_stream"),
+                "raw_source": v.get("raw_source"),
                 "count": v["count"],
                 "total": str(v["total"]),
             }
@@ -2736,9 +2841,17 @@ class AdminUserAuditView(APIView):
         debit_summary = {}
         for d in debits_qs:
             source = d.source_type or "GENERAL"
-            key = f"{d.type} [{source}]"
+            h_type, h_source = _humanize_audit_stream(d.type, source, d.meta)
+            key = f"{h_type} [{h_source}]"
             if key not in debit_summary:
-                debit_summary[key] = {"type": d.type, "source": source, "count": 0, "total": Decimal("0.00")}
+                debit_summary[key] = {
+                    "type": h_type,
+                    "source": h_source,
+                    "raw_type": d.type,
+                    "raw_source": source,
+                    "count": 0,
+                    "total": Decimal("0.00"),
+                }
             debit_summary[key]["count"] += 1
             debit_summary[key]["total"] += d.amount
 
@@ -2747,6 +2860,8 @@ class AdminUserAuditView(APIView):
                 "key": k,
                 "type": v["type"],
                 "source": v["source"],
+                "raw_type": v.get("raw_type"),
+                "raw_source": v.get("raw_source"),
                 "count": v["count"],
                 "total": str(v["total"]),
             }

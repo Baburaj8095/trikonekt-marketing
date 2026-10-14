@@ -2688,7 +2688,7 @@ export default function History() {
                 <ArrowUpwardIcon sx={{ fontSize: 16 }} />
               </Box>
               <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>
-                Total Credits
+                Total Earnings
               </Typography>
             </Stack>
             <Typography sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 900, color: "#059669", letterSpacing: "-0.02em" }}>
@@ -2732,7 +2732,7 @@ export default function History() {
                 <ArrowDownwardIcon sx={{ fontSize: 16 }} />
               </Box>
               <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>
-                Total Debits
+                Self Block
               </Typography>
             </Stack>
             <Typography sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 900, color: "#DC2626", letterSpacing: "-0.02em" }}>

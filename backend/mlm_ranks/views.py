@@ -302,6 +302,76 @@ class UserUpgradeEligibilityView(APIView):
                 "tier3": {"qualified": False, "status": "IN_PROGRESS", "cap": 10000.0, "percent": 4.0, "days_allowed": 30, "days_remaining": 30},
             }
 
+        # Compute cumulative layer earning limits across all matrix layers (Zero frontend math)
+        try:
+            q_layer = (
+                Q(type__in=["LEVEL_BONUS", "AUTOPOOL_BONUS_FIVE", "AUTOPOOL_BONUS_THREE", "PRIME_150_SELF", "PRIME_750_SELF", "PRIME_759_SELF"]) |
+                Q(meta__source__startswith="THREE_MATRIX") |
+                Q(meta__source__startswith="FIVE_MATRIX") |
+                (Q(source_type="RANK_UPGRADE") & (Q(meta__orig_type__icontains="LEVEL") | Q(type__icontains="LEVEL") | Q(meta__kind__icontains="LEVEL"))) |
+                (Q(type="INCOME_CREDIT_75") & (
+                    Q(meta__orig_type__icontains="LEVEL") |
+                    Q(meta__orig_type__icontains="AUTOPOOL") |
+                    Q(meta__source__icontains="MATRIX") |
+                    Q(meta__trigger__in=["PRIME_150", "PRIME_750", "PRIME_759", "SELF_REBIRTH_250"])
+                ))
+            )
+            total_layer_income = WalletTransaction.objects.filter(
+                user=request.user, amount__gt=0
+            ).filter(q_layer).exclude(
+                Q(type__startswith="SELF_ACCOUNT") | Q(meta__ledger="SELF_ACCOUNT")
+            ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+            total_layer_income_float = float(total_layer_income)
+        except Exception:
+            total_layer_income = Decimal("0.00")
+            total_layer_income_float = 0.0
+
+        DEFAULT_LIMITS = [1750, 2000, 4000, 6000, 7500, 8750, 10000, 15000, 20000, 25000]
+        UPGRADE_AMOUNTS = [250, 500, 1000, 1250, 1500, 1750, 2000, 5000, 10000, 25000]
+
+        try:
+            cfg = CommissionConfig.get_solo()
+            master = dict(getattr(cfg, "master_commission_json", {}) or {})
+            levels_cfg = master.get("rank_upgrade_config", {}).get("levels") or []
+        except Exception:
+            levels_cfg = []
+
+        cumulative_layer_progress = []
+        running_cum_limit = Decimal("0.00")
+        for i in range(10):
+            lvl_num = i + 1
+            cfg_lvl = levels_cfg[i] if (isinstance(levels_cfg, list) and i < len(levels_cfg)) else {}
+            upg_amt = Decimal(str((cfg_lvl.get("upgrade_amount") if isinstance(cfg_lvl, dict) else None) or UPGRADE_AMOUNTS[i]))
+            raw_limit = Decimal(str((cfg_lvl.get("earning_limit") if isinstance(cfg_lvl, dict) else None) or DEFAULT_LIMITS[i]))
+            running_cum_limit += raw_limit
+
+            is_reached = total_layer_income >= running_cum_limit
+            is_unlocked = (achieved_level or 0) >= lvl_num
+
+            if is_reached:
+                status = "COMPLETED"
+                status_label = f"Limit Reached (₹{float(running_cum_limit):,.0f} Completed)"
+            elif is_unlocked:
+                status = "IN_PROGRESS"
+                status_label = f"₹{total_layer_income_float:,.2f} / ₹{float(running_cum_limit):,.0f} In Progress"
+            else:
+                status = "LOCKED"
+                status_label = "Upgrade to Unlock"
+
+            cumulative_layer_progress.append({
+                "layer": lvl_num,
+                "name": f"Layer {lvl_num}",
+                "upgrade_amount": float(upg_amt),
+                "layer_limit": float(raw_limit),
+                "cumulative_limit": float(running_cum_limit),
+                "cumulative_earned": min(float(running_cum_limit), total_layer_income_float),
+                "total_layer_income": total_layer_income_float,
+                "is_limit_reached": is_reached,
+                "is_unlocked": is_unlocked,
+                "status": status,
+                "status_label": status_label,
+            })
+
         # For frontend quick use:
         return Response(
             {
@@ -320,6 +390,8 @@ class UserUpgradeEligibilityView(APIView):
                 "team_counts_by_level": level_team_counts,
                 "reason": payload["reason"],
                 "royalty_info": royalty_info,
+                "total_layer_income": total_layer_income_float,
+                "cumulative_layer_progress": cumulative_layer_progress,
             }
         )
 
