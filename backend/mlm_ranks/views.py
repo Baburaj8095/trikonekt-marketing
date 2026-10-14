@@ -343,31 +343,44 @@ class UserUpgradeEligibilityView(APIView):
             cfg_lvl = levels_cfg[i] if (isinstance(levels_cfg, list) and i < len(levels_cfg)) else {}
             upg_amt = Decimal(str((cfg_lvl.get("upgrade_amount") if isinstance(cfg_lvl, dict) else None) or UPGRADE_AMOUNTS[i]))
             raw_limit = Decimal(str((cfg_lvl.get("earning_limit") if isinstance(cfg_lvl, dict) else None) or DEFAULT_LIMITS[i]))
+            prev_cum_limit = running_cum_limit
             running_cum_limit += raw_limit
 
             is_reached = total_layer_income >= running_cum_limit
             is_unlocked = (achieved_level or 0) >= lvl_num
+            is_active_step = (total_layer_income < running_cum_limit) and (total_layer_income >= prev_cum_limit)
 
             if is_reached:
                 status = "COMPLETED"
                 status_label = f"Limit Reached (₹{float(running_cum_limit):,.0f} Completed)"
-            elif is_unlocked:
-                status = "IN_PROGRESS"
-                status_label = f"₹{total_layer_income_float:,.2f} / ₹{float(running_cum_limit):,.0f} In Progress"
+            elif is_active_step:
+                if is_unlocked:
+                    status = "IN_PROGRESS"
+                    status_label = f"₹{total_layer_income_float:,.2f} / ₹{float(running_cum_limit):,.0f} In Progress"
+                else:
+                    status = "LOCKED"
+                    status_label = "Upgrade to Unlock"
             else:
-                status = "LOCKED"
-                status_label = "Upgrade to Unlock"
+                # Ladder step is in the future (earlier layer not completed yet)
+                if is_unlocked:
+                    status = "PENDING"
+                    status_label = f"Pending (Starts after Layer {lvl_num - 1})"
+                else:
+                    status = "LOCKED"
+                    status_label = "Upgrade to Unlock"
 
             cumulative_layer_progress.append({
                 "layer": lvl_num,
                 "name": f"Layer {lvl_num}",
                 "upgrade_amount": float(upg_amt),
                 "layer_limit": float(raw_limit),
+                "prev_cumulative_limit": float(prev_cum_limit),
                 "cumulative_limit": float(running_cum_limit),
                 "cumulative_earned": min(float(running_cum_limit), total_layer_income_float),
                 "total_layer_income": total_layer_income_float,
                 "is_limit_reached": is_reached,
                 "is_unlocked": is_unlocked,
+                "is_active_step": is_active_step,
                 "status": status,
                 "status_label": status_label,
             })

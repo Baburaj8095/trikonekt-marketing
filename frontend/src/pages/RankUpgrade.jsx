@@ -1688,7 +1688,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                         )}
                       </TableCell>
                       <TableCell align="center">
-                        {layerProgress?.is_limit_reached ? (
+                        {layerProgress?.is_limit_reached || layerProgress?.status === "COMPLETED" ? (
                           <Chip
                             icon={<CheckCircleRoundedIcon sx={{ fontSize: "14px !important" }} />}
                             size="small"
@@ -1703,6 +1703,19 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                             color="info"
                             variant="outlined"
                             sx={{ fontWeight: 800, fontSize: 10.5, height: 22 }}
+                          />
+                        ) : layerProgress?.status === "PENDING" ? (
+                          <Chip
+                            size="small"
+                            label={`Pending (Layer ${level - 1} first)`}
+                            sx={{
+                              fontWeight: 700,
+                              fontSize: 10.5,
+                              height: 22,
+                              bgcolor: "#f8fafc",
+                              color: "#64748b",
+                              border: "1px dashed #cbd5e1",
+                            }}
                           />
                         ) : (
                           <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#94a3b8" }}>
