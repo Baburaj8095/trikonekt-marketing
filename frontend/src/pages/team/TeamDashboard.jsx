@@ -45,6 +45,7 @@ import WidgetsRoundedIcon from "@mui/icons-material/WidgetsRounded";
 import PublicRoundedIcon from "@mui/icons-material/PublicRounded";
 import { useNavigate, useLocation } from "react-router-dom";
 import API, { getWalletMe, getWalletMeHistory } from "../../api/api";
+import { useUserTierBadge } from "../../utils/userTierBadge";
 import QuickActionGrid from "../../components/common/QuickActionGrid";
 import IxigoHolidaySection from "../../components/travel/IxigoHolidaySection";
 import imgEcommerce from "../../assets/ecommerce.webp";
@@ -230,6 +231,7 @@ function GiftCoinsIllustration() {
 }
 
 function PremiumHeader({ user, initials, vouchersCount = 0, notificationCount = 0, onOpenNotifications, onOpenGiftCards }) {
+  const tierBadge = useUserTierBadge(user);
   const displayName = useMemo(() => {
     const raw = user?.full_name || user?.name || user?.username || "Baburaj";
     const str = String(raw).trim();
@@ -290,7 +292,7 @@ function PremiumHeader({ user, initials, vouchersCount = 0, notificationCount = 
               letterSpacing: "0.2px",
             }}
           >
-            Agent
+            {tierBadge}
           </Typography>
         </Box>
       </Stack>
@@ -1187,8 +1189,7 @@ function HorizontalScroller({ children }) {
 function IdCardDialog({ open, onClose, user, initials }) {
   const MEDIA_BASE = String(API?.defaults?.baseURL || "").replace(/\/api\/?$/, "");
   const avatar = resolveApiMediaUrl({ image_url: user?.avatar_url || user?.avatar || "" }, MEDIA_BASE);
-  const rawRole = user?.role || user?.category || "Agent";
-  const role = (rawRole === "user" || rawRole === "consumer" || rawRole === "customer" || rawRole === "Community Consumer") ? "Agent" : rawRole;
+  const tierBadge = useUserTierBadge(user);
   const userId = user?.prefixed_id || user?.unique_id || user?.username || user?.id || "-";
 
   return (
@@ -1216,7 +1217,7 @@ function IdCardDialog({ open, onClose, user, initials }) {
               {initials}
             </Avatar>
             <Typography sx={{ mt: 1.25, fontSize: 18, fontWeight: 1000 }}>{user?.full_name || user?.name || "Agent"}</Typography>
-            <Typography sx={{ fontSize: 12, color: C.textSec, fontWeight: 800 }}>{role}</Typography>
+            <Typography sx={{ fontSize: 12, color: C.textSec, fontWeight: 800 }}>{tierBadge}</Typography>
             <Box sx={{ mt: 1.5, textAlign: "left", borderTop: `1px solid ${C.border}`, pt: 1.25 }}>
               <Typography sx={{ fontSize: 12, fontWeight: 800, color: C.textSec }}>User ID</Typography>
               <Typography sx={{ fontSize: 14, fontWeight: 1000 }}>{userId}</Typography>

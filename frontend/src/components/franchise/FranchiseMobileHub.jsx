@@ -2362,6 +2362,20 @@ export default function FranchiseMobileHub({
     return currentTier?.pincodes || [];
   }, [districtPincodesList, currentTier]);
 
+  const activePincode = useMemo(() => {
+    if (selectedSubZone && selectedSubZone !== "all") {
+      return selectedSubZone;
+    }
+    if (user?.pincode) {
+      return user.pincode;
+    }
+    if (effectivePincodes && effectivePincodes.length > 0) {
+      const first = effectivePincodes[0];
+      return typeof first === "object" ? (first?.pincode || first?.code) : first;
+    }
+    return "572106";
+  }, [selectedSubZone, user, effectivePincodes]);
+
   // Filtered Registered Customers List
   const filteredCustomers = useMemo(() => {
     let list = customersList;

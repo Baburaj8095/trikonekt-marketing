@@ -32,6 +32,7 @@ import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import AccountTreeRoundedIcon from "@mui/icons-material/AccountTreeRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { C, R, S } from "../../theme/tokens";
+import { useUserTierBadge } from "../../utils/userTierBadge";
 
 export default function AppDrawer({
   open,
@@ -45,7 +46,7 @@ export default function AppDrawer({
 
   const fullName = user?.full_name || user?.name || user?.username || "Demo1";
   const userPhone = user?.phone || user?.username || "000000001";
-  const status = user?.status || user?.role || "Agent";
+  const tierBadge = useUserTierBadge(user);
 
   const initials = (() => {
     const parts = String(fullName).trim().split(" ").filter(Boolean);
@@ -176,7 +177,7 @@ export default function AppDrawer({
             </Typography>
             <Chip
               size="small"
-              label={`✓ ${status}`}
+              label={`✓ ${tierBadge}`}
               sx={{
                 mt: 0.5,
                 height: 20,
