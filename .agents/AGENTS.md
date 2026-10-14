@@ -27,3 +27,16 @@
     - **Zero Self-Commission on Matrix Levels**: Matrix level commissions are strictly paid to upline ancestors (`recipient != consumer`). A user purchasing a package receives only their designated Personal Cashback / Self Bonus, NEVER matrix level commissions on their own purchase.
     - **SPP 2nd Box Gating**: Matrix accounts are opened ONLY on the 1st SPP purchase (`is_first_month=True`). 2nd box onwards creates 0 matrix accounts and 0 matrix commissions; it triggers only the recurring direct sponsor bonus.
     - **Overhead Income & 24h Washout**: All system margin, tax, and unallocated pool fractions route to Company Overhead (`NSB2C0000000000`) and display on `asiyapp.com/admin/overhead-income`. Any overhead records older than 24 hours are automatically washed out / purged.
+
+- **Strict Versioning, Zero Revert & Deployment Safety (PERMANENTLY LOCKED - NEVER VIOLATE)**:
+  - **No Code Reversion Without Explicit User Permission**: Never overwrite, discard, revert, or roll back any code, routes, compliance pages, terms, policies, or components without the user's explicit, prior authorization.
+  - **Bidirectional Sync Invariant Before Build/Deploy**: Before building or deploying any frontend or backend for `trieducation.in` (`tri-academy`) or `asiyapp.com`:
+    1. Inspect both local and server directories.
+    2. Synchronize any server-side additions or edits into the local repository before compiling.
+    3. Always build directly on the target server or verify that the local build source matches the server source 100%.
+    4. Never upload an un-synced or stale `dist/` bundle that could overwrite live features or compliance pages.
+  - **Preserve Growth Bridge API Optimizations (Under 1s Performance Invariant)**:
+    - **In-Memory Persistent Daemon (`:5006`)**: All DB-heavy growth operations must run through `trikonekt-growth-bridge.service` using pre-warmed Django connections.
+    - **Single-Trip Batch Upgrades**: Multi-tranche purchases (Stages 2, 3) must execute in a single roundtrip via `--tranche` lists (`'1,2,3'`), never sequential loops.
+    - **Fast Overview (`fast=True`)**: Re-use `bridgeResult.overview` directly in `orderController.js` and skip recursive tree counting on purchase completions.
+    - **Daemon Timeout Guard**: The bridge caller in `growthBridgeService.js` must maintain a minimum 45,000ms timeout to avoid premature CLI fallback.
