@@ -191,23 +191,42 @@ class RootConsumerConfig(models.Model):
     def __str__(self):
         return f"RootConsumer<{getattr(self.root_user, 'username', None)}>"
 
+    _cached_solo = None
+    _cached_root_user = None
+
     @classmethod
     def get_solo(cls) -> "RootConsumerConfig":
+        if cls._cached_solo is not None:
+            return cls._cached_solo
         obj = cls.objects.first()
-        return obj or cls.objects.create()
+        if not obj:
+            obj = cls.objects.create()
+        cls._cached_solo = obj
+        return obj
 
     def get_root_user(self):
+        if RootConsumerConfig._cached_root_user is not None:
+            return RootConsumerConfig._cached_root_user
         try:
             u = getattr(self, "root_user", None)
             if u:
+                RootConsumerConfig._cached_root_user = u
                 return u
         except Exception:
             pass
         try:
             from accounts.models import CustomUser
-            return CustomUser.objects.filter(phone="9999999999").first() or CustomUser.objects.filter(id=1).first()
+            u = CustomUser.objects.filter(phone="9999999999").first() or CustomUser.objects.filter(id=1).first()
+            if u:
+                RootConsumerConfig._cached_root_user = u
+            return u
         except Exception:
             return None
+
+    def save(self, *args, **kwargs):
+        RootConsumerConfig._cached_solo = None
+        RootConsumerConfig._cached_root_user = None
+        super().save(*args, **kwargs)
 
 # ==========================
 # Auto-Pool & Commission CFG
@@ -329,12 +348,23 @@ class CommissionConfig(models.Model):
     def __str__(self):
         return f"CommissionConfig base={self.base_coupon_value}"
 
+    _cached_solo = None
+    _cached_company_user = None
+
     @classmethod
     def get_solo(cls) -> "CommissionConfig":
+        if cls._cached_solo is not None:
+            return cls._cached_solo
         obj = cls.objects.first()
-        if obj:
-            return obj
-        return cls.objects.create()
+        if not obj:
+            obj = cls.objects.create()
+        cls._cached_solo = obj
+        return obj
+
+    def save(self, *args, **kwargs):
+        CommissionConfig._cached_solo = None
+        CommissionConfig._cached_company_user = None
+        super().save(*args, **kwargs)
 
     # ----------------------
     # Master config getters
@@ -388,15 +418,19 @@ class CommissionConfig(models.Model):
             return self._D("10.00")
 
     def get_company_user(self):
+        if CommissionConfig._cached_company_user is not None:
+            return CommissionConfig._cached_company_user
         # Prefer explicit config; else fallback to stored relation; else best-effort resolve
         u = getattr(self, "tax_company_user", None)
+        if not u:
+            try:
+                from accounts.models import CustomUser
+                u = CustomUser.objects.filter(category="company").first() or CustomUser.objects.filter(is_superuser=True).first()
+            except Exception:
+                u = None
         if u:
-            return u
-        try:
-            from accounts.models import CustomUser
-            return CustomUser.objects.filter(category="company").first() or CustomUser.objects.filter(is_superuser=True).first()
-        except Exception:
-            return None
+            CommissionConfig._cached_company_user = u
+        return u
 
     def get_withdrawal_sponsor_percent(self) -> _D:
         m = self._m()

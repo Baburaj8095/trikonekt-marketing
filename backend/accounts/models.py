@@ -849,14 +849,60 @@ class Wallet(models.Model):
 
     @classmethod
     def get_or_create_for_user(cls, user: CustomUser) -> "Wallet":
+        cached = getattr(user, "_legacy_wallet", None)
+        if cached:
+            return cached
         try:
             w, _ = cls.objects.get_or_create(user=user)
-            return w
         except Exception:
-            return cls.objects.get(user=user)
+            w = cls.objects.get(user=user)
+        try:
+            user._legacy_wallet = w
+        except Exception:
+            pass
+        return w
 
 
     def _apply_self_account_rule(self, w: "Wallet"):
+        from decimal import Decimal as D
+        try:
+            cur_self = D(str(getattr(w, "self_account_balance", "0") or "0"))
+        except Exception:
+            cur_self = D("0")
+        if cur_self < D("250.00"):
+            return
+
+        wallet_id = getattr(w, "id", None) or getattr(self, "id", None)
+        user_id = getattr(self.user, "id", None)
+
+        def _bg_worker():
+            try:
+                from django.db import connection
+                connection.close()
+                from accounts.models import Wallet
+                w_fresh = Wallet.objects.filter(id=wallet_id).first()
+                if w_fresh:
+                    w_fresh._execute_self_account_rebirth_packs(w_fresh)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).exception("Background rebirth error: %s", e)
+            finally:
+                try:
+                    from django.db import connection
+                    connection.close()
+                except Exception:
+                    pass
+
+        def _dispatch():
+            import threading
+            threading.Thread(target=_bg_worker, daemon=True).start()
+
+        if transaction.get_connection().in_atomic_block:
+            transaction.on_commit(_dispatch)
+        else:
+            _dispatch()
+
+    def _execute_self_account_rebirth_packs(self, w: "Wallet"):
         """
         Consume self_account_balance in ₹250 micro-packs:
           - ₹150 auto e‑coupon purchase for self (requires available coupon; if not available, stop)
@@ -979,6 +1025,45 @@ class Wallet(models.Model):
         Deduct ₹250 from w.franchise_self_rebirth, record SELF_ACCOUNT_DEBIT with is_franchise=True,
         and trigger distribute_self_rebirth_250 (placing in 5 & 3 matrix and distributing per admin settings).
         """
+        from decimal import Decimal as D
+        try:
+            cur_rebirth = D(str(getattr(w, "franchise_self_rebirth", "0") or "0"))
+        except Exception:
+            cur_rebirth = D("0")
+        if cur_rebirth < D("250.00"):
+            return
+
+        wallet_id = getattr(w, "id", None) or getattr(self, "id", None)
+
+        def _bg_franchise_worker():
+            try:
+                from django.db import connection
+                connection.close()
+                from accounts.models import Wallet
+                w_fresh = Wallet.objects.filter(id=wallet_id).first()
+                if w_fresh:
+                    w_fresh._execute_franchise_self_rebirth_packs(w_fresh)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).exception("Background franchise rebirth error: %s", e)
+            finally:
+                try:
+                    from django.db import connection
+                    connection.close()
+                except Exception:
+                    pass
+
+        def _dispatch():
+            import threading
+            threading.Thread(target=_bg_franchise_worker, daemon=True).start()
+
+        if transaction.get_connection().in_atomic_block:
+            transaction.on_commit(_dispatch)
+        else:
+            _dispatch()
+
+    def _execute_franchise_self_rebirth_packs(self, w):
+        from decimal import Decimal as D
         if getattr(w, "_applying_franchise_rebirth", False):
             return
         w._applying_franchise_rebirth = True

@@ -51,6 +51,17 @@ class WalletEngine:
 
     @classmethod
     def get_account(cls, user: CustomUser, wallet_type: str, *, lock: bool = True) -> WalletAccount:
+        cache_dict = getattr(user, "_wallet_accounts_cache", None)
+        if cache_dict is None:
+            cache_dict = {}
+            try:
+                user._wallet_accounts_cache = cache_dict
+            except Exception:
+                pass
+
+        if not lock and wallet_type in cache_dict:
+            return cache_dict[wallet_type]
+
         legacy_wallet = None
         try:
             legacy_wallet = Wallet.get_or_create_for_user(user)
@@ -87,6 +98,7 @@ class WalletEngine:
 
             if dirty:
                 account.save(update_fields=["legacy_wallet", "current_balance", "available_balance", "updated_at"])
+        cache_dict[wallet_type] = account
         return account
 
     @classmethod
