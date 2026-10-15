@@ -978,7 +978,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
         started: false,
         daysLeft: adminConfiguredDays,
         totalDays: adminConfiguredDays,
-        levelRange: isL8Plus ? "L8 to L10" : "L1 to L7",
+        levelRange: isL8Plus ? "Tier 2 Royalty" : "Tier 1 Royalty",
       };
     }
 
@@ -1540,9 +1540,9 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700, mb: 0.5 }}>TOTAL ROYALTY EARNED (ALL TIERS)</Typography>
             <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#0f172a", mb: 0.5 }}>₹{fmt(earnedRoyalty)}</Typography>
             <Box sx={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 0.5, fontSize: 10, color: "#64748b", mb: 0.5 }}>
-              <span>L1 to L7: ₹{fmt(royaltyInfo?.tier1_earned ?? 0)}</span>
-              <span>Dist L8-L10: ₹{fmt(royaltyInfo?.tier2_district_earned ?? (Number(royaltyInfo?.tier2_earned || 0) * 0.6))}</span>
-              <span>State L8-L10: ₹{fmt(royaltyInfo?.tier2_state_earned ?? (Number(royaltyInfo?.tier2_earned || 0) * 0.4))}</span>
+              <span>District (T1): ₹{fmt(royaltyInfo?.tier1_earned ?? 0)}</span>
+              <span>Districtwise (T2): ₹{fmt(royaltyInfo?.tier2_district_earned ?? (Number(royaltyInfo?.tier2_earned || 0) * 0.6))}</span>
+              <span>Statewise (T2): ₹{fmt(royaltyInfo?.tier2_state_earned ?? (Number(royaltyInfo?.tier2_earned || 0) * 0.4))}</span>
               <span>Recovery: ₹{fmt(royaltyInfo?.tier3_earned ?? 0)}</span>
             </Box>
             <LinearProgress
@@ -1795,8 +1795,8 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                     0
                   );
 
-                  const amtVal = cfgLvl?.upgrade_amount ? Number(cfgLvl.upgrade_amount) : Number(r.upgrade_amount || 0);
-                  const rankTitle = cfgLvl?.name ? String(cfgLvl.name).replace(/Level/gi, "Layer") : (r.rank_name ? String(r.rank_name).replace(/Level/gi, "Layer") : `Layer ${level}`);
+                  const rawRankTitle = cfgLvl?.name ? String(cfgLvl.name).replace(/Level/gi, "Layer") : (r.rank_name ? String(r.rank_name).replace(/Level/gi, "Layer") : `Layer ${level}`);
+                  const rankTitle = rawRankTitle.replace(/^L\d+\s*[-:]?\s*/i, "");
                   const isFull = userTeamCount >= maxCap && userTeamCount > 0;
 
                   return (

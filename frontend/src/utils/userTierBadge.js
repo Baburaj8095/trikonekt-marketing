@@ -66,19 +66,19 @@ export function resolveUserTierBadgeSync(user, promoPurchases = [], rankLevel = 
   }
 
   if (levelNum >= 10 || has40k) {
-    return "L10 District Promoter agent";
+    return "District Promoter Agent";
   }
   if ((levelNum >= 7 && levelNum <= 9) || has8k) {
-    return "L7-L9 Super Agent";
+    return "Super Agent";
   }
-  return "L1-L6 agent";
+  return "Prime Agent";
 }
 
 export function useUserTierBadge(user) {
   const [badge, setBadge] = useState(() => {
     try {
       const cached = localStorage.getItem("tri_user_tier_badge");
-      if (cached) return cached;
+      if (cached && !/L\d+/i.test(cached)) return cached;
     } catch (_) {}
     return resolveUserTierBadgeSync(user);
   });
