@@ -811,6 +811,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
 
   // Dynamic available limit for layers: up to ₹1,50,000 minus whatever Royalty has taken
   const dynamicLayerCap = Math.max(0, totalCycleCap - Math.min(maxRoyaltyCap, earnedRoyalty));
+  const maxLayerCap = dynamicLayerCap;
 
   // Dynamic available limit for royalty: up to ₹50,000, but cannot exceed remaining room under ₹1,50,000
   const dynamicRoyaltyCap = Math.min(maxRoyaltyCap, Math.max(0, totalCycleCap - rawLayerIncome));
