@@ -343,6 +343,13 @@ class UserUpgradeEligibilityView(APIView):
             cfg_lvl = levels_cfg[i] if (isinstance(levels_cfg, list) and i < len(levels_cfg)) else {}
             upg_amt = Decimal(str((cfg_lvl.get("upgrade_amount") if isinstance(cfg_lvl, dict) else None) or UPGRADE_AMOUNTS[i]))
             raw_limit = Decimal(str((cfg_lvl.get("earning_limit") if isinstance(cfg_lvl, dict) else None) or DEFAULT_LIMITS[i]))
+            if lvl_num == 10:
+                # Dynamic Layer 10 cap: expands up to ₹1.5L minus earned royalty (min 25,000)
+                earned_roy_amt = Decimal(str(royalty_info.get("total_earned", 0.0) if isinstance(royalty_info, dict) else 0.0))
+                max_roy_cap = Decimal("50000.00")
+                total_cycle_cap = Decimal("150000.00")
+                dynamic_l10_cap = max(Decimal("25000.00"), total_cycle_cap - running_cum_limit - min(max_roy_cap, earned_roy_amt))
+                raw_limit = dynamic_l10_cap
             prev_cum_limit = running_cum_limit
             running_cum_limit += raw_limit
 
@@ -411,6 +418,8 @@ class UserUpgradeEligibilityView(APIView):
                 "royalty_info": royalty_info,
                 "total_layer_income": total_layer_income_float,
                 "cumulative_layer_progress": cumulative_layer_progress,
+                "total_cycle_limit": 150000.0,
+                "dynamic_layer_cap": float(running_cum_limit),
             }
         )
 

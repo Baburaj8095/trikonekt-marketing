@@ -739,49 +739,6 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
     };
   }, []);
 
-  const consumerActiveCycle = userConsumerCycle?.active_cycle || userConsumerCycle?.cycle || "Cycle 1";
-  const maxLayerCap = Number(userConsumerCycle?.layer_limit || userConsumerCycle?.eEduLayerLimit || 100000);
-  const maxRoyaltyCap = Number(userConsumerCycle?.royalty_limit || userConsumerCycle?.royaltyLimit || 50000);
-  const totalCycleCap = maxLayerCap + maxRoyaltyCap; // 1,50,000
-
-  // MUST NOT CROSS EARNING LIMIT: Capped at user's current earning limit & max cycle layer cap (₹1L)
-  const totalEarnings = useMemo(() => {
-    const effectiveCap = currentLimit > 0 ? Math.min(currentLimit, maxLayerCap) : maxLayerCap;
-    return Math.min(rawLayerIncome, effectiveCap);
-  }, [rawLayerIncome, currentLimit, maxLayerCap]);
-
-  const isLimitReached =
-    walletHistory?.is_limit_reached ?? (currentLimit > 0 && rawLayerIncome >= currentLimit);
-
-  const percentUsed =
-    currentLimit > 0
-      ? Math.min(100, Math.max(0, (totalEarnings / currentLimit) * 100))
-      : 0;
-
-  const layerMatrixEligible = useMemo(() => {
-    return Number(
-      walletHistory?.layer_matrix_eligible || Math.max(currentLimit, maxLayerCap)
-    );
-  }, [walletHistory, currentLimit, maxLayerCap]);
-
-  // Income generated after limit reached will be shown in Missing Blocks Income
-  const missingIncome = useMemo(() => {
-    if (rawLayerIncome > maxLayerCap) {
-      return Number((rawLayerIncome - maxLayerCap).toFixed(2));
-    }
-    if (currentLimit > 0 && rawLayerIncome > currentLimit) {
-      return Number((rawLayerIncome - currentLimit).toFixed(2));
-    }
-    return Number(walletHistory?.missing_income || 0);
-  }, [rawLayerIncome, currentLimit, maxLayerCap, walletHistory]);
-
-  const layerMatrixPercent = useMemo(() => {
-    const denom = currentLimit > 0 ? currentLimit : layerMatrixEligible;
-    return denom > 0
-      ? Math.min(100, (totalEarnings / denom) * 100)
-      : 0;
-  }, [totalEarnings, currentLimit, layerMatrixEligible]);
-
   const savedRankConfig = useMemo(() => {
     try {
       const raw = localStorage.getItem("tri_rank_upgrade_config");
@@ -845,15 +802,62 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
   }, [elig]);
 
   const savedRoyaltyConfig = royaltyConfig;
-
   const royaltyInfo = elig?.royalty_info;
   const earnedRoyalty = Number(royaltyInfo?.total_earned ?? 0);
+
+  const consumerActiveCycle = userConsumerCycle?.active_cycle || userConsumerCycle?.cycle || "Cycle 1";
+  const totalCycleCap = Number(elig?.total_cycle_limit || userConsumerCycle?.total_limit || 150000);
+  const maxRoyaltyCap = Number(userConsumerCycle?.royalty_limit || userConsumerCycle?.royaltyLimit || 50000);
+
+  // Dynamic available limit for layers: up to ₹1,50,000 minus whatever Royalty has taken
+  const dynamicLayerCap = Math.max(0, totalCycleCap - Math.min(maxRoyaltyCap, earnedRoyalty));
+
+  // Dynamic available limit for royalty: up to ₹50,000, but cannot exceed remaining room under ₹1,50,000
+  const dynamicRoyaltyCap = Math.min(maxRoyaltyCap, Math.max(0, totalCycleCap - rawLayerIncome));
+
+  // Layer Income Capped only at dynamicLayerCap (max ₹1.5L if Royalty is 0)
+  const totalEarnings = useMemo(() => {
+    return Math.min(rawLayerIncome, dynamicLayerCap);
+  }, [rawLayerIncome, dynamicLayerCap]);
+
+  // Combined active cycle earnings across both Layer Blocks and Royalty (capped at ₹1.5L)
+  const combinedCycleEarnings = useMemo(() => {
+    return Math.min(totalCycleCap, totalEarnings + Math.min(maxRoyaltyCap, earnedRoyalty));
+  }, [totalEarnings, earnedRoyalty, totalCycleCap, maxRoyaltyCap]);
+
+  const combinedCyclePercent = useMemo(() => {
+    return totalCycleCap > 0
+      ? Math.min(100, Math.max(0, (combinedCycleEarnings / totalCycleCap) * 100))
+      : 0;
+  }, [combinedCycleEarnings, totalCycleCap]);
+
+  const layerMatrixPercent = useMemo(() => {
+    const denom = dynamicLayerCap > 0 ? dynamicLayerCap : 150000;
+    return denom > 0
+      ? Math.min(100, (totalEarnings / denom) * 100)
+      : 0;
+  }, [totalEarnings, dynamicLayerCap]);
+
+  const isLimitReached = combinedCycleEarnings >= totalCycleCap;
+
+  const layerMatrixEligible = dynamicLayerCap;
+
+  // Missing Blocks Income: Income generated after ₹1.5L combined cycle limit is reached, or if royalty exceeds ₹50k
+  const missingIncome = useMemo(() => {
+    let overflow = 0;
+    if (rawLayerIncome > dynamicLayerCap) {
+      overflow += (rawLayerIncome - dynamicLayerCap);
+    }
+    if (earnedRoyalty > maxRoyaltyCap) {
+      overflow += (earnedRoyalty - maxRoyaltyCap);
+    }
+    return Number(overflow.toFixed(2));
+  }, [rawLayerIncome, dynamicLayerCap, earnedRoyalty, maxRoyaltyCap]);
 
   const isPackageActive = Boolean(hasApprovedBase || currentLevel >= 1 || elig?.has_prime || elig?.is_prime);
 
   const isCapReached = Boolean(
-    (totalEarnings >= maxLayerCap && earnedRoyalty >= maxRoyaltyCap) ||
-    (totalEarnings + earnedRoyalty) >= totalCycleCap ||
+    combinedCycleEarnings >= totalCycleCap ||
     userConsumerCycle?.status === "completed" ||
     userConsumerCycle?.status === "capped" ||
     userConsumerCycle?.isCapped === true
@@ -867,7 +871,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
     Number(String(consumerActiveCycle || "").replace(/\D/g, "") || 1) >= 2
   );
 
-  // Cycle 2 is ONLY unlocked if package is active AND (earning limit of 1L layer + 50k royalty = 1.5L reached OR admin authorized)
+  // Cycle 2 is unlocked when combined ₹1.5L cap is reached OR admin authorized
   const isCycle2Unlocked = isPackageActive && (isCapReached || isAdminAuthorized);
 
   const totalEligibleRoyaltyCap = useMemo(() => {
@@ -1288,7 +1292,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                   {!isLayerActive ? "FIRST TARGET (LAYER 1)" : currentLevel >= 10 ? "TOTAL LAYER CAPACITY" : `NEXT TARGET (LAYER ${nextLevel})`}
                 </Typography>
                 <Typography sx={{ fontSize: 20, fontWeight: 900, color: "#0f172a", my: 0.5 }}>
-                  ₹{fmt(!isLayerActive ? 1750 : currentLevel >= 10 ? 100000 : (RANK_TIERS.find((t) => t.level === nextLevel)?.limit || 0))}
+                  ₹{fmt(!isLayerActive ? 1750 : currentLevel >= 10 ? dynamicLayerCap : (RANK_TIERS.find((t) => t.level === nextLevel)?.limit || 0))}
                 </Typography>
                 {!isLayerActive ? (
                   <Chip label="Activate Layer 1" color="warning" size="small" sx={{ fontWeight: 800 }} />
@@ -1393,6 +1397,134 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
         </Stack>
       </Paper>
 
+      {/* ── Unified Cycle Earning Limit Hero Card (Combined Layers + Royalty = ₹1.5 Lakh) ── */}
+      <Paper
+        variant="outlined"
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          borderRadius: 3,
+          borderColor: isCapReached ? "#86efac" : "#bfdbfe",
+          background: isCapReached
+            ? "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)"
+            : "linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)",
+          mb: 2,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+        }}
+      >
+        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1} sx={{ mb: 1.5 }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Box
+              sx={{
+                width: 38,
+                height: 38,
+                borderRadius: 2,
+                bgcolor: isCapReached ? "#15803d" : "#2563eb",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#fff",
+              }}
+            >
+              <AccountBalanceWalletRoundedIcon sx={{ fontSize: 22 }} />
+            </Box>
+            <Box>
+              <Typography sx={{ fontWeight: 900, fontSize: 13, color: isCapReached ? "#15803d" : "#1e40af", letterSpacing: 0.3 }}>
+                CYCLE EARNING LIMIT (LAYERS & ROYALTY) ⓘ
+              </Typography>
+              <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>
+                Combined total across all Layer Blocks and Shopping Royalty (Max ₹1.50 Lakh per Cycle)
+              </Typography>
+            </Box>
+          </Stack>
+          <Chip
+            label={isCapReached ? "🎉 Limit Reached (Cycle 2 Unlocked)" : `Eligible ₹${fmt(totalCycleCap)}`}
+            color={isCapReached ? "success" : "primary"}
+            sx={{ fontWeight: 900, fontSize: 12, height: 28 }}
+          />
+        </Stack>
+
+        <Divider sx={{ my: 1.5 }} />
+
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={6}>
+            <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700, mb: 0.5 }}>
+              TOTAL CYCLE EARNINGS (ACTIVE BUCKET)
+            </Typography>
+            <Stack direction="row" spacing={1} alignItems="baseline">
+              <Typography sx={{ fontSize: { xs: 26, sm: 30 }, fontWeight: 900, color: "#0f172a" }}>
+                ₹{fmt(combinedCycleEarnings)}
+              </Typography>
+              <Typography sx={{ fontSize: 14, fontWeight: 700, color: "#64748b" }}>
+                / ₹{fmt(totalCycleCap)}
+              </Typography>
+              <Typography sx={{ fontSize: 12, fontWeight: 800, color: isCapReached ? "#15803d" : "#2563eb", ml: "auto" }}>
+                {combinedCyclePercent.toFixed(1)}%
+              </Typography>
+            </Stack>
+
+            <LinearProgress
+              variant="determinate"
+              value={combinedCyclePercent}
+              sx={{
+                height: 9,
+                borderRadius: 4.5,
+                mt: 1,
+                mb: 1,
+                bgcolor: "#e2e8f0",
+                "& .MuiLinearProgress-bar": {
+                  borderRadius: 4.5,
+                  bgcolor: isCapReached ? "#16a34a" : "#2563eb",
+                },
+              }}
+            />
+
+            <Typography sx={{ fontSize: 11, color: isCapReached ? "#15803d" : "#475569", fontWeight: 700 }}>
+              {isCapReached
+                ? "Cycle 1 complete! Any further income accumulates in Missing Blocks Income until Cycle 2 renewal."
+                : `💡 ₹${fmt(Math.max(0, totalCycleCap - combinedCycleEarnings))} headroom remaining to complete this cycle.`}
+            </Typography>
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <Stack spacing={1}>
+              <Paper variant="outlined" sx={{ p: 1.2, borderRadius: 2, bgcolor: "#fff", borderColor: "#bfdbfe" }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Stack direction="row" spacing={0.8} alignItems="center">
+                    <LayersRoundedIcon color="primary" sx={{ fontSize: 16 }} />
+                    <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: "#0369a1" }}>
+                      Layer Blocks Income:
+                    </Typography>
+                  </Stack>
+                  <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#0f172a" }}>
+                    ₹{fmt(totalEarnings)} <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>/ max ₹{fmt(dynamicLayerCap)}</span>
+                  </Typography>
+                </Stack>
+                <Typography sx={{ fontSize: 10, color: "#64748b", mt: 0.3 }}>
+                  Can earn up to full ₹1.5L if Royalty is ₹0 • Current headroom: ₹{fmt(Math.max(0, dynamicLayerCap - totalEarnings))}
+                </Typography>
+              </Paper>
+
+              <Paper variant="outlined" sx={{ p: 1.2, borderRadius: 2, bgcolor: "#fff", borderColor: "#bbf7d0" }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Stack direction="row" spacing={0.8} alignItems="center">
+                    <ShoppingBagRoundedIcon color="success" sx={{ fontSize: 16 }} />
+                    <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: "#15803d" }}>
+                      Royalty Pool Income:
+                    </Typography>
+                  </Stack>
+                  <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#0f172a" }}>
+                    ₹{fmt(Math.min(maxRoyaltyCap, earnedRoyalty))} <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>/ max ₹{fmt(maxRoyaltyCap)}</span>
+                  </Typography>
+                </Stack>
+                <Typography sx={{ fontSize: 10, color: "#64748b", mt: 0.3 }}>
+                  Strict ceiling of ₹50,000 • Current headroom: ₹{fmt(Math.max(0, dynamicRoyaltyCap - earnedRoyalty))}
+                </Typography>
+              </Paper>
+            </Stack>
+          </Grid>
+        </Grid>
+      </Paper>
+
       {/* ── Royalty Income, Layer Blocks & Missing Income Grid ── */}
       <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid item xs={12} sm={4}>
@@ -1402,7 +1534,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                 <ShoppingBagRoundedIcon color="success" sx={{ fontSize: 18 }} />
                 <Typography sx={{ fontWeight: 900, fontSize: 12, color: "#15803d" }}>ROYALTY INCOME (SHOPPING) ⓘ</Typography>
               </Stack>
-              <Chip label={`Eligible ₹${fmt(totalEligibleRoyaltyCap)}`} color="success" size="small" sx={{ fontWeight: 900, fontSize: 11 }} />
+              <Chip label={`Eligible ₹${fmt(dynamicRoyaltyCap)}`} color="success" size="small" sx={{ fontWeight: 900, fontSize: 11 }} />
             </Stack>
             <Divider sx={{ my: 1 }} />
             <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700, mb: 0.5 }}>TOTAL ROYALTY EARNED (ALL TIERS)</Typography>
@@ -1415,7 +1547,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             </Box>
             <LinearProgress
               variant="determinate"
-              value={totalEligibleRoyaltyCap > 0 ? Math.min(100, (earnedRoyalty / totalEligibleRoyaltyCap) * 100) : 0}
+              value={dynamicRoyaltyCap > 0 ? Math.min(100, (earnedRoyalty / dynamicRoyaltyCap) * 100) : 0}
               color="success"
               sx={{ height: 6, borderRadius: 3, mb: 1 }}
             />
@@ -1501,7 +1633,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
 
             <Divider sx={{ my: 1 }} />
             <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#15803d" }}>
-              TOTAL ELIGIBLE ROYALTY LIMIT ₹{fmt(totalEligibleRoyaltyCap)}
+              TOTAL ELIGIBLE ROYALTY LIMIT ₹{fmt(dynamicRoyaltyCap)} (MAX ₹{fmt(maxRoyaltyCap)})
             </Typography>
           </Paper>
         </Grid>
@@ -1513,7 +1645,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                 <LayersRoundedIcon color="primary" sx={{ fontSize: 18 }} />
                 <Typography sx={{ fontWeight: 900, fontSize: 12, color: "#0369a1" }}>LAYER BLOCKS EARNINGS ⓘ</Typography>
               </Stack>
-              <Chip label={`Eligible ₹${fmt(currentLimit)}`} color="primary" size="small" sx={{ fontWeight: 900, fontSize: 11 }} />
+              <Chip label={`Eligible ₹${fmt(dynamicLayerCap)}`} color="primary" size="small" sx={{ fontWeight: 900, fontSize: 11 }} />
             </Stack>
             <Divider sx={{ my: 1 }} />
             <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700, mb: 0.5 }}>TOTAL LAYER INCOME (ALL SOURCES)</Typography>
@@ -1527,7 +1659,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             <LinearProgress variant="determinate" value={layerMatrixPercent} sx={{ height: 6, borderRadius: 3, mb: 1 }} />
             <Divider sx={{ my: 1 }} />
             <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#0369a1" }}>
-              TOTAL ELIGIBLE LAYER LIMIT ₹{fmt(currentLimit)}
+              TOTAL ELIGIBLE LAYER LIMIT ₹{fmt(dynamicLayerCap)}
             </Typography>
           </Paper>
         </Grid>
@@ -1543,7 +1675,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             <Divider sx={{ my: 1 }} />
             <Typography sx={{ fontSize: 24, fontWeight: 900, color: "#c2410c", my: 0.5 }}>₹{fmt(missingIncome)}</Typography>
             <Typography sx={{ fontSize: 11, color: "#9a3412", mb: 1.5 }}>
-              Income generated after limit reached will be shown here.
+              Income generated after the combined ₹1.5L cycle limit is reached will be shown here.
             </Typography>
             <Button size="small" sx={{ textTransform: "none", color: "#c2410c", fontWeight: 800, p: 0 }}>
               View Missing Income &gt;
@@ -1642,7 +1774,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             </TableHead>
             <TableBody>
               {(() => {
-                const DEFAULT_LIMITS = [1750, 2000, 4000, 6000, 7500, 8750, 10000, 15000, 20000, 100000];
+                const DEFAULT_LIMITS = [1750, 2000, 4000, 6000, 7500, 8750, 10000, 15000, 20000, Math.max(25000, dynamicLayerCap - 75000)];
                 return (ranks || []).map((r, idx) => {
                   const level = Number(r.level_number || idx + 1);
                   const maxCap = Math.pow(5, level);

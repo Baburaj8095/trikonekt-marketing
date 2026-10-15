@@ -152,6 +152,19 @@ def execute_daily_pool_distribution(
     t3_achievers = []
 
     q_royalty = Q(type="GLOBAL_ROYALTY") | Q(source_id__startswith="ROYALTY_") | Q(meta__orig_type="GLOBAL_ROYALTY")
+    q_layer = (
+        Q(type__in=["LEVEL_BONUS", "AUTOPOOL_BONUS_FIVE", "AUTOPOOL_BONUS_THREE", "PRIME_150_SELF", "PRIME_750_SELF", "PRIME_759_SELF"]) |
+        Q(meta__source__startswith="THREE_MATRIX") |
+        Q(meta__source__startswith="FIVE_MATRIX") |
+        (Q(source_type="RANK_UPGRADE") & (Q(meta__orig_type__icontains="LEVEL") | Q(type__icontains="LEVEL") | Q(meta__kind__icontains="LEVEL"))) |
+        (Q(type="INCOME_CREDIT_75") & (
+            Q(meta__orig_type__icontains="LEVEL") |
+            Q(meta__orig_type__icontains="AUTOPOOL") |
+            Q(meta__source__icontains="MATRIX") |
+            Q(meta__trigger__in=["PRIME_150", "PRIME_750", "PRIME_759", "SELF_REBIRTH_250"])
+        ))
+    )
+    total_cycle_cap = Decimal("150000.00")
 
     for u in eligible_users:
         user_earned_royalty = _q2(
@@ -159,6 +172,12 @@ def execute_daily_pool_distribution(
                 user=u
             ).filter(q_royalty).aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
         )
+        user_earned_layer = _q2(
+            WalletTransaction.objects.filter(user=u, amount__gt=0).filter(q_layer).exclude(
+                Q(type__startswith="SELF_ACCOUNT") | Q(meta__ledger="SELF_ACCOUNT")
+            ).aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
+        )
+        cycle_rem_headroom = max(Decimal("0.00"), total_cycle_cap - (user_earned_layer + user_earned_royalty))
 
         upgrades = list(RankUpgrade.objects.filter(
             user=u,
@@ -189,8 +208,8 @@ def execute_daily_pool_distribution(
             days_to_l7 = max(0, (r7_upgrade.upgraded_at.date() - activation_date).days)
             if days_to_l7 <= t1_days or force or user_earned_royalty > 0:
                 t1_qualified = True
-                if user_earned_royalty < t1_cap:
-                    rem_cap = _q2(t1_cap - user_earned_royalty)
+                if user_earned_royalty < t1_cap and cycle_rem_headroom > 0:
+                    rem_cap = min(_q2(t1_cap - user_earned_royalty), cycle_rem_headroom)
                     t1_achievers.append({"user": u, "days_taken": days_to_l7, "rem_cap": rem_cap, "district": u_dist, "state_id": u_state_id})
 
         # Tier 2: L8 to L10 within 7 days from L7
@@ -198,16 +217,16 @@ def execute_daily_pool_distribution(
             days_l7_to_l10 = max(0, (r10_upgrade.upgraded_at.date() - r7_upgrade.upgraded_at.date()).days)
             if days_l7_to_l10 <= t2_days or force or user_earned_royalty > 0:
                 t2_qualified = True
-                if user_earned_royalty < (t1_cap + t2_cap):
-                    rem_cap = _q2((t1_cap + t2_cap) - user_earned_royalty)
+                if user_earned_royalty < (t1_cap + t2_cap) and cycle_rem_headroom > 0:
+                    rem_cap = min(_q2((t1_cap + t2_cap) - user_earned_royalty), cycle_rem_headroom)
                     t2_achievers.append({"user": u, "days_taken": days_l7_to_l10, "rem_cap": rem_cap, "district": u_dist, "state_id": u_state_id})
 
         # Tier 3: L1 to L10 recovery within 30 days
         if highest_lvl >= 10 and not (t1_qualified and t2_qualified) and r10_upgrade and activation_date:
             days_to_l10 = max(0, (r10_upgrade.upgraded_at.date() - activation_date).days)
             if days_to_l10 <= t3_days or force:
-                if user_earned_royalty < t3_cap:
-                    rem_cap = _q2(t3_cap - user_earned_royalty)
+                if user_earned_royalty < t3_cap and cycle_rem_headroom > 0:
+                    rem_cap = min(_q2(t3_cap - user_earned_royalty), cycle_rem_headroom)
                     t3_achievers.append({"user": u, "days_taken": days_to_l10, "rem_cap": rem_cap, "district": u_dist, "state_id": u_state_id})
 
     # -------------------------------------------------------------
