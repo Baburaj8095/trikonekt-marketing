@@ -1796,6 +1796,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                     0
                   );
 
+                  const amtVal = cfgLvl?.upgrade_amount ? Number(cfgLvl.upgrade_amount) : Number(r.upgrade_amount || 0);
                   const rawRankTitle = cfgLvl?.name ? String(cfgLvl.name).replace(/Level/gi, "Layer") : (r.rank_name ? String(r.rank_name).replace(/Level/gi, "Layer") : `Layer ${level}`);
                   const rankTitle = rawRankTitle.replace(/^L\d+\s*[-:]?\s*/i, "");
                   const isFull = userTeamCount >= maxCap && userTeamCount > 0;
