@@ -398,7 +398,7 @@ export default function WalletDashboardV2({ showTable = true }) {
         <Grid item xs={12} sm={4}>
           <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5 }}>
             <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>
-              NEXT CYCLE
+              NEXT TERM
             </Typography>
             <Typography
               sx={{

@@ -201,10 +201,10 @@ function ConsumerCycleRenewalDialog({
         role: "CONSUMER",
       }).catch(() => {});
 
-      setSuccessMsg(`🎉 Cycle 2 Renewal Activated! ₹2,500 debited from ${selectedSource === "MAIN_WALLET" ? "Main Wallet" : "Package Coupon Pocket"}. Your ₹1,00,000 E-Edu Layer capacity and ₹50,000 Royalty cap are renewed.`);
+      setSuccessMsg(`🎉 Term 2 Renewal Activated! ₹2,500 debited from ${selectedSource === "MAIN_WALLET" ? "Main Wallet" : "Package Coupon Pocket"}. Your ₹1,00,000 E-Edu Layer capacity and ₹50,000 Royalty cap are renewed.`);
       if (onRenewSuccess) onRenewSuccess();
     } catch (e) {
-      setErrMsg(e?.response?.data?.detail || e?.message || "Failed to renew cycle. Please contact Admin.");
+      setErrMsg(e?.response?.data?.detail || e?.message || "Failed to renew term. Please contact Admin.");
     } finally {
       setBusy(false);
     }
@@ -226,19 +226,19 @@ function ConsumerCycleRenewalDialog({
       }}
     >
       <DialogTitle sx={{ fontWeight: 950, color: "#0F172A", pb: 1, display: "flex", alignItems: "center", gap: 1 }}>
-        <span style={{ fontSize: 20 }}>🔄</span> Consumer Cycle Renewal Hub
+        <span style={{ fontSize: 20 }}>🔄</span> Consumer Term Renewal Hub
       </DialogTitle>
       <DialogContent dividers sx={{ borderColor: "#E2E8F0", pt: 2, pb: 2.5 }}>
         {/* Status chip */}
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-          <Chip label={`Current: ${currentCycle}`} size="small" sx={{ fontWeight: 800, bgcolor: "#EFF6FF", color: "#1D4ED8" }} />
-          <Chip label="Renew to Cycle 2" size="small" sx={{ fontWeight: 900, bgcolor: "#ECFDF5", color: "#059669" }} />
+          <Chip label={`Current: ${String(currentCycle).replace(/Cycle/gi, "Term")}`} size="small" sx={{ fontWeight: 800, bgcolor: "#EFF6FF", color: "#1D4ED8" }} />
+          <Chip label="Renew to Term 2" size="small" sx={{ fontWeight: 900, bgcolor: "#ECFDF5", color: "#059669" }} />
         </Stack>
 
         {/* Breakdown Card */}
         <Box sx={{ p: 2, bgcolor: "#F1F5F9", borderRadius: 3, border: "1px solid #E2E8F0", mb: 2 }}>
           <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 800, textTransform: "uppercase" }}>
-            Renewal Cost Breakdown (Cycle 2+)
+            Renewal Cost Breakdown (Term 2+)
           </Typography>
           <Stack spacing={0.8} sx={{ mt: 1.2 }}>
             <Stack direction="row" justifyContent="space-between">
@@ -264,7 +264,7 @@ function ConsumerCycleRenewalDialog({
         {/* Earning capacity unlock info */}
         <Box sx={{ p: 1.5, bgcolor: "#EFF6FF", borderRadius: 2.5, border: "1px solid #BFDBFE", mb: 2 }}>
           <Typography sx={{ fontSize: 11.5, color: "#1E40AF", fontWeight: 700 }}>
-            🏆 <b>Cycle 2 Unlocks:</b>
+            🏆 <b>Term 2 Unlocks:</b>
             <br />• Fresh <b>₹1,00,000 (1 Lakh)</b> E-Edu Layer capacity (Layers 1 to 10)
             <br />• Fresh <b>₹50,000 (50k)</b> Royalty Shopping Pool capacity
             <br />• Admin-authorized distribution loop
@@ -357,9 +357,9 @@ function ConsumerCycleRenewalDialog({
           }}
         >
           {busy
-            ? "Activating Cycle 2..."
+            ? "Activating Term 2..."
             : successMsg
-            ? "Cycle 2 Active"
+            ? "Term 2 Active"
             : canPay
             ? `Confirm & Deduct ₹2,500 from ${selectedSource === "MAIN_WALLET" ? "Main Wallet" : "Coupon Pocket"}`
             : "Insufficient Balance in Selected Pocket"}
@@ -1154,7 +1154,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                       TOTAL EARNINGS ⓘ
                     </Typography>
                     <Chip
-                      label={consumerCycleState.cycle || "Cycle 1 Active"}
+                      label={String(consumerCycleState.cycle || "Term 1 Active").replace(/Cycle/gi, "Term")}
                       size="small"
                       onClick={() => {
                         if (isCycle2Unlocked) {
@@ -1242,7 +1242,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                         : "Upgrade Now"}
                     </Button>
 
-                    {/* Cycle 2 Renewal Button only when Cycle 2 is unlocked */}
+                    {/* Term 2 Renewal Button only when Term 2 is unlocked */}
                     {isCycle2Unlocked && (
                       <Button
                         fullWidth
@@ -1260,7 +1260,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                           "&:hover": { bgcolor: "#059669" },
                         }}
                       >
-                        🔄 Start Cycle 2 Renewal Hub (₹2,500)
+                        🔄 Start Term 2 Renewal Hub (₹2,500)
                       </Button>
                     )}
                   </Paper>
@@ -1307,12 +1307,12 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
 
             <Grid item xs={12} sm={4}>
               <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff" }}>
-                <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>NEXT CYCLE</Typography>
+                <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>NEXT TERM</Typography>
                 <Typography sx={{ fontSize: 14, fontWeight: 900, color: !isPackageActive ? "#dc2626" : isCycle2Unlocked ? "#15803d" : "#d97706", my: 0.5 }}>
-                  {!isPackageActive ? "Package Inactive" : isCycle2Unlocked ? "Cycle 2 Unlocked" : "Cycle 2 Locked"}
+                  {!isPackageActive ? "Package Inactive" : isCycle2Unlocked ? "Term 2 Unlocked" : "Term 2 Locked"}
                 </Typography>
                 <Typography sx={{ fontSize: 11, color: "#94a3b8" }}>
-                  {!isPackageActive ? "(Activate Package First)" : isCycle2Unlocked ? "(Eligible for Cycle 2)" : "(Earn ₹1.5L Cap to Unlock)"}
+                  {!isPackageActive ? "(Activate Package First)" : isCycle2Unlocked ? "(Eligible for Term 2)" : "(Earn ₹1.5L Cap to Unlock)"}
                 </Typography>
               </Paper>
             </Grid>
@@ -1342,10 +1342,10 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.5 }}>
             <Typography sx={{ fontSize: 14, fontWeight: 950, color: isCycle2Unlocked ? "#92400E" : !isPackageActive ? "#991B1B" : "#14532D" }}>
               {!isPackageActive
-                ? `🔒 ${consumerActiveCycle} Locked: Package Inactive`
+                ? `🔒 ${String(consumerActiveCycle || "Term 1").replace(/Cycle/gi, "Term")} Locked: Package Inactive`
                 : isCycle2Unlocked
-                ? `🏆 ${consumerActiveCycle} Cap Reached (₹${fmt(totalCycleCap)} Limit Met)!`
-                : `♾️ ${consumerActiveCycle} Earning Limit: ₹${fmt(totalCycleCap)}`}
+                ? `🏆 ${String(consumerActiveCycle || "Term 1").replace(/Cycle/gi, "Term")} Cap Reached (₹${fmt(totalCycleCap)} Limit Met)!`
+                : `♾️ ${String(consumerActiveCycle || "Term 1").replace(/Cycle/gi, "Term")} Earning Limit: ₹${fmt(totalCycleCap)}`}
             </Typography>
             <Chip
               label={!isPackageActive ? "Inactive" : isCycle2Unlocked ? "Cap Reached • Unlocked" : "Active"}
@@ -1361,10 +1361,10 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           </Stack>
           <Typography sx={{ fontSize: 11.5, color: isCycle2Unlocked ? "#78350F" : !isPackageActive ? "#7F1D1D" : "#166534", mt: 0.5 }}>
             {!isPackageActive
-              ? `Your package is inactive. Activate the ₹2,000 Starter Package on asiyapp.com to start receiving layer & royalty earnings toward the ₹${fmt(totalCycleCap)} Cycle 1 cap.`
+              ? `Your package is inactive. Activate the ₹2,000 Starter Package on asiyapp.com to start receiving layer & royalty earnings toward the ₹${fmt(totalCycleCap)} Term 1 cap.`
               : isCycle2Unlocked
-              ? `You have reached the ₹${fmt(totalCycleCap)} total earning cap (Layer up to ₹${fmt(dynamicLayerCap)} + Royalty max ₹${fmt(maxRoyaltyCap)}). Earnings have stopped. You are eligible to activate Cycle 2 by purchasing ₹50,000 Academy Courses or via Renewal Hub.`
-              : `Total Cycle Earned: ₹${fmt(combinedCycleEarnings)} / ₹${fmt(totalCycleCap)} (Layer ₹${fmt(totalEarnings)}/₹${fmt(dynamicLayerCap)} + Royalty ₹${fmt(Math.min(maxRoyaltyCap, earnedRoyalty))}/₹${fmt(maxRoyaltyCap)} • ${combinedCyclePercent.toFixed(1)}%). Once ₹${fmt(totalCycleCap)} is reached or authorized by Admin, Cycle 2 will unlock.`}
+              ? `You have reached the ₹${fmt(totalCycleCap)} total earning cap (Layer up to ₹${fmt(dynamicLayerCap)} + Royalty max ₹${fmt(maxRoyaltyCap)}). Earnings have stopped. You are eligible to activate Term 2 by purchasing ₹50,000 Academy Courses or via Renewal Hub.`
+              : `Total Term Earned: ₹${fmt(combinedCycleEarnings)} / ₹${fmt(totalCycleCap)} (Layer ₹${fmt(totalEarnings)}/₹${fmt(dynamicLayerCap)} + Royalty ₹${fmt(Math.min(maxRoyaltyCap, earnedRoyalty))}/₹${fmt(maxRoyaltyCap)} • ${combinedCyclePercent.toFixed(1)}%). Once ₹${fmt(totalCycleCap)} is reached or authorized by Admin, Term 2 will unlock.`}
           </Typography>
         </Box>
         <Button
@@ -1397,13 +1397,13 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           {!isPackageActive
             ? "🔒 Package Inactive"
             : isCycle2Unlocked
-            ? "🚀 Activate Cycle 2 (Bulk ₹50k Purchase)"
-            : `🔒 Cycle 2 Locked (Earn ₹${fmt(totalCycleCap)} to Unlock)`}
+            ? "🚀 Activate Term 2 (Bulk ₹50k Purchase)"
+            : `🔒 Term 2 Locked (Earn ₹${fmt(totalCycleCap)} to Unlock)`}
         </Button>
       </Stack>
     </Paper>
 
-      {/* ── Unified Cycle Earning Limit Hero Card (Combined Layers + Royalty = ₹1.5 Lakh) ── */}
+      {/* ── Unified Term Earning Limit Hero Card (Combined Layers + Royalty = ₹1.5 Lakh) ── */}
       <Paper
         variant="outlined"
         sx={{
@@ -1435,15 +1435,15 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             </Box>
             <Box>
               <Typography sx={{ fontWeight: 900, fontSize: 13, color: isCapReached ? "#15803d" : "#1e40af", letterSpacing: 0.3 }}>
-                CYCLE EARNING LIMIT (LAYERS & ROYALTY) ⓘ
+                TERM EARNING LIMIT (LAYERS & ROYALTY) ⓘ
               </Typography>
               <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>
-                Combined total across all Layer Blocks and Shopping Royalty (Max ₹1.50 Lakh per Cycle)
+                Combined total across all Layer Blocks and Shopping Royalty (Max ₹1.50 Lakh per Term)
               </Typography>
             </Box>
           </Stack>
           <Chip
-            label={isCapReached ? "🎉 Limit Reached (Cycle 2 Unlocked)" : `Eligible ₹${fmt(totalCycleCap)}`}
+            label={isCapReached ? "🎉 Limit Reached (Term 2 Unlocked)" : `Eligible ₹${fmt(totalCycleCap)}`}
             color={isCapReached ? "success" : "primary"}
             sx={{ fontWeight: 900, fontSize: 12, height: 28 }}
           />
@@ -1454,7 +1454,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
         <Grid container spacing={2} alignItems="center">
           <Grid item xs={12} sm={6}>
             <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 700, mb: 0.5 }}>
-              TOTAL CYCLE EARNINGS (ACTIVE BUCKET)
+              TOTAL TERM EARNINGS (ACTIVE BUCKET)
             </Typography>
             <Stack direction="row" spacing={1} alignItems="baseline">
               <Typography sx={{ fontSize: { xs: 26, sm: 30 }, fontWeight: 900, color: "#0f172a" }}>
@@ -1486,8 +1486,8 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
 
             <Typography sx={{ fontSize: 11, color: isCapReached ? "#15803d" : "#475569", fontWeight: 700 }}>
               {isCapReached
-                ? "Cycle 1 complete! Any further income accumulates in Missing Blocks Income until Cycle 2 renewal."
-                : `💡 ₹${fmt(Math.max(0, totalCycleCap - combinedCycleEarnings))} headroom remaining to complete this cycle.`}
+                ? "Term 1 complete! Any further income accumulates in Missing Blocks Income until Term 2 renewal."
+                : `💡 ₹${fmt(Math.max(0, totalCycleCap - combinedCycleEarnings))} headroom remaining to complete this term.`}
             </Typography>
           </Grid>
 
@@ -1681,7 +1681,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             <Divider sx={{ my: 1 }} />
             <Typography sx={{ fontSize: 24, fontWeight: 900, color: "#c2410c", my: 0.5 }}>₹{fmt(missingIncome)}</Typography>
             <Typography sx={{ fontSize: 11, color: "#9a3412", mb: 1.5 }}>
-              Income generated after the combined ₹1.5L cycle limit is reached will be shown here.
+              Income generated after the combined ₹1.5L term limit is reached will be shown here.
             </Typography>
             <Button size="small" sx={{ textTransform: "none", color: "#c2410c", fontWeight: 800, p: 0 }}>
               View Missing Income &gt;
@@ -1910,7 +1910,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
         </TableContainer>
         <Box sx={{ p: 1.25, bgcolor: "#f8fafc", borderTop: "1px solid #e2e8f0", textAlign: "center" }}>
           <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748b" }}>
-            ⓘ Total Cycle Limit: ₹1,50,000 for Layer 10
+            ⓘ Total Term Limit: ₹1,50,000 for Layer 10
           </Typography>
         </Box>
       </Paper>
@@ -2191,16 +2191,16 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
         </Snackbar>
       )}
 
-      {/* ── Consumer Cycle 2 Renewal Hub Modal ── */}
+      {/* ── Consumer Term 2 Renewal Hub Modal ── */}
       <ConsumerCycleRenewalDialog
         open={cycleRenewalOpen}
         onClose={() => setCycleRenewalOpen(false)}
         walletMe={walletMe}
-        currentCycle={consumerCycleState.cycle || "Cycle 1"}
+        currentCycle={consumerCycleState.cycle || "Term 1"}
         onRenewSuccess={() => {
           setConsumerCycleState((prev) => ({
             ...prev,
-            cycle: "Cycle 2",
+            cycle: "Term 2",
             status: "active",
           }));
         }}

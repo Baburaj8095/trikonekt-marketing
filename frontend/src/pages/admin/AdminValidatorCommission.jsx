@@ -60,7 +60,7 @@ export default function AdminValidatorCommission() {
   // Selected User for Commission Setting & Cycle Activator
   const [selectedUser, setSelectedUser] = useState(null);
   const [userCycleConfig, setUserCycleConfig] = useState({
-    cycle: "Cycle 2",
+    cycle: "Term 2",
     baseAmount: 200000,
     profitPercent: 75,
     gstPercent: 18,
@@ -141,7 +141,7 @@ export default function AdminValidatorCommission() {
           district: u.district || u.city || "Tumakuru",
           state: u.state_name || u.state || "Karnataka",
           level: levelNameMap[u.category] || levelNameMap[franchiseLevel] || "Franchise Partner",
-          activeCycle: storedCycle.active_cycle || "Cycle 1",
+          activeCycle: storedCycle.active_cycle ? String(storedCycle.active_cycle).replace(/Cycle/gi, "Term") : "Term 1",
           cycleStatus: storedCycle.status || "active",
           completionPct: storedCycle.completion_pct ?? (storedCycle.status === "completed" ? 100 : 0),
           baseAmount: base,
@@ -160,12 +160,12 @@ export default function AdminValidatorCommission() {
     } catch (_) {
       // Offline fallback mock data strictly for franchise
       const fallbackList = [
-        { id: 1080, franchiseId: "FR560073001", name: "Ravi Kumar", phone: "9999999999", pincode: "560073", district: "Tumakuru", state: "Karnataka", level: "Pincode Owner", activeCycle: "Cycle 2", cycleStatus: "active", completionPct: 14.03, baseAmount: 200000, profitPercent: 75, totalLimit: 350000, status: "Active" },
-        { id: 1081, franchiseId: "FR560082001", name: "Sumanth M", phone: "9845011111", pincode: "560082", district: "Bengaluru", state: "Karnataka", level: "Pincode Owner", activeCycle: "Cycle 1", cycleStatus: "completed", completionPct: 100, baseAmount: 200000, profitPercent: 75, totalLimit: 350000, status: "Active" },
-        { id: 1082, franchiseId: "FR560090001", name: "Lakshmi N", phone: "9845022222", pincode: "560090", district: "Bengaluru", state: "Karnataka", level: "Pincode Owner", activeCycle: "Cycle 1", cycleStatus: "active", completionPct: 45.2, baseAmount: 200000, profitPercent: 75, totalLimit: 350000, status: "Active" },
-        { id: 1083, franchiseId: "FR562130001", name: "Manjunath S", phone: "9845033333", pincode: "562130", district: "Ramanagara", state: "Karnataka", level: "Pincode Owner", activeCycle: "Cycle 2", cycleStatus: "active", completionPct: 22.0, baseAmount: 200000, profitPercent: 75, totalLimit: 350000, status: "Active" },
-        { id: 1084, franchiseId: "FR570001001", name: "Priya H", phone: "9845044444", pincode: "570001", district: "Kolar", state: "Karnataka", level: "Pincode Owner", activeCycle: "Cycle 1", cycleStatus: "completed", completionPct: 100, baseAmount: 200000, profitPercent: 75, totalLimit: 350000, status: "Active" },
-        { id: 1085, franchiseId: "FR570010001", name: "Shashikala", phone: "9845055555", pincode: "570010", district: "Kolar", state: "Karnataka", level: "Pincode Owner", activeCycle: "Cycle 1", cycleStatus: "active", completionPct: 80.5, baseAmount: 200000, profitPercent: 75, totalLimit: 350000, status: "Active" },
+        { id: 1080, franchiseId: "FR560073001", name: "Ravi Kumar", phone: "9999999999", pincode: "560073", district: "Tumakuru", state: "Karnataka", level: "Pincode Owner", activeCycle: "Term 2", cycleStatus: "active", completionPct: 14.03, baseAmount: 200000, profitPercent: 75, totalLimit: 350000, status: "Active" },
+        { id: 1081, franchiseId: "FR560082001", name: "Sumanth M", phone: "9845011111", pincode: "560082", district: "Bengaluru", state: "Karnataka", level: "Pincode Owner", activeCycle: "Term 1", cycleStatus: "completed", completionPct: 100, baseAmount: 200000, profitPercent: 75, totalLimit: 350000, status: "Active" },
+        { id: 1082, franchiseId: "FR560090001", name: "Lakshmi N", phone: "9845022222", pincode: "560090", district: "Bengaluru", state: "Karnataka", level: "Pincode Owner", activeCycle: "Term 1", cycleStatus: "active", completionPct: 45.2, baseAmount: 200000, profitPercent: 75, totalLimit: 350000, status: "Active" },
+        { id: 1083, franchiseId: "FR562130001", name: "Manjunath S", phone: "9845033333", pincode: "562130", district: "Ramanagara", state: "Karnataka", level: "Pincode Owner", activeCycle: "Term 2", cycleStatus: "active", completionPct: 22.0, baseAmount: 200000, profitPercent: 75, totalLimit: 350000, status: "Active" },
+        { id: 1084, franchiseId: "FR570001001", name: "Priya H", phone: "9845044444", pincode: "570001", district: "Kolar", state: "Karnataka", level: "Pincode Owner", activeCycle: "Term 1", cycleStatus: "completed", completionPct: 100, baseAmount: 200000, profitPercent: 75, totalLimit: 350000, status: "Active" },
+        { id: 1085, franchiseId: "FR570010001", name: "Shashikala", phone: "9845055555", pincode: "570010", district: "Kolar", state: "Karnataka", level: "Pincode Owner", activeCycle: "Term 1", cycleStatus: "active", completionPct: 80.5, baseAmount: 200000, profitPercent: 75, totalLimit: 350000, status: "Active" },
       ];
       setUsersList(fallbackList);
       setTotalCount(fallbackList.length);
@@ -183,7 +183,7 @@ export default function AdminValidatorCommission() {
     setSelectedUser(user);
     setActiveStep(4);
     setUserCycleConfig({
-      cycle: user.activeCycle || "Cycle 1",
+      cycle: user.activeCycle ? String(user.activeCycle).replace(/Cycle/gi, "Term") : "Term 1",
       baseAmount: user.baseAmount != null ? Number(user.baseAmount) : 200000,
       profitPercent: user.profitPercent != null ? Number(user.profitPercent) : 75,
       gstPercent: 18,
@@ -206,8 +206,8 @@ export default function AdminValidatorCommission() {
   const profitAmt = (baseAmt * profitPct) / 100;
   const totalEligibleLimit = baseAmt + profitAmt;
 
-  // Cycle 2+ Taxes (18% GST + 7% Admin Charge on Renewal)
-  const isRenewalCycle = userCycleConfig.cycle !== "Cycle 1";
+  // Term 2+ Taxes (18% GST + 7% Admin Charge on Renewal)
+  const isRenewalCycle = userCycleConfig.cycle !== "Term 1" && userCycleConfig.cycle !== "Cycle 1";
   const gstAmt = isRenewalCycle ? (baseAmt * Number(userCycleConfig.gstPercent || 18)) / 100 : 0;
   const adminChargeAmt = isRenewalCycle ? (baseAmt * Number(userCycleConfig.adminChargePercent || 7)) / 100 : 0;
   const totalPayableFromWallet = baseAmt + gstAmt + adminChargeAmt;
@@ -352,7 +352,7 @@ export default function AdminValidatorCommission() {
                 Admin Validator Commission Setup
               </Typography>
               <Typography sx={{ fontSize: { xs: 11, sm: 12.5 }, color: "#64748B", fontWeight: 600 }}>
-                Set Amount & Profit Percentage for Specific Franchisee • Cycle Earning Limits & Activator
+                Set Amount & Profit Percentage for Specific Franchisee • Term Earning Limits & Activator
               </Typography>
             </Box>
           </Stack>
@@ -495,16 +495,16 @@ export default function AdminValidatorCommission() {
             <TextField
               select
               size="small"
-              label="Cycle"
+              label="Term"
               value={selectedCycleFilter}
               onChange={(e) => setSelectedCycleFilter(e.target.value)}
               sx={{ flex: 0.9 }}
             >
-              <MenuItem value="all">All Cycles</MenuItem>
-              <MenuItem value="Cycle 1">Cycle 1</MenuItem>
-              <MenuItem value="Cycle 2">Cycle 2</MenuItem>
-              <MenuItem value="Cycle 3">Cycle 3</MenuItem>
-              <MenuItem value="Cycle 4">Cycle 4</MenuItem>
+              <MenuItem value="all">All Terms</MenuItem>
+              <MenuItem value="Term 1">Term 1</MenuItem>
+              <MenuItem value="Term 2">Term 2</MenuItem>
+              <MenuItem value="Term 3">Term 3</MenuItem>
+              <MenuItem value="Term 4">Term 4</MenuItem>
               <MenuItem value="Others">Others</MenuItem>
             </TextField>
           </Stack>
@@ -615,14 +615,14 @@ export default function AdminValidatorCommission() {
                               {user.franchiseId}
                             </Typography>
                             <Chip
-                              label={user.activeCycle}
+                              label={String(user.activeCycle || "Term 1").replace(/Cycle/gi, "Term")}
                               size="small"
                               sx={{
                                 height: 20,
                                 fontSize: 10,
                                 fontWeight: 800,
-                                bgcolor: user.activeCycle === "Cycle 2" ? "#DBEAFE" : "#F1F5F9",
-                                color: user.activeCycle === "Cycle 2" ? "#1D4ED8" : "#475569",
+                                bgcolor: String(user.activeCycle).includes("2") ? "#DBEAFE" : "#F1F5F9",
+                                color: String(user.activeCycle).includes("2") ? "#1D4ED8" : "#475569",
                               }}
                             />
                             {isCapReached && (
@@ -693,7 +693,7 @@ export default function AdminValidatorCommission() {
                   <TableCell sx={{ fontWeight: 800, fontSize: 11.5, color: "#475569" }}>Pincode</TableCell>
                   <TableCell sx={{ fontWeight: 800, fontSize: 11.5, color: "#475569" }}>District</TableCell>
                   <TableCell sx={{ fontWeight: 800, fontSize: 11.5, color: "#475569" }}>State</TableCell>
-                  <TableCell sx={{ fontWeight: 800, fontSize: 11.5, color: "#475569" }}>Cycle</TableCell>
+                  <TableCell sx={{ fontWeight: 800, fontSize: 11.5, color: "#475569" }}>Term</TableCell>
                   <TableCell sx={{ fontWeight: 800, fontSize: 11.5, color: "#475569" }}>Cap %</TableCell>
                   <TableCell sx={{ fontWeight: 800, fontSize: 11.5, color: "#475569", textAlign: "center" }}>Action</TableCell>
                 </TableRow>
@@ -744,14 +744,14 @@ export default function AdminValidatorCommission() {
                           <TableCell sx={{ fontSize: 12, color: "#475569" }}>{user.state}</TableCell>
                           <TableCell sx={{ fontSize: 11, fontWeight: 800 }}>
                             <Chip
-                              label={user.activeCycle}
+                              label={String(user.activeCycle || "Term 1").replace(/Cycle/gi, "Term")}
                               size="small"
                               sx={{
                                 height: 20,
                                 fontSize: 10,
                                 fontWeight: 800,
-                                bgcolor: user.activeCycle === "Cycle 2" ? "#EFF6FF" : "#F1F5F9",
-                                color: user.activeCycle === "Cycle 2" ? "#1D4ED8" : "#475569",
+                                bgcolor: String(user.activeCycle).includes("2") ? "#EFF6FF" : "#F1F5F9",
+                                color: String(user.activeCycle).includes("2") ? "#1D4ED8" : "#475569",
                               }}
                             />
                           </TableCell>
@@ -869,21 +869,21 @@ export default function AdminValidatorCommission() {
             </Typography>
 
             <Stack spacing={1.5} sx={{ mb: 2 }}>
-              {/* Row 1: Cycle Selector, Base Amount, Profit % (Responsive Grid) */}
+              {/* Row 1: Term Selector, Base Amount, Profit % (Responsive Grid) */}
               <Grid container spacing={1.5}>
                 <Grid item xs={12} sm={4}>
                   <TextField
                     select
                     fullWidth
                     size="small"
-                    label="Cycle"
+                    label="Term"
                     value={userCycleConfig.cycle}
                     onChange={(e) => setUserCycleConfig((c) => ({ ...c, cycle: e.target.value }))}
                   >
-                    <MenuItem value="Cycle 1">Cycle 1</MenuItem>
-                    <MenuItem value="Cycle 2">Cycle 2</MenuItem>
-                    <MenuItem value="Cycle 3">Cycle 3</MenuItem>
-                    <MenuItem value="Cycle 4">Cycle 4</MenuItem>
+                    <MenuItem value="Term 1">Term 1</MenuItem>
+                    <MenuItem value="Term 2">Term 2</MenuItem>
+                    <MenuItem value="Term 3">Term 3</MenuItem>
+                    <MenuItem value="Term 4">Term 4</MenuItem>
                     <MenuItem value="Others">Others</MenuItem>
                   </TextField>
                 </Grid>
@@ -940,7 +940,7 @@ export default function AdminValidatorCommission() {
                 </Typography>
               </Box>
 
-              {/* ── 2ND CYCLE ONWARDS: GST (18%) + ADMIN CHARGE (7%) BREAKDOWN ── */}
+              {/* ── 2ND TERM ONWARDS: GST (18%) + ADMIN CHARGE (7%) BREAKDOWN ── */}
               {isRenewalCycle && (
                 <Paper elevation={0} sx={{ p: 1.6, borderRadius: "14px", bgcolor: "#FFFBEB", border: "1px solid #FDE68A" }}>
                   <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={0.8} sx={{ mb: 1 }}>
@@ -955,7 +955,7 @@ export default function AdminValidatorCommission() {
                       <TextField
                         size="small"
                         type="number"
-                        label="Cycle GST Rate (%)"
+                        label="Term GST Rate (%)"
                         value={userCycleConfig.gstPercent}
                         onChange={(e) => setUserCycleConfig((c) => ({ ...c, gstPercent: Number(e.target.value) }))}
                         fullWidth
@@ -1017,10 +1017,10 @@ export default function AdminValidatorCommission() {
               </Table>
             </TableContainer>
 
-            {/* ── CYCLE ACTIVATOR CONTROLS (ADMIN CONTROLLED) ── */}
+            {/* ── TERM ACTIVATOR CONTROLS (ADMIN CONTROLLED) ── */}
             <Paper elevation={0} sx={{ p: 1.6, mb: 2, borderRadius: "14px", bgcolor: "#EFF6FF", border: "1px solid #BFDBFE" }}>
               <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#1E40AF", mb: 0.5 }}>
-                ⚙️ Admin Cycle Activator & Access Gate
+                ⚙️ Admin Term Activator & Access Gate
               </Typography>
               <Typography sx={{ fontSize: 11, color: "#3B82F6", mb: 1.5 }}>
                 Control whether {selectedUser.name} can enter {userCycleConfig.cycle}. Admin can directly activate or authorize in-app self-renewal.
@@ -1111,7 +1111,7 @@ export default function AdminValidatorCommission() {
               No Franchisee Selected
             </Typography>
             <Typography sx={{ fontSize: 12.5, color: "#64748B", mt: 0.5, maxWidth: 320, mx: "auto" }}>
-              Click the <strong>Edit</strong> button on any franchise partner from the list to set their Base Amount, Profit %, and activate their Cycles.
+              Click the <strong>Edit</strong> button on any franchise partner from the list to set their Base Amount, Profit %, and activate their Terms.
             </Typography>
           </Paper>
         )}

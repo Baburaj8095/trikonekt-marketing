@@ -1453,8 +1453,8 @@ function SPPMonthlyCadenceWidget() {
 
           <Typography sx={{ fontSize: 12, color: "rgba(255, 255, 255, 0.88)", fontWeight: 500 }}>
             {isCompleted
-              ? "All 12 cycles completed! Maturity unlocked."
-              : `${remaining} boxes remaining to complete this cycle`}
+              ? "All 12 terms completed! Maturity unlocked."
+              : `${remaining} boxes remaining to complete this term`}
           </Typography>
         </Box>
 
@@ -1493,7 +1493,7 @@ function ConsumerCycleRenewalWidget({ onOpenPurchase, cycleState, totalCycleEarn
         <Box>
           <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.8 }}>
             <Chip
-              label={`Cycle ${currentCycleNum} Active`}
+              label={`Term ${currentCycleNum} Active`}
               size="small"
               sx={{ bgcolor: "#22C55E", color: "#FFF", fontWeight: 900, fontSize: 11 }}
             />
@@ -1511,12 +1511,12 @@ function ConsumerCycleRenewalWidget({ onOpenPurchase, cycleState, totalCycleEarn
             )}
           </Stack>
           <Typography sx={{ fontSize: { xs: 16, sm: 18 }, fontWeight: 950, color: "#FFFFFF", letterSpacing: "-0.02em" }}>
-            🔄 Cycle 2+ Academy All Courses Bulk Purchase
+            🔄 Term 2+ Academy All Courses Bulk Purchase
           </Typography>
           <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.85)", mt: 0.5, maxWidth: 540 }}>
             {isUnlocked
-              ? `Cycle ${currentCycleNum} earning cap achieved! Unlock all 3 tracks for Cycle ${currentCycleNum + 1} at once (₹50,000) using Main Wallet or Coupon Pocket for fresh ₹1.5L earning cap.`
-              : `Current Cycle: Cycle ${currentCycleNum}. Total Earning Limit: ₹${totalLimit.toLocaleString("en-IN")}. Cycle ${currentCycleNum + 1} renewal unlocks automatically once earning limit is reached.`}
+              ? `Term ${currentCycleNum} earning cap achieved! Unlock all 3 tracks for Term ${currentCycleNum + 1} at once (₹50,000) using Main Wallet or Coupon Pocket for fresh ₹1.5L earning cap.`
+              : `Current Term: Term ${currentCycleNum}. Total Earning Limit: ₹${totalLimit.toLocaleString("en-IN")}. Term ${currentCycleNum + 1} renewal unlocks automatically once earning limit is reached.`}
           </Typography>
         </Box>
 
@@ -1545,7 +1545,7 @@ function ConsumerCycleRenewalWidget({ onOpenPurchase, cycleState, totalCycleEarn
             "&:hover": { bgcolor: isUnlocked ? "#D97706" : "rgba(255,255,255,0.18)" },
           }}
         >
-          {isUnlocked ? "🚀 Buy All Courses (₹50k)" : `🔒 Cycle ${currentCycleNum + 1} Locked (Cap: ₹1.5L)`}
+          {isUnlocked ? "🚀 Buy All Courses (₹50k)" : `🔒 Term ${currentCycleNum + 1} Locked (Cap: ₹1.5L)`}
         </Button>
       </Stack>
     </Paper>
@@ -1582,7 +1582,8 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
       await API.post("/api/admin/validator/purchase-bulk-courses", {
         userId: walletMe?.id || walletMe?.user_id,
         userCode: walletMe?.user_code || walletMe?.username,
-        cycle: `Cycle ${nextCycleNum}`,
+        cycle: `Term ${nextCycleNum}`,
+        term: nextCycleNum,
         paymentSource,
         baseAmount: baseAmt,
       }).catch(() => null);
@@ -1605,7 +1606,7 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
         }
       } catch (_) {}
 
-      setSuccessMsg(`🎉 All ₹50,000 Academy Courses purchased successfully! Cycle ${nextCycleNum} is now active.`);
+      setSuccessMsg(`🎉 All ₹50,000 Academy Courses purchased successfully! Term ${nextCycleNum} is now active.`);
       setTimeout(() => {
         if (onPurchaseSuccess) onPurchaseSuccess(newState);
         onClose();
@@ -1620,11 +1621,11 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "20px", p: 1 } }}>
       <DialogTitle sx={{ fontWeight: 950, fontSize: 18, color: "#0F172A", pb: 1 }}>
-        🔄 Buy All Academy Courses (₹50,000) & Unlock Cycle {nextCycleNum}
+        🔄 Buy All Academy Courses (₹50,000) & Unlock Term {nextCycleNum}
       </DialogTitle>
       <DialogContent dividers sx={{ borderColor: "#EEF2F6" }}>
         <Typography sx={{ fontSize: 12.5, color: "#64748B", mb: 2 }}>
-          Purchase all 3 academic curriculum tracks at once. Your earnings will reset into <strong>Cycle {nextCycleNum}</strong> with fresh limits and new Matrix placement.
+          Purchase all 3 academic curriculum tracks at once. Your earnings will reset into <strong>Term {nextCycleNum}</strong> with fresh limits and new Matrix placement.
         </Typography>
 
         {/* 3 Tracks Breakdown */}
@@ -1669,7 +1670,7 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
         {/* Fresh Limits Granted */}
         <Box sx={{ p: 1.5, borderRadius: "12px", bgcolor: "#ECFDF5", border: "1px solid #BBF7D0", mb: 2 }}>
           <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#166534" }}>
-            ✨ FRESH LIMITS GRANTED FOR CYCLE {nextCycleNum}:
+            ✨ FRESH LIMITS GRANTED FOR TERM {nextCycleNum}:
           </Typography>
           <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.5 }}>
             <Typography sx={{ fontSize: 12, color: "#15803D" }}>Layer Cap: ₹1,00,000.00</Typography>
@@ -1745,7 +1746,7 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
             "&:hover": { bgcolor: "#047857" },
           }}
         >
-          {submitting ? "Processing..." : `🚀 Pay ₹${totalPayable.toLocaleString("en-IN")} & Unlock Cycle ${nextCycleNum}`}
+          {submitting ? "Processing..." : `🚀 Pay ₹${totalPayable.toLocaleString("en-IN")} & Unlock Term ${nextCycleNum}`}
         </Button>
       </DialogActions>
     </Dialog>

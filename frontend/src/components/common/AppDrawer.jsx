@@ -71,7 +71,7 @@ export default function AppDrawer({
       title: "PACKAGES",
       items: [
         { label: "E-edu Agent Academy", to: academySsoUrl, external: true, icon: SchoolOutlinedIcon },
-        { label: "Academic Cycles & Caps", to: "/user/team-dashboard?action=cycle-bulk-buy", icon: AutorenewRoundedIcon },
+        { label: "Academic Terms & Caps", to: "/user/team-dashboard?action=cycle-bulk-buy", icon: AutorenewRoundedIcon },
         { label: "E-edu Purchase History", to: "/user/prime-invoices", icon: ReceiptLongOutlinedIcon },
         { label: "Smart Shopping Voucher", to: "/user/spp-gift-cards", icon: CardGiftcardOutlinedIcon },
         { label: "Tri Holiday Packages", to: "/user/tri/tri-holidays", icon: FlightTakeoffOutlinedIcon },

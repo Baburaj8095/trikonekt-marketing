@@ -523,7 +523,7 @@ export default function SPPGiftCards() {
                   }}
                 />
                 <Typography variant="subtitle2" sx={{ fontWeight: 800, color: "#0f172a" }}>
-                  30-Day Monthly Renewal Cycle
+                  30-Day Monthly Renewal Term
                 </Typography>
               </Stack>
               <Typography variant="body2" sx={{ color: "#475569", fontWeight: 500, fontSize: "13px" }}>
