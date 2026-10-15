@@ -99,7 +99,19 @@ def _update_matrix_progress(user: CustomUser, pool_type: str, level: int, amount
     """
     try:
         from business.models import UserMatrixProgress  # local import to avoid cycles
-        mp, _ = UserMatrixProgress.objects.get_or_create(user=user, pool_type=pool_type)
+        cache = getattr(user, "_mp_cache", None)
+        if cache is None:
+            cache = {}
+            try:
+                user._mp_cache = cache
+            except Exception:
+                pass
+
+        mp = cache.get(pool_type)
+        if not mp:
+            mp, _ = UserMatrixProgress.objects.get_or_create(user=user, pool_type=pool_type)
+            cache[pool_type] = mp
+
         amt_q = _q2(amount)
         mp.total_earned = _q2((mp.total_earned or Decimal("0.00")) + amt_q)
         try:
