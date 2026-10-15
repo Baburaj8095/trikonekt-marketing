@@ -1334,69 +1334,74 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             : "linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)",
           border: "1.5px solid",
           borderColor: isCycle2Unlocked ? "#F59E0B" : !isPackageActive ? "#F87171" : "#86EFAC",
+          overflow: "hidden",
         }}
-      >
-        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1.5}>
-          <Box>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography sx={{ fontSize: 14.5, fontWeight: 950, color: isCycle2Unlocked ? "#92400E" : !isPackageActive ? "#991B1B" : "#14532D" }}>
-                {!isPackageActive
-                  ? `🔒 ${consumerActiveCycle} Locked: Package Inactive`
-                  : isCycle2Unlocked
-                  ? `🏆 ${consumerActiveCycle} Cap Reached (₹${fmt(totalCycleCap)} Limit Met)!`
-                  : `♾️ ${consumerActiveCycle} Earning Limit: ₹${fmt(totalCycleCap)} (Layer ₹${fmt(maxLayerCap)} + Royalty ₹${fmt(maxRoyaltyCap)})`}
-              </Typography>
-              <Chip
-                label={!isPackageActive ? "Inactive" : isCycle2Unlocked ? "Earning Stopped / Unlocked" : "Active"}
-                size="small"
-                sx={{
-                  bgcolor: !isPackageActive ? "#DC2626" : isCycle2Unlocked ? "#D97706" : "#16A34A",
-                  color: "#FFF",
-                  fontWeight: 900,
-                  fontSize: 10,
-                  height: 20,
-                }}
-              />
-            </Stack>
-            <Typography sx={{ fontSize: 11.5, color: isCycle2Unlocked ? "#78350F" : !isPackageActive ? "#7F1D1D" : "#166534", mt: 0.5 }}>
+    >
+      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} spacing={1.5}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.5 }}>
+            <Typography sx={{ fontSize: 14, fontWeight: 950, color: isCycle2Unlocked ? "#92400E" : !isPackageActive ? "#991B1B" : "#14532D" }}>
               {!isPackageActive
-                ? `Your package is inactive. Activate the ₹2,000 Starter Package on asiyapp.com to start receiving layer & royalty earnings toward the ₹${fmt(totalCycleCap)} Cycle 1 cap.`
+                ? `🔒 ${consumerActiveCycle} Locked: Package Inactive`
                 : isCycle2Unlocked
-                ? `You have reached the ₹${fmt(totalCycleCap)} total earning cap (Layer ₹${fmt(maxLayerCap)} + Royalty ₹${fmt(maxRoyaltyCap)}). Earnings have stopped. You are eligible to activate Cycle 2 by purchasing ₹50,000 Academy Courses or via Renewal Hub.`
-                : `Total Cycle Earned: ₹${fmt(totalEarnings + earnedRoyalty)} / ₹${fmt(totalCycleCap)} (Layer ₹${fmt(totalEarnings)}/₹${fmt(maxLayerCap)} + Royalty ₹${fmt(earnedRoyalty)}/₹${fmt(maxRoyaltyCap)} • ${(((totalEarnings + earnedRoyalty) / totalCycleCap) * 100).toFixed(1)}%). Once ₹${fmt(totalCycleCap)} is reached or authorized by Admin, Cycle 2 will unlock.`}
+                ? `🏆 ${consumerActiveCycle} Cap Reached (₹${fmt(totalCycleCap)} Limit Met)!`
+                : `♾️ ${consumerActiveCycle} Earning Limit: ₹${fmt(totalCycleCap)}`}
             </Typography>
-          </Box>
-          <Button
-            variant="contained"
-            disabled={!isCycle2Unlocked}
-            onClick={() => {
-              if (isCycle2Unlocked) {
-                navigate("/user/team-dashboard?action=cycle-bulk-buy");
-              }
-            }}
-            sx={{
-              bgcolor: isCycle2Unlocked ? "#D97706" : "#94A3B8",
-              color: "#FFF",
-              fontWeight: 900,
-              fontSize: 11.5,
-              textTransform: "none",
-              px: 2.2,
-              py: 0.8,
-              borderRadius: "10px",
-              whiteSpace: "nowrap",
-              cursor: isCycle2Unlocked ? "pointer" : "not-allowed",
-              "&.Mui-disabled": { bgcolor: "#CBD5E1", color: "#64748B" },
-              "&:hover": { bgcolor: isCycle2Unlocked ? "#B45309" : "#94A3B8" },
-            }}
-          >
+            <Chip
+              label={!isPackageActive ? "Inactive" : isCycle2Unlocked ? "Cap Reached • Unlocked" : "Active"}
+              size="small"
+              sx={{
+                bgcolor: !isPackageActive ? "#DC2626" : isCycle2Unlocked ? "#D97706" : "#16A34A",
+                color: "#FFF",
+                fontWeight: 900,
+                fontSize: 10,
+                height: 20,
+              }}
+            />
+          </Stack>
+          <Typography sx={{ fontSize: 11.5, color: isCycle2Unlocked ? "#78350F" : !isPackageActive ? "#7F1D1D" : "#166534", mt: 0.5 }}>
             {!isPackageActive
-              ? "🔒 Package Inactive"
+              ? `Your package is inactive. Activate the ₹2,000 Starter Package on asiyapp.com to start receiving layer & royalty earnings toward the ₹${fmt(totalCycleCap)} Cycle 1 cap.`
               : isCycle2Unlocked
-              ? "🚀 Activate Cycle 2 (Bulk ₹50k Purchase)"
-              : `🔒 Cycle 2 Locked (Earn ₹${fmt(totalCycleCap)} Cap to Unlock)`}
-          </Button>
-        </Stack>
-      </Paper>
+              ? `You have reached the ₹${fmt(totalCycleCap)} total earning cap (Layer up to ₹${fmt(dynamicLayerCap)} + Royalty max ₹${fmt(maxRoyaltyCap)}). Earnings have stopped. You are eligible to activate Cycle 2 by purchasing ₹50,000 Academy Courses or via Renewal Hub.`
+              : `Total Cycle Earned: ₹${fmt(combinedCycleEarnings)} / ₹${fmt(totalCycleCap)} (Layer ₹${fmt(totalEarnings)}/₹${fmt(dynamicLayerCap)} + Royalty ₹${fmt(Math.min(maxRoyaltyCap, earnedRoyalty))}/₹${fmt(maxRoyaltyCap)} • ${combinedCyclePercent.toFixed(1)}%). Once ₹${fmt(totalCycleCap)} is reached or authorized by Admin, Cycle 2 will unlock.`}
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
+          disabled={!isCycle2Unlocked}
+          onClick={() => {
+            if (isCycle2Unlocked) {
+              navigate("/user/team-dashboard?action=cycle-bulk-buy");
+            }
+          }}
+          sx={{
+            bgcolor: isCycle2Unlocked ? "#D97706" : "#94A3B8",
+            color: "#FFF",
+            fontWeight: 900,
+            fontSize: 11.5,
+            textTransform: "none",
+            px: 2,
+            py: 0.9,
+            borderRadius: "10px",
+            whiteSpace: "normal",
+            textAlign: "center",
+            lineHeight: 1.3,
+            width: { xs: "100%", sm: "auto" },
+            flexShrink: 0,
+            cursor: isCycle2Unlocked ? "pointer" : "not-allowed",
+            "&.Mui-disabled": { bgcolor: "#CBD5E1", color: "#64748B" },
+            "&:hover": { bgcolor: isCycle2Unlocked ? "#B45309" : "#94A3B8" },
+          }}
+        >
+          {!isPackageActive
+            ? "🔒 Package Inactive"
+            : isCycle2Unlocked
+            ? "🚀 Activate Cycle 2 (Bulk ₹50k Purchase)"
+            : `🔒 Cycle 2 Locked (Earn ₹${fmt(totalCycleCap)} to Unlock)`}
+        </Button>
+      </Stack>
+    </Paper>
 
       {/* ── Unified Cycle Earning Limit Hero Card (Combined Layers + Royalty = ₹1.5 Lakh) ── */}
       <Paper
