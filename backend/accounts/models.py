@@ -979,10 +979,6 @@ class Wallet(models.Model):
                         if (w.balance or D("0")) < D("250.00"):
                             break
 
-                        # Deduct the ₹250 pack from the self-reserve pocket
-                        w.self_account_balance = cur_self - D("250.00")
-                        w.save(update_fields=["updated_at"])
-
                         # Record SELF_ACCOUNT_DEBIT marker with breakdown and pack index
                         try:
                             existing = WalletTransaction.objects.filter(
@@ -1009,7 +1005,8 @@ class Wallet(models.Model):
                             }
                         )
 
-                        # Post double-entry debit to WalletEngine
+                        # Post single canonical debit to WalletEngine double-entry ledger
+                        posted_double_entry = False
                         try:
                             from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
                             from accounts.wallet_engine import WalletEngine, LedgerPosting
@@ -1034,9 +1031,16 @@ class Wallet(models.Model):
                                 remarks=f"Self Rebirth ID #{pack_index} (₹250)",
                                 postings=postings,
                             )
+                            posted_double_entry = True
                         except Exception as e_de:
+                            posted_double_entry = False
                             import logging
                             logging.getLogger(__name__).warning(f"Double-entry self rebirth debit failed: {e_de}")
+
+                        if not posted_double_entry:
+                            # Fallback if WalletEngine double-entry is unavailable
+                            w.self_account_balance = max(D("0.00"), cur_self - D("250.00"))
+                        w.save(update_fields=["updated_at"])
 
                         pack_to_distribute = pack_index
                 except Exception as e_loop:
