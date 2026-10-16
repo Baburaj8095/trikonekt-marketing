@@ -459,14 +459,44 @@ class Wallet(models.Model):
             if not user or not getattr(user, "id", None):
                 return Decimal("150000.00")
 
-            last_renewal = WalletTransaction.objects.filter(
+            renewal_txs = list(WalletTransaction.objects.filter(
                 user=user,
                 type__in=["ACADEMIC_TERM_RENEWAL", "TERM_RENEWAL"]
-            ).order_by("-created_at").values_list("created_at", flat=True).first()
+            ).order_by("created_at"))
+
+            active_term_start = None
+            if renewal_txs:
+                max_term = 1
+                for r in renewal_txs:
+                    t_val = (r.meta or {}).get("term")
+                    if not t_val:
+                        try:
+                            t_val = int(str(r.source_id).replace("TERM_", ""))
+                        except Exception:
+                            t_val = None
+                    if t_val:
+                        try:
+                            max_term = max(max_term, int(t_val))
+                        except Exception:
+                            pass
+                term_dts = []
+                for r in renewal_txs:
+                    t_val = (r.meta or {}).get("term")
+                    if not t_val:
+                        try:
+                            t_val = int(str(r.source_id).replace("TERM_", ""))
+                        except Exception:
+                            t_val = None
+                    if t_val and int(t_val) == max_term:
+                        term_dts.append(r.created_at)
+                if term_dts:
+                    active_term_start = min(term_dts)
+                else:
+                    active_term_start = renewal_txs[-1].created_at
 
             t_filter = Q(user=user, amount__gt=0)
-            if last_renewal:
-                t_filter &= Q(created_at__gte=last_renewal)
+            if active_term_start:
+                t_filter &= Q(created_at__gte=active_term_start)
 
             q_royalty = Q(type="GLOBAL_ROYALTY") | Q(meta__orig_type="GLOBAL_ROYALTY") | Q(source_type="DAILY_POOL_DISTRIBUTION")
             q_layer = (

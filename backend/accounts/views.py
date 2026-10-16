@@ -4543,19 +4543,39 @@ def wallet_me_history(request):
         term_tracks[cur_key] = ["TRACK_1"]
     active_term_tracks = term_tracks.get(cur_key, ["TRACK_1"])
 
+    # Map each purchased term to its earliest activation timestamp
+    term_start_dts = {}
+    for r in renewal_txs:
+        t_val = (r.meta or {}).get("term")
+        if not t_val:
+            try:
+                t_val = int(str(r.source_id).replace("TERM_", ""))
+            except Exception:
+                t_val = None
+        if t_val:
+            try:
+                t_int = int(t_val)
+                if t_int not in term_start_dts or r.created_at < term_start_dts[t_int]:
+                    term_start_dts[t_int] = r.created_at
+            except Exception:
+                pass
+
     # Precalculate exact database SQL sums for each purchased term
     term_stats = {}
     for idx, t_num in enumerate(purchased_terms):
         t_str = str(t_num)
-        if idx == 0:
-            t_bound = Q(created_at__lt=renewal_txs[0].created_at) if renewal_txs else Q()
+        if t_num == 1:
+            first_renewal = term_start_dts.get(2) or (min(term_start_dts.values()) if term_start_dts else None)
+            t_bound = Q(created_at__lt=first_renewal) if first_renewal else Q()
         else:
-            start_dt = renewal_txs[idx - 1].created_at
-            if idx < len(renewal_txs):
-                end_dt = renewal_txs[idx].created_at
-                t_bound = Q(created_at__gte=start_dt, created_at__lt=end_dt)
+            start_dt = term_start_dts.get(t_num)
+            higher_terms = [t for t in purchased_terms if t > t_num]
+            if higher_terms and term_start_dts.get(min(higher_terms)):
+                end_dt = term_start_dts.get(min(higher_terms))
+                t_bound = Q(created_at__gte=start_dt, created_at__lt=end_dt) if (start_dt and end_dt) else (Q(created_at__gte=start_dt) if start_dt else Q())
             else:
-                t_bound = Q(created_at__gte=start_dt)
+                # Latest purchased active term (e.g. Term 2) has NO end date!
+                t_bound = Q(created_at__gte=start_dt) if start_dt else Q()
 
         t_sub = base_tx.filter(t_bound)
 
@@ -4599,17 +4619,18 @@ def wallet_me_history(request):
         try:
             t_selected = int(term_param)
             if t_selected in purchased_terms:
-                s_idx = purchased_terms.index(t_selected)
-                if s_idx == 0:
-                    if renewal_txs:
-                        active_filter_q &= Q(created_at__lt=renewal_txs[0].created_at)
+                if t_selected == 1:
+                    first_renewal = term_start_dts.get(2) or (min(term_start_dts.values()) if term_start_dts else None)
+                    if first_renewal:
+                        active_filter_q &= Q(created_at__lt=first_renewal)
                 else:
-                    s_start = renewal_txs[s_idx - 1].created_at
-                    if s_idx < len(renewal_txs):
-                        s_end = renewal_txs[s_idx].created_at
-                        active_filter_q &= Q(created_at__gte=s_start, created_at__lt=s_end)
-                    else:
-                        active_filter_q &= Q(created_at__gte=s_start)
+                    t_start = term_start_dts.get(t_selected)
+                    higher_terms = [t for t in purchased_terms if t > t_selected]
+                    if higher_terms and term_start_dts.get(min(higher_terms)):
+                        t_end = term_start_dts.get(min(higher_terms))
+                        active_filter_q &= Q(created_at__gte=t_start, created_at__lt=t_end)
+                    elif t_start:
+                        active_filter_q &= Q(created_at__gte=t_start)
             else:
                 active_filter_q &= Q(id__lt=0)
         except Exception:
