@@ -4493,8 +4493,66 @@ def wallet_me_history(request):
     ssv_layer_tot = D(category_stats.get("SSV_LAYER", {}).get("total", "0.00"))
     layer_matrix_earned = str(five_layer_tot + three_layer_tot + e_layer_tot + ssv_layer_tot)
 
+    # Academic Term Detection & Boundary Filtering (Database-Driven)
+    renewal_txs = list(
+        WalletTransaction.objects.filter(
+            user=user,
+            type__in=["ACADEMIC_TERM_RENEWAL", "TERM_RENEWAL"]
+        ).order_by("created_at")
+    )
+    purchased_terms = [1]
+    for r in renewal_txs:
+        t_val = (r.meta or {}).get("term")
+        if not t_val:
+            try:
+                t_val = int(str(r.source_id).replace("TERM_", ""))
+            except Exception:
+                t_val = len(purchased_terms) + 1
+        try:
+            t_int = int(t_val)
+            if t_int not in purchased_terms:
+                purchased_terms.append(t_int)
+        except Exception:
+            pass
+    purchased_terms.sort()
+    current_term = purchased_terms[-1]
+
+    # Precalculate exact database SQL sums for each purchased term
+    term_stats = {}
+    t1_bound_q = Q(created_at__lt=renewal_txs[0].created_at) if renewal_txs else Q()
+    t1_sub = base_tx.filter(t1_bound_q)
+    term_stats["1"] = {
+        "count": t1_sub.count(),
+        "total": str(t1_sub.filter(amount__gt=0).aggregate(s=Sum("amount"))["s"] or D("0.00")),
+    }
+    if len(renewal_txs) >= 1:
+        t2_bound_q = Q(created_at__gte=renewal_txs[0].created_at)
+        if len(renewal_txs) >= 2:
+            t2_bound_q &= Q(created_at__lt=renewal_txs[1].created_at)
+        t2_sub = base_tx.filter(t2_bound_q)
+        term_stats["2"] = {
+            "count": t2_sub.count(),
+            "total": str(t2_sub.filter(amount__gt=0).aggregate(s=Sum("amount"))["s"] or D("0.00")),
+        }
+
     # Server-Side Filter Processing (100% Database SQL Execution)
     active_filter_q = Q()
+
+    # Term Filter (Strictly DB Timestamp/Marker bounded)
+    term_param = (request.GET.get("term") or "").strip().upper()
+    if term_param and term_param != "ALL":
+        if term_param == "1":
+            if renewal_txs:
+                active_filter_q &= Q(created_at__lt=renewal_txs[0].created_at)
+        elif term_param == "2":
+            if len(renewal_txs) >= 1:
+                t2_q = Q(created_at__gte=renewal_txs[0].created_at)
+                if len(renewal_txs) >= 2:
+                    t2_q &= Q(created_at__lt=renewal_txs[1].created_at)
+                active_filter_q &= t2_q
+            else:
+                active_filter_q &= Q(id__lt=0)  # Empty: Term 2 not purchased
+
     category_param = (request.GET.get("category") or "").strip().upper()
     if category_param and category_param in cat_queries and category_param != "ALL":
         active_filter_q &= cat_queries[category_param]
@@ -4582,6 +4640,10 @@ def wallet_me_history(request):
 
     data = {
         "top": top,
+        "current_term": current_term,
+        "purchased_terms": purchased_terms,
+        "term_stats": term_stats,
+        "selected_term": term_param or "ALL",
         "main_wallet": main_list,
         "incoming": incoming_list,
         "self_account": self_list,
@@ -4609,6 +4671,81 @@ def wallet_me_history(request):
         }
     }
     return Response(data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def wallet_term_renewal(request):
+    """
+    Handles user renewal for Term 2+ academic tracks.
+    Deducts amount dynamically (Base + 18% GST + 7% Admin Fee) from Main Wallet or Coupon Pocket,
+    creates ACADEMIC_TERM_RENEWAL transaction in PostgreSQL, and activates next term.
+    """
+    user = request.user
+    w = Wallet.get_or_create_for_user(user)
+    data = request.data or {}
+    term = int(data.get("term") or 2)
+    track = str(data.get("track") or "TRACK_1")
+    payment_source = str(data.get("paymentSource") or "MAIN_WALLET").upper()
+    try:
+        base_amt = D(str(data.get("baseAmount") or 2000))
+    except Exception:
+        base_amt = D("2000.00")
+
+    gst_amt = (base_amt * D("0.18")).quantize(D("0.01"))
+    admin_fee = (base_amt * D("0.07")).quantize(D("0.01"))
+    total_payable = base_amt + gst_amt + admin_fee
+
+    if payment_source == "COUPON_POCKET":
+        avail = getattr(w, "coupon_balance", D("0.00")) or D("0.00")
+        if avail < total_payable:
+            return Response(
+                {"message": f"Insufficient balance in Coupon Pocket. Available: ₹{avail:.2f}, Required: ₹{total_payable:.2f}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        w.coupon_balance = avail - total_payable
+        w.save(update_fields=["coupon_balance", "updated_at"])
+        bal_after = w.coupon_balance
+    else:
+        avail = getattr(w, "main_balance", D("0.00")) or D("0.00")
+        if avail < total_payable:
+            return Response(
+                {"message": f"Insufficient balance in Main Wallet. Available: ₹{avail:.2f}, Required: ₹{total_payable:.2f}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        w.main_balance = avail - total_payable
+        w.save(update_fields=["main_balance", "updated_at"])
+        bal_after = w.main_balance
+
+    tx = WalletTransaction.objects.create(
+        user=user,
+        amount=-total_payable,
+        balance_after=bal_after,
+        type="ACADEMIC_TERM_RENEWAL",
+        source_type="TERM_RENEWAL",
+        source_id=f"TERM_{term}",
+        meta={
+            "term": term,
+            "track": track,
+            "base_amount": str(base_amt),
+            "gst": str(gst_amt),
+            "admin_fee": str(admin_fee),
+            "total_payable": str(total_payable),
+            "payment_source": payment_source,
+            "ledger": "COUPON_POCKET" if payment_source == "COUPON_POCKET" else "MAIN",
+        }
+    )
+
+    return Response({
+        "success": True,
+        "term": term,
+        "track": track,
+        "total_payable": str(total_payable),
+        "transaction_id": tx.id,
+        "current_term": term,
+        "purchased_terms": [1, term],
+        "message": f"Term {term} activated successfully with {track}!"
+    }, status=status.HTTP_200_OK)
 
 
 @api_view(["GET"])

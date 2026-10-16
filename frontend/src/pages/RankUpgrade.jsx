@@ -805,26 +805,56 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
   const royaltyInfo = elig?.royalty_info;
   const earnedRoyalty = Number(royaltyInfo?.total_earned ?? 0);
 
-  const consumerActiveCycle = userConsumerCycle?.active_cycle || userConsumerCycle?.cycle || "Cycle 1";
+  const consumerActiveCycle = userConsumerCycle?.active_cycle || userConsumerCycle?.cycle || (userConsumerCycle?.currentCycle ? `Term ${userConsumerCycle.currentCycle}` : "Cycle 1");
+  const currentCycleNumber = Number(userConsumerCycle?.currentCycle || (String(consumerActiveCycle).includes("3") ? 3 : (String(consumerActiveCycle).includes("2") ? 2 : 1)));
+  const nextCycleNum = currentCycleNumber + 1;
   const totalCycleCap = Number(elig?.total_cycle_limit || userConsumerCycle?.total_limit || 150000);
   const maxRoyaltyCap = Number(userConsumerCycle?.royalty_limit || userConsumerCycle?.royaltyLimit || 50000);
 
+  // Term History Tabs: strictly only show terms the user has actually purchased (1 up to currentCycleNumber)
+  const [selectedViewingTerm, setSelectedViewingTerm] = useState(null);
+  const viewingTermNumber = selectedViewingTerm !== null ? selectedViewingTerm : currentCycleNumber;
+  const isViewingArchivedTerm = viewingTermNumber < currentCycleNumber;
+
+  // Purchased terms list: Term 2 is only shown if currentCycleNumber >= 2!
+  const purchasedTerms = useMemo(() => {
+    const list = [];
+    for (let i = 1; i <= currentCycleNumber; i++) {
+      list.push({
+        num: i,
+        label: i === currentCycleNumber ? `Term ${i} (Active)` : `Term ${i} (Archived)`,
+        isCurrent: i === currentCycleNumber,
+      });
+    }
+    return list;
+  }, [currentCycleNumber]);
+
+  // Calculations for whichever term is currently selected for viewing:
+  const viewingOffsetEarnings = Math.max(0, (viewingTermNumber - 1) * totalCycleCap);
+  const viewingTermRawLayerIncome = isViewingArchivedTerm
+    ? Math.min(100000, Math.max(0, rawLayerIncome - viewingOffsetEarnings))
+    : Math.max(0, rawLayerIncome - viewingOffsetEarnings);
+
+  const viewingTermEarnedRoyalty = isViewingArchivedTerm
+    ? Math.min(maxRoyaltyCap, Math.max(0, earnedRoyalty - Math.max(0, (viewingTermNumber - 1) * maxRoyaltyCap)))
+    : Math.max(0, earnedRoyalty - Math.max(0, (viewingTermNumber - 1) * maxRoyaltyCap));
+
   // Dynamic available limit for layers: up to ₹1,50,000 minus whatever Royalty has taken
-  const dynamicLayerCap = Math.max(0, totalCycleCap - Math.min(maxRoyaltyCap, earnedRoyalty));
+  const dynamicLayerCap = Math.max(0, totalCycleCap - Math.min(maxRoyaltyCap, viewingTermEarnedRoyalty));
   const maxLayerCap = dynamicLayerCap;
 
   // Dynamic available limit for royalty: up to ₹50,000, but cannot exceed remaining room under ₹1,50,000
-  const dynamicRoyaltyCap = Math.min(maxRoyaltyCap, Math.max(0, totalCycleCap - rawLayerIncome));
+  const dynamicRoyaltyCap = Math.min(maxRoyaltyCap, Math.max(0, totalCycleCap - viewingTermRawLayerIncome));
 
   // Layer Income Capped only at dynamicLayerCap (max ₹1.5L if Royalty is 0)
   const totalEarnings = useMemo(() => {
-    return Math.min(rawLayerIncome, dynamicLayerCap);
-  }, [rawLayerIncome, dynamicLayerCap]);
+    return Math.min(viewingTermRawLayerIncome, dynamicLayerCap);
+  }, [viewingTermRawLayerIncome, dynamicLayerCap]);
 
   // Combined active cycle earnings across both Layer Blocks and Royalty (capped at ₹1.5L)
   const combinedCycleEarnings = useMemo(() => {
-    return Math.min(totalCycleCap, totalEarnings + Math.min(maxRoyaltyCap, earnedRoyalty));
-  }, [totalEarnings, earnedRoyalty, totalCycleCap, maxRoyaltyCap]);
+    return Math.min(totalCycleCap, totalEarnings + Math.min(maxRoyaltyCap, viewingTermEarnedRoyalty));
+  }, [totalEarnings, viewingTermEarnedRoyalty, totalCycleCap, maxRoyaltyCap]);
 
   const combinedCyclePercent = useMemo(() => {
     return totalCycleCap > 0
@@ -846,14 +876,14 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
   // Missing Blocks Income: Income generated after ₹1.5L combined cycle limit is reached, or if royalty exceeds ₹50k
   const missingIncome = useMemo(() => {
     let overflow = 0;
-    if (rawLayerIncome > dynamicLayerCap) {
-      overflow += (rawLayerIncome - dynamicLayerCap);
+    if (viewingTermRawLayerIncome > dynamicLayerCap) {
+      overflow += (viewingTermRawLayerIncome - dynamicLayerCap);
     }
-    if (earnedRoyalty > maxRoyaltyCap) {
-      overflow += (earnedRoyalty - maxRoyaltyCap);
+    if (viewingTermEarnedRoyalty > maxRoyaltyCap) {
+      overflow += (viewingTermEarnedRoyalty - maxRoyaltyCap);
     }
     return Number(overflow.toFixed(2));
-  }, [rawLayerIncome, dynamicLayerCap, earnedRoyalty, maxRoyaltyCap]);
+  }, [viewingTermRawLayerIncome, dynamicLayerCap, viewingTermEarnedRoyalty, maxRoyaltyCap]);
 
   const isPackageActive = Boolean(hasApprovedBase || currentLevel >= 1 || elig?.has_prime || elig?.is_prime);
 
@@ -1363,8 +1393,8 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             {!isPackageActive
               ? `Your package is inactive. Activate the ₹2,000 Starter Package on asiyapp.com to start receiving layer & royalty earnings toward the ₹${fmt(totalCycleCap)} Term 1 cap.`
               : isCycle2Unlocked
-              ? `You have reached the ₹${fmt(totalCycleCap)} total earning cap (Layer up to ₹${fmt(dynamicLayerCap)} + Royalty max ₹${fmt(maxRoyaltyCap)}). Earnings have stopped. You are eligible to activate Term 2 by purchasing ₹50,000 Academy Courses or via Renewal Hub.`
-              : `Total Term Earned: ₹${fmt(combinedCycleEarnings)} / ₹${fmt(totalCycleCap)} (Layer ₹${fmt(totalEarnings)}/₹${fmt(dynamicLayerCap)} + Royalty ₹${fmt(Math.min(maxRoyaltyCap, earnedRoyalty))}/₹${fmt(maxRoyaltyCap)} • ${combinedCyclePercent.toFixed(1)}%). Once ₹${fmt(totalCycleCap)} is reached or authorized by Admin, Term 2 will unlock.`}
+              ? `You have reached the ₹${fmt(totalCycleCap)} total earning cap (Layer up to ₹${fmt(dynamicLayerCap)} + Royalty max ₹${fmt(maxRoyaltyCap)}). Earnings have stopped. You are eligible to activate Term ${nextCycleNum} by purchasing Academy Courses or via Renewal Hub.`
+              : `Total Term Earned: ₹${fmt(combinedCycleEarnings)} / ₹${fmt(totalCycleCap)} (Layer ₹${fmt(totalEarnings)}/₹${fmt(dynamicLayerCap)} + Royalty ₹${fmt(Math.min(maxRoyaltyCap, activeTermEarnedRoyalty))}/₹${fmt(maxRoyaltyCap)} • ${combinedCyclePercent.toFixed(1)}%). Once ₹${fmt(totalCycleCap)} is reached or authorized by Admin, Term ${nextCycleNum} will unlock.`}
           </Typography>
         </Box>
         <Button
@@ -1397,8 +1427,8 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           {!isPackageActive
             ? "🔒 Package Inactive"
             : isCycle2Unlocked
-            ? "🚀 Activate Term 2 (Bulk ₹50k Purchase)"
-            : `🔒 Term 2 Locked (Earn ₹${fmt(totalCycleCap)} to Unlock)`}
+            ? `🚀 Activate Term ${nextCycleNum} Renewal`
+            : `🔒 Term ${nextCycleNum} Locked (Earn ₹${fmt(totalCycleCap)} to Unlock)`}
         </Button>
       </Stack>
     </Paper>
@@ -1417,6 +1447,38 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
         }}
       >
+        {/* Only shown when user has actually purchased more than 1 term (Term 2 purchased!) */}
+        {purchasedTerms.length > 1 && (
+          <Box sx={{ mb: 1.5, pb: 1, borderBottom: "1px dashed rgba(0,0,0,0.12)" }}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ overflowX: "auto" }}>
+              <Typography sx={{ fontSize: 11, fontWeight: 900, color: "#475569", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+                Select Purchased Term History:
+              </Typography>
+              {purchasedTerms.map((t) => {
+                const isSelected = viewingTermNumber === t.num;
+                return (
+                  <Chip
+                    key={t.num}
+                    label={t.label}
+                    clickable
+                    onClick={() => setSelectedViewingTerm(t.num)}
+                    sx={{
+                      fontWeight: 900,
+                      fontSize: 11,
+                      borderRadius: "8px",
+                      bgcolor: isSelected ? (t.isCurrent ? "#2563EB" : "#334155") : "#FFFFFF",
+                      color: isSelected ? "#FFFFFF" : "#475569",
+                      border: "1.5px solid",
+                      borderColor: isSelected ? (t.isCurrent ? "#2563EB" : "#334155") : "#CBD5E1",
+                      boxShadow: isSelected ? "0 2px 6px rgba(0,0,0,0.15)" : "none",
+                    }}
+                  />
+                );
+              })}
+            </Stack>
+          </Box>
+        )}
+
         <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1} sx={{ mb: 1.5 }}>
           <Stack direction="row" spacing={1} alignItems="center">
             <Box
@@ -1424,7 +1486,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                 width: 38,
                 height: 38,
                 borderRadius: 2,
-                bgcolor: isCapReached ? "#15803d" : "#2563eb",
+                bgcolor: isViewingArchivedTerm ? "#334155" : isCapReached ? "#15803d" : "#2563eb",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -1434,8 +1496,8 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
               <AccountBalanceWalletRoundedIcon sx={{ fontSize: 22 }} />
             </Box>
             <Box>
-              <Typography sx={{ fontWeight: 900, fontSize: 13, color: isCapReached ? "#15803d" : "#1e40af", letterSpacing: 0.3 }}>
-                TERM EARNING LIMIT (LAYERS & ROYALTY) ⓘ
+              <Typography sx={{ fontWeight: 900, fontSize: 13, color: isViewingArchivedTerm ? "#334155" : isCapReached ? "#15803d" : "#1e40af", letterSpacing: 0.3 }}>
+                TERM {viewingTermNumber} EARNING LIMIT (LAYERS & ROYALTY) ⓘ {isViewingArchivedTerm && "(HISTORICAL ARCHIVE)"}
               </Typography>
               <Typography sx={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>
                 Combined total across all Layer Blocks and Shopping Royalty (Max ₹1.50 Lakh per Term)
@@ -1443,8 +1505,8 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             </Box>
           </Stack>
           <Chip
-            label={isCapReached ? "🎉 Limit Reached (Term 2 Unlocked)" : `Eligible ₹${fmt(totalCycleCap)}`}
-            color={isCapReached ? "success" : "primary"}
+            label={isViewingArchivedTerm ? `Term ${viewingTermNumber} Completed • Archived` : isCapReached ? `🎉 Limit Reached (Term ${nextCycleNum} Unlocked)` : `Term ${currentCycleNumber} Active • Eligible ₹${fmt(totalCycleCap)}`}
+            color={isViewingArchivedTerm ? "default" : isCapReached ? "success" : "primary"}
             sx={{ fontWeight: 900, fontSize: 12, height: 28 }}
           />
         </Stack>
@@ -1788,11 +1850,18 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                   const isCurrentActive = level === effectiveAchievedLevel;
                   const canBuy = level === effectiveAchievedLevel + 1;
 
+                  const DEFAULT_LIMITS = [1750, 2000, 4000, 6000, 7500, 8750, 10000, 15000, 20000, Math.max(25000, dynamicLayerCap - 75000)];
                   const cfgLvl = savedRankConfig?.levels?.[idx];
                   const limitVal = cfgLvl?.earning_limit ? Number(cfgLvl.earning_limit) : (DEFAULT_LIMITS[idx] || (r.earning_limit ? Number(r.earning_limit) : 0));
                   
                   // Server-computed cumulative limit progress directly from database
                   const layerProgress = elig?.cumulative_layer_progress?.[idx];
+
+                  // Active viewing term layer metrics
+                  const layerCumLimit = Number(layerProgress?.cumulative_limit || (DEFAULT_LIMITS.slice(0, idx + 1).reduce((a, b) => a + b, 0)));
+                  const prevCumLimit = Number(layerProgress?.prev_cumulative_limit || (idx === 0 ? 0 : DEFAULT_LIMITS.slice(0, idx).reduce((a, b) => a + b, 0)));
+                  const isLayerLimitReached = isViewingArchivedTerm ? true : (viewingTermRawLayerIncome >= layerCumLimit);
+                  const isLayerActiveStep = isViewingArchivedTerm ? false : ((level === 1) || (viewingTermRawLayerIncome >= prevCumLimit));
 
                   // Compute exact real-time active community count for this layer from e-Education downline
                   const userTeamCount = Number(
@@ -1820,14 +1889,14 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                       <TableCell sx={{ fontWeight: 700, fontSize: 12.5 }}>{amtVal.toLocaleString("en-IN")}</TableCell>
                       <TableCell sx={{ fontWeight: 700, fontSize: 12.5 }}>
                         <div>{limitVal.toLocaleString("en-IN")}</div>
-                        {layerProgress?.cumulative_limit && (
+                        {layerCumLimit > 0 && (
                           <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>
-                            Cum: ₹{Number(layerProgress.cumulative_limit).toLocaleString("en-IN")}
+                            Cum: ₹{Number(layerCumLimit).toLocaleString("en-IN")}
                           </div>
                         )}
                       </TableCell>
                       <TableCell align="center">
-                        {layerProgress?.is_limit_reached || layerProgress?.status === "COMPLETED" ? (
+                        {isLayerLimitReached ? (
                           <Chip
                             icon={<CheckCircleRoundedIcon sx={{ fontSize: "14px !important" }} />}
                             size="small"
@@ -1835,15 +1904,15 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                             color="success"
                             sx={{ fontWeight: 800, fontSize: 11, height: 22 }}
                           />
-                        ) : layerProgress?.status === "IN_PROGRESS" ? (
+                        ) : isLayerActiveStep ? (
                           <Chip
                             size="small"
-                            label={`₹${Number(layerProgress.total_layer_income || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })} / ₹${Number(layerProgress.cumulative_limit || 0).toLocaleString("en-IN")} In Progress`}
+                            label={`₹${Number(viewingTermRawLayerIncome).toLocaleString("en-IN", { maximumFractionDigits: 0 })} / ₹${Number(layerCumLimit).toLocaleString("en-IN")} In Progress`}
                             color="info"
                             variant="outlined"
                             sx={{ fontWeight: 800, fontSize: 10.5, height: 22 }}
                           />
-                        ) : layerProgress?.status === "PENDING" ? (
+                        ) : (
                           <Chip
                             size="small"
                             label={`Pending (Layer ${level - 1} first)`}
@@ -1856,10 +1925,6 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                               border: "1px dashed #cbd5e1",
                             }}
                           />
-                        ) : (
-                          <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#94a3b8" }}>
-                            Locked
-                          </Typography>
                         )}
                       </TableCell>
                       <TableCell align="center">

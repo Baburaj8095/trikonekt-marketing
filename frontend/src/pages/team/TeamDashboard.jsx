@@ -43,6 +43,7 @@ import WorkspacePremiumRoundedIcon from "@mui/icons-material/WorkspacePremiumRou
 import MilitaryTechRoundedIcon from "@mui/icons-material/MilitaryTechRounded";
 import WidgetsRoundedIcon from "@mui/icons-material/WidgetsRounded";
 import PublicRoundedIcon from "@mui/icons-material/PublicRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import { useNavigate, useLocation } from "react-router-dom";
 import API, { getWalletMe, getWalletMeHistory } from "../../api/api";
 import { useUserTierBadge } from "../../utils/userTierBadge";
@@ -1491,14 +1492,14 @@ function ConsumerCycleRenewalWidget({ onOpenPurchase, cycleState, totalCycleEarn
     >
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={2}>
         <Box>
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.8 }}>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.8, flexWrap: "wrap", gap: 0.5 }}>
             <Chip
               label={`Term ${currentCycleNum} Active`}
               size="small"
               sx={{ bgcolor: "#22C55E", color: "#FFF", fontWeight: 900, fontSize: 11 }}
             />
             <Chip
-              label="Academy All Courses (₹50,000)"
+              label="Modular Tracks (From ₹2,000)"
               size="small"
               sx={{ bgcolor: "rgba(255,255,255,0.22)", color: "#FFF", fontWeight: 800, fontSize: 11 }}
             />
@@ -1511,11 +1512,11 @@ function ConsumerCycleRenewalWidget({ onOpenPurchase, cycleState, totalCycleEarn
             )}
           </Stack>
           <Typography sx={{ fontSize: { xs: 16, sm: 18 }, fontWeight: 950, color: "#FFFFFF", letterSpacing: "-0.02em" }}>
-            🔄 Term 2+ Academy All Courses Bulk Purchase
+            🔄 Term {currentCycleNum + 1} Academic Track Renewal
           </Typography>
           <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.85)", mt: 0.5, maxWidth: 540 }}>
             {isUnlocked
-              ? `Term ${currentCycleNum} earning cap achieved! Unlock all 3 tracks for Term ${currentCycleNum + 1} at once (₹50,000) using Main Wallet or Coupon Pocket for fresh ₹1.5L earning cap.`
+              ? `Term ${currentCycleNum} earning cap achieved! Select Track 1 (₹2k), Track 2 (₹8k), Track 3 (₹40k), or Full Bundle (₹50k) using Main Wallet or Coupon Pocket for fresh ₹1.5L earning cap.`
               : `Current Term: Term ${currentCycleNum}. Total Earning Limit: ₹${totalLimit.toLocaleString("en-IN")}. Term ${currentCycleNum + 1} renewal unlocks automatically once earning limit is reached.`}
           </Typography>
         </Box>
@@ -1545,7 +1546,7 @@ function ConsumerCycleRenewalWidget({ onOpenPurchase, cycleState, totalCycleEarn
             "&:hover": { bgcolor: isUnlocked ? "#D97706" : "rgba(255,255,255,0.18)" },
           }}
         >
-          {isUnlocked ? "🚀 Buy All Courses (₹50k)" : `🔒 Term ${currentCycleNum + 1} Locked (Cap: ₹1.5L)`}
+          {isUnlocked ? "🚀 Select Track & Renew (From ₹2,000)" : `🔒 Term ${currentCycleNum + 1} Locked (Cap: ₹1.5L)`}
         </Button>
       </Stack>
     </Paper>
@@ -1558,11 +1559,175 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
   const [successMsg, setSuccessMsg] = useState("");
   const [errMsg, setErrMsg] = useState("");
 
+  // Top Category Tabs
+  const [activeTab, setActiveTab] = useState("TRACK_1");
+
+  // Track & Tranche Definitions matching trieducation.in
+  const PACKAGES = [
+    // Track 1
+    {
+      key: "TRACK_1",
+      tab: "TRACK_1",
+      trackName: "Track 1 • Foundation",
+      name: "e-Edu Agent (Starter - Layer 1)",
+      shortTitle: "Track 1: Starter (₹2,000)",
+      baseAmount: 2000,
+      scope: "Layer 1 Foundational Masterclasses & SOP Handbook",
+      badgeColor: "#059669",
+      badgeBg: "#ECFDF5",
+      benefits: [
+        "Instant ₹1,000 Kirana & Grocery Shopping Rebate Voucher",
+        "Layer 1 Field Agent Orientation & Digital Certification",
+        "Qualifies user for Term renewals & commissions",
+      ],
+    },
+    // Track 2
+    {
+      key: "TRACK_2_FULL",
+      tab: "TRACK_2",
+      trackName: "Track 2 • Advanced (Full)",
+      name: "Super Agent Leadership (Full Layers 2–7)",
+      shortTitle: "Full Track 2 (₹8,000)",
+      baseAmount: 8000,
+      scope: "Layers 2 to 7 Multi-Pincode Territory Operations",
+      badgeColor: "#7C3AED",
+      badgeBg: "#F5F3FF",
+      benefits: [
+        "Unlocks Prime Builder, Achiever, Champion, Master, Crown & Legend modules",
+        "Cluster mentor overrides across Layers 2–7",
+        "Full Super Agent leadership certification",
+      ],
+    },
+    {
+      key: "TRACK_2_PART1",
+      tab: "TRACK_2",
+      trackName: "Track 2 • Part 1",
+      name: "Super Agent Leadership (Part 1 - Layers 2–5)",
+      shortTitle: "Part 1 (₹4,750)",
+      baseAmount: 4750,
+      scope: "Layers 2 to 5 Cluster Operations & Mentoring",
+      badgeColor: "#7C3AED",
+      badgeBg: "#F5F3FF",
+      benefits: [
+        "Unlocks Ranks 2 through 5 modules",
+        "Installment support: Part 2 (₹3,250) payable anytime later",
+      ],
+    },
+    {
+      key: "TRACK_2_PART2",
+      tab: "TRACK_2",
+      trackName: "Track 2 • Part 2",
+      name: "Super Agent Leadership (Part 2 - Layers 6–7)",
+      shortTitle: "Part 2 (₹3,250)",
+      baseAmount: 3250,
+      scope: "Layers 6 to 7 Crown & Legend Executive Masterclasses",
+      badgeColor: "#7C3AED",
+      badgeBg: "#F5F3FF",
+      benefits: [
+        "Unlocks Ranks 6 and 7 modules",
+        "Completes Super Agent leadership track",
+      ],
+    },
+    // Track 3
+    {
+      key: "TRACK_3_FULL",
+      tab: "TRACK_3",
+      trackName: "Track 3 • District Scale (Full)",
+      name: "Promoter Agent & DAP (Full Layers 8–10)",
+      shortTitle: "Full Track 3 (₹40,000)",
+      baseAmount: 40000,
+      scope: "Layers 8 to 10 Executive District Enterprise Leadership",
+      badgeColor: "#D97706",
+      badgeBg: "#FFFBEB",
+      benefits: [
+        "District Agent Promoter (DAP) qualification",
+        "State wholesale agreements & franchise overrides",
+        "Qualifies for ₹50,000 Daily Midnight Royalty Pool",
+      ],
+    },
+    {
+      key: "TRACK_3_T1",
+      tab: "TRACK_3",
+      trackName: "Track 3 • Tranche 1",
+      name: "Promoter Agent Tranche 1 (Layer 8)",
+      shortTitle: "Tranche 1 (₹5,000)",
+      baseAmount: 5000,
+      scope: "Layer 8 Executive District Operations",
+      badgeColor: "#D97706",
+      badgeBg: "#FFFBEB",
+      benefits: [
+        "Unlocks Layer 8 modules",
+        "Tranche 2 (₹10,000) & Tranche 3 (₹25,000) payable progressively",
+      ],
+    },
+    {
+      key: "TRACK_3_T2",
+      tab: "TRACK_3",
+      trackName: "Track 3 • Tranche 2",
+      name: "Promoter Agent Tranche 2 (Layer 9)",
+      shortTitle: "Tranche 2 (₹10,000)",
+      baseAmount: 10000,
+      scope: "Layer 9 District Enterprise Expansion",
+      badgeColor: "#D97706",
+      badgeBg: "#FFFBEB",
+      benefits: [
+        "Unlocks Layer 9 modules & district cluster governance",
+      ],
+    },
+    {
+      key: "TRACK_3_T3",
+      tab: "TRACK_3",
+      trackName: "Track 3 • Tranche 3",
+      name: "Promoter Agent Tranche 3 (Layer 10)",
+      shortTitle: "Tranche 3 (₹25,000)",
+      baseAmount: 25000,
+      scope: "Layer 10 Master Enterprise & Governance",
+      badgeColor: "#D97706",
+      badgeBg: "#FFFBEB",
+      benefits: [
+        "Unlocks Layer 10 apex master modules",
+        "Final DAP tranche for full district leadership",
+      ],
+    },
+    // Bulk All Tracks
+    {
+      key: "BULK",
+      tab: "BULK",
+      trackName: "All 3 Tracks • Comprehensive",
+      name: "All 3 Academic Tracks (Bulk Package - Layers 1–10)",
+      shortTitle: "All 3 Tracks Bulk (₹50,000)",
+      baseAmount: 50000,
+      scope: "Complete 10-Layer Academic Curriculum & DAP License",
+      badgeColor: "#1D4ED8",
+      badgeBg: "#EFF6FF",
+      benefits: [
+        "Instant renewal across all 10 Layers simultaneously",
+        "Instant qualification for Daily Royalty Pool",
+        "Complete platform renewal bundle",
+      ],
+    },
+  ];
+
+  const [selectedKey, setSelectedKey] = useState("TRACK_1");
+
+  // Keep selected key synced with active tab
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    const firstInTab = PACKAGES.find((p) => p.tab === newTab);
+    if (firstInTab) {
+      setSelectedKey(firstInTab.key);
+    }
+  };
+
+  const selectedPkg = PACKAGES.find((p) => p.key === selectedKey) || PACKAGES[0];
+
   const mainBalance = Number(walletMe?.main_wallet || walletMe?.balance || walletMe?.main_income_balance || 0);
   const couponBalance = Number(walletMe?.coupon_wallet || walletMe?.vouchers_total || 0);
 
-  const baseAmt = 50000;
-  const totalPayable = 62500;
+  const baseAmt = selectedPkg.baseAmount;
+  const gstAmt = Math.round(baseAmt * 0.18);
+  const adminFeeAmt = Math.round(baseAmt * 0.07);
+  const totalPayable = baseAmt + gstAmt + adminFeeAmt;
 
   const currentCycleNum = cycleState?.currentCycle || 1;
   const nextCycleNum = currentCycleNum + 1;
@@ -1579,24 +1744,33 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
         return;
       }
 
-      await API.post("/api/admin/validator/purchase-bulk-courses", {
+      const payload = {
         userId: walletMe?.id || walletMe?.user_id,
         userCode: walletMe?.user_code || walletMe?.username,
         cycle: `Term ${nextCycleNum}`,
         term: nextCycleNum,
         paymentSource,
         baseAmount: baseAmt,
-      }).catch(() => null);
+        track: selectedPkg.key,
+      };
+
+      try {
+        await API.post("/accounts/wallet/term-renewal/", payload);
+      } catch (_) {
+        await API.post("/api/admin/validator/purchase-bulk-courses", payload).catch(() => null);
+      }
 
       const newState = {
         currentCycle: nextCycleNum,
-        baseAmount: 50000,
+        baseAmount: baseAmt,
         profitPercent: 200,
         eligibleLimit: 150000,
         layerLimit: 100000,
         royaltyLimit: 50000,
         status: "active",
         adminAuthorized: true,
+        selectedTrack: selectedPkg.key,
+        purchasedAt: new Date().toISOString(),
       };
 
       try {
@@ -1606,63 +1780,264 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
         }
       } catch (_) {}
 
-      setSuccessMsg(`🎉 All ₹50,000 Academy Courses purchased successfully! Term ${nextCycleNum} is now active.`);
+      setSuccessMsg(`🎉 ${selectedPkg.name} purchased successfully! Term ${nextCycleNum} is now active.`);
       setTimeout(() => {
         if (onPurchaseSuccess) onPurchaseSuccess(newState);
         onClose();
       }, 1500);
     } catch (e) {
-      setErrMsg(e?.response?.data?.message || "Failed to complete bulk course purchase. Please try again.");
+      setErrMsg(e?.response?.data?.message || "Failed to complete course purchase. Please try again.");
     } finally {
       setSubmitting(false);
     }
   };
 
+  const tabPackages = PACKAGES.filter((p) => p.tab === activeTab);
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "20px", p: 1 } }}>
-      <DialogTitle sx={{ fontWeight: 950, fontSize: 18, color: "#0F172A", pb: 1 }}>
-        🔄 Buy All Academy Courses (₹50,000) & Unlock Term {nextCycleNum}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: { xs: "20px", sm: "24px" },
+          p: { xs: 0.5, sm: 1 },
+          m: { xs: 1.5, sm: 2 },
+          maxHeight: "92vh",
+        },
+      }}
+    >
+      <DialogTitle
+        sx={{
+          p: { xs: 1.8, sm: 2.2 },
+          pb: { xs: 1, sm: 1.5 },
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 1,
+        }}
+      >
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
+          <Box
+            sx={{
+              width: 38,
+              height: 38,
+              borderRadius: "12px",
+              bgcolor: "#EFF6FF",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 20,
+              flexShrink: 0,
+              border: "1px solid #DBEAFE",
+            }}
+          >
+            🎓
+          </Box>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography
+              sx={{
+                fontWeight: 950,
+                fontSize: { xs: 15, sm: 16.5 },
+                color: "#0F172A",
+                lineHeight: 1.2,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              Academic Track Renewal
+            </Typography>
+            <Typography sx={{ fontSize: 11.5, color: "#64748B", fontWeight: 700, mt: 0.2 }}>
+              Term {nextCycleNum} Selection • Modular Packages
+            </Typography>
+          </Box>
+        </Stack>
+        <IconButton
+          onClick={onClose}
+          size="small"
+          sx={{
+            color: "#64748B",
+            bgcolor: "#F1F5F9",
+            flexShrink: 0,
+            "&:hover": { bgcolor: "#E2E8F0" },
+          }}
+        >
+          <CloseRoundedIcon fontSize="small" />
+        </IconButton>
       </DialogTitle>
-      <DialogContent dividers sx={{ borderColor: "#EEF2F6" }}>
+      <DialogContent dividers sx={{ borderColor: "#EEF2F6", p: { xs: 2, sm: 2.5 } }}>
         <Typography sx={{ fontSize: 12.5, color: "#64748B", mb: 2 }}>
-          Purchase all 3 academic curriculum tracks at once. Your earnings will reset into <strong>Term {nextCycleNum}</strong> with fresh limits and new Matrix placement.
+          Choose an individual academic track or the complete bulk bundle. Your earnings will reset into <strong>Term {nextCycleNum}</strong> with fresh limits and <strong>zero duplicate matrix accounts</strong>.
         </Typography>
 
-        {/* 3 Tracks Breakdown */}
+        {/* Top Track Categories (Tabs like trieducation.in) */}
+        <Typography sx={{ fontSize: 11, fontWeight: 900, color: "#475569", textTransform: "uppercase", letterSpacing: "0.5px", mb: 1 }}>
+          Select Programme Track:
+        </Typography>
+        <Stack
+          direction="row"
+          spacing={0.8}
+          sx={{
+            mb: 2,
+            overflowX: "auto",
+            pb: 0.8,
+            WebkitOverflowScrolling: "touch",
+            scrollbarWidth: "none",
+            "&::-webkit-scrollbar": { display: "none" },
+          }}
+        >
+          {[
+            { id: "TRACK_1", label: "Track 1: Foundation (₹2k)", color: "#059669" },
+            { id: "TRACK_2", label: "Track 2: Super Agent (₹8k)", color: "#7C3AED" },
+            { id: "TRACK_3", label: "Track 3: Promoter & DAP (₹40k)", color: "#D97706" },
+            { id: "BULK", label: "All 3 Tracks Bulk (₹50k)", color: "#1D4ED8" },
+          ].map((tab) => {
+            const isTabActive = activeTab === tab.id;
+            return (
+              <Chip
+                key={tab.id}
+                label={tab.label}
+                clickable
+                onClick={() => handleTabChange(tab.id)}
+                sx={{
+                  flexShrink: 0,
+                  fontWeight: 900,
+                  fontSize: 11.5,
+                  borderRadius: "10px",
+                  bgcolor: isTabActive ? tab.color : "#F1F5F9",
+                  color: isTabActive ? "#FFFFFF" : "#475569",
+                  border: isTabActive ? `1px solid ${tab.color}` : "1px solid #E2E8F0",
+                  "&:hover": {
+                    bgcolor: isTabActive ? tab.color : "#E2E8F0",
+                  },
+                }}
+              />
+            );
+          })}
+        </Stack>
+
+        {/* Tranche / Part Payment Selector (when multiple options in tab) */}
+        {tabPackages.length > 1 && (
+          <Box sx={{ mb: 2 }}>
+            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#475569", mb: 0.8 }}>
+              CHOOSE PAYMENT OPTION / TRANCHE:
+            </Typography>
+            <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
+              {tabPackages.map((pkg) => {
+                const isSelected = selectedKey === pkg.key;
+                return (
+                  <Paper
+                    key={pkg.key}
+                    onClick={() => setSelectedKey(pkg.key)}
+                    elevation={0}
+                    sx={{
+                      flex: 1,
+                      minWidth: "120px",
+                      p: 1.2,
+                      borderRadius: "12px",
+                      border: "2px solid",
+                      borderColor: isSelected ? pkg.badgeColor : "#E2E8F0",
+                      bgcolor: isSelected ? pkg.badgeBg : "#FFFFFF",
+                      cursor: "pointer",
+                      textAlign: "center",
+                      transition: "all 150ms ease",
+                    }}
+                  >
+                    <Typography sx={{ fontSize: 12, fontWeight: 900, color: isSelected ? pkg.badgeColor : "#0F172A" }}>
+                      {pkg.shortTitle}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10, color: "#64748B", mt: 0.3 }}>
+                      ₹{pkg.baseAmount.toLocaleString("en-IN")} Base
+                    </Typography>
+                  </Paper>
+                );
+              })}
+            </Stack>
+          </Box>
+        )}
+
+        {/* Selected Track Details Card */}
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 2,
+            borderRadius: "14px",
+            bgcolor: selectedPkg.badgeBg,
+            borderColor: selectedPkg.badgeColor,
+            borderWidth: "1.5px",
+            mb: 2,
+          }}
+        >
+          <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
+            <Box>
+              <Chip
+                label={selectedPkg.trackName}
+                size="small"
+                sx={{
+                  bgcolor: selectedPkg.badgeColor,
+                  color: "#FFF",
+                  fontWeight: 900,
+                  fontSize: 10,
+                  height: 22,
+                  mb: 0.5,
+                }}
+              />
+              <Typography sx={{ fontSize: 14, fontWeight: 950, color: "#0F172A" }}>
+                {selectedPkg.name}
+              </Typography>
+              <Typography sx={{ fontSize: 11.5, color: "#475569", mt: 0.2 }}>
+                {selectedPkg.scope}
+              </Typography>
+            </Box>
+            <Typography sx={{ fontSize: 18, fontWeight: 950, color: selectedPkg.badgeColor }}>
+              ₹{baseAmt.toLocaleString("en-IN")}
+            </Typography>
+          </Stack>
+
+          {/* Key Benefits Bullet List */}
+          <Box sx={{ pt: 1, borderTop: "1px dashed rgba(0,0,0,0.12)", mt: 1 }}>
+            {selectedPkg.benefits.map((b, i) => (
+              <Stack key={i} direction="row" spacing={0.8} alignItems="center" sx={{ my: 0.4 }}>
+                <Typography sx={{ fontSize: 11, color: selectedPkg.badgeColor, fontWeight: 900 }}>✓</Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#334155", fontWeight: 500 }}>{b}</Typography>
+              </Stack>
+            ))}
+          </Box>
+        </Paper>
+
+        {/* Invoice Breakdown */}
         <Paper variant="outlined" sx={{ p: 2, borderRadius: "14px", bgcolor: "#F8FAFC", mb: 2 }}>
-          <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#475569", mb: 1 }}>
-            ACADEMY TRACKS INCLUDED IN BULK BUNDLE:
+          <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: "#475569", mb: 1 }}>
+            INVOICE DETAILS:
           </Typography>
-          <Stack spacing={1}>
+          <Stack spacing={0.8}>
             <Stack direction="row" justifyContent="space-between">
-              <Typography sx={{ fontSize: 13, color: "#1E293B" }}>Track 1: Foundation (Starter - Layer 1)</Typography>
-              <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>₹ 2,000.00</Typography>
+              <Typography sx={{ fontSize: 12.5, color: "#475569" }}>Course Subtotal:</Typography>
+              <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A" }}>
+                ₹ {baseAmt.toLocaleString("en-IN")}.00
+              </Typography>
             </Stack>
             <Stack direction="row" justifyContent="space-between">
-              <Typography sx={{ fontSize: 13, color: "#1E293B" }}>Track 2: Super Agent Leadership (Layers 2-7)</Typography>
-              <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>₹ 8,000.00</Typography>
+              <Typography sx={{ fontSize: 12, color: "#64748B" }}>Statutory GST (18% Extra):</Typography>
+              <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>
+                + ₹ {gstAmt.toLocaleString("en-IN")}.00
+              </Typography>
             </Stack>
             <Stack direction="row" justifyContent="space-between">
-              <Typography sx={{ fontSize: 13, color: "#1E293B" }}>Track 3: Promoter Agent & DAP (Layers 8-10)</Typography>
-              <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>₹ 40,000.00</Typography>
-            </Stack>
-            <Divider sx={{ my: 0.5 }} />
-            <Stack direction="row" justifyContent="space-between">
-              <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: "#0F172A" }}>Course Subtotal:</Typography>
-              <Typography sx={{ fontSize: 14, fontWeight: 950, color: "#2563EB" }}>₹ 50,000.00</Typography>
-            </Stack>
-            <Stack direction="row" justifyContent="space-between">
-              <Typography sx={{ fontSize: 12.5, color: "#64748B" }}>Statutory GST (18% Extra):</Typography>
-              <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: "#0F172A" }}>+ ₹ 9,000.00</Typography>
-            </Stack>
-            <Stack direction="row" justifyContent="space-between">
-              <Typography sx={{ fontSize: 12.5, color: "#64748B" }}>Admin Platform Fee (7% Extra):</Typography>
-              <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: "#0F172A" }}>+ ₹ 3,500.00</Typography>
+              <Typography sx={{ fontSize: 12, color: "#64748B" }}>Admin Platform Fee (7% Extra):</Typography>
+              <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>
+                + ₹ {adminFeeAmt.toLocaleString("en-IN")}.00
+              </Typography>
             </Stack>
             <Divider sx={{ my: 0.5 }} />
-            <Stack direction="row" justifyContent="space-between">
-              <Typography sx={{ fontSize: 14, fontWeight: 950, color: "#0F172A" }}>Total Payable from Wallet:</Typography>
-              <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#059669" }}>₹ 62,500.00</Typography>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography sx={{ fontSize: 13.5, fontWeight: 950, color: "#0F172A" }}>Total Payable from Wallet:</Typography>
+              <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#059669" }}>
+                ₹ {totalPayable.toLocaleString("en-IN")}.00
+              </Typography>
             </Stack>
           </Stack>
         </Paper>
@@ -1673,14 +2048,14 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
             ✨ FRESH LIMITS GRANTED FOR TERM {nextCycleNum}:
           </Typography>
           <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.5 }}>
-            <Typography sx={{ fontSize: 12, color: "#15803D" }}>Layer Cap: ₹1,00,000.00</Typography>
-            <Typography sx={{ fontSize: 12, color: "#15803D" }}>Royalty: ₹50,000.00</Typography>
-            <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#15803D" }}>Total: ₹1,50,000.00</Typography>
+            <Typography sx={{ fontSize: 11.5, color: "#15803D" }}>Layer Cap: ₹1,00,000.00</Typography>
+            <Typography sx={{ fontSize: 11.5, color: "#15803D" }}>Royalty: ₹50,000.00</Typography>
+            <Typography sx={{ fontSize: 11.5, fontWeight: 900, color: "#15803D" }}>Total: ₹1,50,000.00</Typography>
           </Stack>
         </Box>
 
         {/* Payment Source Selector */}
-        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#0F172A", mb: 1 }}>
+        <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#0F172A", mb: 1 }}>
           Select Payment Source (Strict: Internal Wallets Only)
         </Typography>
         <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
@@ -1728,11 +2103,21 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
         {errMsg && <Alert severity="error" sx={{ mb: 1.5, fontSize: 12 }}>{errMsg}</Alert>}
         {successMsg && <Alert severity="success" sx={{ mb: 1.5, fontSize: 12 }}>{successMsg}</Alert>}
       </DialogContent>
-      <DialogActions sx={{ p: 2 }}>
-        <Button onClick={onClose} sx={{ textTransform: "none", fontWeight: 700, color: "#64748B" }}>
+      <DialogActions sx={{ p: { xs: 1.5, sm: 2 }, pt: 1, gap: 1, flexDirection: { xs: "column-reverse", sm: "row" } }}>
+        <Button
+          fullWidth
+          onClick={onClose}
+          sx={{
+            textTransform: "none",
+            fontWeight: 700,
+            color: "#64748B",
+            width: { xs: "100%", sm: "auto" },
+          }}
+        >
           Cancel
         </Button>
         <Button
+          fullWidth
           variant="contained"
           onClick={handlePurchase}
           disabled={submitting}
@@ -1740,13 +2125,16 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
             bgcolor: "#059669",
             color: "#FFF",
             fontWeight: 900,
+            fontSize: { xs: 12.5, sm: 13.5 },
             textTransform: "none",
-            borderRadius: "10px",
-            px: 3,
+            borderRadius: "12px",
+            py: 1.1,
+            px: 2.5,
+            width: { xs: "100%", sm: "auto" },
             "&:hover": { bgcolor: "#047857" },
           }}
         >
-          {submitting ? "Processing..." : `🚀 Pay ₹${totalPayable.toLocaleString("en-IN")} & Unlock Term ${nextCycleNum}`}
+          {submitting ? "Processing..." : `🚀 Pay ₹${totalPayable.toLocaleString("en-IN")} & Activate Term ${nextCycleNum}`}
         </Button>
       </DialogActions>
     </Dialog>

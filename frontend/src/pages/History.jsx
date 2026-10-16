@@ -1323,6 +1323,9 @@ const SectionList = React.memo(function SectionList({ sections, fallbackRows = [
 function PhonePeFilterDrawer({
   open,
   onClose,
+  termFilter = "ALL",
+  setTermFilter,
+  purchasedTerms = [1],
   datePreset,
   setDatePreset,
   customStartDate,
@@ -1399,7 +1402,7 @@ function PhonePeFilterDrawer({
             Filter Transactions
           </Typography>
           <Typography sx={{ fontSize: 12, color: "#64748B" }}>
-            PhonePe-style date range & source filters
+            PhonePe-style academic term, date range & category filters
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} alignItems="center">
@@ -1414,6 +1417,40 @@ function PhonePeFilterDrawer({
             <CloseRoundedIcon />
           </IconButton>
         </Stack>
+      </Box>
+
+      {/* Section 0: Academic Term Filter (Strictly bounded to purchased terms) */}
+      <Box sx={{ mb: 2.5 }}>
+        <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#1E293B", mb: 1 }}>
+          🎓 Academic Term
+        </Typography>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.8 }}>
+          {[
+            { label: "All Terms", value: "ALL" },
+            { label: "Term 1", value: "1" },
+            ...(purchasedTerms.includes(2) ? [{ label: "Term 2", value: "2" }] : []),
+            ...(purchasedTerms.includes(3) ? [{ label: "Term 3", value: "3" }] : []),
+          ].map((t) => {
+            const isSelected = String(termFilter) === String(t.value);
+            return (
+              <Chip
+                key={t.value}
+                label={t.label}
+                onClick={() => setTermFilter && setTermFilter(t.value)}
+                sx={{
+                  fontWeight: 800,
+                  fontSize: 12,
+                  borderRadius: 999,
+                  bgcolor: isSelected ? "#064E3B" : "#F1F5F9",
+                  color: isSelected ? "#FFFFFF" : "#475569",
+                  border: "1px solid",
+                  borderColor: isSelected ? "#064E3B" : "#E2E8F0",
+                  cursor: "pointer",
+                }}
+              />
+            );
+          })}
+        </Box>
       </Box>
 
       {/* Section 1: Date Range */}
@@ -1882,6 +1919,12 @@ export default function History() {
   const [txDetailOpen, setTxDetailOpen] = useState(false);
   const [tab, setTab] = useState(0);
 
+  // Academic Term Filter State (Strictly bounded to database-purchased terms)
+  const [termFilter, setTermFilter] = useState("ALL"); // "ALL" | "1" | "2" ...
+  const [purchasedTerms, setPurchasedTerms] = useState([1]);
+  const [currentTerm, setCurrentTerm] = useState(1);
+  const [dbTermStats, setDbTermStats] = useState({});
+
   // PhonePe-Style Filter State
   const [searchQuery, setSearchQuery] = useState("");
   const [datePreset, setDatePreset] = useState("all");
@@ -1900,6 +1943,9 @@ export default function History() {
     try {
       setErr("");
       const params = { limit: 2000 };
+      if (termFilter && termFilter !== "ALL") {
+        params.term = termFilter;
+      }
       if (sourceFilter && sourceFilter !== "ALL") {
         params.category = sourceFilter;
       }
@@ -1921,6 +1967,27 @@ export default function History() {
 
       const res = await API.get("/accounts/wallet/me/history/", { params });
       const data = res?.data || {};
+
+      if (data?.current_term) {
+        setCurrentTerm(Number(data.current_term));
+      }
+      if (data?.purchased_terms && Array.isArray(data.purchased_terms)) {
+        setPurchasedTerms(data.purchased_terms);
+      } else {
+        try {
+          const userCycle = JSON.parse(
+            localStorage.getItem(`trikonekt_cycle_user_${currentUser?.id}`) ||
+            localStorage.getItem("trikonekt_consumer_cycle_state") || "{}"
+          );
+          const c = Number(userCycle.currentCycle || 1);
+          const p = [1];
+          for (let i = 2; i <= c; i++) p.push(i);
+          setPurchasedTerms(p);
+        } catch (_) {}
+      }
+      if (data?.term_stats) {
+        setDbTermStats(data.term_stats);
+      }
 
       if (data?.category_stats) {
         setDbCategoryStats(data.category_stats);
@@ -1978,7 +2045,7 @@ export default function History() {
     } finally {
       setLoading(false);
     }
-  }, [sourceFilter, flowFilter, datePreset, customStartDate, customEndDate, searchQuery]);
+  }, [termFilter, sourceFilter, flowFilter, datePreset, customStartDate, customEndDate, searchQuery, currentUser?.id]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -2074,14 +2141,16 @@ export default function History() {
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
+    if (termFilter && termFilter !== "ALL") count++;
     if (datePreset !== "all" || customStartDate || customEndDate) count++;
     if (flowFilter !== "ALL") count++;
     if (sourceFilter !== "ALL") count++;
     if (searchQuery.trim()) count++;
     return count;
-  }, [datePreset, customStartDate, customEndDate, flowFilter, sourceFilter, searchQuery]);
+  }, [termFilter, datePreset, customStartDate, customEndDate, flowFilter, sourceFilter, searchQuery]);
 
   const handleResetFilters = () => {
+    setTermFilter("ALL");
     setDatePreset("all");
     setCustomStartDate("");
     setCustomEndDate("");
@@ -2222,7 +2291,7 @@ export default function History() {
             </Stack>
 
             <Chip
-              label="Term 1 Active"
+              label={`Term ${currentTerm} Active`}
               size="small"
               onClick={() => navigate("/rank-upgrade")}
               sx={{
@@ -2793,6 +2862,96 @@ export default function History() {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* 2.5 ACADEMIC TERM SELECTOR (Term 2 shown strictly only when purchased) */}
+      <Box
+        sx={{
+          mb: 1.5,
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          overflowX: "auto",
+          pb: 0.5,
+          "&::-webkit-scrollbar": { display: "none" },
+          scrollbarWidth: "none",
+        }}
+      >
+        <Chip
+          icon={<SchoolRoundedIcon sx={{ fontSize: 16, color: termFilter === "ALL" ? "#FFF !important" : "#059669 !important" }} />}
+          label={`All Terms (${categoryStats.ALL.count})`}
+          onClick={() => setTermFilter("ALL")}
+          sx={{
+            flexShrink: 0,
+            fontWeight: 800,
+            fontSize: 11.5,
+            height: 32,
+            borderRadius: "999px",
+            bgcolor: termFilter === "ALL" ? "#064E3B" : "#FFFFFF",
+            color: termFilter === "ALL" ? "#FFFFFF" : "#064E3B",
+            border: "1.5px solid",
+            borderColor: termFilter === "ALL" ? "#064E3B" : "#A7F3D0",
+            cursor: "pointer",
+            boxShadow: "0 1px 4px rgba(6, 78, 59, 0.08)",
+          }}
+        />
+
+        <Chip
+          label={`Term 1 ${dbTermStats["1"] ? `(₹${fmtAmount(dbTermStats["1"].total)})` : ""}`}
+          onClick={() => setTermFilter("1")}
+          sx={{
+            flexShrink: 0,
+            fontWeight: 800,
+            fontSize: 11.5,
+            height: 32,
+            borderRadius: "999px",
+            bgcolor: termFilter === "1" ? "#064E3B" : "#FFFFFF",
+            color: termFilter === "1" ? "#FFFFFF" : "#334155",
+            border: "1.5px solid",
+            borderColor: termFilter === "1" ? "#064E3B" : "#CBD5E1",
+            cursor: "pointer",
+            boxShadow: "0 1px 4px rgba(0, 0, 0, 0.04)",
+          }}
+        />
+
+        {purchasedTerms.includes(2) && (
+          <Chip
+            label={`Term 2 (Active) ${dbTermStats["2"] ? `(₹${fmtAmount(dbTermStats["2"].total)})` : ""}`}
+            onClick={() => setTermFilter("2")}
+            sx={{
+              flexShrink: 0,
+              fontWeight: 800,
+              fontSize: 11.5,
+              height: 32,
+              borderRadius: "999px",
+              bgcolor: termFilter === "2" ? "#064E3B" : "#FFFFFF",
+              color: termFilter === "2" ? "#FFFFFF" : "#2563EB",
+              border: "1.5px solid",
+              borderColor: termFilter === "2" ? "#064E3B" : "#93C5FD",
+              cursor: "pointer",
+              boxShadow: "0 1px 4px rgba(37, 99, 235, 0.08)",
+            }}
+          />
+        )}
+
+        {purchasedTerms.includes(3) && (
+          <Chip
+            label={`Term 3 ${dbTermStats["3"] ? `(₹${fmtAmount(dbTermStats["3"].total)})` : ""}`}
+            onClick={() => setTermFilter("3")}
+            sx={{
+              flexShrink: 0,
+              fontWeight: 800,
+              fontSize: 11.5,
+              height: 32,
+              borderRadius: "999px",
+              bgcolor: termFilter === "3" ? "#064E3B" : "#FFFFFF",
+              color: termFilter === "3" ? "#FFFFFF" : "#334155",
+              border: "1.5px solid",
+              borderColor: termFilter === "3" ? "#064E3B" : "#E2E8F0",
+              cursor: "pointer",
+            }}
+          />
+        )}
+      </Box>
 
       {/* 3. SEARCH + HORIZONTAL FILTER BAR (Image 2 exact styling) */}
       <Stack spacing={1.2} sx={{ mb: 1.8 }}>
@@ -3474,6 +3633,9 @@ export default function History() {
       <PhonePeFilterDrawer
         open={filterDrawerOpen}
         onClose={() => setFilterDrawerOpen(false)}
+        termFilter={termFilter}
+        setTermFilter={setTermFilter}
+        purchasedTerms={purchasedTerms}
         datePreset={datePreset}
         setDatePreset={setDatePreset}
         customStartDate={customStartDate}

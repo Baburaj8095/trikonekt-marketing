@@ -42,6 +42,7 @@ from .views import (
     OfferLetterPDFView,
     # Wallet history/banks/spend
     wallet_me_history,
+    wallet_term_renewal,
     wallet_me_banks,
     wallet_purchase_ecoupon,
     wallet_purchase_product,
@@ -107,6 +108,8 @@ urlpatterns = [
     path('admin/franchise/wallet/work-approvals/', AdminFranchiseWorkApprovalView.as_view(), name='admin_franchise_work_approvals'),
     path('wallet/me/transactions/', WalletTransactionsList.as_view(), name='wallet_transactions'),
     path('wallet/me/history/', wallet_me_history, name='wallet_me_history'),
+    path('wallet/term-renewal/', wallet_term_renewal, name='wallet_term_renewal'),
+    path('validator/purchase-bulk-courses/', wallet_term_renewal, name='validator_purchase_bulk_courses_alias'),
     path('wallet/me/banks/', wallet_me_banks, name='wallet_me_banks'),
     path('wallet/transfer/lookup-consumer/', WalletTransferConsumerLookup.as_view(), name='wallet_transfer_lookup_consumer'),
     path('wallet/transfer/request-otp/', WalletTransferOtpRequest.as_view(), name='wallet_transfer_request_otp'),

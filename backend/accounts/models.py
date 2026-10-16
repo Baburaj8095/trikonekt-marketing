@@ -972,7 +972,21 @@ class Wallet(models.Model):
                         w = Wallet.objects.select_for_update().get(pk=w.pk)
                         cur_self = D(str(getattr(w, "self_account_balance", "0") or "0"))
 
-                        if cur_self < D("250.00"):
+                        # Mathematical Hard Ceiling Invariant:
+                        # A user can never generate more rebirths than lifetime SELF_ACCOUNT_CREDIT allows
+                        total_self_cr = WalletTransaction.objects.filter(
+                            user=self.user, amount__gt=0, type="SELF_ACCOUNT_CREDIT"
+                        ).aggregate(total=models.Sum("amount"))["total"] or D("0.00")
+                        existing_debits_count = WalletTransaction.objects.filter(
+                            user=self.user, type="SELF_ACCOUNT_DEBIT"
+                        ).count()
+                        max_allowed_rebirths = int(total_self_cr // D("250.00"))
+                        if existing_debits_count >= max_allowed_rebirths:
+                            # Reached exact funded limit; reconcile wallet balance and break
+                            correct_balance = max(D("0.00"), total_self_cr - (existing_debits_count * D("250.00")))
+                            if w.self_account_balance != correct_balance:
+                                w.self_account_balance = correct_balance
+                                w.save(update_fields=["self_account_balance", "updated_at"])
                             break
 
                         # Balance safety check before deduction
@@ -1037,10 +1051,9 @@ class Wallet(models.Model):
                             import logging
                             logging.getLogger(__name__).warning(f"Double-entry self rebirth debit failed: {e_de}")
 
-                        if not posted_double_entry:
-                            # Fallback if WalletEngine double-entry is unavailable
-                            w.self_account_balance = max(D("0.00"), cur_self - D("250.00"))
-                        w.save(update_fields=["updated_at"])
+                        # Atomically persist updated balance to PostgreSQL in all cases
+                        w.self_account_balance = max(D("0.00"), cur_self - D("250.00"))
+                        w.save(update_fields=["self_account_balance", "updated_at"])
 
                         pack_to_distribute = pack_index
                 except Exception as e_loop:

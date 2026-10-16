@@ -10,6 +10,7 @@ from business.views_ssv import (
     AdminSSVActivateCycleView,
     AdminSSVSaveCycleView,
 )
+from accounts.views import wallet_term_renewal
 from .views import (
     AdminMetricsView,
     AdminUserTreeRoot,
@@ -214,6 +215,7 @@ urlpatterns = [
     path("ssv/cycles/", AdminSSVCyclesView.as_view()),
     path("ssv/cycles/activate/", AdminSSVActivateCycleView.as_view()),
     path("ssv/cycles/save/", AdminSSVSaveCycleView.as_view()),
+    path("validator/purchase-bulk-courses/", wallet_term_renewal),
 
     # Dynamic admin models (auto-discovered)
     path("", include(dynamic_router.urls)),
