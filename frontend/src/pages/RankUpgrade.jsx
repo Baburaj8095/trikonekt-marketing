@@ -582,6 +582,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletErr, setWalletErr] = useState("");
   const [cycleRenewalOpen, setCycleRenewalOpen] = useState(false);
+  const [missingDialogOpen, setMissingDialogOpen] = useState(false);
   const [consumerCycleState, setConsumerCycleState] = useState({
     cycle: "Cycle 1",
     status: "active",
@@ -891,6 +892,9 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
 
   // Missing Blocks Income: Income generated after ₹1.5L combined cycle limit is reached, or if royalty exceeds ₹50k
   const missingIncome = useMemo(() => {
+    if (termStat?.missing_total !== undefined && Number(termStat.missing_total) > 0) {
+      return Number(termStat.missing_total);
+    }
     let overflow = 0;
     if (viewingTermRawLayerIncome > dynamicLayerCap) {
       overflow += (viewingTermRawLayerIncome - dynamicLayerCap);
@@ -899,7 +903,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
       overflow += (viewingTermEarnedRoyalty - maxRoyaltyCap);
     }
     return Number(overflow.toFixed(2));
-  }, [viewingTermRawLayerIncome, dynamicLayerCap, viewingTermEarnedRoyalty, maxRoyaltyCap]);
+  }, [termStat, viewingTermRawLayerIncome, dynamicLayerCap, viewingTermEarnedRoyalty, maxRoyaltyCap]);
 
   const isPackageActive = Boolean(hasApprovedBase || currentLevel >= 1 || elig?.has_prime || elig?.is_prime);
 
@@ -1771,7 +1775,11 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             <Typography sx={{ fontSize: 11, color: "#9a3412", mb: 1.5 }}>
               Income generated after the combined ₹1.5L term limit is reached will be shown here.
             </Typography>
-            <Button size="small" sx={{ textTransform: "none", color: "#c2410c", fontWeight: 800, p: 0 }}>
+            <Button
+              size="small"
+              onClick={() => setMissingDialogOpen(true)}
+              sx={{ textTransform: "none", color: "#c2410c", fontWeight: 800, p: 0 }}
+            >
               View Missing Income &gt;
             </Button>
           </Paper>
@@ -2296,6 +2304,109 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           }));
         }}
       />
+
+      {/* ── Missing Blocks Income Explanation & History Dialog ── */}
+      <Dialog
+        open={missingDialogOpen}
+        onClose={() => setMissingDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: "20px",
+            p: 1,
+            border: "1px solid #FFEDD5",
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 950, color: "#9A3412", pb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+          <HourglassEmptyRoundedIcon sx={{ color: "#EA580C" }} />
+          Missing Blocks Income Details
+        </DialogTitle>
+        <DialogContent dividers sx={{ borderColor: "#FED7AA", pt: 2, pb: 2.5 }}>
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 2,
+              mb: 2.5,
+              borderRadius: "14px",
+              bgcolor: "#FFF7ED",
+              borderColor: "#FDBA74",
+              textAlign: "center",
+            }}
+          >
+            <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#9A3412", textTransform: "uppercase", letterSpacing: 0.5 }}>
+              Total Term {viewingTermNumber} Missed Income
+            </Typography>
+            <Typography sx={{ fontSize: 32, fontWeight: 950, color: "#C2410C", my: 0.5 }}>
+              ₹{fmt(missingIncome)}
+            </Typography>
+            <Typography sx={{ fontSize: 11.5, color: "#7C2D12", maxWidth: 440, mx: "auto" }}>
+              Income generated from Matrix & Layer placements after your Term {viewingTermNumber} limit (₹1.5 Lakhs) is reached.
+            </Typography>
+          </Paper>
+
+          <Box sx={{ mb: 2 }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#1E293B", mb: 1 }}>
+              How Does Earning Cap & Missing Income Work?
+            </Typography>
+            <Stack spacing={1.2}>
+              <Box sx={{ p: 1.5, bgcolor: "#F8FAFC", borderRadius: "12px", border: "1px solid #E2E8F0" }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>
+                  1. Capped at ₹1.5 Lakhs per Academic Term
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#64748B", mt: 0.3 }}>
+                  Each Academic Term has a combined ₹1,50,000 cap (up to ₹1,00,000 in Layers and ₹50,000 in Royalty).
+                </Typography>
+              </Box>
+
+              <Box sx={{ p: 1.5, bgcolor: "#F8FAFC", borderRadius: "12px", border: "1px solid #E2E8F0" }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>
+                  2. Direct Sponsor Bonus Is NEVER Capped
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#64748B", mt: 0.3 }}>
+                  Your direct referral bonuses (SPP ₹1,000, Prime direct, and Rank 1 upgrade direct) always flow 100% as usual without any limits.
+                </Typography>
+              </Box>
+
+              <Box sx={{ p: 1.5, bgcolor: "#F8FAFC", borderRadius: "12px", border: "1px solid #E2E8F0" }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>
+                  3. Unlock Fresh ₹1.5L Headroom via Renewal
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: "#64748B", mt: 0.3 }}>
+                  Select Track 1 (₹2k), Track 2 (₹8k), Track 3 (₹40k), or Full Bundle (₹50k) to renew and unlock fresh ₹1.5L headroom for the next term.
+                </Typography>
+              </Box>
+            </Stack>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, display: "flex", justifyContent: "space-between", gap: 1 }}>
+          <Button
+            onClick={() => setMissingDialogOpen(false)}
+            sx={{ fontWeight: 800, color: "#64748B", textTransform: "none" }}
+          >
+            Close
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setMissingDialogOpen(false);
+              setCycleRenewalOpen(true);
+            }}
+            sx={{
+              bgcolor: "#EA580C",
+              color: "#FFF",
+              fontWeight: 900,
+              textTransform: "none",
+              borderRadius: "10px",
+              px: 2.5,
+              "&:hover": { bgcolor: "#C2410C" },
+            }}
+          >
+            🚀 Renew Term & Unlock Headroom
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

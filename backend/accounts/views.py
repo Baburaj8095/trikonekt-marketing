@@ -4450,6 +4450,7 @@ def wallet_me_history(request):
         "DIRECT": (Q(type="DIRECT_REF_BONUS") | Q(meta__orig_type="DIRECT_REF_BONUS") | (Q(source_type="RANK_UPGRADE") & (Q(meta__kind="RANK_UPGRADE_DIRECT") | Q(meta__level=0)))) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT"),
         "WITHDRAWAL": (Q(type__in=["WITHDRAWAL_DEBIT", "WITHDRAWAL_REQUEST"]) | Q(source_type="WITHDRAWAL")),
         "P2P": (Q(type__in=["P2P_PACKAGE_COUPON_SEND", "P2P_PACKAGE_COUPON_RECEIVE"]) | Q(source_type__icontains="P2P")),
+        "MISSING_INCOME": Q(type="MISSING_BLOCK_OVERFLOW") | Q(meta__ledger="MISSING_INCOME"),
     }
     cat_queries["LAYER"] = cat_queries["FIVE_LAYER"] | cat_queries["THREE_LAYER"] | cat_queries["E_EDU_LAYER"] | cat_queries["SSV_LAYER"]
 
@@ -4558,27 +4559,35 @@ def wallet_me_history(request):
 
         t_sub = base_tx.filter(t_bound)
 
-        layer_sub = t_sub.filter(amount__gt=0).filter(
+        missing_sub = t_sub.filter(type="MISSING_BLOCK_OVERFLOW")
+        missing_amt = missing_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
+
+        credited_sub = t_sub.filter(amount__gt=0).exclude(
+            Q(type__startswith="SELF_ACCOUNT") | Q(meta__ledger="SELF_ACCOUNT") | Q(type="MISSING_BLOCK_OVERFLOW")
+        )
+
+        layer_sub = credited_sub.filter(
             Q(type__in=["AUTOPOOL_BONUS_FIVE", "AUTOPOOL_BONUS_THREE", "LEVEL_BONUS"]) |
             Q(meta__source__icontains="MATRIX") |
             Q(meta__source__icontains="LAYER") |
             Q(source_type="RANK_UPGRADE") |
             (Q(type="INCOME_CREDIT_75") & (Q(meta__source__icontains="MATRIX") | Q(meta__orig_type__in=["AUTOPOOL_BONUS_FIVE", "AUTOPOOL_BONUS_THREE"])))
-        ).exclude(Q(type__startswith="SELF_ACCOUNT") | Q(meta__ledger="SELF_ACCOUNT"))
+        )
 
-        royalty_sub = t_sub.filter(amount__gt=0).filter(
+        royalty_sub = credited_sub.filter(
             Q(type="GLOBAL_ROYALTY") | Q(meta__source="GLOBAL_ROYALTY")
-        ).exclude(Q(type__startswith="SELF_ACCOUNT") | Q(meta__ledger="SELF_ACCOUNT"))
+        )
 
-        tot_amt = t_sub.filter(amount__gt=0).aggregate(s=Sum("amount"))["s"] or D("0.00")
+        tot_amt = credited_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
         layer_amt = layer_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
         royalty_amt = royalty_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
 
         term_stats[t_str] = {
-            "count": t_sub.count(),
+            "count": credited_sub.count(),
             "total": str(tot_amt),
             "layer_total": str(layer_amt),
             "royalty_total": str(royalty_amt),
+            "missing_total": str(missing_amt),
         }
 
     # Server-Side Filter Processing (100% Database SQL Execution)

@@ -448,8 +448,54 @@ class Wallet(models.Model):
             kwargs["update_fields"] = [f for f in update_fields if f not in legacy_fields]
         super().save(*args, **kwargs)
 
-    def __str__(self) -> str:
-        return f"Wallet<{self.user.username}>"
+    def get_active_term_headroom(self) -> Decimal:
+        """
+        Calculates remaining layer commission headroom for user's active academic term.
+        Total combined cycle cap: ₹150,000.00 (Layers + Royalty).
+        """
+        try:
+            from django.db.models import Sum, Q
+            user = self.user
+            if not user or not getattr(user, "id", None):
+                return Decimal("150000.00")
+
+            last_renewal = WalletTransaction.objects.filter(
+                user=user,
+                type__in=["ACADEMIC_TERM_RENEWAL", "TERM_RENEWAL"]
+            ).order_by("-created_at").values_list("created_at", flat=True).first()
+
+            t_filter = Q(user=user, amount__gt=0)
+            if last_renewal:
+                t_filter &= Q(created_at__gte=last_renewal)
+
+            q_royalty = Q(type="GLOBAL_ROYALTY") | Q(meta__orig_type="GLOBAL_ROYALTY") | Q(source_type="DAILY_POOL_DISTRIBUTION")
+            q_layer = (
+                Q(type__in=["LEVEL_BONUS", "AUTOPOOL_BONUS_FIVE", "AUTOPOOL_BONUS_THREE", "PRIME_150_SELF", "PRIME_750_SELF", "PRIME_759_SELF"]) |
+                Q(meta__source__startswith="THREE_MATRIX") |
+                Q(meta__source__startswith="FIVE_MATRIX") |
+                (Q(source_type="RANK_UPGRADE") & (Q(meta__orig_type__icontains="LEVEL") | Q(type__icontains="LEVEL") | Q(meta__kind__icontains="LEVEL"))) |
+                (Q(type="INCOME_CREDIT_75") & (
+                    Q(meta__orig_type__icontains="LEVEL") |
+                    Q(meta__orig_type__icontains="AUTOPOOL") |
+                    Q(meta__source__icontains="MATRIX") |
+                    Q(meta__trigger__in=["PRIME_150", "PRIME_750", "PRIME_759", "SELF_REBIRTH_250"])
+                ))
+            )
+
+            earned_royalty = WalletTransaction.objects.filter(t_filter).filter(q_royalty).exclude(
+                Q(type__startswith="SELF_ACCOUNT") | Q(meta__ledger="SELF_ACCOUNT") | Q(type="MISSING_BLOCK_OVERFLOW")
+            ).aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
+
+            earned_layer = WalletTransaction.objects.filter(t_filter).filter(q_layer).exclude(
+                Q(type__startswith="SELF_ACCOUNT") | Q(meta__ledger="SELF_ACCOUNT") | Q(type="MISSING_BLOCK_OVERFLOW")
+            ).aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
+
+            total_cap = Decimal("150000.00")
+            current_total = Decimal(str(earned_layer)) + Decimal(str(earned_royalty))
+            rem = total_cap - current_total
+            return max(Decimal("0.00"), rem.quantize(Decimal("0.01")))
+        except Exception:
+            return Decimal("150000.00")
 
     @transaction.atomic
     def credit(
@@ -583,6 +629,67 @@ class Wallet(models.Model):
             return w.balance
 
         if (is_commission or is_prime_tx) and not no_withhold and amt > 0:
+            # Check Academic Term Headroom for Matrix / Layer Incomes (capped at ₹150,000 per term)
+            # Direct sponsor bonuses are exempt and flow unconstrained.
+            is_layer_tx = (
+                tx_upper in {
+                    "AUTOPOOL_BONUS_FIVE",
+                    "AUTOPOOL_BONUS_THREE",
+                    "LEVEL_BONUS",
+                    "LEVEL",
+                    "MONTHLY_759_LEVEL",
+                }
+                or meta.get("kind") == "RANK_UPGRADE_LEVEL"
+                or "MATRIX" in str(meta.get("source", "")).upper()
+                or "LAYER" in str(meta.get("source", "")).upper()
+            )
+
+            if is_layer_tx:
+                headroom = self.get_active_term_headroom()
+                if headroom <= D("0.00"):
+                    # 100% Capped: Route entire commission to MISSING_BLOCK_OVERFLOW (no credit to spendable wallet)
+                    meta_missing = {
+                        **(meta or {}),
+                        "ledger": "MISSING_INCOME",
+                        "orig_type": str(tx_type),
+                        "gross": str(amt),
+                        "reason": "ACADEMIC_TERM_CAP_REACHED",
+                        "headroom": "0.00",
+                    }
+                    WalletTransaction.objects.create(
+                        user=self.user,
+                        amount=amt,
+                        balance_after=w.balance,
+                        type="MISSING_BLOCK_OVERFLOW",
+                        source_type=source_type or '',
+                        source_id=str(source_id) if source_id is not None else '',
+                        meta=meta_missing,
+                        matrix_account_id=matrix_account_id,
+                    )
+                    return w.balance
+                elif headroom < amt:
+                    # Partial headroom: record overflow portion as MISSING_BLOCK_OVERFLOW, credit remaining up to headroom
+                    overflow_amt = (amt - headroom).quantize(D("0.01"))
+                    amt = headroom
+                    meta_missing = {
+                        **(meta or {}),
+                        "ledger": "MISSING_INCOME",
+                        "orig_type": str(tx_type),
+                        "gross": str(overflow_amt),
+                        "reason": "ACADEMIC_TERM_CAP_REACHED_PARTIAL",
+                        "headroom": "0.00",
+                    }
+                    WalletTransaction.objects.create(
+                        user=self.user,
+                        amount=overflow_amt,
+                        balance_after=w.balance,
+                        type="MISSING_BLOCK_OVERFLOW",
+                        source_type=source_type or '',
+                        source_id=str(source_id) if source_id is not None else '',
+                        meta=meta_missing,
+                        matrix_account_id=matrix_account_id,
+                    )
+
             # 75/25 streaming model:
             # - 75% -> income (main + withdrawable when active)
             # - 25% -> self reserve (self_account_balance)
@@ -1358,6 +1465,7 @@ class WalletTransaction(models.Model):
         ('SELF_ACCOUNT_CREDIT', 'Self Account Credit'),
         ('SELF_ACCOUNT_DEBIT', 'Self Account Debit (250 Pack)'),
         ('AUTO_ECOUPON_ISSUED', 'Auto E-Coupon Issued'),
+        ('MISSING_BLOCK_OVERFLOW', 'Missing Block Overflow'),
     ]
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='wallet_transactions', db_index=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
