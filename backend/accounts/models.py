@@ -1019,7 +1019,7 @@ class Wallet(models.Model):
                                 LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.CREDIT, D("250.00")),
                             ]
                             WalletEngine.post_transaction(
-                                category=FinanceCategories.COMMISSION_PAYOUT,
+                                category=FinanceCategories.SELF_REBIRTH,
                                 user=self.user,
                                 source_module=WalletTypes.SELF_PACKAGE_POCKET,
                                 source_id=str(pack_index or ""),
@@ -1034,7 +1034,8 @@ class Wallet(models.Model):
                                 postings=postings,
                             )
                         except Exception as e_de:
-                            logger.warning(f"Double-entry self rebirth debit failed: {e_de}")
+                            import logging
+                            logging.getLogger(__name__).warning(f"Double-entry self rebirth debit failed: {e_de}")
 
                         # Trigger dedicated ₹250 Self Rebirth distribution engine (100% admin-controlled)
                         try:
