@@ -11,6 +11,7 @@ import {
   DialogTitle,
   Divider,
   Alert,
+  Drawer,
   IconButton,
   Paper,
   Stack,
@@ -1795,28 +1796,40 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
   const tabPackages = PACKAGES.filter((p) => p.tab === activeTab);
 
   return (
-    <Dialog
+    <Drawer
+      anchor="bottom"
       open={open}
       onClose={onClose}
-      maxWidth="sm"
-      fullWidth
       PaperProps={{
         sx: {
-          borderRadius: { xs: "20px", sm: "24px" },
-          p: { xs: 0.5, sm: 1 },
-          m: { xs: 1.5, sm: 2 },
-          maxHeight: "92vh",
+          borderTopLeftRadius: "28px",
+          borderTopRightRadius: "28px",
+          p: 0,
+          maxWidth: 600,
+          mx: "auto",
+          bgcolor: "#FFFFFF",
+          boxShadow: "0 -20px 50px rgba(15, 23, 42, 0.22)",
+          maxHeight: "90vh",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
         },
       }}
     >
-      <DialogTitle
+      {/* Posh Top Drag Handle Indicator */}
+      <Box sx={{ pt: 1.5, pb: 0.8, display: "flex", justifyContent: "center" }}>
+        <Box sx={{ width: 44, height: 4.5, bgcolor: "#CBD5E1", borderRadius: 3 }} />
+      </Box>
+
+      {/* Header */}
+      <Box
         sx={{
-          p: { xs: 1.8, sm: 2.2 },
-          pb: { xs: 1, sm: 1.5 },
+          px: { xs: 2, sm: 2.5 },
+          pb: 1.5,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 1,
+          borderBottom: "1px solid #EEF2F6",
         }}
       >
         <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0, flex: 1 }}>
@@ -1840,7 +1853,7 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
             <Typography
               sx={{
                 fontWeight: 950,
-                fontSize: { xs: 15, sm: 16.5 },
+                fontSize: { xs: 15.5, sm: 17 },
                 color: "#0F172A",
                 lineHeight: 1.2,
                 whiteSpace: "nowrap",
@@ -1867,8 +1880,18 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
         >
           <CloseRoundedIcon fontSize="small" />
         </IconButton>
-      </DialogTitle>
-      <DialogContent dividers sx={{ borderColor: "#EEF2F6", p: { xs: 2, sm: 2.5 } }}>
+      </Box>
+
+      {/* Smoothly Scrollable Content */}
+      <Box
+        sx={{
+          px: { xs: 2, sm: 2.5 },
+          py: 2,
+          overflowY: "auto",
+          flex: 1,
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
         <Typography sx={{ fontSize: 12.5, color: "#64748B", mb: 2 }}>
           Choose an individual academic track or the complete bulk bundle. Your earnings will reset into <strong>Term {nextCycleNum}</strong> with fresh limits and <strong>zero duplicate matrix accounts</strong>.
         </Typography>
@@ -2058,7 +2081,7 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
         <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#0F172A", mb: 1 }}>
           Select Payment Source (Strict: Internal Wallets Only)
         </Typography>
-        <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mb: 2 }}>
           <Paper
             onClick={() => setPaymentSource("MAIN_WALLET")}
             elevation={0}
@@ -2102,20 +2125,18 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
 
         {errMsg && <Alert severity="error" sx={{ mb: 1.5, fontSize: 12 }}>{errMsg}</Alert>}
         {successMsg && <Alert severity="success" sx={{ mb: 1.5, fontSize: 12 }}>{successMsg}</Alert>}
-      </DialogContent>
-      <DialogActions sx={{ p: { xs: 1.5, sm: 2 }, pt: 1, gap: 1, flexDirection: { xs: "column-reverse", sm: "row" } }}>
-        <Button
-          fullWidth
-          onClick={onClose}
-          sx={{
-            textTransform: "none",
-            fontWeight: 700,
-            color: "#64748B",
-            width: { xs: "100%", sm: "auto" },
-          }}
-        >
-          Cancel
-        </Button>
+      </Box>
+
+      {/* Sticky Bottom Actions Bar (CRED / PhonePe Posh Style) */}
+      <Box
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          pt: 1.5,
+          borderTop: "1px solid #EEF2F6",
+          bgcolor: "#FFFFFF",
+          boxShadow: "0 -8px 24px rgba(15, 23, 42, 0.05)",
+        }}
+      >
         <Button
           fullWidth
           variant="contained"
@@ -2125,19 +2146,31 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
             bgcolor: "#059669",
             color: "#FFF",
             fontWeight: 900,
-            fontSize: { xs: 12.5, sm: 13.5 },
+            fontSize: 14,
             textTransform: "none",
-            borderRadius: "12px",
-            py: 1.1,
-            px: 2.5,
-            width: { xs: "100%", sm: "auto" },
+            borderRadius: "14px",
+            py: 1.3,
+            boxShadow: "0 4px 14px rgba(5, 150, 105, 0.35)",
             "&:hover": { bgcolor: "#047857" },
           }}
         >
           {submitting ? "Processing..." : `🚀 Pay ₹${totalPayable.toLocaleString("en-IN")} & Activate Term ${nextCycleNum}`}
         </Button>
-      </DialogActions>
-    </Dialog>
+        <Button
+          fullWidth
+          onClick={onClose}
+          sx={{
+            mt: 0.8,
+            textTransform: "none",
+            fontWeight: 700,
+            color: "#64748B",
+            fontSize: 12.5,
+          }}
+        >
+          Cancel
+        </Button>
+      </Box>
+    </Drawer>
   );
 }
 
