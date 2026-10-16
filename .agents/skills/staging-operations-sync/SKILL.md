@@ -9,6 +9,18 @@ description: Standard Operating Procedures for working on Trikonekt Staging (EC2
 > **Core Operating Directive**:
 > Whenever working on the Trikonekt Staging environment (`asiyapp.com` / `trieducation.in` on EC2 `65.0.40.184`), the agent must ALWAYS follow these strict ledger invariants, deployment safety protocols, and synchronization procedures to guarantee zero code loss, zero financial drift, and 100% database integrity.
 
+> [!CAUTION]
+> **MANDATORY USER APPROVAL — ZERO EXCEPTIONS (PERMANENTLY LOCKED)**
+> **NO script, SSH command, Django shell query, management command, or database operation of any kind — including read-only SELECT queries — may be executed on the staging server or live PostgreSQL database without the user's explicit written approval in the current conversation.**
+>
+> Required workflow EVERY TIME:
+> 1. **Show** the exact command/script to be run with full arguments
+> 2. **Explain** what it will do (read vs write, tables affected, users affected)
+> 3. **Wait** for explicit written approval (`"yes"`, `"run it"`, `"go ahead"`)
+> 4. **Never** assume prior approval carries over to the next step
+>
+> **Why this rule exists:** On 2026-10-14, a seed script was run 6 times on user `9999999999` without owner awareness, creating 5 duplicate SPP PromoPurchase records and 10 extra AutoPoolAccount matrix entries. The `unique_together` DB constraint did not fire (NULL ≠ NULL in SQL), and the growth bridge idempotency guard was bypassed entirely since the script wrote directly to ORM. This caused the "Smart SSP 6 IDs" display bug visible in Layer Blocks.
+
 ---
 
 ## 1. Staging Server Environment Inventory

@@ -45,6 +45,36 @@
     - **Stage 2 (₹8k) & Stage 3 (₹40k) Bulk Prefetch & Idempotency (PERMANENTLY LOCKED)**: Bulk `Rank` / `RankUpgrade` queries and `set(target_levels).issubset(achieved_levels)` in `execute_stage_upgrade` MUST NEVER be converted back to sequential per-level loops.
     - **Daemon Socket Resiliency (PERMANENTLY LOCKED)**: Exception handling for `(BrokenPipeError, ConnectionResetError)` in `growth_bridge_daemon.py` MUST be preserved to prevent thread lockups.
 
+- **MANDATORY USER APPROVAL BEFORE ANY SCRIPT/COMMAND EXECUTION (PERMANENTLY LOCKED — ZERO EXCEPTIONS)**:
+  - **NO script, management command, shell command, SSH command, or DB query may be executed on the staging server (`65.0.40.184`) or against the production PostgreSQL database WITHOUT the user's explicit written "yes, run it" approval in the current conversation.**
+  - This applies to ALL of the following — no exceptions:
+    - Django management commands (`manage.py seed_*`, `manage.py shell`, `manage.py migrate`, `manage.py repair_*`, etc.)
+    - Any script under `backend/scripts/`, `backend/scratch/`, `backend/accounts/management/commands/`, `backend/business/management/commands/`
+    - Any SSH terminal command that touches the live DB — including read-only `SELECT` queries and `django shell` reads
+    - Any `python` / `.venv/bin/python` invocation on the server
+    - Any DB cleanup, backfill, repair, or seed operation
+  - **Required workflow EVERY TIME — no shortcuts:**
+    1. Show the user the **exact command or script** that will run, with full arguments
+    2. Explain **what it does** (read-only vs write, which tables, which users affected)
+    3. **Wait for explicit written approval** (`"yes"`, `"run it"`, `"go ahead"`, etc.)
+    4. Only then execute — never assume approval carries over from a previous message
+  - **Identified High-Risk Scripts (NEVER run without approval):**
+    - `backend/run_concurrent_load_test.py` — deletes users + creates PromoPurchase records directly via ORM
+    - `backend/scripts/run_full_fix.py` — bulk DB fixes via subprocess
+    - `backend/scripts/run_prime_tests.py` — creates + approves PromoPurchase directly
+    - `backend/scratch/test_all_features_live.py` — writes to live production tables
+    - `backend/scratch/test_concurrent_multi_user.py` — concurrent load test writing live DB
+    - `backend/accounts/management/commands/seed_karnataka_full.py` — seeds users + purchases (no idempotency on MONTHLY packages)
+    - `backend/accounts/management/commands/seed_demo_hierarchy.py` — seeds full hierarchy
+    - `backend/accounts/management/commands/seed_loadtest_data.py` — seeds load test data
+    - `backend/business/management/commands/seed_root_consumer.py` — sets apex root user
+    - `backend/business/management/commands/seed_trikonekt_bulk_consumers.py` — bulk user creation
+    - `backend/business/management/commands/repair_matrix_from_sources.py` — matrix repair (modifies AutoPoolAccount)
+    - `backend/business/management/commands/rebuild_prime_matrices.py` — full matrix rebuild
+    - `backend/jobs/management/commands/process_tasks.py` — job queue processor
+    - `backend/business/services/daily_pool_distributor.py` — daily pool auto-distribution (runs at 11:59 PM)
+    - `backend/scripts_run/send_ssv_due_reminders.py` — sends live SMS/notifications to users
+
 - **Sensitive Core Files — DO NOT MODIFY OR REVERT WITHOUT EXPLICIT WRITTEN APPROVAL**:
   - `tri-academy/backend/src/scripts/growth_bridge_exec.py` (Core Bridge Executor & Commission Caches)
   - `tri-academy/backend/src/scripts/growth_bridge_daemon.py` (Persistent Python Daemon on port 5006)
