@@ -1513,22 +1513,23 @@ function ConsumerCycleRenewalWidget({ onOpenPurchase, cycleState, totalCycleEarn
             )}
           </Stack>
           <Typography sx={{ fontSize: { xs: 16, sm: 18 }, fontWeight: 950, color: "#FFFFFF", letterSpacing: "-0.02em" }}>
-            🔄 Term {currentCycleNum + 1} Academic Track Renewal
+            {isUnlocked
+              ? `🔄 Term ${currentCycleNum + 1} Academic Track Renewal`
+              : `🎓 Active Academic Programme • Term ${currentCycleNum}`}
           </Typography>
           <Typography sx={{ fontSize: 12, color: "rgba(255,255,255,0.85)", mt: 0.5, maxWidth: 540 }}>
             {isUnlocked
-              ? `Term ${currentCycleNum} earning cap achieved! Select Track 1 (₹2k), Track 2 (₹8k), Track 3 (₹40k), or Full Bundle (₹50k) using Main Wallet or Coupon Pocket for fresh ₹1.5L earning cap.`
-              : `Current Term: Term ${currentCycleNum}. Total Earning Limit: ₹${totalLimit.toLocaleString("en-IN")}. Term ${currentCycleNum + 1} renewal unlocks automatically once earning limit is reached.`}
+              ? `Term ${currentCycleNum} earning cap achieved! Select Track 1 (₹2k), Track 2 (₹8k), Track 3 (₹40k), or Full Bundle (₹50k) for fresh ₹1.5L earning cap in Term ${currentCycleNum + 1}.`
+              : `Current Term: Term ${currentCycleNum}. Earning Cap: ₹${totalLimit.toLocaleString("en-IN")}. Total Earned: ₹${Number(totalCycleEarned).toLocaleString("en-IN")} (${percent}%). Term ${currentCycleNum + 1} renewal unlocks when ₹1.5L limit is reached.`}
           </Typography>
         </Box>
 
         <Button
           variant="contained"
-          onClick={isUnlocked ? onOpenPurchase : undefined}
-          disabled={!isUnlocked}
+          onClick={onOpenPurchase}
           sx={{
-            bgcolor: isUnlocked ? "#F59E0B" : "rgba(255,255,255,0.18)",
-            color: isUnlocked ? "#0F172A" : "rgba(255,255,255,0.6)",
+            bgcolor: isUnlocked ? "#F59E0B" : "rgba(255,255,255,0.22)",
+            color: isUnlocked ? "#0F172A" : "#FFFFFF",
             fontWeight: 950,
             fontSize: 12.5,
             textTransform: "none",
@@ -1538,16 +1539,10 @@ function ConsumerCycleRenewalWidget({ onOpenPurchase, cycleState, totalCycleEarn
             boxShadow: isUnlocked ? "0 4px 14px rgba(245, 158, 11, 0.4)" : "none",
             whiteSpace: "nowrap",
             width: { xs: "100%", sm: "auto" },
-            "&.Mui-disabled": {
-              bgcolor: "rgba(255,255,255,0.18)",
-              color: "rgba(255,255,255,0.5)",
-              cursor: "not-allowed",
-              pointerEvents: "auto",
-            },
-            "&:hover": { bgcolor: isUnlocked ? "#D97706" : "rgba(255,255,255,0.18)" },
+            "&:hover": { bgcolor: isUnlocked ? "#D97706" : "rgba(255,255,255,0.32)" },
           }}
         >
-          {isUnlocked ? "🚀 Select Track & Renew (From ₹2,000)" : `🔒 Term ${currentCycleNum + 1} Locked (Cap: ₹1.5L)`}
+          {isUnlocked ? `🚀 Select Track & Renew to Term ${currentCycleNum + 1}` : `🎓 View Term ${currentCycleNum} Tracks & Upgrades`}
         </Button>
       </Stack>
     </Paper>
