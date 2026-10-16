@@ -4747,9 +4747,9 @@ def wallet_term_renewal(request):
     except Exception:
         base_amt = D("2000.00")
 
-    gst_amt = (base_amt * D("0.18")).quantize(D("0.01"))
+    gst_amt = D("0.00")  # Removed 18% GST from Term 2 onwards, keeping only 7% Admin Fee
     admin_fee = (base_amt * D("0.07")).quantize(D("0.01"))
-    total_payable = base_amt + gst_amt + admin_fee
+    total_payable = base_amt + admin_fee
 
     if payment_source == "COUPON_POCKET":
         avail = getattr(w, "coupon_balance", D("0.00")) or D("0.00")

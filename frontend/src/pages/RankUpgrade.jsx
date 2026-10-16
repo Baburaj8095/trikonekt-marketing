@@ -181,9 +181,9 @@ function ConsumerCycleRenewalDialog({
   const couponBal = getPackagePurchaseCouponBalance(walletMe);
 
   const baseAmt = 2000;
-  const gstAmt = 360; // 18%
+  const gstAmt = 0; // Removed 18% GST from Term 2 onwards, keeping only 7% Admin Fee
   const adminChargeAmt = 140; // 7%
-  const totalPayable = 2500; // 2000 + 360 + 140
+  const totalPayable = 2140; // 2000 + 140
 
   const hasEnoughMain = mainBal >= totalPayable;
   const hasEnoughCoupon = couponBal >= totalPayable;
@@ -201,7 +201,7 @@ function ConsumerCycleRenewalDialog({
         role: "CONSUMER",
       }).catch(() => {});
 
-      setSuccessMsg(`🎉 Term 2 Renewal Activated! ₹2,500 debited from ${selectedSource === "MAIN_WALLET" ? "Main Wallet" : "Package Coupon Pocket"}. Your ₹1,00,000 E-Edu Layer capacity and ₹50,000 Royalty cap are renewed.`);
+      setSuccessMsg(`🎉 Term 2 Renewal Activated! ₹2,140 debited from ${selectedSource === "MAIN_WALLET" ? "Main Wallet" : "Package Coupon Pocket"}. Your ₹1,00,000 E-Edu Layer capacity and ₹50,000 Royalty cap are renewed.`);
       if (onRenewSuccess) onRenewSuccess();
     } catch (e) {
       setErrMsg(e?.response?.data?.detail || e?.message || "Failed to renew term. Please contact Admin.");
@@ -246,17 +246,13 @@ function ConsumerCycleRenewalDialog({
               <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A" }}>₹2,000.00</Typography>
             </Stack>
             <Stack direction="row" justifyContent="space-between">
-              <Typography sx={{ fontSize: 13, color: "#92400E" }}>+ Statutory GST (18%)</Typography>
-              <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#92400E" }}>+ ₹360.00</Typography>
-            </Stack>
-            <Stack direction="row" justifyContent="space-between">
               <Typography sx={{ fontSize: 13, color: "#92400E" }}>+ Admin Infrastructure (7%)</Typography>
               <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#92400E" }}>+ ₹140.00</Typography>
             </Stack>
             <Divider sx={{ my: 0.5 }} />
             <Stack direction="row" justifyContent="space-between">
               <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A" }}>Total Payable from Pocket</Typography>
-              <Typography sx={{ fontSize: 18, fontWeight: 950, color: "#059669" }}>₹2,500.00</Typography>
+              <Typography sx={{ fontSize: 18, fontWeight: 950, color: "#059669" }}>₹2,140.00</Typography>
             </Stack>
           </Stack>
         </Box>
@@ -361,7 +357,7 @@ function ConsumerCycleRenewalDialog({
             : successMsg
             ? "Term 2 Active"
             : canPay
-            ? `Confirm & Deduct ₹2,500 from ${selectedSource === "MAIN_WALLET" ? "Main Wallet" : "Coupon Pocket"}`
+            ? `Confirm & Deduct ₹2,140 from ${selectedSource === "MAIN_WALLET" ? "Main Wallet" : "Coupon Pocket"}`
             : "Insufficient Balance in Selected Pocket"}
         </Button>
         <Button onClick={onClose} sx={{ textTransform: "none", color: "#64748B", fontWeight: 700 }}>
@@ -1304,7 +1300,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                           "&:hover": { bgcolor: "#059669" },
                         }}
                       >
-                        🔄 Start Term 2 Renewal Hub (₹2,500)
+                        🔄 Start Term 2 Renewal Hub (₹2,140)
                       </Button>
                     )}
                   </Paper>

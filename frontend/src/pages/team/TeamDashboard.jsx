@@ -1735,9 +1735,9 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
   const couponBalance = Number(walletMe?.coupon_wallet || walletMe?.vouchers_total || 0);
 
   const baseAmt = selectedPkg.baseAmount;
-  const gstAmt = Math.round(baseAmt * 0.18);
+  const gstAmt = 0; // Removed 18% GST from Term 2 onwards, keeping only 7% Admin Platform Fee
   const adminFeeAmt = Math.round(baseAmt * 0.07);
-  const totalPayable = baseAmt + gstAmt + adminFeeAmt;
+  const totalPayable = baseAmt + adminFeeAmt;
 
   const currentCycleNum = Number(cycleState?.currentCycle || walletHistory?.current_term || 1);
   const isTermCapped = Boolean(cycleState?.isCapped);
@@ -2201,12 +2201,6 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
               <Typography sx={{ fontSize: 12.5, color: "#475569" }}>Course Subtotal:</Typography>
               <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#0F172A" }}>
                 ₹ {baseAmt.toLocaleString("en-IN")}.00
-              </Typography>
-            </Stack>
-            <Stack direction="row" justifyContent="space-between">
-              <Typography sx={{ fontSize: 12, color: "#64748B" }}>Statutory GST (18% Extra):</Typography>
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>
-                + ₹ {gstAmt.toLocaleString("en-IN")}.00
               </Typography>
             </Stack>
             <Stack direction="row" justifyContent="space-between">
