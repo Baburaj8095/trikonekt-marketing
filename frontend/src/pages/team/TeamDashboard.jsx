@@ -1470,6 +1470,7 @@ function SPPMonthlyCadenceWidget() {
 function ConsumerCycleRenewalWidget({ onOpenPurchase, cycleState, totalCycleEarned = 0 }) {
   const currentCycleNum = cycleState?.currentCycle || 1;
   const totalLimit = Number(cycleState?.totalLimit || cycleState?.eligibleLimit || 150000);
+  const percent = Math.min(100, Math.round((Number(totalCycleEarned) / totalLimit) * 100));
   const isCapped = Boolean(
     cycleState?.isCapped === true ||
     cycleState?.status === "completed" ||
