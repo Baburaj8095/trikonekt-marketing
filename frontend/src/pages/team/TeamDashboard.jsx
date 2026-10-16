@@ -1559,6 +1559,15 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errMsg, setErrMsg] = useState("");
+  const [purchasedResult, setPurchasedResult] = useState(null);
+
+  useEffect(() => {
+    if (open) {
+      setPurchasedResult(null);
+      setErrMsg("");
+      setSuccessMsg("");
+    }
+  }, [open]);
 
   // Top Category Tabs
   const [activeTab, setActiveTab] = useState("TRACK_1");
@@ -1755,10 +1764,15 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
         track: selectedPkg.key,
       };
 
+      let res;
       try {
-        await API.post("/accounts/wallet/term-renewal/", payload);
-      } catch (_) {
-        await API.post("/api/admin/validator/purchase-bulk-courses", payload).catch(() => null);
+        res = await API.post("/accounts/wallet/term-renewal/", payload);
+      } catch (err1) {
+        try {
+          res = await API.post("/api/admin/validator/purchase-bulk-courses", payload);
+        } catch (err2) {
+          throw err1 || err2;
+        }
       }
 
       const newState = {
@@ -1769,6 +1783,7 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
         layerLimit: 100000,
         royaltyLimit: 50000,
         status: "active",
+        isCapped: false,
         adminAuthorized: true,
         selectedTrack: selectedPkg.key,
         purchasedAt: new Date().toISOString(),
@@ -1781,13 +1796,17 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
         }
       } catch (_) {}
 
-      setSuccessMsg(`🎉 ${selectedPkg.name} purchased successfully! Term ${nextCycleNum} is now active.`);
-      setTimeout(() => {
-        if (onPurchaseSuccess) onPurchaseSuccess(newState);
-        onClose();
-      }, 1500);
+      if (onPurchaseSuccess) onPurchaseSuccess(newState);
+
+      setPurchasedResult({
+        term: nextCycleNum,
+        trackName: selectedPkg.name,
+        amount: totalPayable,
+        paymentSource: paymentSource === "MAIN_WALLET" ? "Main Wallet" : "Coupon Pocket",
+        txId: res?.data?.transaction_id || `TRM-${Date.now().toString().slice(-6)}`,
+      });
     } catch (e) {
-      setErrMsg(e?.response?.data?.message || "Failed to complete course purchase. Please try again.");
+      setErrMsg(e?.response?.data?.message || e?.message || "Failed to complete course purchase. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -1838,16 +1857,16 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
               width: 38,
               height: 38,
               borderRadius: "12px",
-              bgcolor: "#EFF6FF",
+              bgcolor: purchasedResult ? "#ECFDF5" : "#EFF6FF",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontSize: 20,
               flexShrink: 0,
-              border: "1px solid #DBEAFE",
+              border: purchasedResult ? "1px solid #A7F3D0" : "1px solid #DBEAFE",
             }}
           >
-            🎓
+            {purchasedResult ? "🎉" : "🎓"}
           </Box>
           <Box sx={{ minWidth: 0 }}>
             <Typography
@@ -1861,10 +1880,10 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
                 textOverflow: "ellipsis",
               }}
             >
-              Academic Track Renewal
+              {purchasedResult ? `Term ${purchasedResult.term} Activated` : "Academic Track Renewal"}
             </Typography>
-            <Typography sx={{ fontSize: 11.5, color: "#64748B", fontWeight: 700, mt: 0.2 }}>
-              Term {nextCycleNum} Selection • Modular Packages
+            <Typography sx={{ fontSize: 11.5, color: purchasedResult ? "#059669" : "#64748B", fontWeight: 700, mt: 0.2 }}>
+              {purchasedResult ? "Renewal Payment Completed • Status Active" : `Term ${nextCycleNum} Selection • Modular Packages`}
             </Typography>
           </Box>
         </Stack>
@@ -1892,9 +1911,85 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
           WebkitOverflowScrolling: "touch",
         }}
       >
-        <Typography sx={{ fontSize: 12.5, color: "#64748B", mb: 2 }}>
-          Choose an individual academic track or the complete bulk bundle. Your earnings will reset into <strong>Term {nextCycleNum}</strong> with fresh limits and <strong>zero duplicate matrix accounts</strong>.
-        </Typography>
+        {purchasedResult ? (
+          <Box sx={{ py: 2, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <Box
+              sx={{
+                width: 68,
+                height: 68,
+                borderRadius: "50%",
+                bgcolor: "#ECFDF5",
+                border: "2px solid #10B981",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 34,
+                mb: 1.8,
+                boxShadow: "0 8px 24px rgba(16, 185, 129, 0.22)",
+              }}
+            >
+              ✓
+            </Box>
+            <Typography sx={{ fontSize: 19, fontWeight: 950, color: "#065F46", mb: 0.5 }}>
+              Payment & Activation Successful!
+            </Typography>
+            <Typography sx={{ fontSize: 12.5, color: "#64748B", mb: 2.5, maxWidth: 380, lineHeight: 1.4 }}>
+              <strong>Term {purchasedResult.term}</strong> is now live. ₹{purchasedResult.amount.toLocaleString("en-IN")}.00 deducted from your {purchasedResult.paymentSource}.
+            </Typography>
+
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2,
+                borderRadius: "16px",
+                bgcolor: "#F8FAFC",
+                borderColor: "#E2E8F0",
+                width: "100%",
+                maxWidth: 420,
+                textAlign: "left",
+              }}
+            >
+              <Stack spacing={1.2}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography sx={{ fontSize: 12, color: "#64748B" }}>Academic Status:</Typography>
+                  <Chip
+                    label={`Term ${purchasedResult.term} (Active)`}
+                    size="small"
+                    sx={{ bgcolor: "#10B981", color: "#FFF", fontWeight: 900, fontSize: 11, height: 22 }}
+                  />
+                </Stack>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography sx={{ fontSize: 12, color: "#64748B" }}>Purchased Programme:</Typography>
+                  <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A", textAlign: "right", maxWidth: 220 }}>
+                    {purchasedResult.trackName}
+                  </Typography>
+                </Stack>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography sx={{ fontSize: 12, color: "#64748B" }}>Total Paid:</Typography>
+                  <Typography sx={{ fontSize: 13.5, fontWeight: 950, color: "#059669" }}>
+                    ₹ {purchasedResult.amount.toLocaleString("en-IN")}.00
+                  </Typography>
+                </Stack>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography sx={{ fontSize: 12, color: "#64748B" }}>Fresh Earning Headroom:</Typography>
+                  <Typography sx={{ fontSize: 13, fontWeight: 950, color: "#2563EB" }}>
+                    ₹ 1,50,000.00
+                  </Typography>
+                </Stack>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography sx={{ fontSize: 11, color: "#94A3B8" }}>Ref / Txn ID:</Typography>
+                  <Typography sx={{ fontSize: 11, fontFamily: "monospace", color: "#64748B" }}>
+                    #{purchasedResult.txId}
+                  </Typography>
+                </Stack>
+              </Stack>
+            </Paper>
+          </Box>
+        ) : (
+          <>
+            <Typography sx={{ fontSize: 12.5, color: "#64748B", mb: 2 }}>
+              Choose an individual academic track or the complete bulk bundle. Your earnings will reset into <strong>Term {nextCycleNum}</strong> with fresh limits and <strong>zero duplicate matrix accounts</strong>.
+            </Typography>
 
         {/* Top Track Categories (Tabs like trieducation.in) */}
         <Typography sx={{ fontSize: 11, fontWeight: 900, color: "#475569", textTransform: "uppercase", letterSpacing: "0.5px", mb: 1 }}>
@@ -2123,8 +2218,10 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
           </Paper>
         </Stack>
 
-        {errMsg && <Alert severity="error" sx={{ mb: 1.5, fontSize: 12 }}>{errMsg}</Alert>}
-        {successMsg && <Alert severity="success" sx={{ mb: 1.5, fontSize: 12 }}>{successMsg}</Alert>}
+            {errMsg && <Alert severity="error" sx={{ mb: 1.5, fontSize: 12 }}>{errMsg}</Alert>}
+            {successMsg && <Alert severity="success" sx={{ mb: 1.5, fontSize: 12 }}>{successMsg}</Alert>}
+          </>
+        )}
       </Box>
 
       {/* Sticky Bottom Actions Bar (CRED / PhonePe Posh Style) */}
@@ -2137,38 +2234,60 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
           boxShadow: "0 -8px 24px rgba(15, 23, 42, 0.05)",
         }}
       >
-        <Button
-          fullWidth
-          variant="contained"
-          onClick={handlePurchase}
-          disabled={submitting}
-          sx={{
-            bgcolor: "#059669",
-            color: "#FFF",
-            fontWeight: 900,
-            fontSize: 14,
-            textTransform: "none",
-            borderRadius: "14px",
-            py: 1.3,
-            boxShadow: "0 4px 14px rgba(5, 150, 105, 0.35)",
-            "&:hover": { bgcolor: "#047857" },
-          }}
-        >
-          {submitting ? "Processing..." : `🚀 Pay ₹${totalPayable.toLocaleString("en-IN")} & Activate Term ${nextCycleNum}`}
-        </Button>
-        <Button
-          fullWidth
-          onClick={onClose}
-          sx={{
-            mt: 0.8,
-            textTransform: "none",
-            fontWeight: 700,
-            color: "#64748B",
-            fontSize: 12.5,
-          }}
-        >
-          Cancel
-        </Button>
+        {purchasedResult ? (
+          <Button
+            fullWidth
+            variant="contained"
+            onClick={onClose}
+            sx={{
+              bgcolor: "#059669",
+              color: "#FFF",
+              fontWeight: 900,
+              fontSize: 14,
+              borderRadius: "14px",
+              py: 1.3,
+              boxShadow: "0 4px 14px rgba(5, 150, 105, 0.35)",
+              "&:hover": { bgcolor: "#047857" },
+            }}
+          >
+            ✓ Done • Return to Dashboard
+          </Button>
+        ) : (
+          <>
+            <Button
+              fullWidth
+              variant="contained"
+              onClick={handlePurchase}
+              disabled={submitting}
+              sx={{
+                bgcolor: "#059669",
+                color: "#FFF",
+                fontWeight: 900,
+                fontSize: 14,
+                textTransform: "none",
+                borderRadius: "14px",
+                py: 1.3,
+                boxShadow: "0 4px 14px rgba(5, 150, 105, 0.35)",
+                "&:hover": { bgcolor: "#047857" },
+              }}
+            >
+              {submitting ? "Processing..." : `🚀 Pay ₹${totalPayable.toLocaleString("en-IN")} & Activate Term ${nextCycleNum}`}
+            </Button>
+            <Button
+              fullWidth
+              onClick={onClose}
+              sx={{
+                mt: 0.8,
+                textTransform: "none",
+                fontWeight: 700,
+                color: "#64748B",
+                fontSize: 12.5,
+              }}
+            >
+              Cancel
+            </Button>
+          </>
+        )}
       </Box>
     </Drawer>
   );
@@ -2290,6 +2409,35 @@ export default function TeamDashboard() {
     });
   }, [achievedPrimeLevel, primeRanks, videos]);
 
+  const fetchWallet = useCallback(async () => {
+    try {
+      const [meRes, histRes] = await Promise.allSettled([
+        getWalletMe(),
+        getWalletMeHistory(),
+      ]);
+      if (meRes.status === "fulfilled" && meRes.value) {
+        setWalletMeData(meRes.value);
+      }
+      if (histRes.status === "fulfilled" && histRes.value) {
+        const hist = histRes.value;
+        const activeTerm = Number(hist?.current_term || 1);
+        const curTermStat = hist?.term_stats?.[String(activeTerm)] || {};
+        const currentTermEarned = Number(curTermStat?.total || 0);
+        const isTermCapped = currentTermEarned >= 150000;
+
+        setTotalCycleEarned(currentTermEarned);
+        setConsumerCycleState({
+          currentCycle: activeTerm,
+          totalLimit: 150000,
+          layerLimit: 100000,
+          royaltyLimit: 50000,
+          status: isTermCapped ? "completed" : "active",
+          isCapped: isTermCapped,
+        });
+      }
+    } catch (_) {}
+  }, []);
+
   useEffect(() => {
     let alive = true;
 
@@ -2354,25 +2502,6 @@ export default function TeamDashboard() {
       } catch {}
     };
 
-    const fetchWallet = async () => {
-      try {
-        const [meRes, histRes] = await Promise.allSettled([
-          getWalletMe(),
-          getWalletMeHistory(),
-        ]);
-        if (!alive) return;
-        if (meRes.status === "fulfilled" && meRes.value) {
-          setWalletMeData(meRes.value);
-        }
-        if (histRes.status === "fulfilled" && histRes.value) {
-          const hist = histRes.value;
-          const layerEarned = Number(hist?.layer_income_all_sources || hist?.layer_matrix_earned || hist?.income?.matrixLevel || 0);
-          const royaltyEarned = Number(hist?.income?.globalTri || 0);
-          setTotalCycleEarned(layerEarned + royaltyEarned);
-        }
-      } catch (_) {}
-    };
-
     fetchBanners();
     fetchAchievers();
     fetchProfile();
@@ -2381,7 +2510,7 @@ export default function TeamDashboard() {
     return () => {
       alive = false;
     };
-  }, [storedUser]);
+  }, [storedUser, fetchWallet]);
 
   const navIndex = useMemo(() => {
     const p = location.pathname || "";
@@ -2682,11 +2811,16 @@ export default function TeamDashboard() {
         open={cycleBulkBuyOpen}
         onClose={() => {
           setCycleBulkBuyOpen(false);
+          fetchWallet();
           navigate("/user/team-dashboard", { replace: true });
         }}
         cycleState={consumerCycleState}
         walletMe={walletMeData}
-        onPurchaseSuccess={(newState) => setConsumerCycleState(newState)}
+        onPurchaseSuccess={(newState) => {
+          setConsumerCycleState(newState);
+          setTotalCycleEarned(0);
+          fetchWallet();
+        }}
       />
     </Box>
   );

@@ -4519,20 +4519,41 @@ def wallet_me_history(request):
 
     # Precalculate exact database SQL sums for each purchased term
     term_stats = {}
-    t1_bound_q = Q(created_at__lt=renewal_txs[0].created_at) if renewal_txs else Q()
-    t1_sub = base_tx.filter(t1_bound_q)
-    term_stats["1"] = {
-        "count": t1_sub.count(),
-        "total": str(t1_sub.filter(amount__gt=0).aggregate(s=Sum("amount"))["s"] or D("0.00")),
-    }
-    if len(renewal_txs) >= 1:
-        t2_bound_q = Q(created_at__gte=renewal_txs[0].created_at)
-        if len(renewal_txs) >= 2:
-            t2_bound_q &= Q(created_at__lt=renewal_txs[1].created_at)
-        t2_sub = base_tx.filter(t2_bound_q)
-        term_stats["2"] = {
-            "count": t2_sub.count(),
-            "total": str(t2_sub.filter(amount__gt=0).aggregate(s=Sum("amount"))["s"] or D("0.00")),
+    for idx, t_num in enumerate(purchased_terms):
+        t_str = str(t_num)
+        if idx == 0:
+            t_bound = Q(created_at__lt=renewal_txs[0].created_at) if renewal_txs else Q()
+        else:
+            start_dt = renewal_txs[idx - 1].created_at
+            if idx < len(renewal_txs):
+                end_dt = renewal_txs[idx].created_at
+                t_bound = Q(created_at__gte=start_dt, created_at__lt=end_dt)
+            else:
+                t_bound = Q(created_at__gte=start_dt)
+
+        t_sub = base_tx.filter(t_bound)
+
+        layer_sub = t_sub.filter(amount__gt=0).filter(
+            Q(type__in=["AUTOPOOL_BONUS_FIVE", "AUTOPOOL_BONUS_THREE", "LEVEL_BONUS"]) |
+            Q(meta__source__icontains="MATRIX") |
+            Q(meta__source__icontains="LAYER") |
+            Q(source_type="RANK_UPGRADE") |
+            (Q(type="INCOME_CREDIT_75") & (Q(meta__source__icontains="MATRIX") | Q(meta__orig_type__in=["AUTOPOOL_BONUS_FIVE", "AUTOPOOL_BONUS_THREE"])))
+        ).exclude(Q(type__startswith="SELF_ACCOUNT") | Q(meta__ledger="SELF_ACCOUNT"))
+
+        royalty_sub = t_sub.filter(amount__gt=0).filter(
+            Q(type="GLOBAL_ROYALTY") | Q(meta__source="GLOBAL_ROYALTY")
+        ).exclude(Q(type__startswith="SELF_ACCOUNT") | Q(meta__ledger="SELF_ACCOUNT"))
+
+        tot_amt = t_sub.filter(amount__gt=0).aggregate(s=Sum("amount"))["s"] or D("0.00")
+        layer_amt = layer_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
+        royalty_amt = royalty_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
+
+        term_stats[t_str] = {
+            "count": t_sub.count(),
+            "total": str(tot_amt),
+            "layer_total": str(layer_amt),
+            "royalty_total": str(royalty_amt),
         }
 
     # Server-Side Filter Processing (100% Database SQL Execution)
@@ -4541,17 +4562,24 @@ def wallet_me_history(request):
     # Term Filter (Strictly DB Timestamp/Marker bounded)
     term_param = (request.GET.get("term") or "").strip().upper()
     if term_param and term_param != "ALL":
-        if term_param == "1":
-            if renewal_txs:
-                active_filter_q &= Q(created_at__lt=renewal_txs[0].created_at)
-        elif term_param == "2":
-            if len(renewal_txs) >= 1:
-                t2_q = Q(created_at__gte=renewal_txs[0].created_at)
-                if len(renewal_txs) >= 2:
-                    t2_q &= Q(created_at__lt=renewal_txs[1].created_at)
-                active_filter_q &= t2_q
+        try:
+            t_selected = int(term_param)
+            if t_selected in purchased_terms:
+                s_idx = purchased_terms.index(t_selected)
+                if s_idx == 0:
+                    if renewal_txs:
+                        active_filter_q &= Q(created_at__lt=renewal_txs[0].created_at)
+                else:
+                    s_start = renewal_txs[s_idx - 1].created_at
+                    if s_idx < len(renewal_txs):
+                        s_end = renewal_txs[s_idx].created_at
+                        active_filter_q &= Q(created_at__gte=s_start, created_at__lt=s_end)
+                    else:
+                        active_filter_q &= Q(created_at__gte=s_start)
             else:
-                active_filter_q &= Q(id__lt=0)  # Empty: Term 2 not purchased
+                active_filter_q &= Q(id__lt=0)
+        except Exception:
+            pass
 
     category_param = (request.GET.get("category") or "").strip().upper()
     if category_param and category_param in cat_queries and category_param != "ALL":
@@ -4736,6 +4764,28 @@ def wallet_term_renewal(request):
         }
     )
 
+    renewal_txs = list(
+        WalletTransaction.objects.filter(
+            user=user,
+            type__in=["ACADEMIC_TERM_RENEWAL", "TERM_RENEWAL"]
+        ).order_by("created_at")
+    )
+    purchased_terms = [1]
+    for r in renewal_txs:
+        t_val = (r.meta or {}).get("term")
+        if not t_val:
+            try:
+                t_val = int(str(r.source_id).replace("TERM_", ""))
+            except Exception:
+                t_val = len(purchased_terms) + 1
+        try:
+            t_int = int(t_val)
+            if t_int not in purchased_terms:
+                purchased_terms.append(t_int)
+        except Exception:
+            pass
+    purchased_terms.sort()
+
     return Response({
         "success": True,
         "term": term,
@@ -4743,7 +4793,7 @@ def wallet_term_renewal(request):
         "total_payable": str(total_payable),
         "transaction_id": tx.id,
         "current_term": term,
-        "purchased_terms": [1, term],
+        "purchased_terms": purchased_terms,
         "message": f"Term {term} activated successfully with {track}!"
     }, status=status.HTTP_200_OK)
 

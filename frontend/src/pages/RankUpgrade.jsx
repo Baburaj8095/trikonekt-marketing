@@ -805,21 +805,27 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
   const royaltyInfo = elig?.royalty_info;
   const earnedRoyalty = Number(royaltyInfo?.total_earned ?? 0);
 
-  const consumerActiveCycle = userConsumerCycle?.active_cycle || userConsumerCycle?.cycle || (userConsumerCycle?.currentCycle ? `Term ${userConsumerCycle.currentCycle}` : "Cycle 1");
-  const currentCycleNumber = Number(userConsumerCycle?.currentCycle || (String(consumerActiveCycle).includes("3") ? 3 : (String(consumerActiveCycle).includes("2") ? 2 : 1)));
+  const activeDbTerm = Number(walletHistory?.current_term || (Array.isArray(walletHistory?.purchased_terms) && walletHistory.purchased_terms.slice(-1)[0]) || 0);
+  const consumerActiveCycle = activeDbTerm ? `Term ${activeDbTerm}` : (userConsumerCycle?.active_cycle || userConsumerCycle?.cycle || (userConsumerCycle?.currentCycle ? `Term ${userConsumerCycle.currentCycle}` : "Cycle 1"));
+  const currentCycleNumber = activeDbTerm || Number(userConsumerCycle?.currentCycle || (String(consumerActiveCycle).includes("3") ? 3 : (String(consumerActiveCycle).includes("2") ? 2 : 1)));
   const nextCycleNum = currentCycleNumber + 1;
   const totalCycleCap = Number(elig?.total_cycle_limit || userConsumerCycle?.total_limit || 150000);
   const maxRoyaltyCap = Number(userConsumerCycle?.royalty_limit || userConsumerCycle?.royaltyLimit || 50000);
 
-  // Term History Tabs: strictly only show terms the user has actually purchased (1 up to currentCycleNumber)
+  // Term History Tabs: strictly only show terms the user has actually purchased (from DB purchased_terms)
   const [selectedViewingTerm, setSelectedViewingTerm] = useState(null);
   const viewingTermNumber = selectedViewingTerm !== null ? selectedViewingTerm : currentCycleNumber;
   const isViewingArchivedTerm = viewingTermNumber < currentCycleNumber;
 
-  // Purchased terms list: Term 2 is only shown if currentCycleNumber >= 2!
+  // Purchased terms list: derived directly from database WalletTransaction records
   const purchasedTerms = useMemo(() => {
+    const dbTerms = Array.isArray(walletHistory?.purchased_terms) && walletHistory.purchased_terms.length > 0
+      ? walletHistory.purchased_terms.map(Number)
+      : [];
     const list = [];
-    for (let i = 1; i <= currentCycleNumber; i++) {
+    const maxTerm = Math.max(currentCycleNumber, ...(dbTerms.length ? dbTerms : [1]));
+    for (let i = 1; i <= maxTerm; i++) {
+      if (dbTerms.length > 0 && !dbTerms.includes(i)) continue;
       list.push({
         num: i,
         label: i === currentCycleNumber ? `Term ${i} (Active)` : `Term ${i} (Archived)`,
@@ -827,17 +833,31 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
       });
     }
     return list;
-  }, [currentCycleNumber]);
+  }, [currentCycleNumber, walletHistory?.purchased_terms]);
 
-  // Calculations for whichever term is currently selected for viewing:
-  const viewingOffsetEarnings = Math.max(0, (viewingTermNumber - 1) * totalCycleCap);
-  const viewingTermRawLayerIncome = isViewingArchivedTerm
-    ? Math.min(100000, Math.max(0, rawLayerIncome - viewingOffsetEarnings))
-    : Math.max(0, rawLayerIncome - viewingOffsetEarnings);
+  // Database-driven calculations for whichever term is currently selected for viewing:
+  const termStat = walletHistory?.term_stats?.[String(viewingTermNumber)];
 
-  const viewingTermEarnedRoyalty = isViewingArchivedTerm
-    ? Math.min(maxRoyaltyCap, Math.max(0, earnedRoyalty - Math.max(0, (viewingTermNumber - 1) * maxRoyaltyCap)))
-    : Math.max(0, earnedRoyalty - Math.max(0, (viewingTermNumber - 1) * maxRoyaltyCap));
+  const viewingTermRawLayerIncome = useMemo(() => {
+    if (termStat?.layer_total !== undefined) {
+      const val = Number(termStat.layer_total);
+      return isViewingArchivedTerm ? Math.min(100000, val) : val;
+    }
+    const offset = Math.max(0, (viewingTermNumber - 1) * totalCycleCap);
+    return isViewingArchivedTerm
+      ? Math.min(100000, Math.max(0, rawLayerIncome - offset))
+      : Math.max(0, rawLayerIncome - offset);
+  }, [termStat, isViewingArchivedTerm, rawLayerIncome, totalCycleCap, viewingTermNumber]);
+
+  const viewingTermEarnedRoyalty = useMemo(() => {
+    if (termStat?.royalty_total !== undefined) {
+      const val = Number(termStat.royalty_total);
+      return isViewingArchivedTerm ? Math.min(maxRoyaltyCap, val) : val;
+    }
+    return isViewingArchivedTerm
+      ? Math.min(maxRoyaltyCap, Math.max(0, earnedRoyalty - Math.max(0, (viewingTermNumber - 1) * maxRoyaltyCap)))
+      : Math.max(0, earnedRoyalty - Math.max(0, (viewingTermNumber - 1) * maxRoyaltyCap));
+  }, [termStat, isViewingArchivedTerm, maxRoyaltyCap, earnedRoyalty, viewingTermNumber]);
 
   // Dynamic available limit for layers: up to ₹1,50,000 minus whatever Royalty has taken
   const dynamicLayerCap = Math.max(0, totalCycleCap - Math.min(maxRoyaltyCap, viewingTermEarnedRoyalty));
@@ -887,23 +907,17 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
 
   const isPackageActive = Boolean(hasApprovedBase || currentLevel >= 1 || elig?.has_prime || elig?.is_prime);
 
-  const isCapReached = Boolean(
-    combinedCycleEarnings >= totalCycleCap ||
-    userConsumerCycle?.status === "completed" ||
-    userConsumerCycle?.status === "capped" ||
-    userConsumerCycle?.isCapped === true
-  );
+  // Active term database stats
+  const activeTermStat = walletHistory?.term_stats?.[String(currentCycleNumber)];
+  const activeTermEarned = Number(activeTermStat?.total ?? (currentCycleNumber === viewingTermNumber ? combinedCycleEarnings : 0));
+  const isActiveTermCapped = activeTermEarned >= totalCycleCap;
 
-  const isAdminAuthorized = Boolean(
-    userConsumerCycle?.admin_authorized ||
-    userConsumerCycle?.adminAuthorized ||
-    userConsumerCycle?.cycle2_enabled ||
-    userConsumerCycle?.status === "authorized" ||
-    Number(String(consumerActiveCycle || "").replace(/\D/g, "") || 1) >= 2
-  );
+  // Viewing term cap state
+  const isCapReached = Boolean(isViewingArchivedTerm || combinedCycleEarnings >= totalCycleCap);
 
-  // Cycle 2 is unlocked when combined ₹1.5L cap is reached OR admin authorized
-  const isCycle2Unlocked = isPackageActive && (isCapReached || isAdminAuthorized);
+  // Next term renewal is unlocked ONLY when the currently active term has reached its ₹1.5L cap
+  const isRenewalUnlocked = isPackageActive && isActiveTermCapped;
+  const isCycle2Unlocked = isRenewalUnlocked;
 
   const totalEligibleRoyaltyCap = useMemo(() => {
     if (royaltyInfo?.total_cap !== undefined && Number(royaltyInfo.total_cap) > 0) {
@@ -1184,10 +1198,10 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                       TOTAL EARNINGS ⓘ
                     </Typography>
                     <Chip
-                      label={String(consumerCycleState.cycle || "Term 1 Active").replace(/Cycle/gi, "Term")}
+                      label={`Term ${currentCycleNumber} Active`}
                       size="small"
                       onClick={() => {
-                        if (isCycle2Unlocked) {
+                        if (isRenewalUnlocked) {
                           setCycleRenewalOpen(true);
                         }
                       }}
@@ -1357,31 +1371,41 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           p: 2,
           mb: 2,
           borderRadius: 3,
-          background: isCycle2Unlocked
+          background: isViewingArchivedTerm
+            ? "linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 100%)"
+            : isRenewalUnlocked
             ? "linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)"
             : !isPackageActive
             ? "linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)"
             : "linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)",
           border: "1.5px solid",
-          borderColor: isCycle2Unlocked ? "#F59E0B" : !isPackageActive ? "#F87171" : "#86EFAC",
+          borderColor: isViewingArchivedTerm
+            ? "#CBD5E1"
+            : isRenewalUnlocked
+            ? "#F59E0B"
+            : !isPackageActive
+            ? "#F87171"
+            : "#86EFAC",
           overflow: "hidden",
         }}
     >
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} spacing={1.5}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.5 }}>
-            <Typography sx={{ fontSize: 14, fontWeight: 950, color: isCycle2Unlocked ? "#92400E" : !isPackageActive ? "#991B1B" : "#14532D" }}>
-              {!isPackageActive
-                ? `🔒 ${String(consumerActiveCycle || "Term 1").replace(/Cycle/gi, "Term")} Locked: Package Inactive`
-                : isCycle2Unlocked
-                ? `🏆 ${String(consumerActiveCycle || "Term 1").replace(/Cycle/gi, "Term")} Cap Reached (₹${fmt(totalCycleCap)} Limit Met)!`
-                : `♾️ ${String(consumerActiveCycle || "Term 1").replace(/Cycle/gi, "Term")} Earning Limit: ₹${fmt(totalCycleCap)}`}
+            <Typography sx={{ fontSize: 14, fontWeight: 950, color: isViewingArchivedTerm ? "#334155" : isRenewalUnlocked ? "#92400E" : !isPackageActive ? "#991B1B" : "#14532D" }}>
+              {isViewingArchivedTerm
+                ? `🏆 Term ${viewingTermNumber} (Archived • ₹${fmt(totalCycleCap)} Cap Met)`
+                : !isPackageActive
+                ? `🔒 Term ${currentCycleNumber} Locked: Package Inactive`
+                : isRenewalUnlocked
+                ? `🏆 Term ${currentCycleNumber} Cap Reached (₹${fmt(totalCycleCap)} Limit Met)!`
+                : `♾️ Term ${currentCycleNumber} Earning Limit: ₹${fmt(totalCycleCap)}`}
             </Typography>
             <Chip
-              label={!isPackageActive ? "Inactive" : isCycle2Unlocked ? "Cap Reached • Unlocked" : "Active"}
+              label={isViewingArchivedTerm ? "Archived 🏆" : !isPackageActive ? "Inactive" : isRenewalUnlocked ? "Cap Reached • Unlocked" : "Active ⚡"}
               size="small"
               sx={{
-                bgcolor: !isPackageActive ? "#DC2626" : isCycle2Unlocked ? "#D97706" : "#16A34A",
+                bgcolor: isViewingArchivedTerm ? "#64748B" : !isPackageActive ? "#DC2626" : isRenewalUnlocked ? "#D97706" : "#16A34A",
                 color: "#FFF",
                 fontWeight: 900,
                 fontSize: 10,
@@ -1389,24 +1413,28 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
               }}
             />
           </Stack>
-          <Typography sx={{ fontSize: 11.5, color: isCycle2Unlocked ? "#78350F" : !isPackageActive ? "#7F1D1D" : "#166534", mt: 0.5 }}>
-            {!isPackageActive
-              ? `Your package is inactive. Activate the ₹2,000 Starter Package on asiyapp.com to start receiving layer & royalty earnings toward the ₹${fmt(totalCycleCap)} Term 1 cap.`
-              : isCycle2Unlocked
-              ? `You have reached the ₹${fmt(totalCycleCap)} total earning cap (Layer up to ₹${fmt(dynamicLayerCap)} + Royalty max ₹${fmt(maxRoyaltyCap)}). Earnings have stopped. You are eligible to activate Term ${nextCycleNum} by purchasing Academy Courses or via Renewal Hub.`
-              : `Total Term Earned: ₹${fmt(combinedCycleEarnings)} / ₹${fmt(totalCycleCap)} (Layer ₹${fmt(totalEarnings)}/₹${fmt(dynamicLayerCap)} + Royalty ₹${fmt(Math.min(maxRoyaltyCap, activeTermEarnedRoyalty))}/₹${fmt(maxRoyaltyCap)} • ${combinedCyclePercent.toFixed(1)}%). Once ₹${fmt(totalCycleCap)} is reached or authorized by Admin, Term ${nextCycleNum} will unlock.`}
+          <Typography sx={{ fontSize: 11.5, color: isViewingArchivedTerm ? "#475569" : isRenewalUnlocked ? "#78350F" : !isPackageActive ? "#7F1D1D" : "#166534", mt: 0.5 }}>
+            {isViewingArchivedTerm
+              ? `Viewing historical records for Term ${viewingTermNumber}. Earnings were capped at ₹${fmt(totalCycleCap)}. Currently, Term ${currentCycleNumber} is active.`
+              : !isPackageActive
+              ? `Your package is inactive. Activate the ₹2,000 Starter Package on asiyapp.com to start receiving layer & royalty earnings toward the ₹${fmt(totalCycleCap)} Term ${currentCycleNumber} cap.`
+              : isRenewalUnlocked
+              ? `You have reached the ₹${fmt(totalCycleCap)} total earning cap for Term ${currentCycleNumber}. You are eligible to activate Term ${nextCycleNum} renewal.`
+              : `Total Term Earned: ₹${fmt(combinedCycleEarnings)} / ₹${fmt(totalCycleCap)} (Layer ₹${fmt(totalEarnings)}/₹${fmt(dynamicLayerCap)} + Royalty ₹${fmt(Math.min(maxRoyaltyCap, viewingTermEarnedRoyalty))}/₹${fmt(maxRoyaltyCap)} • ${combinedCyclePercent.toFixed(1)}%). Headroom remaining: ₹${fmt(Math.max(0, totalCycleCap - combinedCycleEarnings))}.`}
           </Typography>
         </Box>
         <Button
           variant="contained"
-          disabled={!isCycle2Unlocked}
+          disabled={!isViewingArchivedTerm && !isRenewalUnlocked}
           onClick={() => {
-            if (isCycle2Unlocked) {
+            if (isViewingArchivedTerm) {
+              setSelectedViewingTerm(currentCycleNumber);
+            } else if (isRenewalUnlocked) {
               navigate("/user/team-dashboard?action=cycle-bulk-buy");
             }
           }}
           sx={{
-            bgcolor: isCycle2Unlocked ? "#D97706" : "#94A3B8",
+            bgcolor: isViewingArchivedTerm ? "#2563EB" : isRenewalUnlocked ? "#D97706" : "#94A3B8",
             color: "#FFF",
             fontWeight: 900,
             fontSize: 11.5,
@@ -1419,16 +1447,18 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             lineHeight: 1.3,
             width: { xs: "100%", sm: "auto" },
             flexShrink: 0,
-            cursor: isCycle2Unlocked ? "pointer" : "not-allowed",
+            cursor: (isViewingArchivedTerm || isRenewalUnlocked) ? "pointer" : "not-allowed",
             "&.Mui-disabled": { bgcolor: "#CBD5E1", color: "#64748B" },
-            "&:hover": { bgcolor: isCycle2Unlocked ? "#B45309" : "#94A3B8" },
+            "&:hover": { bgcolor: isViewingArchivedTerm ? "#1D4ED8" : isRenewalUnlocked ? "#B45309" : "#94A3B8" },
           }}
         >
-          {!isPackageActive
+          {isViewingArchivedTerm
+            ? `⚡ Switch to Term ${currentCycleNumber} (Active)`
+            : !isPackageActive
             ? "🔒 Package Inactive"
-            : isCycle2Unlocked
+            : isRenewalUnlocked
             ? `🚀 Activate Term ${nextCycleNum} Renewal`
-            : `🔒 Term ${nextCycleNum} Locked (Earn ₹${fmt(totalCycleCap)} to Unlock)`}
+            : `🔒 Term ${nextCycleNum} Locked (Cap: ₹${fmt(totalCycleCap)})`}
         </Button>
       </Stack>
     </Paper>
@@ -1548,7 +1578,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
 
             <Typography sx={{ fontSize: 11, color: isCapReached ? "#15803d" : "#475569", fontWeight: 700 }}>
               {isCapReached
-                ? "Term 1 complete! Any further income accumulates in Missing Blocks Income until Term 2 renewal."
+                ? `Term ${viewingTermNumber} complete! Any further income accumulates in Missing Blocks Income until Term ${viewingTermNumber + 1} renewal.`
                 : `💡 ₹${fmt(Math.max(0, totalCycleCap - combinedCycleEarnings))} headroom remaining to complete this term.`}
             </Typography>
           </Grid>
