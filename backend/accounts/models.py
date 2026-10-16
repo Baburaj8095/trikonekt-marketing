@@ -966,6 +966,7 @@ class Wallet(models.Model):
 
                 # Re-fetch the wallet row from database inside an atomic transaction block
                 # to safely lock the row and get the absolute latest balance
+                pack_to_distribute = None
                 try:
                     with transaction.atomic():
                         w = Wallet.objects.select_for_update().get(pk=w.pk)
@@ -1037,17 +1038,20 @@ class Wallet(models.Model):
                             import logging
                             logging.getLogger(__name__).warning(f"Double-entry self rebirth debit failed: {e_de}")
 
-                        # Trigger dedicated ₹250 Self Rebirth distribution engine (100% admin-controlled)
-                        try:
-                            from business.services.self_rebirth import distribute_self_rebirth_250
-                            distribute_self_rebirth_250(self.user, pack_index=pack_index)
-                        except Exception as e:
-                            import logging
-                            logging.getLogger(__name__).exception("Failed to distribute self rebirth 250: %s", e)
+                        pack_to_distribute = pack_index
                 except Exception as e_loop:
                     import logging
-                    logging.getLogger(__name__).exception("Rebirth execution loop exception: %s", e_loop)
+                    logging.getLogger(__name__).exception("Rebirth execution loop debit exception: %s", e_loop)
                     break
+
+                # Distribute commissions OUTSIDE the atomic debit block once the lock on accounts_wallet is released
+                if pack_to_distribute is not None:
+                    try:
+                        from business.services.self_rebirth import distribute_self_rebirth_250
+                        distribute_self_rebirth_250(self.user, pack_index=pack_to_distribute)
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).exception("Failed to distribute self rebirth 250: %s", e)
         finally:
             w._applying_self_rule = False
             try:
@@ -1110,6 +1114,7 @@ class Wallet(models.Model):
                 loops += 1
                 if loops > 50:
                     break
+                pack_to_distribute = None
                 try:
                     with transaction.atomic():
                         w = Wallet.objects.select_for_update().get(pk=w.pk)
@@ -1146,18 +1151,20 @@ class Wallet(models.Model):
                                 "description": f"Franchise Self Rebirth ID #{pack_index} (₹250)",
                             }
                         )
-
-                        # Trigger dedicated ₹250 Self Rebirth distribution engine
-                        try:
-                            from business.services.self_rebirth import distribute_self_rebirth_250
-                            distribute_self_rebirth_250(self.user, pack_index=pack_index)
-                        except Exception as e:
-                            import logging
-                            logging.getLogger(__name__).exception("Failed to distribute franchise self rebirth 250: %s", e)
+                        pack_to_distribute = pack_index
                 except Exception as e_fl:
                     import logging
-                    logging.getLogger(__name__).exception("Franchise rebirth loop exception: %s", e_fl)
+                    logging.getLogger(__name__).exception("Franchise rebirth loop debit exception: %s", e_fl)
                     break
+
+                # Trigger dedicated ₹250 Self Rebirth distribution engine OUTSIDE the atomic debit block
+                if pack_to_distribute is not None:
+                    try:
+                        from business.services.self_rebirth import distribute_self_rebirth_250
+                        distribute_self_rebirth_250(self.user, pack_index=pack_to_distribute)
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).exception("Failed to distribute franchise self rebirth 250: %s", e)
         finally:
             w._applying_franchise_rebirth = False
 
