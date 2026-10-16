@@ -2237,7 +2237,56 @@ export default function History() {
             />
           </Stack>
 
-          <Stack direction="row" spacing={1} sx={{ mt: 2.2 }}>
+          {/* Self Account Pocket Balance Pill (25% Commission Reserve for ₹250 Rebirth Loop) */}
+          <Box
+            onClick={() => setSourceFilter("SAVE")}
+            sx={{
+              mt: 1.8,
+              p: 1.2,
+              borderRadius: "14px",
+              bgcolor: "rgba(255, 255, 255, 0.12)",
+              backdropFilter: "blur(10px)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              "&:hover": { bgcolor: "rgba(255, 255, 255, 0.18)" },
+            }}
+          >
+            <Stack direction="row" spacing={1} alignItems="center">
+              <Box
+                sx={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: "10px",
+                  bgcolor: "rgba(254, 243, 199, 0.25)",
+                  color: "#FDE68A",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px solid rgba(253, 230, 138, 0.4)",
+                }}
+              >
+                <SavingsIcon sx={{ fontSize: 18 }} />
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 11, color: "rgba(255, 255, 255, 0.8)", fontWeight: 700 }}>
+                  Self Account Pocket (25%)
+                </Typography>
+                <Typography sx={{ fontSize: 10, color: "rgba(255, 255, 255, 0.65)", fontWeight: 600 }}>
+                  ₹250 Rebirth reserve balance
+                </Typography>
+              </Box>
+            </Stack>
+
+            <Typography sx={{ fontSize: 15, fontWeight: 900, color: "#FDE68A", letterSpacing: "-0.01em" }}>
+              ₹ {fmtAmount(ledgerSummary.totalSelf || 0)}
+            </Typography>
+          </Box>
+
+          <Stack direction="row" spacing={1} sx={{ mt: 1.8 }}>
             <Button
               size="small"
               variant="contained"
@@ -2703,13 +2752,16 @@ export default function History() {
         <Grid item xs={6}>
           <Paper
             elevation={0}
-            onClick={() => setFlowFilter("DEBIT")}
+            onClick={() => {
+              setFlowFilter("DEBIT");
+              setSourceFilter("SAVE");
+            }}
             sx={{
               p: 1.8,
               borderRadius: "18px",
               bgcolor: "#FFFFFF",
               border: "1px solid",
-              borderColor: flowFilter === "DEBIT" ? "#DC2626" : "#EEF2F6",
+              borderColor: (flowFilter === "DEBIT" && sourceFilter === "SAVE") ? "#DC2626" : "#EEF2F6",
               boxShadow: "0 2px 8px rgba(15, 23, 42, 0.03)",
               cursor: "pointer",
               transition: "all 0.15s ease",
@@ -2732,14 +2784,14 @@ export default function History() {
                 <ArrowDownwardIcon sx={{ fontSize: 16 }} />
               </Box>
               <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>
-                Self Block
+                Self Block (₹250 Debits)
               </Typography>
             </Stack>
             <Typography sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 900, color: "#DC2626", letterSpacing: "-0.02em" }}>
-              ₹ {fmtAmount(ledgerSummary.totalDebits)}
+              ₹ {fmtAmount(ledgerSummary.selfDebits || ledgerSummary.totalDebits)}
             </Typography>
             <Typography sx={{ fontSize: 11, fontWeight: 600, color: "#94A3B8", mt: 0.2 }}>
-              {ledgerSummary.debitCount} transactions
+              {ledgerSummary.debitCount} IDs generated
             </Typography>
           </Paper>
         </Grid>
@@ -2848,7 +2900,26 @@ export default function History() {
             }}
           />
 
-          {/* Chip 2: 5-Matrix Layer */}
+          {/* Chip 2: Self Account (25%) */}
+          <Chip
+            icon={<SavingsIcon sx={{ fontSize: "16px !important", color: (sourceFilter === "SAVE" || sourceFilter === "SELF_ACCOUNT") ? "#FFFFFF !important" : "#D97706 !important" }} />}
+            label={`Self Account (${categoryStats.SAVE.count}) ₹${fmtAmount(categoryStats.SAVE.total)}`}
+            onClick={() => setSourceFilter("SAVE")}
+            sx={{
+              fontWeight: 800,
+              fontSize: 11.5,
+              height: 32,
+              borderRadius: "999px",
+              bgcolor: (sourceFilter === "SAVE" || sourceFilter === "SELF_ACCOUNT") ? "#D97706" : "#FFFFFF",
+              color: (sourceFilter === "SAVE" || sourceFilter === "SELF_ACCOUNT") ? "#FFFFFF" : "#92400E",
+              border: "1.5px solid",
+              borderColor: (sourceFilter === "SAVE" || sourceFilter === "SELF_ACCOUNT") ? "#D97706" : "#FDE68A",
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+            }}
+          />
+
+          {/* Chip 3: 5-Matrix Layer */}
           <Chip
             icon={<LayersRoundedIcon sx={{ fontSize: "16px !important", color: sourceFilter === "FIVE_LAYER" ? "#FFFFFF !important" : "#2563EB !important" }} />}
             label={`5 Layer (${categoryStats.FIVE_LAYER.count}) ₹${fmtAmount(categoryStats.FIVE_LAYER.total)}`}
@@ -2943,24 +3014,6 @@ export default function History() {
             }}
           />
 
-          {/* Chip 6: Self Account / Self Block (25%) */}
-          <Chip
-            icon={<SavingsIcon sx={{ fontSize: "16px !important", color: (sourceFilter === "SAVE" || sourceFilter === "SELF_ACCOUNT") ? "#FFFFFF !important" : "#D97706 !important" }} />}
-            label={`Self Account / Self Block (25%) (${categoryStats.SAVE.count}) ₹${fmtAmount(categoryStats.SAVE.total)}`}
-            onClick={() => setSourceFilter("SAVE")}
-            sx={{
-              fontWeight: 800,
-              fontSize: 11.5,
-              height: 32,
-              borderRadius: "999px",
-              bgcolor: (sourceFilter === "SAVE" || sourceFilter === "SELF_ACCOUNT") ? "#D97706" : "#FFFFFF",
-              color: (sourceFilter === "SAVE" || sourceFilter === "SELF_ACCOUNT") ? "#FFFFFF" : "#92400E",
-              border: "1.5px solid",
-              borderColor: (sourceFilter === "SAVE" || sourceFilter === "SELF_ACCOUNT") ? "#D97706" : "#FDE68A",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-          />
 
           {/* Chip 4: SSV Layer */}
           <Chip

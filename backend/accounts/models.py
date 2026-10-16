@@ -964,53 +964,89 @@ class Wallet(models.Model):
                 if loops > 50:
                     break  # hard safety
 
-                # Re-fetch the wallet row from database at the start of each iteration to get
-                # the absolute latest balance (accounting for recursive/nested credits)
+                # Re-fetch the wallet row from database inside an atomic transaction block
+                # to safely lock the row and get the absolute latest balance
                 try:
-                    w = Wallet.objects.select_for_update().get(pk=w.pk)
-                    cur_self = D(str(getattr(w, "self_account_balance", "0") or "0"))
-                except Exception:
-                    cur_self = D("0")
+                    with transaction.atomic():
+                        w = Wallet.objects.select_for_update().get(pk=w.pk)
+                        cur_self = D(str(getattr(w, "self_account_balance", "0") or "0"))
 
-                if cur_self < D("250.00"):
-                    break
+                        if cur_self < D("250.00"):
+                            break
 
-                # Balance safety check before deduction
-                if cur_self < D("250.00") or (w.balance or D("0")) < D("250.00"):
-                    break
+                        # Balance safety check before deduction
+                        if (w.balance or D("0")) < D("250.00"):
+                            break
 
-                # Deduct the pack from self-reserve
-                w.self_account_balance = cur_self - D("250.00")
-                w.save(update_fields=["self_account_balance", "updated_at"])
+                        # Deduct the ₹250 pack from the self-reserve pocket
+                        w.self_account_balance = cur_self - D("250.00")
+                        w.save(update_fields=["updated_at"])
 
-                # Record SELF_ACCOUNT_DEBIT marker with breakdown and pack index
-                try:
-                    existing = WalletTransaction.objects.filter(user=self.user, type="SELF_ACCOUNT_DEBIT", source_type="SELF_250_PACK").count()
-                    pack_index = int(existing) + 1
-                except Exception:
-                    pack_index = None
+                        # Record SELF_ACCOUNT_DEBIT marker with breakdown and pack index
+                        try:
+                            existing = WalletTransaction.objects.filter(
+                                user=self.user,
+                                type="SELF_ACCOUNT_DEBIT",
+                                source_type="SELF_250_PACK",
+                            ).count()
+                            pack_index = int(existing) + 1
+                        except Exception:
+                            pack_index = None
 
-                WalletTransaction.objects.create(
-                    user=self.user,
-                    amount=D("-250.00"),
-                    balance_after=w.balance,
-                    type="SELF_ACCOUNT_DEBIT",
-                    source_type="SELF_250_PACK",
-                    source_id=str(pack_index) if pack_index is not None else "",
-                    meta={
-                        "source_type": "SELF_250_PACK",
-                        "pack_index": pack_index,
-                        "description": f"Self Rebirth ID #{pack_index} (₹250)",
-                    }
-                )
+                        tx_debit = WalletTransaction.objects.create(
+                            user=self.user,
+                            amount=D("-250.00"),
+                            balance_after=w.balance,
+                            type="SELF_ACCOUNT_DEBIT",
+                            source_type="SELF_250_PACK",
+                            source_id=str(pack_index) if pack_index is not None else "",
+                            meta={
+                                "ledger": "SELF_ACCOUNT",
+                                "source_type": "SELF_250_PACK",
+                                "pack_index": pack_index,
+                                "description": f"Self Rebirth ID #{pack_index} (₹250)",
+                            }
+                        )
 
-                # Trigger dedicated ₹250 Self Rebirth distribution engine (100% admin-controlled)
-                try:
-                    from business.services.self_rebirth import distribute_self_rebirth_250
-                    distribute_self_rebirth_250(self.user, pack_index=pack_index)
-                except Exception as e:
+                        # Post double-entry debit to WalletEngine
+                        try:
+                            from accounts.finance_constants import WalletTypes, FinanceCategories, LedgerDirections
+                            from accounts.wallet_engine import WalletEngine, LedgerPosting
+
+                            system_user = WalletEngine.get_system_user()
+                            postings = [
+                                LedgerPosting(self.user, WalletTypes.SELF_PACKAGE_POCKET, LedgerDirections.DEBIT, D("250.00")),
+                                LedgerPosting(system_user, WalletTypes.SYSTEM, LedgerDirections.CREDIT, D("250.00")),
+                            ]
+                            WalletEngine.post_transaction(
+                                category=FinanceCategories.COMMISSION_PAYOUT,
+                                user=self.user,
+                                source_module=WalletTypes.SELF_PACKAGE_POCKET,
+                                source_id=str(pack_index or ""),
+                                destination_module=WalletTypes.SYSTEM,
+                                gross_amount=D("250.00"),
+                                net_amount=D("250.00"),
+                                idempotency_key=f"self_rebirth_debit:{self.user.id}:{pack_index}",
+                                legacy_wallet_transaction=tx_debit,
+                                created_by=system_user,
+                                approved_by=system_user,
+                                remarks=f"Self Rebirth ID #{pack_index} (₹250)",
+                                postings=postings,
+                            )
+                        except Exception as e_de:
+                            logger.warning(f"Double-entry self rebirth debit failed: {e_de}")
+
+                        # Trigger dedicated ₹250 Self Rebirth distribution engine (100% admin-controlled)
+                        try:
+                            from business.services.self_rebirth import distribute_self_rebirth_250
+                            distribute_self_rebirth_250(self.user, pack_index=pack_index)
+                        except Exception as e:
+                            import logging
+                            logging.getLogger(__name__).exception("Failed to distribute self rebirth 250: %s", e)
+                except Exception as e_loop:
                     import logging
-                    logging.getLogger(__name__).exception("Failed to distribute self rebirth 250: %s", e)
+                    logging.getLogger(__name__).exception("Rebirth execution loop exception: %s", e_loop)
+                    break
         finally:
             w._applying_self_rule = False
             try:
@@ -1074,50 +1110,53 @@ class Wallet(models.Model):
                 if loops > 50:
                     break
                 try:
-                    w = Wallet.objects.select_for_update().get(pk=w.pk)
-                    cur_rebirth = D(str(getattr(w, "franchise_self_rebirth", "0") or "0"))
-                except Exception:
-                    cur_rebirth = D("0")
+                    with transaction.atomic():
+                        w = Wallet.objects.select_for_update().get(pk=w.pk)
+                        cur_rebirth = D(str(getattr(w, "franchise_self_rebirth", "0") or "0"))
 
-                if cur_rebirth < D("250.00"):
-                    break
+                        if cur_rebirth < D("250.00"):
+                            break
 
-                # Deduct the pack from franchise_self_rebirth
-                w.franchise_self_rebirth = cur_rebirth - D("250.00")
-                w.save(update_fields=["franchise_self_rebirth", "updated_at"])
+                        # Deduct the pack from franchise_self_rebirth
+                        w.franchise_self_rebirth = cur_rebirth - D("250.00")
+                        w.save(update_fields=["franchise_self_rebirth", "updated_at"])
 
-                try:
-                    existing = WalletTransaction.objects.filter(
-                        user=self.user,
-                        type="SELF_ACCOUNT_DEBIT",
-                        source_type="SELF_250_PACK",
-                    ).count()
-                    pack_index = int(existing) + 1
-                except Exception:
-                    pack_index = None
+                        try:
+                            existing = WalletTransaction.objects.filter(
+                                user=self.user,
+                                type="SELF_ACCOUNT_DEBIT",
+                                source_type="SELF_250_PACK",
+                            ).count()
+                            pack_index = int(existing) + 1
+                        except Exception:
+                            pack_index = None
 
-                WalletTransaction.objects.create(
-                    user=self.user,
-                    amount=D("-250.00"),
-                    balance_after=w.balance,
-                    type="SELF_ACCOUNT_DEBIT",
-                    source_type="SELF_250_PACK",
-                    source_id=str(pack_index) if pack_index is not None else "",
-                    meta={
-                        "is_franchise": True,
-                        "source_type": "SELF_250_PACK",
-                        "pack_index": pack_index,
-                        "description": f"Franchise Self Rebirth ID #{pack_index} (₹250)",
-                    }
-                )
+                        WalletTransaction.objects.create(
+                            user=self.user,
+                            amount=D("-250.00"),
+                            balance_after=w.balance,
+                            type="SELF_ACCOUNT_DEBIT",
+                            source_type="SELF_250_PACK",
+                            source_id=str(pack_index) if pack_index is not None else "",
+                            meta={
+                                "is_franchise": True,
+                                "source_type": "SELF_250_PACK",
+                                "pack_index": pack_index,
+                                "description": f"Franchise Self Rebirth ID #{pack_index} (₹250)",
+                            }
+                        )
 
-                # Trigger dedicated ₹250 Self Rebirth distribution engine
-                try:
-                    from business.services.self_rebirth import distribute_self_rebirth_250
-                    distribute_self_rebirth_250(self.user, pack_index=pack_index)
-                except Exception as e:
+                        # Trigger dedicated ₹250 Self Rebirth distribution engine
+                        try:
+                            from business.services.self_rebirth import distribute_self_rebirth_250
+                            distribute_self_rebirth_250(self.user, pack_index=pack_index)
+                        except Exception as e:
+                            import logging
+                            logging.getLogger(__name__).exception("Failed to distribute franchise self rebirth 250: %s", e)
+                except Exception as e_fl:
                     import logging
-                    logging.getLogger(__name__).exception("Failed to distribute franchise self rebirth 250: %s", e)
+                    logging.getLogger(__name__).exception("Franchise rebirth loop exception: %s", e_fl)
+                    break
         finally:
             w._applying_franchise_rebirth = False
 
