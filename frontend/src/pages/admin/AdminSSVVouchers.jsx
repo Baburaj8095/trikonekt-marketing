@@ -402,15 +402,15 @@ export default function AdminSSVVouchers() {
               </FormControl>
             </Box>
 
-            {/* Cycle Duration Pill */}
+            {/* Term Duration Pill */}
             <Box sx={{ display: "flex", flexDirection: "column", bgcolor: "#f1f5f9", px: 1.5, py: 0.5, borderRadius: 2 }}>
-              <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>Cycle Duration</Typography>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>Term Duration</Typography>
               <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}>
                 {currentCycleObj?.duration || "Active / Open"}
               </Typography>
             </Box>
 
-            {/* View Cycle Details Button */}
+            {/* View Term Details Button */}
             <Button
               variant="contained"
               startIcon={<CalendarMonthIcon />}
@@ -424,10 +424,10 @@ export default function AdminSSVVouchers() {
                 px: 2,
               }}
             >
-              View Cycle Details
+              View Term Details
             </Button>
 
-            {/* Direct Link to Full Cycle Management Screen */}
+            {/* Direct Link to Full Term Management Screen */}
             <Button
               variant="outlined"
               onClick={() => navigate(`/admin/cycle-management?state_id=${selectedStateId}`)}
@@ -441,7 +441,7 @@ export default function AdminSSVVouchers() {
                 px: 2,
               }}
             >
-              Cycle Management
+              Term Management
             </Button>
           </Box>
         </Box>
@@ -665,13 +665,13 @@ export default function AdminSSVVouchers() {
             }}
           >
             <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0f172a", mb: 1 }}>
-              📊 Cycle Wise Summary - {currentStateObj?.name || "Karnataka"}
+              📊 Term Wise Summary - {currentStateObj?.name || "Karnataka"}
             </Typography>
             <TableContainer>
               <Table size="small">
                 <TableHead>
                   <TableRow sx={{ bgcolor: "#f8fafc" }}>
-                    <TableCell sx={{ fontWeight: 800, fontSize: 11, color: "#475569" }}>Cycle</TableCell>
+                    <TableCell sx={{ fontWeight: 800, fontSize: 11, color: "#475569" }}>Term</TableCell>
                     <TableCell sx={{ fontWeight: 800, fontSize: 11, color: "#475569" }}>Period</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 800, fontSize: 11, color: "#475569" }}>Eligible</TableCell>
                     <TableCell align="center" sx={{ fontWeight: 800, fontSize: 11, color: "#475569" }}>Created</TableCell>
@@ -682,7 +682,7 @@ export default function AdminSSVVouchers() {
                 <TableBody>
                   {cycleSummary.map((cs, idx) => (
                     <TableRow key={idx} sx={{ "&:hover": { bgcolor: "#f8fafc" } }}>
-                      <TableCell sx={{ fontWeight: 800, fontSize: 12, color: "#1e293b" }}>{cs.cycle}</TableCell>
+                      <TableCell sx={{ fontWeight: 800, fontSize: 12, color: "#1e293b" }}>{String(cs.cycle || "").replace(/Cycle/gi, "Term")}</TableCell>
                       <TableCell sx={{ fontSize: 11, color: "#64748b" }}>{cs.period}</TableCell>
                       <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11 }}>{Number(cs.eligible).toLocaleString("en-IN")}</TableCell>
                       <TableCell align="center" sx={{ fontWeight: 800, fontSize: 11, color: "#7c3aed" }}>{Number(cs.created).toLocaleString("en-IN")}</TableCell>
@@ -719,7 +719,7 @@ export default function AdminSSVVouchers() {
             <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 900, color: "#0f172a", fontSize: 17 }}>
-                  {currentStateObj?.name || "Karnataka"} - Users Details (Cycle {selectedCycleNum})
+                  {currentStateObj?.name || "Karnataka"} - Users Details (Term {selectedCycleNum})
                 </Typography>
                 <IconButton size="small" onClick={() => fetchUsers()} title="Refresh list">
                   <RefreshIcon sx={{ color: "#16a34a" }} />
@@ -1209,7 +1209,7 @@ export default function AdminSSVVouchers() {
         {/* ========================================================= */}
         <Dialog open={cycleModalOpen} onClose={() => setCycleModalOpen(false)} maxWidth="sm" fullWidth>
           <DialogTitle sx={{ fontWeight: 900, color: "#0f172a", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span>📅 Cycle Details & Activation - {currentStateObj?.name || "Karnataka"}</span>
+            <span>📅 Term Details & Activation - {currentStateObj?.name || "Karnataka"}</span>
           </DialogTitle>
           <DialogContent dividers>
             <Stack spacing={2}>
@@ -1229,7 +1229,7 @@ export default function AdminSSVVouchers() {
                   <Box>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
                       <Typography sx={{ fontWeight: 800, fontSize: 14, color: "#0f172a" }}>
-                        {c.label}
+                        {String(c.label || "").replace(/Cycle/gi, "Term")}
                       </Typography>
                       {c.is_active && (
                         <Chip label="ACTIVE" color="success" size="small" sx={{ fontWeight: 800, height: 20 }} />
@@ -1257,7 +1257,7 @@ export default function AdminSSVVouchers() {
                           borderRadius: 1.5,
                         }}
                       >
-                        {activatingCycleId === c.cycle_number ? "Activating..." : "Activate Cycle"}
+                        {activatingCycleId === c.cycle_number ? "Activating..." : "Activate Term"}
                       </Button>
                     )}
                   </Box>
@@ -1274,7 +1274,7 @@ export default function AdminSSVVouchers() {
               }}
               sx={{ fontWeight: 700, textTransform: "none", borderColor: "#16a34a", color: "#16a34a" }}
             >
-              Open Cycle Management Screen →
+              Open Term Management Screen →
             </Button>
             <Button onClick={() => setCycleModalOpen(false)} sx={{ fontWeight: 800 }}>
               Close

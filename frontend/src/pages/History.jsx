@@ -1357,7 +1357,7 @@ function PhonePeFilterDrawer({
     { label: "E-Edu Layer", value: "E_EDU_LAYER" },
     { label: "E-Edu Direct Referral", value: "E_EDU_DIRECT" },
     { label: "E-Edu All", value: "E_EDU" },
-    { label: "Self Account / Self Block (25%)", value: "SAVE" },
+    { label: "Self Account / Self Block", value: "SAVE" },
     { label: "SSV Layer", value: "SSV_LAYER" },
     { label: "SSV Bonus", value: "SSV_BONUS" },
     { label: "All Layers & Blocks", value: "LAYER" },
@@ -2222,7 +2222,7 @@ export default function History() {
             </Stack>
 
             <Chip
-              label="Cycle 1 Active"
+              label="Term 1 Active"
               size="small"
               onClick={() => navigate("/rank-upgrade")}
               sx={{
@@ -2237,7 +2237,7 @@ export default function History() {
             />
           </Stack>
 
-          {/* Self Account Pocket Balance Pill (25% Commission Reserve for ₹250 Rebirth Loop) */}
+          {/* Self Account Pocket Balance Pill */}
           <Box
             onClick={() => setSourceFilter("SAVE")}
             sx={{
@@ -2272,11 +2272,8 @@ export default function History() {
                 <SavingsIcon sx={{ fontSize: 18 }} />
               </Box>
               <Box>
-                <Typography sx={{ fontSize: 11, color: "rgba(255, 255, 255, 0.8)", fontWeight: 700 }}>
-                  Self Account Pocket (25%)
-                </Typography>
-                <Typography sx={{ fontSize: 10, color: "rgba(255, 255, 255, 0.65)", fontWeight: 600 }}>
-                  ₹250 Rebirth reserve balance
+                <Typography sx={{ fontSize: 11.5, color: "rgba(255, 255, 255, 0.9)", fontWeight: 700 }}>
+                  Self Account Pocket
                 </Typography>
               </Box>
             </Stack>
@@ -3225,7 +3222,7 @@ export default function History() {
               </Avatar>
               <Box sx={{ flex: 1 }}>
                 <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#92400E" }}>
-                  Self Account / Self Block Repurchase Pocket (25%)
+                  Self Account / Self Block Repurchase Pocket
                 </Typography>
                 <Typography sx={{ fontSize: 11.5, color: "#B45309", fontWeight: 700 }}>
                   Total Transactions: {categoryStats.SAVE.count} • Total Amount Saved: ₹ {fmtAmount(categoryStats.SAVE.total)}

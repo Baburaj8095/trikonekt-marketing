@@ -1866,6 +1866,16 @@ function App() {
           }
         />
         <Route
+          path="/admin/term-management"
+          element={
+            <AdminProtectedRoute>
+              <AdminShell>
+                <AdminCycleManagement />
+              </AdminShell>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/commission-config"
           element={
             <AdminProtectedRoute>

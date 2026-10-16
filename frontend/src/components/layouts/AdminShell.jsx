@@ -338,7 +338,7 @@ export default function AdminShell({ children }) {
         label: "Coupons & Rewards",
         items: [
           { to: "/admin/ssv-vouchers", label: "SSV Vouchers", icon: "ticket" },
-          { to: "/admin/cycle-management", label: "Cycle Management", icon: "chart" },
+          { to: "/admin/cycle-management", label: "Term Management", icon: "chart" },
           { to: "/admin/workflows/generate-coupon", label: "Generate Coupon", icon: "ticket" },
           { to: "/admin/wallet-vouchers", label: "Coupon / Voucher Maintenance", icon: "ticket" },
           { to: "/admin/lucky-draw", label: "Lucky Draw", icon: "ticket" },

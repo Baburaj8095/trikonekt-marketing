@@ -214,10 +214,10 @@ export default function AdminCycleManagement() {
           </IconButton>
           <Box>
             <Typography variant="h5" sx={{ fontWeight: 700, color: "#1e293b" }}>
-              Cycle Management
+              Term Management
             </Typography>
             <Typography variant="body2" sx={{ color: "#64748b" }}>
-              Configure, schedule, and activate state-wise SSV cycles. Only ONE cycle can be active per state at a time.
+              Configure, schedule, and activate state-wise SSV terms. Only ONE term can be active per state at a time.
             </Typography>
           </Box>
         </Box>
@@ -257,7 +257,7 @@ export default function AdminCycleManagement() {
               "&:hover": { bgcolor: "#15803d" },
             }}
           >
-            Add New Cycle
+            Add New Term
           </Button>
 
           <Button
@@ -288,7 +288,7 @@ export default function AdminCycleManagement() {
             <CardContent sx={{ p: 2.5 }}>
               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>
-                  Total Cycles Configured
+                  Total Terms Configured
                 </Typography>
                 <Box sx={{ p: 1, borderRadius: 1.5, bgcolor: "#eff6ff", color: "#2563eb" }}>
                   <EventAvailableIcon fontSize="small" />
@@ -317,15 +317,15 @@ export default function AdminCycleManagement() {
             <CardContent sx={{ p: 2.5 }}>
               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: "#15803d", textTransform: "uppercase" }}>
-                  Currently Active Cycle
+                  Currently Active Term
                 </Typography>
                 <Chip label="LIVE" color="success" size="small" sx={{ fontWeight: 800, height: 22 }} />
               </Box>
               <Typography variant="h5" sx={{ fontWeight: 800, color: "#14532d" }}>
-                {activeCycle ? activeCycle.cycle_label : "No Active Cycle"}
+                {activeCycle ? String(activeCycle.cycle_label || "").replace(/Cycle/gi, "Term") : "No Active Term"}
               </Typography>
               <Typography variant="caption" sx={{ color: "#15803d", fontWeight: 600 }}>
-                {activeCycle ? activeCycle.duration : "Please activate a cycle"}
+                {activeCycle ? activeCycle.duration : "Please activate a term"}
               </Typography>
             </CardContent>
           </Card>
@@ -336,7 +336,7 @@ export default function AdminCycleManagement() {
             <CardContent sx={{ p: 2.5 }}>
               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>
-                  Active Cycle Eligible Users
+                  Active Term Eligible Users
                 </Typography>
                 <Box sx={{ p: 1, borderRadius: 1.5, bgcolor: "#f3e8ff", color: "#9333ea" }}>
                   <PeopleAltIcon fontSize="small" />
@@ -346,7 +346,7 @@ export default function AdminCycleManagement() {
                 {activeCycle?.eligible_users || 0}
               </Typography>
               <Typography variant="caption" sx={{ color: "#64748b" }}>
-                Based on paid boxes in this cycle window
+                Based on paid boxes in this term window
               </Typography>
             </CardContent>
           </Card>
@@ -357,7 +357,7 @@ export default function AdminCycleManagement() {
             <CardContent sx={{ p: 2.5 }}>
               <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>
-                  Vouchers Issued (Active Cycle)
+                  Vouchers Issued (Active Term)
                 </Typography>
                 <Box sx={{ p: 1, borderRadius: 1.5, bgcolor: "#ecfdf5", color: "#059669" }}>
                   <ConfirmationNumberIcon fontSize="small" />
@@ -387,13 +387,13 @@ export default function AdminCycleManagement() {
         >
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 700, color: "#1e293b" }}>
-              All Cycles for {selectedStateObj?.name || "State"}
+              All Terms for {selectedStateObj?.name || "State"}
             </Typography>
             <Typography variant="caption" sx={{ color: "#64748b" }}>
-              Activating a cycle immediately shifts all voucher issuance, KPI reports, and eligibility queries to that cycle.
+              Activating a term immediately shifts all voucher issuance, KPI reports, and eligibility queries to that term.
             </Typography>
           </Box>
-          <Tooltip title="Refresh Cycles">
+          <Tooltip title="Refresh Terms">
             <IconButton onClick={fetchCycles} disabled={loading} sx={{ bgcolor: "#f1f5f9" }}>
               <RefreshIcon />
             </IconButton>
@@ -405,7 +405,7 @@ export default function AdminCycleManagement() {
             <TableHead sx={{ bgcolor: "#f8fafc" }}>
               <TableRow>
                 <TableCell sx={{ fontWeight: 700, color: "#475569" }}>#</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Cycle Label</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Term Label</TableCell>
                 <TableCell sx={{ fontWeight: 700, color: "#475569" }}>Duration Window</TableCell>
                 <TableCell sx={{ fontWeight: 700, color: "#475569" }} align="center">
                   Eligible Users
@@ -433,7 +433,7 @@ export default function AdminCycleManagement() {
                   <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
                     <CircularProgress size={32} />
                     <Typography variant="body2" sx={{ mt: 1, color: "#64748b" }}>
-                      Loading cycles...
+                      Loading terms...
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -441,7 +441,7 @@ export default function AdminCycleManagement() {
                 <TableRow>
                   <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
                     <Typography variant="body1" sx={{ color: "#64748b" }}>
-                      No cycles configured for this state yet.
+                      No terms configured for this state yet.
                     </Typography>
                     <Button
                       variant="contained"
@@ -548,12 +548,12 @@ export default function AdminCycleManagement() {
                             {activatingCycleId === c.id ? (
                               <CircularProgress size={16} sx={{ color: "#ffffff" }} />
                             ) : (
-                              "Activate Cycle"
+                              "Activate Term"
                             )}
                           </Button>
                         )}
 
-                        <Tooltip title="Edit Cycle Window">
+                        <Tooltip title="Edit Term Window">
                           <IconButton
                             size="small"
                             onClick={() => handleOpenEditModal(c)}
@@ -572,10 +572,10 @@ export default function AdminCycleManagement() {
         </TableContainer>
       </Card>
 
-      {/* Add / Edit Cycle Dialog */}
+      {/* Add / Edit Term Dialog */}
       <Dialog open={modalOpen} onClose={() => setModalOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 700, color: "#1e293b", borderBottom: "1px solid #e2e8f0" }}>
-          {modalMode === "CREATE" ? "Add New Cycle" : `Edit ${editingCycle?.cycle_label || "Cycle"}`}
+          {modalMode === "CREATE" ? "Add New Term" : `Edit ${String(editingCycle?.cycle_label || "Term").replace(/Cycle/gi, "Term")}`}
         </DialogTitle>
         <DialogContent sx={{ pt: 3 }}>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5, mt: 1 }}>
@@ -587,22 +587,22 @@ export default function AdminCycleManagement() {
               size="small"
             />
             <TextField
-              label="Cycle Number"
+              label="Term Number"
               type="number"
               value={formCycleNum}
               onChange={(e) => setFormCycleNum(e.target.value)}
               fullWidth
               size="small"
               required
-              helperText="E.g., 1 for Cycle 1, 2 for Cycle 2"
+              helperText="E.g., 1 for Term 1, 2 for Term 2"
             />
             <TextField
-              label="Cycle Label"
+              label="Term Label"
               value={formCycleLabel}
               onChange={(e) => setFormCycleLabel(e.target.value)}
               fullWidth
               size="small"
-              placeholder="E.g. Cycle 1"
+              placeholder="E.g. Term 1"
             />
             <TextField
               label="Start Date (Optional)"
@@ -612,7 +612,7 @@ export default function AdminCycleManagement() {
               fullWidth
               size="small"
               InputLabelProps={{ shrink: true }}
-              helperText="Optional cycle launch date"
+              helperText="Optional term launch date"
             />
             <TextField
               label="End Date (Optional / Open)"
@@ -622,7 +622,7 @@ export default function AdminCycleManagement() {
               fullWidth
               size="small"
               InputLabelProps={{ shrink: true }}
-              helperText="Cycles do not have end dates. Leave empty for continuous open cycle."
+              helperText="Terms do not have end dates. Leave empty for continuous open term."
             />
             <FormControlLabel
               control={
@@ -634,7 +634,7 @@ export default function AdminCycleManagement() {
               }
               label={
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  Make this the ACTIVE cycle immediately
+                  Make this the ACTIVE term immediately
                 </Typography>
               }
             />
@@ -651,7 +651,7 @@ export default function AdminCycleManagement() {
             disabled={modalSubmitting}
             sx={{ fontWeight: 700, borderRadius: 1.5, px: 3, bgcolor: "#16a34a", "&:hover": { bgcolor: "#15803d" } }}
           >
-            {modalSubmitting ? <CircularProgress size={20} sx={{ color: "#fff" }} /> : "Save Cycle"}
+            {modalSubmitting ? <CircularProgress size={20} sx={{ color: "#fff" }} /> : "Save Term"}
           </Button>
         </DialogActions>
       </Dialog>

@@ -1467,8 +1467,8 @@ export default function AdminDashboard() {
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <span style={{ width: 22, height: 22, borderRadius: 6, background: "#059669", color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>16</span>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 900, color: "#065f46" }}>SSV Cycle Management & Activator</div>
-                  <div style={{ fontSize: 11, color: "#047857", fontWeight: 700 }}>Enable Cycles, Target Pools & User Tracking</div>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: "#065f46" }}>SSV Term Management & Activator</div>
+                  <div style={{ fontSize: 11, color: "#047857", fontWeight: 700 }}>Enable Terms, Target Pools & User Tracking</div>
                 </div>
               </div>
               <AccountTreeRoundedIcon sx={{ fontSize: 20, color: "#059669" }} />

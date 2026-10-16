@@ -604,16 +604,16 @@ function UserProfileDrawer({ open, loading, user, onClose, onEdit, onReset }) {
                       borderColor: (userCycleInfo?.cycle === "Cycle 2" || userCycleInfo?.active_cycle === "Cycle 2") ? "#93c5fd" : "#86efac",
                     }}
                   >
-                    {userCycleInfo?.cycle || userCycleInfo?.active_cycle || "Cycle 1"}
+                    {String(userCycleInfo?.cycle || userCycleInfo?.active_cycle || "Term 1").replace(/Cycle/gi, "Term")}
                   </span>
                 </div>
 
-                <DetailRow label="Active Cycle" value={userCycleInfo?.cycle || userCycleInfo?.active_cycle || "Cycle 1"} />
+                <DetailRow label="Active Term" value={String(userCycleInfo?.cycle || userCycleInfo?.active_cycle || "Term 1").replace(/Cycle/gi, "Term")} />
                 <DetailRow label="Layer Cap Limit" value={`₹${moneyValue(userCycleInfo?.layer_limit || 100000)}`} />
                 <DetailRow label="Royalty Cap Limit" value={`₹${moneyValue(userCycleInfo?.royalty_limit || 50000)}`} />
-                <DetailRow label="Total Cycle Cap" value={`₹${moneyValue(userCycleInfo?.total_limit || 150000)}`} />
+                <DetailRow label="Total Term Cap" value={`₹${moneyValue(userCycleInfo?.total_limit || 150000)}`} />
                 <DetailRow
-                  label="Cycle Earning Status"
+                  label="Term Earning Status"
                   value={
                     Number(user?.total_earning || 0) >= 150000
                       ? "🏆 ₹1.5L Limit Reached (Earning Stopped)"
@@ -624,9 +624,9 @@ function UserProfileDrawer({ open, loading, user, onClose, onEdit, onReset }) {
                   label="Admin Gate Authorization"
                   value={
                     userCycleInfo?.admin_authorized || userCycleInfo?.status === "authorized"
-                      ? "🔓 Cycle 2 Authorized by Admin"
+                      ? "🔓 Term 2 Authorized by Admin"
                       : (userCycleInfo?.cycle === "Cycle 2" || userCycleInfo?.active_cycle === "Cycle 2")
-                      ? "🚀 Cycle 2 Active"
+                      ? "🚀 Term 2 Active"
                       : "🔒 Locked until ₹1.5L reached or Admin authorized"
                   }
                 />
@@ -666,7 +666,7 @@ function UserProfileDrawer({ open, loading, user, onClose, onEdit, onReset }) {
                       cursor: "pointer",
                     }}
                   >
-                    🔓 Authorize Cycle 2
+                    🔓 Authorize Term 2
                   </button>
                   <button
                     type="button"
@@ -685,7 +685,7 @@ function UserProfileDrawer({ open, loading, user, onClose, onEdit, onReset }) {
                       cursor: "pointer",
                     }}
                   >
-                    🚀 Force Activate Cycle 2
+                    🚀 Force Activate Term 2
                   </button>
                   <button
                     type="button"
@@ -702,7 +702,7 @@ function UserProfileDrawer({ open, loading, user, onClose, onEdit, onReset }) {
                       cursor: "pointer",
                     }}
                   >
-                    🔄 Reset Cycle 1
+                    🔄 Reset Term 1
                   </button>
                 </div>
               </div>
@@ -1930,7 +1930,7 @@ export default function AdminUsers() {
       },
       {
         field: "__cycle_status",
-        headerName: "Cycle",
+        headerName: "Term",
         minWidth: 110,
         width: 110,
         align: "center",
@@ -1946,8 +1946,8 @@ export default function AdminUsers() {
             if (raw) cycleData = JSON.parse(raw);
           } catch (_) {}
 
-          const cycleName = cycleData?.cycle || cycleData?.active_cycle || "Cycle 1";
-          const isCycle2 = cycleName === "Cycle 2";
+          const cycleName = String(cycleData?.cycle || cycleData?.active_cycle || "Term 1").replace(/Cycle/gi, "Term");
+          const isCycle2 = cycleName.includes("2");
           const isAuthorized = cycleData?.admin_authorized || cycleData?.status === "authorized";
           const isCapped = Number(row?.total_earning || 0) >= 150000;
 
@@ -1960,9 +1960,9 @@ export default function AdminUsers() {
                 }}
                 title={
                   isCapped
-                    ? "Limit ₹1.5L reached! Earning stopped. Click to authorize Cycle 2."
+                    ? "Limit ₹1.5L reached! Earning stopped. Click to authorize Term 2."
                     : isAuthorized
-                    ? "Cycle 2 Authorized by Admin."
+                    ? "Term 2 Authorized by Admin."
                     : `${cycleName}: Earning towards ₹1.5L cap.`
                 }
                 style={{
@@ -1976,7 +1976,7 @@ export default function AdminUsers() {
                   border: `1px solid ${isCycle2 ? "#93c5fd" : isCapped ? "#fde68a" : isAuthorized ? "#c7d2fe" : "#bbf7d0"}`,
                 }}
               >
-                {isCapped ? "⚠️ Capped (₹1.5L)" : isAuthorized ? "🔓 Cycle 2 Auth" : isCycle2 ? "🚀 Cycle 2" : "Cycle 1"}
+                {isCapped ? "⚠️ Capped (₹1.5L)" : isAuthorized ? "🔓 Term 2 Auth" : isCycle2 ? "🚀 Term 2" : "Term 1"}
               </span>
             </div>
           );
