@@ -2784,7 +2784,7 @@ export default function History() {
                 <ArrowDownwardIcon sx={{ fontSize: 16 }} />
               </Box>
               <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>
-                Self Block (₹250 Debits)
+                Self Block
               </Typography>
             </Stack>
             <Typography sx={{ fontSize: { xs: 20, sm: 22 }, fontWeight: 900, color: "#DC2626", letterSpacing: "-0.02em" }}>
