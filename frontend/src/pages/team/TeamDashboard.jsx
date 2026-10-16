@@ -1554,7 +1554,7 @@ function ConsumerCycleRenewalWidget({ onOpenPurchase, cycleState, totalCycleEarn
   );
 }
 
-function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuccess, walletMe }) {
+function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuccess, walletMe, walletHistory }) {
   const [paymentSource, setPaymentSource] = useState("MAIN_WALLET");
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
@@ -1739,8 +1739,26 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
   const adminFeeAmt = Math.round(baseAmt * 0.07);
   const totalPayable = baseAmt + gstAmt + adminFeeAmt;
 
-  const currentCycleNum = cycleState?.currentCycle || 1;
-  const nextCycleNum = currentCycleNum + 1;
+  const currentCycleNum = Number(cycleState?.currentCycle || walletHistory?.current_term || 1);
+  const isTermCapped = Boolean(cycleState?.isCapped);
+  const targetTerm = isTermCapped ? currentCycleNum + 1 : currentCycleNum;
+
+  // Discovered active tracks for the current term from database history
+  const activeTermTracks = useMemo(() => {
+    const list = walletHistory?.active_term_tracks || walletHistory?.term_tracks?.[String(currentCycleNum)];
+    if (Array.isArray(list) && list.length > 0) return list;
+    if (currentCycleNum >= 2) return ["TRACK_1"];
+    return ["TRACK_1"];
+  }, [walletHistory, currentCycleNum]);
+
+  // Is the currently selected package/track already purchased for the active term?
+  const isAlreadyPurchased = !isTermCapped && (
+    activeTermTracks.includes(selectedPkg.key) ||
+    (selectedPkg.tab === "TRACK_1" && activeTermTracks.some((t) => t.startsWith("TRACK_1"))) ||
+    (selectedPkg.tab === "TRACK_2" && activeTermTracks.includes("TRACK_2_FULL")) ||
+    (selectedPkg.tab === "TRACK_3" && activeTermTracks.includes("TRACK_3_FULL")) ||
+    (selectedPkg.key === "BULK" && activeTermTracks.includes("BULK"))
+  );
 
   const handlePurchase = async () => {
     setSubmitting(true);
@@ -1757,8 +1775,8 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
       const payload = {
         userId: walletMe?.id || walletMe?.user_id,
         userCode: walletMe?.user_code || walletMe?.username,
-        cycle: `Term ${nextCycleNum}`,
-        term: nextCycleNum,
+        cycle: `Term ${targetTerm}`,
+        term: targetTerm,
         paymentSource,
         baseAmount: baseAmt,
         track: selectedPkg.key,
@@ -1776,7 +1794,7 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
       }
 
       const newState = {
-        currentCycle: nextCycleNum,
+        currentCycle: targetTerm,
         baseAmount: baseAmt,
         profitPercent: 200,
         eligibleLimit: 150000,
@@ -1799,7 +1817,7 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
       if (onPurchaseSuccess) onPurchaseSuccess(newState);
 
       setPurchasedResult({
-        term: nextCycleNum,
+        term: targetTerm,
         trackName: selectedPkg.name,
         amount: totalPayable,
         paymentSource: paymentSource === "MAIN_WALLET" ? "Main Wallet" : "Coupon Pocket",
@@ -1866,7 +1884,7 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
               border: purchasedResult ? "1px solid #A7F3D0" : "1px solid #DBEAFE",
             }}
           >
-            {purchasedResult ? "🎉" : "🎓"}
+            {purchasedResult ? "🎉" : isAlreadyPurchased ? "✓" : "🎓"}
           </Box>
           <Box sx={{ minWidth: 0 }}>
             <Typography
@@ -1880,10 +1898,18 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
                 textOverflow: "ellipsis",
               }}
             >
-              {purchasedResult ? `Term ${purchasedResult.term} Activated` : "Academic Track Renewal"}
+              {purchasedResult
+                ? `Term ${purchasedResult.term} Activated`
+                : isTermCapped
+                ? `Academic Track Renewal • Term ${targetTerm}`
+                : `Academic Tracks & Upgrades • Term ${currentCycleNum}`}
             </Typography>
             <Typography sx={{ fontSize: 11.5, color: purchasedResult ? "#059669" : "#64748B", fontWeight: 700, mt: 0.2 }}>
-              {purchasedResult ? "Renewal Payment Completed • Status Active" : `Term ${nextCycleNum} Selection • Modular Packages`}
+              {purchasedResult
+                ? "Renewal Payment Completed • Status Active"
+                : isTermCapped
+                ? `Term ${targetTerm} Selection • Fresh ₹1.5L Headroom`
+                : `Term ${currentCycleNum} (Active) • Modular Packages`}
             </Typography>
           </Box>
         </Stack>
@@ -1988,7 +2014,10 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
         ) : (
           <>
             <Typography sx={{ fontSize: 12.5, color: "#64748B", mb: 2 }}>
-              Choose an individual academic track or the complete bulk bundle. Your earnings will reset into <strong>Term {nextCycleNum}</strong> with fresh limits and <strong>zero duplicate matrix accounts</strong>.
+              {isTermCapped
+                ? `Choose an individual academic track or the complete bulk bundle. Your earnings will reset into Term ${targetTerm} with fresh limits and zero duplicate matrix accounts.`
+                : `Review your activated tracks for Term ${currentCycleNum} or choose higher leadership tiers (Track 2 or Track 3) to upgrade your overrides.`
+              }
             </Typography>
 
         {/* Top Track Categories (Tabs like trieducation.in) */}
@@ -2014,10 +2043,16 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
             { id: "BULK", label: "All 3 Tracks Bulk (₹50k)", color: "#1D4ED8" },
           ].map((tab) => {
             const isTabActive = activeTab === tab.id;
+            const isTabPurchased = !isTermCapped && (
+              (tab.id === "TRACK_1" && activeTermTracks.some((t) => t.startsWith("TRACK_1"))) ||
+              (tab.id === "TRACK_2" && activeTermTracks.includes("TRACK_2_FULL")) ||
+              (tab.id === "TRACK_3" && activeTermTracks.includes("TRACK_3_FULL")) ||
+              (tab.id === "BULK" && activeTermTracks.includes("BULK"))
+            );
             return (
               <Chip
                 key={tab.id}
-                label={tab.label}
+                label={isTabPurchased ? `✓ ${tab.label} (Active)` : tab.label}
                 clickable
                 onClick={() => handleTabChange(tab.id)}
                 sx={{
@@ -2025,9 +2060,9 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
                   fontWeight: 900,
                   fontSize: 11.5,
                   borderRadius: "10px",
-                  bgcolor: isTabActive ? tab.color : "#F1F5F9",
-                  color: isTabActive ? "#FFFFFF" : "#475569",
-                  border: isTabActive ? `1px solid ${tab.color}` : "1px solid #E2E8F0",
+                  bgcolor: isTabActive ? tab.color : isTabPurchased ? "#ECFDF5" : "#F1F5F9",
+                  color: isTabActive ? "#FFFFFF" : isTabPurchased ? "#065F46" : "#475569",
+                  border: isTabActive ? `1px solid ${tab.color}` : isTabPurchased ? "1px solid #A7F3D0" : "1px solid #E2E8F0",
                   "&:hover": {
                     bgcolor: isTabActive ? tab.color : "#E2E8F0",
                   },
@@ -2091,18 +2126,32 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
         >
           <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
             <Box>
-              <Chip
-                label={selectedPkg.trackName}
-                size="small"
-                sx={{
-                  bgcolor: selectedPkg.badgeColor,
-                  color: "#FFF",
-                  fontWeight: 900,
-                  fontSize: 10,
-                  height: 22,
-                  mb: 0.5,
-                }}
-              />
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                <Chip
+                  label={selectedPkg.trackName}
+                  size="small"
+                  sx={{
+                    bgcolor: selectedPkg.badgeColor,
+                    color: "#FFF",
+                    fontWeight: 900,
+                    fontSize: 10,
+                    height: 22,
+                  }}
+                />
+                {isAlreadyPurchased && (
+                  <Chip
+                    label={`✓ ACTIVE FOR TERM ${currentCycleNum}`}
+                    size="small"
+                    sx={{
+                      bgcolor: "#10B981",
+                      color: "#FFF",
+                      fontWeight: 900,
+                      fontSize: 10,
+                      height: 22,
+                    }}
+                  />
+                )}
+              </Stack>
               <Typography sx={{ fontSize: 14, fontWeight: 950, color: "#0F172A" }}>
                 {selectedPkg.name}
               </Typography>
@@ -2110,9 +2159,16 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
                 {selectedPkg.scope}
               </Typography>
             </Box>
-            <Typography sx={{ fontSize: 18, fontWeight: 950, color: selectedPkg.badgeColor }}>
-              ₹{baseAmt.toLocaleString("en-IN")}
-            </Typography>
+            <Box sx={{ textAlign: "right" }}>
+              <Typography sx={{ fontSize: 18, fontWeight: 950, color: selectedPkg.badgeColor }}>
+                ₹{baseAmt.toLocaleString("en-IN")}
+              </Typography>
+              {isAlreadyPurchased && (
+                <Typography sx={{ fontSize: 10.5, fontWeight: 900, color: "#059669" }}>
+                  ✓ PURCHASED
+                </Typography>
+              )}
+            </Box>
           </Stack>
 
           {/* Key Benefits Bullet List */}
@@ -2128,9 +2184,18 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
 
         {/* Invoice Breakdown */}
         <Paper variant="outlined" sx={{ p: 2, borderRadius: "14px", bgcolor: "#F8FAFC", mb: 2 }}>
-          <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: "#475569", mb: 1 }}>
-            INVOICE DETAILS:
-          </Typography>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+            <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: "#475569" }}>
+              INVOICE & ACTIVATION DETAILS:
+            </Typography>
+            {isAlreadyPurchased && (
+              <Chip
+                label={`Status: PAID & ACTIVE FOR TERM ${currentCycleNum}`}
+                size="small"
+                sx={{ bgcolor: "#ECFDF5", color: "#059669", fontWeight: 900, fontSize: 10, height: 20, border: "1px solid #A7F3D0" }}
+              />
+            )}
+          </Stack>
           <Stack spacing={0.8}>
             <Stack direction="row" justifyContent="space-between">
               <Typography sx={{ fontSize: 12.5, color: "#475569" }}>Course Subtotal:</Typography>
@@ -2152,18 +2217,28 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
             </Stack>
             <Divider sx={{ my: 0.5 }} />
             <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography sx={{ fontSize: 13.5, fontWeight: 950, color: "#0F172A" }}>Total Payable from Wallet:</Typography>
-              <Typography sx={{ fontSize: 16, fontWeight: 950, color: "#059669" }}>
+              <Typography sx={{ fontSize: 13.5, fontWeight: 950, color: "#0F172A" }}>
+                {isAlreadyPurchased ? "Total Paid from Wallet:" : "Total Payable from Wallet:"}
+              </Typography>
+              <Typography sx={{ fontSize: 16, fontWeight: 950, color: isAlreadyPurchased ? "#059669" : "#2563EB" }}>
                 ₹ {totalPayable.toLocaleString("en-IN")}.00
               </Typography>
             </Stack>
+            {isAlreadyPurchased && (
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ pt: 0.5 }}>
+                <Typography sx={{ fontSize: 11.5, color: "#64748B" }}>Payment Status:</Typography>
+                <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: "#059669" }}>
+                  ✓ PAID & ACTIVE
+                </Typography>
+              </Stack>
+            )}
           </Stack>
         </Paper>
 
         {/* Fresh Limits Granted */}
         <Box sx={{ p: 1.5, borderRadius: "12px", bgcolor: "#ECFDF5", border: "1px solid #BBF7D0", mb: 2 }}>
           <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#166534" }}>
-            ✨ FRESH LIMITS GRANTED FOR TERM {nextCycleNum}:
+            ✨ {isAlreadyPurchased ? `CURRENT LIMITS FOR TERM ${currentCycleNum}:` : `FRESH LIMITS GRANTED FOR TERM ${targetTerm}:`}
           </Typography>
           <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.5 }}>
             <Typography sx={{ fontSize: 11.5, color: "#15803D" }}>Layer Cap: ₹1,00,000.00</Typography>
@@ -2172,51 +2247,74 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
           </Stack>
         </Box>
 
-        {/* Payment Source Selector */}
-        <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#0F172A", mb: 1 }}>
-          Select Payment Source (Strict: Internal Wallets Only)
-        </Typography>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mb: 2 }}>
+        {/* Payment Source Selector or Active Track Message */}
+        {isAlreadyPurchased ? (
           <Paper
-            onClick={() => setPaymentSource("MAIN_WALLET")}
             elevation={0}
             sx={{
-              flex: 1,
-              p: 1.5,
+              p: 2,
               borderRadius: "14px",
-              border: "2px solid",
-              borderColor: paymentSource === "MAIN_WALLET" ? "#2563EB" : "#E2E8F0",
-              bgcolor: paymentSource === "MAIN_WALLET" ? "#EFF6FF" : "#FFFFFF",
-              cursor: "pointer",
+              bgcolor: "#F0FDF4",
+              border: "1px solid #BBF7D0",
+              mb: 2,
+              textAlign: "center",
             }}
           >
-            <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>Main Wallet</Typography>
-            <Typography sx={{ fontSize: 15, fontWeight: 950, color: "#2563EB", my: 0.3 }}>
-              ₹ {mainBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#15803D", mb: 0.5 }}>
+              ✓ {selectedPkg.shortTitle} is Active for Term {currentCycleNum}
             </Typography>
-            <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>Available balance</Typography>
+            <Typography sx={{ fontSize: 11.5, color: "#166534", lineHeight: 1.4 }}>
+              Your foundational e-Edu Agent subscription has been paid and verified in database. To expand your multi-pincode mentoring or DAP franchise overrides, select <strong>Track 2</strong> or <strong>Track 3</strong> above.
+            </Typography>
           </Paper>
+        ) : (
+          <>
+            <Typography sx={{ fontSize: 12, fontWeight: 900, color: "#0F172A", mb: 1 }}>
+              Select Payment Source (Strict: Internal Wallets Only)
+            </Typography>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mb: 2 }}>
+              <Paper
+                onClick={() => setPaymentSource("MAIN_WALLET")}
+                elevation={0}
+                sx={{
+                  flex: 1,
+                  p: 1.5,
+                  borderRadius: "14px",
+                  border: "2px solid",
+                  borderColor: paymentSource === "MAIN_WALLET" ? "#2563EB" : "#E2E8F0",
+                  bgcolor: paymentSource === "MAIN_WALLET" ? "#EFF6FF" : "#FFFFFF",
+                  cursor: "pointer",
+                }}
+              >
+                <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>Main Wallet</Typography>
+                <Typography sx={{ fontSize: 15, fontWeight: 950, color: "#2563EB", my: 0.3 }}>
+                  ₹ {mainBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </Typography>
+                <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>Available balance</Typography>
+              </Paper>
 
-          <Paper
-            onClick={() => setPaymentSource("COUPON_POCKET")}
-            elevation={0}
-            sx={{
-              flex: 1,
-              p: 1.5,
-              borderRadius: "14px",
-              border: "2px solid",
-              borderColor: paymentSource === "COUPON_POCKET" ? "#2563EB" : "#E2E8F0",
-              bgcolor: paymentSource === "COUPON_POCKET" ? "#EFF6FF" : "#FFFFFF",
-              cursor: "pointer",
-            }}
-          >
-            <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>Coupon Pocket</Typography>
-            <Typography sx={{ fontSize: 15, fontWeight: 950, color: "#2563EB", my: 0.3 }}>
-              ₹ {couponBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-            </Typography>
-            <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>Shopping vouchers</Typography>
-          </Paper>
-        </Stack>
+              <Paper
+                onClick={() => setPaymentSource("COUPON_POCKET")}
+                elevation={0}
+                sx={{
+                  flex: 1,
+                  p: 1.5,
+                  borderRadius: "14px",
+                  border: "2px solid",
+                  borderColor: paymentSource === "COUPON_POCKET" ? "#2563EB" : "#E2E8F0",
+                  bgcolor: paymentSource === "COUPON_POCKET" ? "#EFF6FF" : "#FFFFFF",
+                  cursor: "pointer",
+                }}
+              >
+                <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>Coupon Pocket</Typography>
+                <Typography sx={{ fontSize: 15, fontWeight: 950, color: "#2563EB", my: 0.3 }}>
+                  ₹ {couponBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </Typography>
+                <Typography sx={{ fontSize: 10.5, color: "#64748B" }}>Shopping vouchers</Typography>
+              </Paper>
+            </Stack>
+          </>
+        )}
 
             {errMsg && <Alert severity="error" sx={{ mb: 1.5, fontSize: 12 }}>{errMsg}</Alert>}
             {successMsg && <Alert severity="success" sx={{ mb: 1.5, fontSize: 12 }}>{successMsg}</Alert>}
@@ -2252,6 +2350,40 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
           >
             ✓ Done • Return to Dashboard
           </Button>
+        ) : isAlreadyPurchased ? (
+          <Stack spacing={1}>
+            <Button
+              fullWidth
+              variant="contained"
+              disabled
+              sx={{
+                bgcolor: "#10B981 !important",
+                color: "#FFFFFF !important",
+                fontWeight: 900,
+                fontSize: 14,
+                textTransform: "none",
+                borderRadius: "14px",
+                py: 1.3,
+                opacity: "1 !important",
+                boxShadow: "0 4px 14px rgba(16, 185, 129, 0.25)",
+                cursor: "default",
+              }}
+            >
+              ✓ {selectedPkg.shortTitle} Already Activated for Term {currentCycleNum}
+            </Button>
+            <Button
+              fullWidth
+              onClick={onClose}
+              sx={{
+                textTransform: "none",
+                fontWeight: 700,
+                color: "#64748B",
+                fontSize: 12.5,
+              }}
+            >
+              Close
+            </Button>
+          </Stack>
         ) : (
           <>
             <Button
@@ -2260,7 +2392,7 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
               onClick={handlePurchase}
               disabled={submitting}
               sx={{
-                bgcolor: "#059669",
+                bgcolor: isTermCapped ? "#059669" : selectedPkg.badgeColor || "#059669",
                 color: "#FFF",
                 fontWeight: 900,
                 fontSize: 14,
@@ -2271,7 +2403,12 @@ function CycleBulkCoursePurchaseModal({ open, onClose, cycleState, onPurchaseSuc
                 "&:hover": { bgcolor: "#047857" },
               }}
             >
-              {submitting ? "Processing..." : `🚀 Pay ₹${totalPayable.toLocaleString("en-IN")} & Activate Term ${nextCycleNum}`}
+              {submitting
+                ? "Processing..."
+                : isTermCapped
+                ? `🚀 Pay ₹${totalPayable.toLocaleString("en-IN")} & Activate Term ${targetTerm}`
+                : `🚀 Pay ₹${totalPayable.toLocaleString("en-IN")} & Upgrade to ${selectedPkg.shortTitle}`
+              }
             </Button>
             <Button
               fullWidth
@@ -2348,6 +2485,7 @@ export default function TeamDashboard() {
   const [giftCardBannerDismissed, setGiftCardBannerDismissed] = useState(false);
   const [cycleBulkBuyOpen, setCycleBulkBuyOpen] = useState(false);
   const [walletMeData, setWalletMeData] = useState(null);
+  const [walletHistoryData, setWalletHistoryData] = useState(null);
   const [totalCycleEarned, setTotalCycleEarned] = useState(0);
   const [consumerCycleState, setConsumerCycleState] = useState(() => {
     try {
@@ -2420,6 +2558,7 @@ export default function TeamDashboard() {
       }
       if (histRes.status === "fulfilled" && histRes.value) {
         const hist = histRes.value;
+        setWalletHistoryData(hist);
         const activeTerm = Number(hist?.current_term || 1);
         const curTermStat = hist?.term_stats?.[String(activeTerm)] || {};
         const currentTermEarned = Number(curTermStat?.total || 0);
@@ -2816,6 +2955,7 @@ export default function TeamDashboard() {
         }}
         cycleState={consumerCycleState}
         walletMe={walletMeData}
+        walletHistory={walletHistoryData}
         onPurchaseSuccess={(newState) => {
           setConsumerCycleState(newState);
           setTotalCycleEarned(0);

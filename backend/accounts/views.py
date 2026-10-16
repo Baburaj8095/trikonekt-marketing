@@ -4517,6 +4517,31 @@ def wallet_me_history(request):
     purchased_terms.sort()
     current_term = purchased_terms[-1]
 
+    # Discover purchased tracks per term from database records
+    term_tracks = {}
+    term_tracks["1"] = ["TRACK_1"]
+    for r in renewal_txs:
+        t_val = (r.meta or {}).get("term")
+        if not t_val:
+            try:
+                t_val = int(str(r.source_id).replace("TERM_", ""))
+            except Exception:
+                t_val = None
+        trk = (r.meta or {}).get("track")
+        if t_val:
+            t_key = str(t_val)
+            if t_key not in term_tracks:
+                term_tracks[t_key] = []
+            if trk and trk not in term_tracks[t_key]:
+                term_tracks[t_key].append(trk)
+            elif not trk and "TRACK_1" not in term_tracks[t_key]:
+                term_tracks[t_key].append("TRACK_1")
+
+    cur_key = str(current_term)
+    if cur_key not in term_tracks:
+        term_tracks[cur_key] = ["TRACK_1"]
+    active_term_tracks = term_tracks.get(cur_key, ["TRACK_1"])
+
     # Precalculate exact database SQL sums for each purchased term
     term_stats = {}
     for idx, t_num in enumerate(purchased_terms):
@@ -4671,6 +4696,8 @@ def wallet_me_history(request):
         "current_term": current_term,
         "purchased_terms": purchased_terms,
         "term_stats": term_stats,
+        "term_tracks": term_tracks,
+        "active_term_tracks": active_term_tracks,
         "selected_term": term_param or "ALL",
         "main_wallet": main_list,
         "incoming": incoming_list,
