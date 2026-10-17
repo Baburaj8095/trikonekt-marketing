@@ -19,5 +19,3 @@ export function isGrowthProduction() {
   // Strictly matches production growth.vin and its direct subdomains
   return host === "growth.vin" || host.endsWith(".growth.vin");
 }
-
-export const TRIEDUCATION_REGISTER_URL = "https://trieducation.in/register";

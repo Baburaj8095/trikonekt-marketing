@@ -3,7 +3,7 @@
 // Styling is done via MUI sx props. Requires @mui/material and @mui/icons-material v7.
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { isGrowthProduction, TRIEDUCATION_REGISTER_URL } from "../../utils/growthProductionGuard";
+import { isGrowthProduction } from "../../utils/growthProductionGuard";
 import {
   AppBar,
   Toolbar,
@@ -244,10 +244,7 @@ const Login = () => {
     if (val) setRole(val);
   };
   const handleRegisterNav = () => {
-    if (isGrowthProduction()) {
-      window.location.href = TRIEDUCATION_REGISTER_URL;
-      return;
-    }
+    if (isGrowthProduction()) return;
     // Registration page should show only Consumer registration
     const s = normalizeSponsor(sponsorId);
     const qs = s ? `?sponsor=${encodeURIComponent(s)}` : "";
@@ -2689,7 +2686,7 @@ const Login = () => {
                     Contact Support
                   </Link>
                 </Typography>
-              ) : (
+              ) : isGrowthProduction() ? null : (
                 <Typography variant="body2" sx={{ color: "text.secondary" }}>
                   Don't have an account?{" "}
                   <Link component="button" type="button" variant="body2" onClick={handleRegisterNav} sx={{ fontWeight: 700 }}>

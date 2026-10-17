@@ -23,7 +23,6 @@ import AgencyShell from "./components/layouts/AgencyShell";
 import EmployeeShell from "./components/layouts/EmployeeShell";
 import EnhancedLogin from "./pages/Auth/EnhancedLogin";
 import { isGrowthProduction } from "./utils/growthProductionGuard";
-import GrowthRegistrationDisabledNotice from "./components/common/GrowthRegistrationDisabledNotice";
 import Wallet from "./pages/Wallet";
 import History from "./pages/History";
 import AgencyHistory from "./pages/agency/AgencyHistory";
@@ -212,7 +211,7 @@ import AdminOverheadIncome from "./pages/admin/AdminOverheadIncome";
 
 function GrowthRegistrationRoute({ children }) {
   if (isGrowthProduction()) {
-    return <GrowthRegistrationDisabledNotice />;
+    return <Navigate to="/login" replace />;
   }
   return children;
 }
@@ -224,7 +223,7 @@ function LegacyAuthEntry() {
     const mode = String(params.get("mode") || "").toLowerCase();
     if (mode === "register") {
       if (isGrowthProduction()) {
-        return <GrowthRegistrationDisabledNotice />;
+        return <Navigate to="/login" replace />;
       }
       const role = String(params.get("role") || "user").toLowerCase();
       const sponsor =

@@ -3,8 +3,7 @@
 // Styling is done via MUI sx props. Requires @mui/material and @mui/icons-material v7.
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { isGrowthProduction, TRIEDUCATION_REGISTER_URL } from "../../utils/growthProductionGuard";
-import GrowthRegistrationDisabledNotice from "../../components/common/GrowthRegistrationDisabledNotice";
+import { isGrowthProduction } from "../../utils/growthProductionGuard";
 import {
   AppBar,
   Toolbar,
@@ -53,7 +52,7 @@ import {
   CheckCircleRounded as CheckIcon,
 } from "@mui/icons-material";
 
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useNavigate, useParams, useLocation, Navigate } from "react-router-dom";
 import API from "../../api/api";
 import LOGO from "../../assets/TRIKONEKT.jpg";
 import "./EnhancedLogin.css";
@@ -125,10 +124,7 @@ const Login = () => {
   }, [location.pathname, location.search, mode, lockedRole, navigate]);
 
   const handleModeChange = () => {
-    if (mode === "login" && isGrowthProduction()) {
-      window.location.href = TRIEDUCATION_REGISTER_URL;
-      return;
-    }
+    if (isGrowthProduction()) return;
     setMode(mode === "login" ? "register" : "login");
   };
   const handleRoleChange = (_, val) => {
@@ -1985,7 +1981,7 @@ const Login = () => {
 
   // === FINAL UI (polished) ===
   if (mode === "register" && isGrowthProduction()) {
-    return <GrowthRegistrationDisabledNotice />;
+    return <Navigate to="/login" replace />;
   }
 
   return (
@@ -2042,16 +2038,18 @@ const Login = () => {
 
           <Divider sx={{ my: 2 }} />
 
-          <Tabs
-            value={mode}
-            onChange={(_, nv) => setMode(nv)}
-            variant="fullWidth"
-            TabIndicatorProps={{ sx: { backgroundColor: "#1976d2", height: 2 } }}
-            sx={{ mb: 2, "& .MuiTab-root": { textTransform: "none", fontWeight: 600 } }}
-          >
-            <Tab label="Login" value="login" />
-            <Tab label="Register" value="register" />
-          </Tabs>
+          {!isGrowthProduction() && (
+            <Tabs
+              value={mode}
+              onChange={(_, nv) => setMode(nv)}
+              variant="fullWidth"
+              TabIndicatorProps={{ sx: { backgroundColor: "#1976d2", height: 2 } }}
+              sx={{ mb: 2, "& .MuiTab-root": { textTransform: "none", fontWeight: 600 } }}
+            >
+              <Tab label="Login" value="login" />
+              <Tab label="Register" value="register" />
+            </Tabs>
+          )}
 
           <Box sx={{ mb: 2 }}>
             <ToggleButtonGroup
@@ -2383,12 +2381,14 @@ const Login = () => {
               {isLogin ? "LOGIN" : "REGISTER"}
             </Button>
 
-            <Typography variant="body2" align="center" sx={{ color: "text.secondary" }}>
-              {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-              <Link component="button" type="button" variant="body2" onClick={handleModeChange} sx={{ fontWeight: 700 }}>
-                {isLogin ? "Register" : "Login"}
-              </Link>
-            </Typography>
+            {!isGrowthProduction() && (
+              <Typography variant="body2" align="center" sx={{ color: "text.secondary" }}>
+                {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
+                <Link component="button" type="button" variant="body2" onClick={handleModeChange} sx={{ fontWeight: 700 }}>
+                  {isLogin ? "Register" : "Login"}
+                </Link>
+              </Typography>
+            )}
           </Box>
 
           {/* Registration success popup */}

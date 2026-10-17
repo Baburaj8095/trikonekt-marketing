@@ -259,7 +259,7 @@ class RegisterView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         if is_growth_production_request(request):
             return Response(
-                {"detail": "Direct registration on growth.vin is disabled. Please register via trieducation.in."},
+                {"detail": "Registration is disabled on growth.vin. Only existing accounts can log in."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         return super().create(request, *args, **kwargs)
