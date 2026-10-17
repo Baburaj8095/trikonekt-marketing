@@ -1997,7 +1997,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                         ) : isLayerActiveStep ? (
                           <Chip
                             size="small"
-                            label={`₹${Number(viewingTermRawLayerIncome).toLocaleString("en-IN", { maximumFractionDigits: 0 })} / ₹${Number(layerCumLimit).toLocaleString("en-IN")} In Progress`}
+                            label={`₹${fmt(viewingTermRawLayerIncome)} / ₹${fmt(layerCumLimit)} In Progress`}
                             color="info"
                             variant="outlined"
                             sx={{ fontWeight: 800, fontSize: 10.5, height: 22 }}
