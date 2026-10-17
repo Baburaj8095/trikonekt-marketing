@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import API from "../../api/api";
 import {
   Box,
   Paper,
@@ -188,8 +189,8 @@ export default function FranchisePatternHub({
     const matched = captainsList.find((c) => String(c.pincode || "") === String(currentInspectPincode));
     if (matched) {
       return {
-        name: matched.name || matched.full_name,
-        phone: matched.phone || "+91 98450 12345",
+        name: matched.name || matched.full_name || "Field Captain",
+        phone: matched.phone || "-",
         pincode: currentInspectPincode,
         district: matched.district || currentInspectDistrict,
         state: matched.state || currentInspectState,
@@ -197,75 +198,39 @@ export default function FranchisePatternHub({
       };
     }
     const pinObj = districtPincodesList.find((p) => String(p.pincode) === String(currentInspectPincode));
+    const assignedName = pinObj?.agency?.name || pinObj?.coordinator?.name;
+    const assignedPhone = pinObj?.agency?.phone || pinObj?.coordinator?.phone;
     return {
-      name: pinObj?.agency?.name || pinObj?.coordinator?.name || user?.full_name || "Assigned Captain",
-      phone: pinObj?.agency?.phone || pinObj?.coordinator?.phone || user?.phone || "+91 98450 12345",
+      name: assignedName || "No Field Captain Assigned",
+      phone: assignedPhone || "-",
       pincode: currentInspectPincode,
       district: currentInspectDistrict,
       state: currentInspectState,
-      status: "Active On-Duty",
+      status: assignedName ? "Active On-Duty" : "Vacant",
     };
-  }, [captainsList, currentInspectPincode, currentInspectDistrict, currentInspectState, districtPincodesList, user]);
+  }, [captainsList, currentInspectPincode, currentInspectDistrict, currentInspectState, districtPincodesList]);
 
   // ─────────────────────────────────────────────────────────────
   // 5. DYNAMIC SUPPORT & ISSUES WITH ONBOARDING LINEAGE
   // ─────────────────────────────────────────────────────────────
   const dynamicIssues = useMemo(() => {
-    return [
-      {
-        id: "#ISS-201",
-        merchantName: "Sri Manjunatha Provision Store",
-        category: "B2C",
-        subType: "Near Store",
-        issue: "Daily QR Payment Sync Error",
-        status: "Open",
-        captainName: pinCaptain.name,
-        captainPhone: pinCaptain.phone,
-        pincode: currentInspectPincode,
-        district: currentInspectDistrict,
-        state: currentInspectState,
-      },
-      {
-        id: "#ISS-202",
-        merchantName: "Apex Hardware Wholesalers",
-        category: "B2B",
-        subType: "Near Store",
-        issue: "Bulk Invoice Credit Settlement Delay",
-        status: "Open",
-        captainName: pinCaptain.name,
-        captainPhone: pinCaptain.phone,
-        pincode: currentInspectPincode,
-        district: currentInspectDistrict,
-        state: currentInspectState,
-      },
-      {
-        id: "#ISS-203",
-        merchantName: "Tandoori Nights Express",
-        category: "Trizone",
-        subType: "TriEat",
-        issue: "Rider Pickup Notification Delay",
-        status: "Open",
-        captainName: pinCaptain.name,
-        captainPhone: pinCaptain.phone,
-        pincode: currentInspectPincode,
-        district: currentInspectDistrict,
-        state: currentInspectState,
-      },
-      {
-        id: "#ISS-204",
-        merchantName: "Cauvery Organic Mart",
-        category: "B2C",
-        subType: "Online",
-        issue: "Product Catalog Image Rejection",
-        status: "In Progress",
-        captainName: pinCaptain.name,
-        captainPhone: pinCaptain.phone,
-        pincode: currentInspectPincode,
-        district: currentInspectDistrict,
-        state: currentInspectState,
-      },
-    ];
-  }, [pinCaptain, currentInspectPincode, currentInspectDistrict, currentInspectState]);
+    if (Array.isArray(issuesList) && issuesList.length > 0) {
+      return issuesList.map((tk, idx) => ({
+        id: tk.id || tk.ticket_id || `#ISS-${idx + 101}`,
+        merchantName: tk.merchant_name || tk.merchantName || tk.title || "Merchant Ticket",
+        category: tk.category || (String(tk.type || "").includes("B2B") ? "B2B" : String(tk.type || "").includes("Trizone") ? "Trizone" : "B2C"),
+        subType: tk.subType || tk.service_type || "Near Store",
+        issue: tk.issue || tk.description || tk.subject || "Support Inquiry",
+        status: tk.status || "Open",
+        captainName: tk.captain_name || tk.captainName || pinCaptain.name,
+        captainPhone: tk.captain_phone || tk.captainPhone || pinCaptain.phone,
+        pincode: tk.pincode || currentInspectPincode,
+        district: tk.district || currentInspectDistrict,
+        state: tk.state || currentInspectState,
+      }));
+    }
+    return [];
+  }, [issuesList, pinCaptain, currentInspectPincode, currentInspectDistrict, currentInspectState]);
 
   const issueCounts = useMemo(() => {
     return {
@@ -280,41 +245,45 @@ export default function FranchisePatternHub({
   // 6. DYNAMIC ACTIVE VS INACTIVE PINCODES (District Level)
   // ─────────────────────────────────────────────────────────────
   const { activePincodesList, inactivePincodesList } = useMemo(() => {
-    const list = districtPincodesList && districtPincodesList.length > 0
-      ? districtPincodesList
-      : [
-          { pincode: "572106", name: "Turuvekere Hub", type: "Urban", agency: { status: "ACTIVE", name: "Ramesh Patil", phone: "9845012345" }, merchants_count: 84, captains_count: 2 },
-          { pincode: "572101", name: "Tumakuru Head Post", type: "Urban", agency: { status: "ACTIVE", name: "Kiran Gowda", phone: "9880098765" }, merchants_count: 142, captains_count: 3 },
-          { pincode: "572213", name: "Gubbi Town", type: "Rural", agency: { status: "ACTIVE", name: "Prakash Kumar", phone: "9846122334" }, merchants_count: 56, captains_count: 1 },
-          { pincode: "572115", name: "Chiknayakanhalli", type: "Rural", agency: { status: "VACANT" }, merchants_count: 0, captains_count: 0 },
-          { pincode: "572120", name: "Kunigal Hub", type: "Rural", agency: { status: "VACANT" }, merchants_count: 0, captains_count: 0 },
-          { pincode: "572228", name: "Tiptur Central", type: "Urban", agency: { status: "VACANT" }, merchants_count: 0, captains_count: 0 },
-        ];
-
-    const active = list.filter((p) => p.agency?.status === "ACTIVE" || p.status === "Active");
-    const inactive = list.filter((p) => p.agency?.status !== "ACTIVE" && p.status !== "Active");
+    const list = Array.isArray(districtPincodesList) ? districtPincodesList : [];
+    const active = list.filter(
+      (p) =>
+        p.agency?.status === "ACTIVE" ||
+        p.coordinator?.status === "ACTIVE" ||
+        Number(p.merchant_count || 0) > 0 ||
+        Number(p.captain_count || 0) > 0 ||
+        p.status === "Active"
+    );
+    const inactive = list.filter((p) => !active.includes(p));
     return { activePincodesList: active, inactivePincodesList: inactive };
   }, [districtPincodesList]);
 
   // ─────────────────────────────────────────────────────────────
   // 7. DYNAMIC ACTIVE VS INACTIVE DISTRICTS (State Level)
   // ─────────────────────────────────────────────────────────────
+  const [stateDistrictsList, setStateDistrictsList] = useState([]);
+
+  useEffect(() => {
+    if (isStateLevel) {
+      API.get(`/agency/state-districts/?state=${encodeURIComponent(currentInspectState)}`)
+        .then((res) => {
+          if (Array.isArray(res?.data?.districts)) {
+            setStateDistrictsList(res.data.districts);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isStateLevel, currentInspectState]);
+
   const { activeDistrictsList, inactiveDistrictsList } = useMemo(() => {
-    const defaultDistricts = [
-      { name: "Bengaluru Urban", status: "ACTIVE", partnerName: "Prakash R", phone: "9843541234", merchants: 1840, captains: 64, pincodes: 48 },
-      { name: "Tumakuru", status: "ACTIVE", partnerName: "Ramesh Patil", phone: "9845012345", merchants: 620, captains: 24, pincodes: 24 },
-      { name: "Mysuru", status: "ACTIVE", partnerName: "Manjunath S", phone: "9876543210", merchants: 780, captains: 30, pincodes: 32 },
-      { name: "Hassan", status: "ACTIVE", partnerName: "Venkatesh K", phone: "9845112233", merchants: 410, captains: 16, pincodes: 18 },
-      { name: "Mandya", status: "ACTIVE", partnerName: "Shivanna N", phone: "9844001122", merchants: 390, captains: 14, pincodes: 16 },
-      { name: "Belagavi", status: "VACANT", partnerName: "Unassigned", phone: "-", merchants: 0, captains: 0, pincodes: 36 },
-      { name: "Kalaburagi", status: "VACANT", partnerName: "Unassigned", phone: "-", merchants: 0, captains: 0, pincodes: 28 },
-      { name: "Ballari", status: "VACANT", partnerName: "Unassigned", phone: "-", merchants: 0, captains: 0, pincodes: 22 },
-    ];
+    const list = stateDistrictsList || [];
+    const active = list.filter((d) => d.status === "ACTIVE" || d.agency?.status === "ACTIVE" || d.coordinator?.status === "ACTIVE");
+    const inactive = list.filter((d) => !active.includes(d));
     return {
-      activeDistrictsList: defaultDistricts.filter((d) => d.status === "ACTIVE"),
-      inactiveDistrictsList: defaultDistricts.filter((d) => d.status !== "ACTIVE"),
+      activeDistrictsList: active,
+      inactiveDistrictsList: inactive,
     };
-  }, []);
+  }, [stateDistrictsList]);
 
   return (
     <Box sx={{ width: "100%", pb: 3 }}>
@@ -661,7 +630,7 @@ export default function FranchisePatternHub({
                       />
                     </Stack>
                     <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 600, mt: 0.3 }}>
-                      Partner: <strong>{d.partnerName}</strong> ({d.phone})
+                      Partner: <strong>{d.partnerName || d.agency?.name || (d.status === "ACTIVE" ? "Assigned Partner" : "Vacant Slot")}</strong> ({d.phone || d.agency?.phone || "-"})
                     </Typography>
                   </Box>
                   <ArrowForwardIosRoundedIcon sx={{ fontSize: 14, color: "#94A3B8" }} />
@@ -673,15 +642,15 @@ export default function FranchisePatternHub({
                 <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1, textAlign: "center" }}>
                   <Box sx={{ p: 0.75, borderRadius: "8px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6" }}>
                     <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#64748B" }}>Merchants</Typography>
-                    <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#059669" }}>{d.merchants}</Typography>
+                    <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#059669" }}>{d.merchant_count ?? d.merchants ?? 0}</Typography>
                   </Box>
                   <Box sx={{ p: 0.75, borderRadius: "8px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6" }}>
                     <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#64748B" }}>Captains</Typography>
-                    <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#7C3AED" }}>{d.captains}</Typography>
+                    <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#7C3AED" }}>{d.captain_count ?? d.captains ?? 0}</Typography>
                   </Box>
                   <Box sx={{ p: 0.75, borderRadius: "8px", bgcolor: "#FFFFFF", border: "1px solid #EEF2F6" }}>
                     <Typography sx={{ fontSize: 10, fontWeight: 700, color: "#64748B" }}>PIN Codes</Typography>
-                    <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#2563EB" }}>{d.pincodes}</Typography>
+                    <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#2563EB" }}>{d.pincode_count ?? d.pincodes ?? 0}</Typography>
                   </Box>
                 </Box>
               </Paper>
@@ -765,7 +734,13 @@ export default function FranchisePatternHub({
                         />
                       </Stack>
                       <Typography sx={{ fontSize: 11, color: "#64748B", fontWeight: 600, mt: 0.3 }}>
-                        Assigned: <strong>{p.agency?.name || "Prakash Kumar"}</strong> ({p.agency?.phone || "+91 98461 22334"})
+                        {p.agency?.status === "ACTIVE" ? (
+                          <>Agency: <strong>{p.agency.name || "Agency Head"}</strong> ({p.agency.phone || p.agency.code || "-"})</>
+                        ) : p.coordinator?.status === "ACTIVE" ? (
+                          <>Coordinator: <strong>{p.coordinator.name || "Coordinator"}</strong> ({p.coordinator.phone || p.coordinator.code || "-"})</>
+                        ) : (
+                          <span style={{ color: "#94A3B8", fontStyle: "italic" }}>Vacant Slot (No Partner / Coordinator)</span>
+                        )}
                       </Typography>
                     </Box>
                     <ArrowForwardIosRoundedIcon sx={{ fontSize: 14, color: "#94A3B8" }} />
@@ -774,8 +749,8 @@ export default function FranchisePatternHub({
                   <Divider sx={{ my: 1 }} />
 
                   <Stack direction="row" spacing={3} sx={{ fontSize: 11.5, color: "#475569" }}>
-                    <span>Merchants: <strong>{p.merchants_count || 84}</strong></span>
-                    <span>Captains: <strong>{p.captains_count || 2}</strong></span>
+                    <span>Merchants: <strong>{p.merchant_count ?? 0}</strong></span>
+                    <span>Captains: <strong>{p.captain_count ?? 0}</strong></span>
                     <span style={{ color: "#2563EB", fontWeight: 700 }}>➔ View PIN Details</span>
                   </Stack>
                 </Paper>
@@ -971,51 +946,58 @@ export default function FranchisePatternHub({
 
         {/* Ticket List with Onboarding Details */}
         <Stack spacing={1}>
-          {dynamicIssues.map((tk) => (
-            <Paper
-              key={tk.id}
-              elevation={0}
-              sx={{
-                p: 1.25,
-                borderRadius: "12px",
-                bgcolor: "#F8FAFC",
-                border: "1px solid #E2E8F0",
-              }}
-            >
-              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5 }}>
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <Chip
-                    size="small"
-                    label={tk.category}
-                    sx={{
-                      height: 18,
-                      fontSize: 9.5,
-                      fontWeight: 800,
-                      bgcolor: tk.category === "B2C" ? "#DBEAFE" : tk.category === "B2B" ? "#D1FAE5" : "#FEF3C7",
-                      color: tk.category === "B2C" ? "#1E40AF" : tk.category === "B2B" ? "#065F46" : "#92400E",
-                    }}
-                  />
-                  <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: "#0F172A" }}>
-                    {tk.merchantName}
-                  </Typography>
+          {dynamicIssues.length > 0 ? (
+            dynamicIssues.map((tk) => (
+              <Paper
+                key={tk.id}
+                elevation={0}
+                sx={{
+                  p: 1.25,
+                  borderRadius: "12px",
+                  bgcolor: "#F8FAFC",
+                  border: "1px solid #E2E8F0",
+                }}
+              >
+                <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Chip
+                      size="small"
+                      label={tk.category}
+                      sx={{
+                        height: 18,
+                        fontSize: 9.5,
+                        fontWeight: 800,
+                        bgcolor: tk.category === "B2C" ? "#DBEAFE" : tk.category === "B2B" ? "#D1FAE5" : "#FEF3C7",
+                        color: tk.category === "B2C" ? "#1E40AF" : tk.category === "B2B" ? "#065F46" : "#92400E",
+                      }}
+                    />
+                    <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: "#0F172A" }}>
+                      {tk.merchantName}
+                    </Typography>
+                  </Stack>
+                  <Chip size="small" label={tk.status} color="warning" sx={{ height: 18, fontSize: 9.5, fontWeight: 800 }} />
                 </Stack>
-                <Chip size="small" label={tk.status} color="warning" sx={{ height: 18, fontSize: 9.5, fontWeight: 800 }} />
-              </Stack>
 
-              <Typography sx={{ fontSize: 11, color: "#475569", fontWeight: 600, mb: 0.5 }}>
-                Issue: {tk.issue}
+                <Typography sx={{ fontSize: 11, color: "#475569", fontWeight: 600, mb: 0.5 }}>
+                  Issue: {tk.issue}
+                </Typography>
+
+                <Box sx={{ p: 0.75, borderRadius: "8px", bgcolor: "#FFFFFF", border: "1px solid #E2E8F0", fontSize: 10.5, color: "#64748B" }}>
+                  <span>Onboarded by: </span>
+                  <strong style={{ color: "#0F172A" }}>{tk.captainName}</strong>
+                  <span> ({tk.captainPhone}) • PIN </span>
+                  <strong>{tk.pincode}</strong>
+                  <span>, {tk.district}, {tk.state}</span>
+                </Box>
+              </Paper>
+            ))
+          ) : (
+            <Paper elevation={0} sx={{ p: 2.5, borderRadius: "12px", bgcolor: "#F8FAFC", border: "1px dashed #CBD5E1", textAlign: "center" }}>
+              <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#64748B" }}>
+                No active support tickets in this territory
               </Typography>
-
-              {/* Exact requirement: Show who onboarded the merchant (Like Pincode, District, and State) */}
-              <Box sx={{ p: 0.75, borderRadius: "8px", bgcolor: "#FFFFFF", border: "1px solid #E2E8F0", fontSize: 10.5, color: "#64748B" }}>
-                <span>Onboarded by: </span>
-                <strong style={{ color: "#0F172A" }}>{tk.captainName}</strong>
-                <span> ({tk.captainPhone}) • PIN </span>
-                <strong>{tk.pincode}</strong>
-                <span>, {tk.district}, {tk.state}</span>
-              </Box>
             </Paper>
-          ))}
+          )}
         </Stack>
       </Paper>
     </Box>
