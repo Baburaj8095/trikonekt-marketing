@@ -167,17 +167,28 @@ def execute_daily_pool_distribution(
     total_cycle_cap = Decimal("150000.00")
 
     for u in eligible_users:
+        w_obj = Wallet.objects.filter(user=u).first()
+        active_term_start = None
+        if w_obj and hasattr(w_obj, "get_active_term_start"):
+            active_term_start = w_obj.get_active_term_start()
+
+        t_filter_usr = Q(user=u)
+        if active_term_start:
+            t_filter_usr &= Q(created_at__gte=active_term_start)
+
         user_earned_royalty = _q2(
-            WalletTransaction.objects.filter(
-                user=u
-            ).filter(q_royalty).aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
+            WalletTransaction.objects.filter(t_filter_usr).filter(q_royalty).aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
         )
         user_earned_layer = _q2(
-            WalletTransaction.objects.filter(user=u, amount__gt=0).filter(q_layer).exclude(
+            WalletTransaction.objects.filter(t_filter_usr, amount__gt=0).filter(q_layer).exclude(
                 Q(type__startswith="SELF_ACCOUNT") | Q(meta__ledger="SELF_ACCOUNT")
             ).aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
         )
-        cycle_rem_headroom = max(Decimal("0.00"), total_cycle_cap - (user_earned_layer + user_earned_royalty))
+
+        if w_obj and hasattr(w_obj, "get_active_term_headroom"):
+            cycle_rem_headroom = w_obj.get_active_term_headroom()
+        else:
+            cycle_rem_headroom = max(Decimal("0.00"), total_cycle_cap - (user_earned_layer + user_earned_royalty))
 
         upgrades = list(RankUpgrade.objects.filter(
             user=u,

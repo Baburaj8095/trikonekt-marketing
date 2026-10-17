@@ -448,6 +448,41 @@ class Wallet(models.Model):
             kwargs["update_fields"] = [f for f in update_fields if f not in legacy_fields]
         super().save(*args, **kwargs)
 
+    def get_active_term_start(self):
+        try:
+            renewal_txs = list(WalletTransaction.objects.filter(
+                user=self.user,
+                type__in=["ACADEMIC_TERM_RENEWAL", "TERM_RENEWAL"]
+            ).order_by("created_at"))
+            if not renewal_txs:
+                return None
+            max_term = 1
+            for r in renewal_txs:
+                t_val = (r.meta or {}).get("term")
+                if not t_val:
+                    try:
+                        t_val = int(str(r.source_id).replace("TERM_", ""))
+                    except Exception:
+                        t_val = None
+                if t_val:
+                    try:
+                        max_term = max(max_term, int(t_val))
+                    except Exception:
+                        pass
+            term_dts = []
+            for r in renewal_txs:
+                t_val = (r.meta or {}).get("term")
+                if not t_val:
+                    try:
+                        t_val = int(str(r.source_id).replace("TERM_", ""))
+                    except Exception:
+                        t_val = None
+                if t_val and int(t_val) == max_term:
+                    term_dts.append(r.created_at)
+            return min(term_dts) if term_dts else renewal_txs[-1].created_at
+        except Exception:
+            return None
+
     def get_active_term_headroom(self) -> Decimal:
         """
         Calculates remaining layer commission headroom for user's active academic term.
@@ -552,7 +587,7 @@ class Wallet(models.Model):
                 u_phone = str(getattr(user, "phone", "") or getattr(user, "username", "") or "").strip()
                 is_apex_root = (u_phone == "9999999999" or getattr(user, "id", None) == 1)
 
-                if is_apex_root and max_term == 1:
+                if is_apex_root:
                     active_level = 10
                 elif max_term == 1:
                     rp = getattr(user, "rank_profile", None)
@@ -565,12 +600,36 @@ class Wallet(models.Model):
                         ).aggregate(m=Max("to_rank__level_number"))["m"]
                         active_level = max(1, int(hi or 1))
                 else:
-                    # For Term 2+, level starts at 1 and advances with upgrades purchased in this term
+                    # For Term 2+, level starts at 1 and advances with renewal tracks or upgrades purchased in this term
+                    active_level = 1
+                    track_levels = {
+                        "TRACK_1": 1,
+                        "TRACK_2_PART1": 5,
+                        "TRACK_2_PART2": 7,
+                        "TRACK_2_FULL": 7,
+                        "TRACK_3_TRANCHE1": 8,
+                        "TRACK_3_TRANCHE2": 9,
+                        "TRACK_3_TRANCHE3": 10,
+                        "TRACK_3_FULL": 10,
+                    }
+                    for r in renewal_txs:
+                        t_val = (r.meta or {}).get("term")
+                        if not t_val:
+                            try:
+                                t_val = int(str(r.source_id).replace("TERM_", ""))
+                            except Exception:
+                                t_val = None
+                        if t_val and int(t_val) == max_term:
+                            tr = str((r.meta or {}).get("track") or "").upper()
+                            if tr in track_levels:
+                                active_level = max(active_level, track_levels[tr])
+
                     q_upg = RankUpgrade.objects.filter(user=user, payment_status="SUCCESS")
                     if active_term_start:
                         q_upg = q_upg.filter(created_at__gte=active_term_start)
                     hi = q_upg.aggregate(m=Max("to_rank__level_number"))["m"]
-                    active_level = max(1, int(hi or 1))
+                    if hi:
+                        active_level = max(active_level, int(hi))
             except Exception:
                 active_level = 1
 
