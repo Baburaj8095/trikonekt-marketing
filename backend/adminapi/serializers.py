@@ -2036,7 +2036,7 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
                             user=instance, level="district", state=sel_state, district=d, defaults={"pincode": ""}
                         )
 
-            # Pincode Coordinator: assign up to 4 pincodes under current state/district
+            # Pincode Coordinator: assign up to 2 pincodes under current state/district
             if isinstance(assign_pincodes, list) and cat == "agency_pincode_coordinator":
                 sel_state = getattr(instance, "state", None)
                 try:
@@ -2050,7 +2050,7 @@ class AdminUserEditSerializer(serializers.ModelSerializer):
                     if len(s) == 6 and s not in seenp:
                         seenp.add(s)
                         pins.append(s)
-                pins = pins[:4]
+                pins = pins[:2]
                 if pins:
                     instance.region_assignments.filter(level="pincode").exclude(pincode__in=pins).delete()
                 else:

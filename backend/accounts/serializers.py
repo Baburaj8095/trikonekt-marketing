@@ -24,7 +24,7 @@ AGENCY_CATEGORIES = {
 # Assignment caps per spec
 MAX_STATES_PER_SC = 2           # State Coordinator can select max 2 states
 MAX_DISTRICTS_PER_DC = 4        # District Coordinator can manage max 4 districts
-MAX_PINCODES_PER_PC = 4         # Pincode Coordinator can manage up to 4 pincodes
+MAX_PINCODES_PER_PC = 2         # Pincode Coordinator can manage up to 2 pincodes
 
 
 class RegisterSerializer(serializers.ModelSerializer):

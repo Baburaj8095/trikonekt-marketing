@@ -1,4 +1,4 @@
-﻿// Login3.jsx  v3 Dark + Teal UX (logic preserved from Auth/Login.jsx)
+// Login3.jsx  v3 Dark + Teal UX (logic preserved from Auth/Login.jsx)
 // Notes:
 // - All logic, state, API calls, and flows are kept the same as src/pages/Auth/Login.jsx
 // - Only the UI/UX styling is changed to match the attached dark sketch
@@ -1081,11 +1081,11 @@ const Login3 = () => {
         return false;
       }
       if (!assignPincodes.length) {
-        setErrorMsg("Select at least one pincode (max 4).");
+        setErrorMsg("Select at least one pincode (max 2).");
         return false;
       }
-      if (assignPincodes.length > 4) {
-        setErrorMsg("You can select maximum 4 pincodes.");
+      if (assignPincodes.length > 2) {
+        setErrorMsg("You can select maximum 2 pincodes.");
         return false;
       }
       if (sponsorPincodes.length && assignPincodes.some((p) => !sponsorPincodes.includes(p))) {
@@ -1629,13 +1629,18 @@ const Login3 = () => {
 
             {(sponsorId && isPC) && (
               <FormControl fullWidth sx={{ mb: 2 }}>
-                <InputLabel>Pincodes (Max 4)</InputLabel>
+                <InputLabel>Pincodes (Max 2)</InputLabel>
                 <Select
                   multiple
-                  label="Pincodes (Max 4)"
+                  label="Pincodes (Max 2)"
                   value={assignPincodes}
                   onChange={(e) => {
                     const arr = Array.from(e.target.value || []);
+                    if (arr.length > 2) {
+                      setErrorMsg("You can select maximum 2 pincodes.");
+                      return;
+                    }
+                    setErrorMsg("");
                     setAssignPincodes(arr);
                   }}
                   disabled={!selectedState || !selectedDistrictAgency}
@@ -1645,7 +1650,7 @@ const Login3 = () => {
                     <MenuItem key={pin} value={pin}>{pin}</MenuItem>
                   ))}
                 </Select>
-                <Typography variant="caption" color="text.secondary">Select up to 4 pincodes.</Typography>
+                <Typography variant="caption" color="text.secondary">Select up to 2 pincodes.</Typography>
               </FormControl>
             )}
 

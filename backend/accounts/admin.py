@@ -42,11 +42,11 @@ class CustomUserAdminForm(forms.ModelForm):
         widget=FilteredSelectMultiple("Districts", is_stacked=False),
         help_text="For District Coordinator: select up to 4 Districts. District list is derived from Cities under the selected State on the profile."
     )
-    # Shown for Pincode Coordinator (max 4)
+    # Shown for Pincode Coordinator (max 2)
     assign_pincodes = forms.CharField(
         required=False,
         widget=forms.Textarea(attrs={"rows": 2}),
-        help_text="For Pincode Coordinator: enter up to 4 pincodes, comma-separated (e.g. 585103,585104)."
+        help_text="For Pincode Coordinator: enter up to 2 pincodes, comma-separated (e.g. 585103,585104)."
     )
 
     class Meta:
@@ -94,8 +94,8 @@ class CustomUserAdminForm(forms.ModelForm):
         if cat == "agency_pincode_coordinator":
             raw = (cleaned.get("assign_pincodes") or "").replace("\n", ",")
             pins = [p.strip() for p in raw.split(",") if p.strip()]
-            if len(pins) > 4:
-                raise forms.ValidationError("Select maximum 4 pincodes for Pincode Coordinator.")
+            if len(pins) > 2:
+                raise forms.ValidationError("Select maximum 2 pincodes for Pincode Coordinator.")
             for p in pins:
                 if not p.isdigit() or len(p) != 6:
                     raise forms.ValidationError(f"Invalid pincode: {p}")
@@ -654,7 +654,7 @@ class BulkRegionActionForm(ActionForm):
     districts_csv = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 2}), help_text="Comma-separated district names. Used when level=district.")
     pincodes_csv = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 2}), help_text="Comma-separated 6-digit pincodes. Used when level=pincode.")
     replace = forms.BooleanField(required=False, help_text="Replace existing assignments at this level for selected users.")
-    ignore_caps = forms.BooleanField(required=False, help_text="Ignore per-category caps (4 districts, 4 pincodes).")
+    ignore_caps = forms.BooleanField(required=False, help_text="Ignore per-category caps (4 districts, 2 pincodes).")
 
     # Distribution fields (for 'Distribute users by region' action)
     dist_child_category = forms.ChoiceField(
@@ -823,9 +823,13 @@ class CategoryProxyAdmin(admin.ModelAdmin):
                     if not pins:
                         skipped += 1
                         continue
-                    # Cap: 4 pincodes for PC/P (unless override)
-                    if not ignore_caps and self.category_value in ('agency_pincode_coordinator', 'agency_pincode'):
-                        if user.region_assignments.filter(level='pincode').count() >= 4:
+                    # Cap: 2 pincodes for PC (unless override)
+                    if not ignore_caps and self.category_value == 'agency_pincode_coordinator':
+                        if user.region_assignments.filter(level='pincode').count() >= 2:
+                            skipped += 1
+                            continue
+                    elif not ignore_caps and self.category_value == 'agency_pincode':
+                        if user.region_assignments.filter(level='pincode').count() >= 1:
                             skipped += 1
                             continue
                     for p in pins:

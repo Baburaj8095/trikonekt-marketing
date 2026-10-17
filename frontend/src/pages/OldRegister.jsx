@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import API from "../api/api";
 
 const AGENCY_CATEGORIES = new Set([
@@ -277,8 +277,8 @@ export default function Register() {
         alert("Provide at least one 6-digit pincode (comma separated).");
         return false;
       }
-      if (pins.length > 4) {
-        alert("You can provide maximum 4 pincodes.");
+      if (pins.length > 2) {
+        alert("You can provide maximum 2 pincodes.");
         return false;
       }
     } else if (isPincode || isSubFranchise) {
@@ -578,7 +578,7 @@ export default function Register() {
 
       {isPC && (
         <fieldset style={{ border: "1px solid #ddd", padding: 8 }}>
-          <legend>Pincode Coordinator: Select State, District and provide up to 4 pincodes</legend>
+          <legend>Pincode Coordinator: Select State, District and provide up to 2 pincodes</legend>
           <label>
             State (under Sponsor)
             <select
@@ -605,7 +605,7 @@ export default function Register() {
             </select>
           </label>
           <label>
-            Pincodes (comma separated, 6-digit, Max 4)
+            Pincodes (comma separated, 6-digit, Max 2)
             <input
               placeholder="e.g., 585103, 560001"
               value={assignPincodesText}

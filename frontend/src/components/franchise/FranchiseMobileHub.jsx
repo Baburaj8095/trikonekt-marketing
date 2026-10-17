@@ -458,7 +458,7 @@ function groupByMonth(items) {
 /**
  * EXACT 6 AGENCY TIERS AND GEOGRAPHIC SCOPES
  * 1. Pincode: 1 Pincode
- * 2. Pincode Coordinator: 4 Pincodes
+ * 2. Pincode Coordinator: 2 Pincodes
  * 3. District: 1 District
  * 4. District Coordinator: 2 Districts
  * 5. State: 1 State
@@ -701,8 +701,8 @@ export const TEST_AGENCY_ACCOUNTS = {
     name: "Pincode Coordinator",
     title: "Pincode Coordinator",
     roleKey: "agency_pincode_coordinator",
-    jurisdiction: "4 Pincodes: 572106, 572101, 572102, 572103",
-    badge: "4 Pincodes Cluster",
+    jurisdiction: "2 Pincodes: 572106, 572101",
+    badge: "2 Pincodes Cluster",
     color: "#7C3AED",
     initialBalance: 0.0,
     mainBalance: 0.0,

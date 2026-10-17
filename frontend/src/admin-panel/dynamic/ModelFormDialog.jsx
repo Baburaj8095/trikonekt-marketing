@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import {
   Dialog,
   DialogTitle,
@@ -1285,13 +1285,20 @@ export default function ModelFormDialog({
               {isPC && (
                 <TextField
                   select
-                  label="Pincodes (Max 4)"
+                  label="Pincodes (Max 2)"
                   value={assignPincodes}
-                  onChange={(e) => setAssignPincodes(Array.from(e.target.value || []))}
+                  onChange={(e) => {
+                    const sel = Array.from(e.target.value || []);
+                    if (sel.length > 2) {
+                      window.alert("Maximum 2 pincodes allowed for Pincode Coordinator.");
+                      return;
+                    }
+                    setAssignPincodes(sel);
+                  }}
                   SelectProps={{ multiple: true, renderValue: (selected) => (Array.from(selected || [])).join(", ") }}
                   size="small"
                   disabled={!stateIdSel || !cityIdSel}
-                  helperText="Select one or more pincodes"
+                  helperText="Select up to 2 pincodes"
                 >
                   {(pincodeOptionsAdmin || []).map((pin) => (
                     <MenuItem key={pin} value={pin}>

@@ -307,9 +307,9 @@ export default function AdminFranchiseUsers() {
         payload.selected_district = registerForm.district;
         payload.state = registerForm.state || 1;
       } else if (registerForm.category === "agency_pincode_coordinator") {
-        const pins = (registerForm.selectedPincodes || []).slice(0, 4);
+        const pins = (registerForm.selectedPincodes || []).slice(0, 2);
         if (pins.length === 0) {
-          window.alert("Please select at least 1 pincode (Max 4 pincodes allowed).");
+          window.alert("Please select at least 1 pincode (Max 2 pincodes allowed).");
           setRegisterSubmitting(false);
           return;
         }
@@ -915,8 +915,8 @@ export default function AdminFranchiseUsers() {
                   options={pincodeOptions}
                   value={registerForm.selectedPincodes || []}
                   onChange={(event, newValue) => {
-                    if (newValue.length > 4) {
-                      window.alert("Maximum 4 pincodes allowed for Pincode Coordinator.");
+                    if (newValue.length > 2) {
+                      window.alert("Maximum 2 pincodes allowed for Pincode Coordinator.");
                       return;
                     }
                     const cleaned = newValue.map((p) => String(p).replace(/\D/g, "").slice(0, 6)).filter(Boolean);
@@ -937,9 +937,9 @@ export default function AdminFranchiseUsers() {
                   renderInput={(params) => (
                     <TextField
                       {...params}
-                      label="Assigned Pincodes (Max 4) *"
-                      placeholder={registerForm.selectedPincodes?.length >= 4 ? "Max 4 reached" : (loadingPincodes ? "Loading pincodes..." : "Select or type 6-digit PIN")}
-                      helperText={`Selected: ${registerForm.selectedPincodes?.length || 0} / 4 pincodes in ${registerForm.district || 'district'}.`}
+                      label="Assigned Pincodes (Max 2) *"
+                      placeholder={registerForm.selectedPincodes?.length >= 2 ? "Max 2 reached" : (loadingPincodes ? "Loading pincodes..." : "Select or type 6-digit PIN")}
+                      helperText={`Selected: ${registerForm.selectedPincodes?.length || 0} / 2 pincodes in ${registerForm.district || 'district'}.`}
                     />
                   )}
                 />

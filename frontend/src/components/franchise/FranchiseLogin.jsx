@@ -44,8 +44,8 @@ export const FRANCHISE_ROLES = [
   {
     key: "agency_pincode_coordinator",
     title: "Pincode Coordinator",
-    badge: "4 Pincodes Cluster",
-    jurisdiction: "PIN 572106, 572101, 572102, 572103",
+    badge: "2 Pincodes Cluster",
+    jurisdiction: "PIN 572106, 572101",
     icon: <LayersRoundedIcon sx={{ fontSize: 20 }} />,
     color: "#7C3AED",
     bg: "#F5F3FF",
