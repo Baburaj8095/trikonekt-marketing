@@ -16,6 +16,7 @@ import {
   Typography,
 } from "@mui/material";
 import API from "../api/api";
+import { isGrowthProduction } from "../utils/growthProductionGuard";
 
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import PaymentsIcon from "@mui/icons-material/Payments";
@@ -36,7 +37,7 @@ function fmtAmount(value) {
   return num.toFixed(2);
 }
 
-const TRANSFER_OPTIONS = [
+const BASE_TRANSFER_OPTIONS = [
   {
     value: "coupon",
     label: "Coupon Pocket Wallet",
@@ -463,11 +464,15 @@ export default function TeamWallet() {
           label = "Source for all transfers";
           actions = [
             { label: "Transfer", onClick: () => setTransferOpen(true) },
-            {
-              label: "Withdraw",
-              onClick: () => (window.location.href = "/user/wallet"),
-              disabled: !kycVerified,
-            },
+            ...(isGrowthProduction()
+              ? []
+              : [
+                  {
+                    label: "Withdraw",
+                    onClick: () => (window.location.href = "/user/wallet"),
+                    disabled: !kycVerified,
+                  },
+                ]),
             {
               label: "Buy Pkg",
               onClick: () => (window.location.href = "/user/promo-packages"),
@@ -478,9 +483,11 @@ export default function TeamWallet() {
           amount = Number(transferWallets?.coupon) || Number(voucherData?.coupon_wallet_balance) || 0;
           icon = <LocalShippingIcon />;
           label = "Create 30-day/7-day vouchers";
-          actions = [
-            { label: "Voucher", onClick: () => setVoucherOpen(true) },
-          ];
+          actions = isGrowthProduction()
+            ? []
+            : [
+                { label: "Voucher", onClick: () => setVoucherOpen(true) },
+              ];
           break;
         case 7:
           amount = Number(transferWallets?.internal || 0);
@@ -491,13 +498,15 @@ export default function TeamWallet() {
           amount = Number(transferWallets?.withdrawal || walletData?.withdrawable_balance || 0);
           icon = <PaymentsIcon />;
           label = `Min Rs. ${limits?.minWithdraw || 500}`;
-          actions = [
-            {
-              label: "Withdraw",
-              onClick: () => (window.location.href = "/user/wallet"),
-              disabled: !kycVerified,
-            },
-          ];
+          actions = isGrowthProduction()
+            ? []
+            : [
+                {
+                  label: "Withdraw",
+                  onClick: () => (window.location.href = "/user/wallet"),
+                  disabled: !kycVerified,
+                },
+              ];
           break;
         case 9:
           amount = addMoneyPocketBalance;
@@ -508,13 +517,15 @@ export default function TeamWallet() {
           amount = Number(transferWallets?.withdrawal || walletData?.withdrawable_balance || 0);
           icon = <PaymentsIcon />;
           label = `Min ₹${limits?.minWithdraw || 500}`;
-          actions = [
-            {
-              label: "Withdraw",
-              onClick: () => (window.location.href = "/user/wallet"),
-              disabled: !kycVerified,
-            },
-          ];
+          actions = isGrowthProduction()
+            ? []
+            : [
+                {
+                  label: "Withdraw",
+                  onClick: () => (window.location.href = "/user/wallet"),
+                  disabled: !kycVerified,
+                },
+              ];
           break;
         case 11:
           amount = Number(transferWallets?.packagePurchaseCoupon) || Number(voucherData?.package_coupon_wallet_balance) || 0;
@@ -561,40 +572,46 @@ export default function TeamWallet() {
   );
 
   const transferPockets = useMemo(
-    () => [
-      {
-        no: 1,
-        transferType: "coupon",
-        title: "Coupon Pocket",
-        wallet: walletByNo[6],
-        onClick: () => (window.location.href = "/user/coupon-pocket"),
-      },
-      {
-        no: 2,
-        title: "Self Package Pocket",
-        wallet: walletByNo[7],
-        disabled: true,
-      },
-      {
-        no: 3,
-        transferType: "withdrawal",
-        title: "Withdrawal To Pocket",
-        wallet: walletByNo[10],
-        onClick: () => (window.location.href = "/user/wallet"),
-      },
-      {
-        no: 4,
-        title: "Add Money (Buy Package)",
-        wallet: walletByNo[9],
-        disabled: true,
-      },
-      {
-        no: 5,
-        title: "Package Purchase Coupon Received (Buy Package)",
-        wallet: walletByNo[11],
-        onClick: () => (window.location.href = "/user/package-coupon-pocket"),
-      },
-    ],
+    () => {
+      const all = [
+        {
+          no: 1,
+          transferType: "coupon",
+          title: "Coupon Pocket",
+          wallet: walletByNo[6],
+          onClick: () => (window.location.href = "/user/coupon-pocket"),
+        },
+        {
+          no: 2,
+          title: "Self Package Pocket",
+          wallet: walletByNo[7],
+          disabled: true,
+        },
+        {
+          no: 3,
+          transferType: "withdrawal",
+          title: "Withdrawal To Pocket",
+          wallet: walletByNo[10],
+          onClick: () => (window.location.href = "/user/wallet"),
+        },
+        {
+          no: 4,
+          title: "Add Money (Buy Package)",
+          wallet: walletByNo[9],
+          disabled: true,
+        },
+        {
+          no: 5,
+          title: "Package Purchase Coupon Received (Buy Package)",
+          wallet: walletByNo[11],
+          onClick: () => (window.location.href = "/user/package-coupon-pocket"),
+        },
+      ];
+      if (isGrowthProduction()) {
+        return all.filter((p) => p.transferType !== "coupon" && p.transferType !== "withdrawal");
+      }
+      return all;
+    },
     [walletByNo]
   );
 
@@ -665,7 +682,18 @@ export default function TeamWallet() {
     [coupons, income, selfRebirthStats, walletByNo, walletData]
   );
 
+  const transferOptions = useMemo(() => {
+    if (isGrowthProduction()) {
+      return BASE_TRANSFER_OPTIONS.filter((opt) => opt.value !== "coupon" && opt.value !== "withdrawal");
+    }
+    return BASE_TRANSFER_OPTIONS;
+  }, []);
+
   const openTransferType = (transferType) => {
+    if (isGrowthProduction() && (transferType === "withdrawal" || transferType === "coupon")) {
+      setError("This operation is not permitted on this portal.");
+      return;
+    }
     setTransferForm({ transfer_type: transferType, amount: "", consumer_id: "", otp: "" });
     setLookupResult(null);
     setOtpRequested(false);
@@ -673,8 +701,8 @@ export default function TeamWallet() {
   };
 
   const transferPreviewText = useMemo(
-    () => TRANSFER_OPTIONS.find((item) => item.value === transferForm.transfer_type)?.helper || "",
-    [transferForm.transfer_type]
+    () => transferOptions.find((item) => item.value === transferForm.transfer_type)?.helper || "",
+    [transferForm.transfer_type, transferOptions]
   );
 
   const transferChargeText = useMemo(() => {
@@ -860,10 +888,10 @@ export default function TeamWallet() {
             title="Main Wallet"
             amount={walletByNo[5]?.amount}
             icon={walletByNo[5]?.icon}
-            caption="Choose a pocket after click"
+            caption={isGrowthProduction() ? "Main Wallet Balance" : "Choose a pocket after click"}
             highlight
             tone={5}
-            onClick={() => openTransferType("coupon")}
+            onClick={isGrowthProduction() ? undefined : () => openTransferType("coupon")}
           />
         </Box>
 
@@ -1068,7 +1096,7 @@ export default function TeamWallet() {
               fullWidth
               size="small"
             >
-              {TRANSFER_OPTIONS.map((option) => (
+              {transferOptions.map((option) => (
                 <MenuItem key={option.value} value={option.value}>
                   {option.label}
                 </MenuItem>

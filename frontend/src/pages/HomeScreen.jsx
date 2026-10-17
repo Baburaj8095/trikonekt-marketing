@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import {
   Box,
   Container,
@@ -19,6 +19,7 @@ import {
   viewportOnce,
 } from "../animations/motion";
 import { useNavigate } from "react-router-dom";
+import { isGrowthProduction } from "../utils/growthProductionGuard";
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -65,20 +66,22 @@ export default function LandingPage() {
             </Typography>
 
             <Box mt={4} display="flex" gap={2} flexWrap="wrap">
-              <motion.div {...tapScale}>
-                <Button
-                  variant="contained"
-                  size="large"
-                  sx={{
-                    bgcolor: "#145DA0",
-                    height: 48,
-                    px: 4,
-                  }}
-                  onClick={() => navigate("/auth/register-v2")}
-                >
-                  Get Started
-                </Button>
-              </motion.div>
+              {!isGrowthProduction() && (
+                <motion.div {...tapScale}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    sx={{
+                      bgcolor: "#145DA0",
+                      height: 48,
+                      px: 4,
+                    }}
+                    onClick={() => navigate("/auth/register-v2")}
+                  >
+                    Get Started
+                  </Button>
+                </motion.div>
+              )}
 
               <motion.div {...tapScale}>
                 <Button
@@ -216,19 +219,35 @@ export default function LandingPage() {
             </Typography>
 
             <motion.div {...tapScale}>
-              <Button
-                variant="contained"
-                sx={{
-                  mt: 4,
-                  bgcolor: "#22C55E",
-                  color: "#0C2D48",
-                  height: 48,
-                  px: 5,
-                }}
-                onClick={() => navigate("/auth/register-v2")}
-              >
-                Create Account
-              </Button>
+              {isGrowthProduction() ? (
+                <Button
+                  variant="contained"
+                  sx={{
+                    mt: 4,
+                    bgcolor: "#145DA0",
+                    color: "#FFFFFF",
+                    height: 48,
+                    px: 5,
+                  }}
+                  onClick={() => navigate("/auth/login")}
+                >
+                  Go to Login
+                </Button>
+              ) : (
+                <Button
+                  variant="contained"
+                  sx={{
+                    mt: 4,
+                    bgcolor: "#22C55E",
+                    color: "#0C2D48",
+                    height: 48,
+                    px: 5,
+                  }}
+                  onClick={() => navigate("/auth/register-v2")}
+                >
+                  Create Account
+                </Button>
+              )}
             </motion.div>
           </motion.div>
         </Container>

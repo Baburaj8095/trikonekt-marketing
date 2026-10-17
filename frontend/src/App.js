@@ -191,6 +191,21 @@ import FranchiseAgreementCopy from "./components/franchise/pages/FranchiseAgreem
 import HubbleGiftCards from "./pages/HubbleGiftCards";
 import GiftCardSummary from "./pages/GiftCardSummary";
 import AdminFranchiseDocuments from "./pages/admin/AdminFranchiseDocuments";
+import { isGrowthProduction } from "./utils/growthProductionGuard";
+
+function GrowthRegistrationRoute({ children }) {
+  if (isGrowthProduction()) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+}
+
+function GrowthCouponPocketRoute({ children }) {
+  if (isGrowthProduction()) {
+    return <Navigate to="/user/team-dashboard" replace />;
+  }
+  return children;
+}
 
 function LegacyAuthEntry() {
   const location = useLocation();
@@ -198,6 +213,9 @@ function LegacyAuthEntry() {
     const params = new URLSearchParams(location.search || "");
     const mode = String(params.get("mode") || "").toLowerCase();
     if (mode === "register") {
+      if (isGrowthProduction()) {
+        return <Navigate to="/login" replace />;
+      }
       const role = String(params.get("role") || "user").toLowerCase();
       const sponsor =
         params.get("sponsor") ||
@@ -290,15 +308,15 @@ function App() {
         <Route path="/c/:slug" element={<ConsumerShell><CategoryPage /></ConsumerShell>} />
         <Route path="/auth/select" element={<RoleSelect />} />
         <Route path="/login" element={<LegacyAuthEntry />} />
-        <Route path="/register" element={<EnhancedLogin />} />
+        <Route path="/register" element={<GrowthRegistrationRoute><EnhancedLogin /></GrowthRegistrationRoute>} />
         <Route path="/enhanced-login" element={<EnhancedLogin />} />
         {/* Role-scoped auth routes */}
         <Route path="/auth/login/:role" element={<Login />} />
-        <Route path="/auth/register/:role" element={<EnhancedLogin />} />
+        <Route path="/auth/register/:role" element={<GrowthRegistrationRoute><EnhancedLogin /></GrowthRegistrationRoute>} />
         <Route path="/auth/login" element={<Login />} />
-        <Route path="/auth/register" element={<EnhancedLogin />} />
-        <Route path="/auth/register-v2" element={<RegisterV2 />} />
-        <Route path="/auth/register-v2/:role" element={<RegisterV2 />} />
+        <Route path="/auth/register" element={<GrowthRegistrationRoute><EnhancedLogin /></GrowthRegistrationRoute>} />
+        <Route path="/auth/register-v2" element={<GrowthRegistrationRoute><RegisterV2 /></GrowthRegistrationRoute>} />
+        <Route path="/auth/register-v2/:role" element={<GrowthRegistrationRoute><RegisterV2 /></GrowthRegistrationRoute>} />
         {/* V2 public routes */}
         <Route path="/v2/home" element={<HomeV2 />} />
         <Route path="/v2/about" element={<AboutV2 />} />
@@ -306,7 +324,7 @@ function App() {
         <Route path="/v2/terms" element={<TermsV2 />} />
         <Route path="/v2/contact" element={<ContactV2 />} />
         <Route path="/v2/login/:role" element={<LoginV2 />} />
-        <Route path="/v2/register/:role" element={<RegisterV2V2 />} />
+        <Route path="/v2/register/:role" element={<GrowthRegistrationRoute><RegisterV2V2 /></GrowthRegistrationRoute>} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/impersonate" element={<ImpersonateLanding />} />
         <Route path="/agency/impersonate" element={<ImpersonateLanding />} />
@@ -502,11 +520,13 @@ function App() {
         <Route
           path="/user/coupon-pocket"
           element={
-            <ProtectedRoute allowedRoles={["user"]}>
-              <ConsumerShell>
-                <CouponPocket />
-              </ConsumerShell>
-            </ProtectedRoute>
+            <GrowthCouponPocketRoute>
+              <ProtectedRoute allowedRoles={["user"]}>
+                <ConsumerShell>
+                  <CouponPocket />
+                </ConsumerShell>
+              </ProtectedRoute>
+            </GrowthCouponPocketRoute>
           }
         />
 
@@ -728,11 +748,13 @@ function App() {
         <Route
           path="/user/package-coupon-pocket"
           element={
-            <ProtectedRoute allowedRoles={["user"]}>
-              <ConsumerShell>
-                <PackageCouponPocket />
-              </ConsumerShell>
-            </ProtectedRoute>
+            <GrowthCouponPocketRoute>
+              <ProtectedRoute allowedRoles={["user"]}>
+                <ConsumerShell>
+                  <PackageCouponPocket />
+                </ConsumerShell>
+              </ProtectedRoute>
+            </GrowthCouponPocketRoute>
           }
         />
         <Route

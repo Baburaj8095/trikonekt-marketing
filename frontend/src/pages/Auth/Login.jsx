@@ -1,8 +1,9 @@
-﻿// Login.jsx  Final polished wireframe UI (single-file).
+// Login.jsx  Final polished wireframe UI (single-file).
 // NOTE: This file PRESERVES your original logic (API calls, geolocation, registration, dialogs).
 // Styling is done via MUI sx props. Requires @mui/material and @mui/icons-material v7.
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { isGrowthProduction } from "../../utils/growthProductionGuard";
 import {
   AppBar,
   Toolbar,
@@ -165,7 +166,7 @@ const Login = () => {
   // Redirect legacy /login?mode=register[&role=...] links to the role-scoped register route
   // This avoids any admin-session auto-redirects that can occur on the generic /login page.
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || isGrowthProduction()) return;
     try {
       const params = new URLSearchParams(location.search || "");
       const qMode = String(params.get("mode") || params.get("category") || "").toLowerCase();
@@ -237,6 +238,7 @@ const Login = () => {
     if (val) setRole(val);
   };
   const handleRegisterNav = () => {
+    if (isGrowthProduction()) return;
     // Registration page should show only Consumer registration
     const s = normalizeSponsor(sponsorId);
     const qs = s ? `?sponsor=${encodeURIComponent(s)}` : "";
@@ -2569,14 +2571,16 @@ const Login = () => {
               </Box>
             )}
 
-            <Box sx={{ mt: 1.5, textAlign: { xs: "left", sm: "center" } }}>
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                Don't have an account?{" "}
-                <Link component="button" type="button" variant="body2" onClick={handleRegisterNav} sx={{ fontWeight: 700 }}>
-                  Register here
-                </Link>
-              </Typography>
-            </Box>
+            {!isGrowthProduction() && (
+              <Box sx={{ mt: 1.5, textAlign: { xs: "left", sm: "center" } }}>
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  Don't have an account?{" "}
+                  <Link component="button" type="button" variant="body2" onClick={handleRegisterNav} sx={{ fontWeight: 700 }}>
+                    Register here
+                  </Link>
+                </Typography>
+              </Box>
+            )}
 
           </Box>
 

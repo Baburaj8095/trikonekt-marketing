@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import {
   AppBar,
   Toolbar,
@@ -14,6 +14,7 @@ import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
 import { useNavigate, useLocation } from "react-router-dom";
 import LOGO from "../assets/TRIKONEKT.jpg";
+import { isGrowthProduction } from "../utils/growthProductionGuard";
 
 export default function PublicNavbar() {
   const navigate = useNavigate();
@@ -101,18 +102,20 @@ export default function PublicNavbar() {
             >
               Login
             </Button>
-            <Button
-              variant="contained"
-              sx={{
-                fontWeight: 600,
-                textTransform: "none",
-                bgcolor: "#145DA0",
-                px: 2.5,
-              }}
-              onClick={() => navigate("/auth/register-v2")}
-            >
-              Get Started
-            </Button>
+            {!isGrowthProduction() && (
+              <Button
+                variant="contained"
+                sx={{
+                  fontWeight: 600,
+                  textTransform: "none",
+                  bgcolor: "#145DA0",
+                  px: 2.5,
+                }}
+                onClick={() => navigate("/auth/register-v2")}
+              >
+                Get Started
+              </Button>
+            )}
           </Box>
 
           {/* MOBILE MENU ICON */}
@@ -163,14 +166,16 @@ export default function PublicNavbar() {
           </List>
 
           <Box sx={{ p: 2 }}>
-            <Button
-              fullWidth
-              variant="contained"
-              sx={{ mb: 1, bgcolor: "#145DA0" }}
-              onClick={() => handleNav("/auth/register-v2")}
-            >
-              Get Started
-            </Button>
+            {!isGrowthProduction() && (
+              <Button
+                fullWidth
+                variant="contained"
+                sx={{ mb: 1, bgcolor: "#145DA0" }}
+                onClick={() => handleNav("/auth/register-v2")}
+              >
+                Get Started
+              </Button>
+            )}
             <Button
               fullWidth
               variant="outlined"
