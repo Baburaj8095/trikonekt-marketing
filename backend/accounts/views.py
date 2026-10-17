@@ -4613,17 +4613,21 @@ def wallet_me_history(request):
 
         layer_amt = five_amt + three_amt + e_edu_layer_amt + spp_amt
         tot_amt = credited_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
+        cycle_eligible_amt = layer_amt + min(D("50000.00"), royalty_amt)
+        cycle_earned = min(D("150000.00"), cycle_eligible_amt)
 
         term_stats[t_str] = {
             "count": credited_sub.count(),
             "total": str(tot_amt),
+            "cycle_earned": str(cycle_earned),
+            "cycle_cap": "150000.00",
             "layer_total": str(layer_amt),
             "five_total": str(five_amt),
             "three_total": str(three_amt),
             "e_edu_layer_total": str(e_edu_layer_amt),
             "e_edu_direct_total": str(e_edu_direct_amt),
             "e_edu_total": str(e_edu_layer_amt + e_edu_direct_amt),
-            "direct_total": str(direct_amt),
+            "direct_total": str(direct_amt or e_edu_direct_amt),
             "royalty_total": str(royalty_amt),
             "spp_total": str(spp_amt),
             "missing_total": str(missing_amt),

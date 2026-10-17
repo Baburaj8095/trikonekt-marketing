@@ -838,11 +838,11 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
   const viewingTermRawLayerIncome = useMemo(() => {
     if (termStat?.layer_total !== undefined) {
       const val = Number(termStat.layer_total);
-      return isViewingArchivedTerm ? Math.min(100000, val) : val;
+      return isViewingArchivedTerm ? Math.min(totalCycleCap, val) : val;
     }
     const offset = Math.max(0, (viewingTermNumber - 1) * totalCycleCap);
     return isViewingArchivedTerm
-      ? Math.min(100000, Math.max(0, rawLayerIncome - offset))
+      ? Math.min(totalCycleCap, Math.max(0, rawLayerIncome - offset))
       : Math.max(0, rawLayerIncome - offset);
   }, [termStat, isViewingArchivedTerm, rawLayerIncome, totalCycleCap, viewingTermNumber]);
 
@@ -1449,15 +1449,18 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
               const tThree = Number(stat.three_total || 0);
               const tEEduLayer = Number(stat.e_edu_layer_total || 0);
               const tEEduDirect = Number(stat.e_edu_direct_total || 0);
-              const tEEduTotal = Number(stat.e_edu_total || (tEEduLayer + tEEduDirect));
               const tRoyalty = Number(stat.royalty_total || 0);
-              const tDirect = Number(stat.direct_total || 0);
+              const tDirect = Number(stat.direct_total || tEEduDirect || 0);
               const tMissing = Number(stat.missing_total || 0);
 
               const isSelected = viewingTermNumber === t.num;
               const isCurrent = t.num === currentCycleNumber;
               const capLimit = 150000;
-              const pct = Math.min(100, Math.max(0, (tTotal / capLimit) * 100));
+              const tCycleEarned = stat.cycle_earned !== undefined
+                ? Number(stat.cycle_earned)
+                : Math.min(capLimit, tLayer + Math.min(50000, tRoyalty));
+              const pct = Math.min(100, Math.max(0, (tCycleEarned / capLimit) * 100));
+              const isCapMet = tCycleEarned >= capLimit;
 
               return (
                 <Grid item xs={12} md={6} key={t.num}>
@@ -1508,9 +1511,16 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                     <Divider sx={{ my: 1 }} />
 
                     <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 0.5 }}>
-                      <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>TOTAL TERM EARNINGS</Typography>
+                      <Box>
+                        <Typography sx={{ fontSize: 10.5, fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>
+                          Cycle Limit (Layers & Royalty)
+                        </Typography>
+                        {isCapMet && (
+                          <Chip label="₹1.5L Cap Met" size="small" color="success" sx={{ height: 18, fontSize: 9.5, fontWeight: 900, mt: 0.2 }} />
+                        )}
+                      </Box>
                       <Typography sx={{ fontSize: 18, fontWeight: 950, color: isCurrent ? "#15803d" : "#0f172a" }}>
-                        ₹{fmt(tTotal)} <span style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8" }}>/ ₹{fmt(capLimit)}</span>
+                        ₹{fmt(tCycleEarned)} <span style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8" }}>/ ₹{fmt(capLimit)}</span>
                       </Typography>
                     </Stack>
 
@@ -1532,7 +1542,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                     <Box
                       sx={{
                         display: "grid",
-                        gridTemplateColumns: "repeat(3, 1fr)",
+                        gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)" },
                         gap: 1,
                         bgcolor: isSelected ? "rgba(255,255,255,0.7)" : "#f8fafc",
                         p: 1.25,
@@ -1540,29 +1550,29 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                         border: "1px solid #e2e8f0",
                       }}
                     >
-                      <Box>
+                      <Box sx={{ overflow: "hidden" }}>
                         <Typography sx={{ fontSize: 9.5, color: "#64748b", fontWeight: 800 }}>5-MATRIX</Typography>
                         <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#0f172a" }}>₹{fmt(tFive)}</Typography>
                       </Box>
-                      <Box>
+                      <Box sx={{ overflow: "hidden" }}>
                         <Typography sx={{ fontSize: 9.5, color: "#64748b", fontWeight: 800 }}>3-MATRIX</Typography>
                         <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#0f172a" }}>₹{fmt(tThree)}</Typography>
                       </Box>
-                      <Box>
-                        <Typography sx={{ fontSize: 9.5, color: "#7c3aed", fontWeight: 800 }}>E-EDU TOTAL</Typography>
-                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#7c3aed" }}>₹{fmt(tEEduTotal)}</Typography>
+                      <Box sx={{ overflow: "hidden" }}>
+                        <Typography sx={{ fontSize: 9.5, color: "#7c3aed", fontWeight: 800 }}>E-EDU LAYER</Typography>
+                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#7c3aed" }}>₹{fmt(tEEduLayer)}</Typography>
                       </Box>
-                      <Box>
-                        <Typography sx={{ fontSize: 9.5, color: "#6d28d9", fontWeight: 700 }}>↳ e-Edu Layer</Typography>
-                        <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: "#6d28d9" }}>₹{fmt(tEEduLayer)}</Typography>
-                      </Box>
-                      <Box>
-                        <Typography sx={{ fontSize: 9.5, color: "#6d28d9", fontWeight: 700 }}>↳ e-Edu Direct</Typography>
-                        <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: "#6d28d9" }}>₹{fmt(tEEduDirect)}</Typography>
-                      </Box>
-                      <Box>
+                      <Box sx={{ overflow: "hidden" }}>
                         <Typography sx={{ fontSize: 9.5, color: "#059669", fontWeight: 800 }}>ROYALTY</Typography>
                         <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#059669" }}>₹{fmt(tRoyalty)}</Typography>
+                      </Box>
+                      <Box sx={{ overflow: "hidden" }}>
+                        <Typography sx={{ fontSize: 9.5, color: "#2563eb", fontWeight: 800 }}>DIRECT SPONSOR</Typography>
+                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#2563eb" }}>₹{fmt(tDirect)}</Typography>
+                      </Box>
+                      <Box sx={{ overflow: "hidden" }}>
+                        <Typography sx={{ fontSize: 9.5, color: "#0f172a", fontWeight: 800 }}>TOTAL RECEIVED</Typography>
+                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#0f172a" }}>₹{fmt(tTotal)}</Typography>
                       </Box>
                     </Box>
 
