@@ -101,6 +101,7 @@ import { AGENCY_TOKENS } from "./AgencyTokens";
 import API from "../../api/api";
 import DistrictPincodeCoverageCenter from "./DistrictPincodeCoverageCenter";
 import StateDistrictRollupCenter from "./StateDistrictRollupCenter";
+import FranchisePatternHub from "./FranchisePatternHub";
 
 /**
  * DYNAMIC ADMIN-CONFIGURED COMMISSION ENGINE
@@ -2213,50 +2214,77 @@ export default function FranchiseMobileHub({
     const isStateCluster = currentTier.scopeType === "states_cluster";
     const isExecutiveTerritoryTier = ["agency_district", "agency_district_coordinator", "agency_state", "agency_state_coordinator"].includes(currentTierKey);
 
-    // 1. Scoped Merchants
+    // Dynamic assigned regions (Zero Hardcoding)
+    const userPins = (Array.isArray(user?.assign_pincodes) && user.assign_pincodes.length > 0)
+      ? user.assign_pincodes
+      : (user?.pincode ? [user.pincode] : (effectivePincodes.map((p) => typeof p === "object" ? p.pincode : p) || []));
+    const userDists = (Array.isArray(user?.assign_districts) && user.assign_districts.length > 0)
+      ? user.assign_districts
+      : (user?.city ? [user.city] : []);
+    const userStates = (Array.isArray(user?.assign_states) && user.assign_states.length > 0)
+      ? user.assign_states
+      : (user?.stateName ? [user.stateName] : []);
+
+    // 1. Scoped Merchants (Zero Hardcoding)
     let scopedMerchants = merchantsList.filter((m) => {
-      if (isPincodeTier) return m.pincode === "572106";
+      const mPin = String(m.pincode || "");
+      const mDist = String(m.district || m.city || "").toLowerCase();
+      const mState = String(m.state || "").toLowerCase();
+
+      if (isPincodeTier) return userPins.length > 0 ? userPins.includes(mPin) : true;
       if (isPincodeCluster) {
-        if (selectedSubZone !== "all") return m.pincode === selectedSubZone;
-        return ["572106", "572101"].includes(m.pincode);
+        if (selectedSubZone !== "all") return mPin === selectedSubZone;
+        return userPins.length > 0 ? userPins.includes(mPin) : true;
       }
-      if (isDistrictTier) return m.district === "Tumakuru";
+      if (isDistrictTier) {
+        return userDists.length > 0 ? userDists.some((d) => mDist.includes(d.toLowerCase())) : true;
+      }
       if (isDistrictCluster) {
         if (selectedSubZone !== "all") {
-          return m.district?.toLowerCase().includes(selectedSubZone.toLowerCase()) || m.pincode === selectedSubZone;
+          return mDist.includes(selectedSubZone.toLowerCase()) || mPin === selectedSubZone;
         }
-        return m.district === "Tumakuru" || m.district === "Hassan";
+        return userDists.length > 0 ? userDists.some((d) => mDist.includes(d.toLowerCase())) : true;
       }
-      if (isStateTier) return m.state === "Karnataka";
+      if (isStateTier) {
+        return userStates.length > 0 ? userStates.some((s) => mState.includes(s.toLowerCase())) : true;
+      }
       if (isStateCluster) {
         if (selectedSubZone !== "all") {
-          return m.state?.toLowerCase().includes(selectedSubZone.toLowerCase());
+          return mState.includes(selectedSubZone.toLowerCase());
         }
-        return m.state === "Karnataka" || m.state === "Goa";
+        return userStates.length > 0 ? userStates.some((s) => mState.includes(s.toLowerCase())) : true;
       }
       return true;
     });
 
-    // 2. Scoped Captains
+    // 2. Scoped Captains (Zero Hardcoding)
     let scopedCaptains = captainsList.filter((c) => {
-      if (isPincodeTier) return c.pincode === "572106";
+      const cPin = String(c.pincode || "");
+      const cDist = String(c.district || c.city || "").toLowerCase();
+      const cState = String(c.state || "").toLowerCase();
+
+      if (isPincodeTier) return userPins.length > 0 ? userPins.includes(cPin) : true;
       if (isPincodeCluster) {
-        if (selectedSubZone !== "all") return c.pincode === selectedSubZone;
-        return ["572106", "572101"].includes(c.pincode);
+        if (selectedSubZone !== "all") return cPin === selectedSubZone;
+        return userPins.length > 0 ? userPins.includes(cPin) : true;
       }
-      if (isDistrictTier) return c.district === "Tumakuru";
+      if (isDistrictTier) {
+        return userDists.length > 0 ? userDists.some((d) => cDist.includes(d.toLowerCase())) : true;
+      }
       if (isDistrictCluster) {
         if (selectedSubZone !== "all") {
-          return c.district?.toLowerCase().includes(selectedSubZone.toLowerCase()) || c.pincode === selectedSubZone;
+          return cDist.includes(selectedSubZone.toLowerCase()) || cPin === selectedSubZone;
         }
-        return c.district === "Tumakuru" || c.district === "Hassan";
+        return userDists.length > 0 ? userDists.some((d) => cDist.includes(d.toLowerCase())) : true;
       }
-      if (isStateTier) return c.state === "Karnataka";
+      if (isStateTier) {
+        return userStates.length > 0 ? userStates.some((s) => cState.includes(s.toLowerCase())) : true;
+      }
       if (isStateCluster) {
         if (selectedSubZone !== "all") {
-          return c.state?.toLowerCase().includes(selectedSubZone.toLowerCase());
+          return cState.includes(selectedSubZone.toLowerCase());
         }
-        return c.state === "Karnataka" || c.state === "Goa";
+        return userStates.length > 0 ? userStates.some((s) => cState.includes(s.toLowerCase())) : true;
       }
       return true;
     });
@@ -2636,125 +2664,22 @@ export default function FranchiseMobileHub({
             )}
           </Paper>
 
-          {/* Purple Gradient Earnings Wallet Hero Card (Live Dynamic Balance) */}
-          <Box sx={{ mb: 2 }}>
-            <WalletCard
-              balance={walletState?.mainWallet ? walletState.mainWallet.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00"}
-              monthlyGrowth={`₹ ${(walletState.totalEarned || 0).toFixed(2)} Total Geo Payouts`}
-              onWithdraw={() => setWithdrawDialogOpen(true)}
-              onViewHistory={() => setActiveScreen("history")}
-            />
-          </Box>
-
-          {/* Key Metrics Header */}
-          <Box sx={{ mb: 2 }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.2, px: 0.5 }}>
-              <Typography sx={{ fontSize: 14, fontWeight: 900, color: "#0F172A", letterSpacing: "-0.01em" }}>
-                Key Metrics
-              </Typography>
-              <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: "#2563EB", cursor: "pointer" }}>
-                Swipe &rarr;
-              </Typography>
-            </Stack>
-
-            {/* 4 Pastel KPI Metric Cards in 2x2 Grid with 100% Live DB Counts */}
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                gap: 1.5,
-                mb: 1.5,
-              }}
-            >
-              <Box
-                onClick={() => {
-                  if (activeZoneMetrics.isExecutiveTerritoryTier) {
-                    setActiveScreen("pincode");
-                  } else {
-                    setActiveScreen("merchants");
-                  }
-                }}
-                sx={{ cursor: "pointer", minWidth: 0 }}
-              >
-                <MetricCard
-                  label="Merchants"
-                  value={String(activeZoneMetrics.dispMerchants ?? 0)}
-                  subtext={activeZoneMetrics.dispMerchants > 0 ? `${activeZoneMetrics.dispActiveMerchants} active` : "0 active"}
-                  dotColor="#059669"
-                  icon={<StoreRoundedIcon sx={{ fontSize: 18 }} />}
-                  iconColor="#059669"
-                  iconBg="#DCFCE7"
-                  cardBg="#F0FDF4"
-                  cardBorder="#DCFCE7"
-                />
-              </Box>
-
-              <Box
-                onClick={() => {
-                  if (activeZoneMetrics.isExecutiveTerritoryTier) {
-                    setActiveScreen("pincode");
-                  } else {
-                    setActiveScreen("captains");
-                  }
-                }}
-                sx={{ cursor: "pointer", minWidth: 0 }}
-              >
-                <MetricCard
-                  label="Captains"
-                  value={String(activeZoneMetrics.dispCaptains ?? 0)}
-                  subtext={activeZoneMetrics.dispCaptains > 0 ? `${activeZoneMetrics.dispActiveCaptains} assigned` : "0 assigned"}
-                  dotColor="#7C3AED"
-                  icon={<ShieldRoundedIcon sx={{ fontSize: 18 }} />}
-                  iconColor="#7C3AED"
-                  iconBg="#F3E8FF"
-                  cardBg="#FAF5FF"
-                  cardBorder="#F3E8FF"
-                />
-              </Box>
-
-              <Box onClick={() => setActiveScreen("pincode")} sx={{ cursor: "pointer", minWidth: 0 }}>
-                <MetricCard
-                  label={activeZoneMetrics.isExecutiveTerritoryTier ? (currentTierKey.includes("state") ? "Districts" : "Pincodes") : "Pincode Zone"}
-                  value={String(activeZoneMetrics.isExecutiveTerritoryTier ? (districtSummary?.total_pincodes || effectivePincodes.length) : (activePincode || "572106"))}
-                  subtext={
-                    activeZoneMetrics.isExecutiveTerritoryTier
-                      ? districtSummary
-                        ? `${districtSummary.active_agencies} Agency • ${districtSummary.active_coordinators} Coord`
-                        : `${effectivePincodes.filter((p) => p.status === "Active" || p.agency?.status === "ACTIVE").length} Active`
-                      : "Assigned Zone"
-                  }
-                  dotColor="#4F46E5"
-                  icon={<LocationOnRoundedIcon sx={{ fontSize: 18 }} />}
-                  iconColor="#4F46E5"
-                  iconBg="#EEF2FF"
-                  cardBg="#F5F3FF"
-                  cardBorder="#E0E7FF"
-                />
-              </Box>
-
-              <Box onClick={() => setActiveScreen("history")} sx={{ cursor: "pointer", minWidth: 0 }}>
-                <MetricCard
-                  label="Earnings"
-                  value={`₹${activeZoneMetrics.dispEarnings}`}
-                  subtext="Total Revenue"
-                  dotColor="#D97706"
-                  icon={<AccountBalanceWalletRoundedIcon sx={{ fontSize: 18 }} />}
-                  iconColor="#D97706"
-                  iconBg="#FEF3C7"
-                  cardBg="#FFFBEB"
-                  cardBorder="#FEF3C7"
-                />
-              </Box>
-            </Box>
-
-            {/* Pagination Dots */}
-            <Stack direction="row" spacing={0.8} justifyContent="center" alignItems="center">
-              <Box sx={{ width: 18, height: 5, borderRadius: "999px", bgcolor: "#5F259F" }} />
-              <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "#CBD5E1" }} />
-              <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "#CBD5E1" }} />
-              <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: "#CBD5E1" }} />
-            </Stack>
-          </Box>
+          {/* Dynamic 6-Tier Franchise User UI Visual/View Pattern Engine */}
+          <FranchisePatternHub
+            user={user}
+            tierKey={currentTierKey}
+            walletState={walletState}
+            cycleState={cycleState}
+            dashboardMetrics={dashboardMetrics}
+            districtPincodesList={districtPincodesList}
+            districtSummary={districtSummary}
+            merchantsList={merchantsList}
+            captainsList={captainsList}
+            issuesList={issuesList}
+            onWithdraw={() => setWithdrawDialogOpen(true)}
+            onViewHistory={() => setActiveScreen("history")}
+            onOpenSupport={() => setActiveScreen("support")}
+          />
 
           {/* Quick Actions (PhonePe Feature Card Layout - 1 Row 4 Cards, 100% Full Width) */}
           <Paper
