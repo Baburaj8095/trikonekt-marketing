@@ -1,5 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
+import { isGrowthProduction } from "../../utils/growthProductionGuard";
 import {
   Avatar,
   Box,
@@ -75,7 +76,7 @@ export default function AppDrawer({
         { label: "E-edu Purchase History", to: "/user/prime-invoices", icon: ReceiptLongOutlinedIcon },
         { label: "Smart Shopping Voucher", to: "/user/spp-gift-cards", icon: CardGiftcardOutlinedIcon },
         { label: "Tri Holiday Packages", to: "/user/tri/tri-holidays", icon: FlightTakeoffOutlinedIcon },
-        { label: "P2P Coupon Pocket", to: "/user/coupon-pocket", icon: ConfirmationNumberOutlinedIcon },
+        ...(isGrowthProduction() ? [] : [{ label: "P2P Coupon Pocket", to: "/user/coupon-pocket", icon: ConfirmationNumberOutlinedIcon }]),
       ],
     },
     {

@@ -234,10 +234,35 @@ class AdminWalletUploadRequestRejectView(APIView):
         return Response(WalletUploadRequestSerializer(obj, context={"request": request}).data, status=status.HTTP_200_OK)
 
 
+def is_growth_production_request(request):
+    """
+    Returns True ONLY for requests targeted to production growth.vin.
+    Returns False for staging (asiyapp.com, staging-growth.vin, staging-api.growth.vin, localhost, etc.).
+    """
+    try:
+        host = (request.get_host() or "").split(":")[0].lower()
+    except Exception:
+        host = ""
+    if "staging" in host or "asiyapp" in host or "localhost" in host or "127.0.0.1" in host:
+        return False
+    if "growth.vin" in host:
+        return True
+    from django.conf import settings
+    return bool(getattr(settings, "GROWTH_VIN_PROD_RESTRICTED", False))
+
+
 class RegisterView(generics.CreateAPIView):
     queryset = CustomUser.objects.all()
     permission_classes = [AllowAny]
     serializer_class = RegisterSerializer
+
+    def create(self, request, *args, **kwargs):
+        if is_growth_production_request(request):
+            return Response(
+                {"detail": "Direct registration on growth.vin is disabled. Please register via trieducation.in."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         """
@@ -3410,6 +3435,14 @@ class WalletTransferOtpRequest(APIView):
         if transfer_type not in allowed:
             return Response({"detail": "Invalid transfer_type."}, status=status.HTTP_400_BAD_REQUEST)
 
+        if is_growth_production_request(request):
+            if transfer_type == "coupon":
+                return Response({"detail": "Transfers to Coupon Pocket are disabled on growth.vin."}, status=status.HTTP_403_FORBIDDEN)
+            if transfer_type == "withdrawal":
+                return Response({"detail": "Withdrawals are currently paused on growth.vin."}, status=status.HTTP_403_FORBIDDEN)
+            if transfer_type in {"wallet_to_wallet", "p2p_transfer"}:
+                return Response({"detail": "P2P wallet-to-wallet transfers are disabled on growth.vin."}, status=status.HTTP_403_FORBIDDEN)
+
         try:
             from decimal import Decimal as D
             amount_d = D(str(amount or "0"))
@@ -3466,6 +3499,14 @@ class WalletTransferConfirm(APIView):
 
         amount = D(str(payload.get("amount") or "0"))
         target_consumer_id = payload.get("target_consumer_id")
+
+        if is_growth_production_request(request):
+            if transfer_type == "coupon":
+                return Response({"detail": "Transfers to Coupon Pocket are disabled on growth.vin."}, status=status.HTTP_403_FORBIDDEN)
+            if transfer_type == "withdrawal":
+                return Response({"detail": "Withdrawals are currently paused on growth.vin."}, status=status.HTTP_403_FORBIDDEN)
+            if transfer_type in {"wallet_to_wallet", "p2p_transfer"}:
+                return Response({"detail": "P2P wallet-to-wallet transfers are disabled on growth.vin."}, status=status.HTTP_403_FORBIDDEN)
 
         if transfer_type in {"shopping", "coupon", "internal", "withdrawal"}:
             result = _move_main_to_derived_wallet(request.user, amount, transfer_type)
@@ -4029,6 +4070,14 @@ class WithdrawalCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = WithdrawalRequestSerializer
     queryset = WalletTransaction.objects.none()  # unused, but DRF requires queryset on generic views
+
+    def create(self, request, *args, **kwargs):
+        if is_growth_production_request(request):
+            return Response(
+                {"detail": "Withdrawals are currently paused on growth.vin."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         serializer.save()

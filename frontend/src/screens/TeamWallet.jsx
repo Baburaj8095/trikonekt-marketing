@@ -17,6 +17,7 @@ import {
   Typography,
 } from "@mui/material";
 import API from "../api/api";
+import { isGrowthProduction } from "../utils/growthProductionGuard";
 import WalletDashboardV2 from "../pages/consumer/WalletDashboardV2";
 import QuickActionGrid from "../components/common/QuickActionGrid";
 import StatusBadge from "../components/common/StatusBadge";
@@ -47,7 +48,7 @@ function fmtAmount(value) {
   return num.toFixed(2);
 }
 
-const TRANSFER_OPTIONS = [
+const BASE_TRANSFER_OPTIONS = [
   {
     value: "coupon",
     label: "Coupon Pocket Wallet",
@@ -64,6 +65,11 @@ const TRANSFER_OPTIONS = [
     helper: "Move amount to withdrawal wallet before bank withdrawal.",
   },
 ];
+
+const getTransferOptions = () =>
+  isGrowthProduction()
+    ? BASE_TRANSFER_OPTIONS.filter((opt) => opt.value === "internal")
+    : BASE_TRANSFER_OPTIONS;
 
 const WALLET_DEFINITIONS = [
   { slNo: 1, name: "Bonus Wallet", section: "core" },
@@ -318,7 +324,7 @@ export default function TeamWallet() {
   const [otpRequested, setOtpRequested] = useState(false);
   const [lookupResult, setLookupResult] = useState(null);
   const [transferForm, setTransferForm] = useState({
-    transfer_type: "coupon",
+    transfer_type: isGrowthProduction() ? "internal" : "coupon",
     amount: "",
     consumer_id: "",
     otp: "",
@@ -675,7 +681,13 @@ export default function TeamWallet() {
     [coupons, income, selfRebirthStats, walletByNo, walletData]
   );
 
+  const transferOptions = useMemo(() => getTransferOptions(), []);
+
   const openTransferType = (transferType) => {
+    if (isGrowthProduction() && (transferType === "withdrawal" || transferType === "coupon" || transferType === "wallet_to_wallet")) {
+      setError(`Transfers to ${transferType === "withdrawal" ? "Withdrawal" : "Coupon"} Pocket are disabled on growth.vin.`);
+      return;
+    }
     setTransferForm({ transfer_type: transferType, amount: "", consumer_id: "", otp: "" });
     setLookupResult(null);
     setOtpRequested(false);
@@ -683,8 +695,8 @@ export default function TeamWallet() {
   };
 
   const transferPreviewText = useMemo(
-    () => TRANSFER_OPTIONS.find((item) => item.value === transferForm.transfer_type)?.helper || "",
-    [transferForm.transfer_type]
+    () => transferOptions.find((item) => item.value === transferForm.transfer_type)?.helper || "",
+    [transferForm.transfer_type, transferOptions]
   );
 
   const transferChargeText = useMemo(() => {
@@ -1021,23 +1033,24 @@ export default function TeamWallet() {
 
                 <Button
                   onClick={() => openTransferType("withdrawal")}
+                  disabled={isGrowthProduction()}
                   variant="contained"
                   size="small"
                   startIcon={<RedeemIcon sx={{ fontSize: 18 }} />}
                   sx={{
-                    bgcolor: "#f97316",
+                    bgcolor: isGrowthProduction() ? "#94a3b8" : "#f97316",
                     color: "#ffffff",
                     fontWeight: 800,
                     fontSize: { xs: 11, sm: 12 },
                     textTransform: "none",
                     borderRadius: "12px",
                     py: 0.9,
-                    boxShadow: "0 4px 12px rgba(249, 115, 22, 0.3)",
-                    "&:hover": { bgcolor: "#ea580c" },
+                    boxShadow: isGrowthProduction() ? "none" : "0 4px 12px rgba(249, 115, 22, 0.3)",
+                    "&:hover": { bgcolor: isGrowthProduction() ? "#94a3b8" : "#ea580c" },
                     whiteSpace: "nowrap",
                   }}
                 >
-                  Withdraw
+                  {isGrowthProduction() ? "Withdrawals Paused" : "Withdraw"}
                 </Button>
               </Box>
             </Stack>
@@ -1642,7 +1655,7 @@ export default function TeamWallet() {
               fullWidth
               size="small"
             >
-              {TRANSFER_OPTIONS.map((option) => (
+              {transferOptions.map((option) => (
                 <MenuItem key={option.value} value={option.value}>
                   {option.label}
                 </MenuItem>

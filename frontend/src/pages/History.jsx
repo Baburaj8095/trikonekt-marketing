@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { isGrowthProduction } from "../utils/growthProductionGuard";
 import {
   Box,
   Grid,
@@ -2502,23 +2503,25 @@ export default function History() {
           >
             Transfer from Wallet
           </Button>
-          <Button
-            size="small"
-            variant={drawerMode === "p2p" ? "contained" : "outlined"}
-            onClick={() => setDrawerMode("p2p")}
-            sx={{
-              flex: 1,
-              borderRadius: 999,
-              textTransform: "none",
-              fontWeight: 800,
-              fontSize: 12,
-              bgcolor: drawerMode === "p2p" ? "#0066E6" : "transparent",
-              borderColor: "#0066E6",
-              color: drawerMode === "p2p" ? "#fff" : "#0066E6",
-            }}
-          >
-            P2P Send ({p2pTaxPercent}%)
-          </Button>
+          {!isGrowthProduction() && (
+            <Button
+              size="small"
+              variant={drawerMode === "p2p" ? "contained" : "outlined"}
+              onClick={() => setDrawerMode("p2p")}
+              sx={{
+                flex: 1,
+                borderRadius: 999,
+                textTransform: "none",
+                fontWeight: 800,
+                fontSize: 12,
+                bgcolor: drawerMode === "p2p" ? "#0066E6" : "transparent",
+                borderColor: "#0066E6",
+                color: drawerMode === "p2p" ? "#fff" : "#0066E6",
+              }}
+            >
+              P2P Send ({p2pTaxPercent}%)
+            </Button>
+          )}
           <Button
             size="small"
             variant={drawerMode === "menu" ? "contained" : "outlined"}
@@ -2541,9 +2544,15 @@ export default function History() {
         {/* Unified Transfer from Main Wallet Sheet */}
         {(drawerMode === "withdrawal" || drawerMode === "pockets" || drawerMode === "coupon") && (
           <Box sx={{ mb: 2 }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A", mb: 1 }}>
-              Select Destination
-            </Typography>
+            {isGrowthProduction() ? (
+              <Alert severity="warning" sx={{ borderRadius: 2, fontSize: 13, my: 1 }}>
+                Transfers from Main Wallet to Withdrawal or Coupon Pockets are currently paused on growth.vin.
+              </Alert>
+            ) : (
+              <>
+                <Typography sx={{ fontSize: 13, fontWeight: 800, color: "#0F172A", mb: 1 }}>
+                  Select Destination
+                </Typography>
 
             {/* Destination Selection Cards */}
             <Grid container spacing={1.2} sx={{ mb: 2 }}>
@@ -2721,6 +2730,8 @@ export default function History() {
                   </Button>
                 </Stack>
               </Stack>
+            )}
+              </>
             )}
           </Box>
         )}

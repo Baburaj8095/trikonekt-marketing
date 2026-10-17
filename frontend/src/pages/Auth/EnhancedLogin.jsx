@@ -3,6 +3,8 @@
 // Styling is done via MUI sx props. Requires @mui/material and @mui/icons-material v7.
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { isGrowthProduction, TRIEDUCATION_REGISTER_URL } from "../../utils/growthProductionGuard";
+import GrowthRegistrationDisabledNotice from "../../components/common/GrowthRegistrationDisabledNotice";
 import {
   AppBar,
   Toolbar,
@@ -122,7 +124,13 @@ const Login = () => {
     } catch {}
   }, [location.pathname, location.search, mode, lockedRole, navigate]);
 
-  const handleModeChange = () => setMode(mode === "login" ? "register" : "login");
+  const handleModeChange = () => {
+    if (mode === "login" && isGrowthProduction()) {
+      window.location.href = TRIEDUCATION_REGISTER_URL;
+      return;
+    }
+    setMode(mode === "login" ? "register" : "login");
+  };
   const handleRoleChange = (_, val) => {
     if (lockedRole) return;
     if (val) setRole(val);
@@ -1976,6 +1984,10 @@ const Login = () => {
   };
 
   // === FINAL UI (polished) ===
+  if (mode === "register" && isGrowthProduction()) {
+    return <GrowthRegistrationDisabledNotice />;
+  }
+
   return (
     <Box className="enhanced-root"
       sx={{

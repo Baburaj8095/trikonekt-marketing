@@ -26,6 +26,10 @@ class P2PCouponTransferView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        from accounts.views import is_growth_production_request
+        if is_growth_production_request(request):
+            return Response({"detail": "P2P coupon transfers are disabled on growth.vin."}, status=status.HTTP_403_FORBIDDEN)
+
         recipient_phone = request.data.get("recipient_phone") or request.data.get("phone")
         amount = request.data.get("amount")
         coupon_type = request.data.get("coupon_type", "PACKAGE_COUPON")
