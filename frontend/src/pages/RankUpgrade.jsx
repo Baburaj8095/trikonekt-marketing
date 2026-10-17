@@ -170,6 +170,7 @@ function ConsumerCycleRenewalDialog({
   onClose,
   walletMe,
   currentCycle = "Cycle 1",
+  targetTerm = 2,
   onRenewSuccess,
 }) {
   const [selectedSource, setSelectedSource] = useState("MAIN_WALLET");
@@ -194,17 +195,18 @@ function ConsumerCycleRenewalDialog({
     setErrMsg("");
     setSuccessMsg("");
     try {
-      // Call Java Spring Boot Cycle Activator Engine
-      await API.post("/api/admin/validator/activate-cycle", {
-        cycle: "Cycle 2",
-        source: selectedSource,
-        role: "CONSUMER",
-      }).catch(() => {});
+      const res = await API.post("/api/accounts/wallet/term-renewal/", {
+        term: targetTerm,
+        paymentSource: selectedSource,
+        baseAmount: baseAmt,
+      });
 
-      setSuccessMsg(`🎉 Term 2 Renewal Activated! ₹2,140 debited from ${selectedSource === "MAIN_WALLET" ? "Main Wallet" : "Package Coupon Pocket"}. Your ₹1,00,000 E-Edu Layer capacity and ₹50,000 Royalty cap are renewed.`);
-      if (onRenewSuccess) onRenewSuccess();
+      const recovered = res.data?.recovered_missing_amount ? Number(res.data.recovered_missing_amount) : 0;
+      let msg = res.data?.message || `🎉 Term ${targetTerm} Activated! ₹2,140 debited from ${selectedSource === "MAIN_WALLET" ? "Main Wallet" : "Package Coupon Pocket"}.`;
+      setSuccessMsg(msg);
+      if (onRenewSuccess) onRenewSuccess(res.data);
     } catch (e) {
-      setErrMsg(e?.response?.data?.detail || e?.message || "Failed to renew term. Please contact Admin.");
+      setErrMsg(e?.response?.data?.message || e?.response?.data?.detail || e?.message || "Failed to renew term. Please contact Admin.");
     } finally {
       setBusy(false);
     }
@@ -832,6 +834,10 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
     return list;
   }, [currentCycleNumber, walletHistory?.purchased_terms]);
 
+  const nextTermNumber = useMemo(() => {
+    return (purchasedTerms.length > 0 ? Math.max(...purchasedTerms.map((t) => t.num)) : 1) + 1;
+  }, [purchasedTerms]);
+
   // Database-driven calculations for whichever term is currently selected for viewing:
   const termStat = walletHistory?.term_stats?.[String(viewingTermNumber)];
 
@@ -1316,8 +1322,8 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                         : "Upgrade Now"}
                     </Button>
 
-                    {/* Term 2 Renewal Button only when Term 2 is unlocked */}
-                    {isCycle2Unlocked && (
+                    {/* Term Renewal Button with 3-Layer Guard */}
+                    {isCycle2Unlocked ? (
                       <Button
                         fullWidth
                         variant="contained"
@@ -1334,7 +1340,25 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
                           "&:hover": { bgcolor: "#059669" },
                         }}
                       >
-                        🔄 Start Term 2 Renewal Hub (₹2,140)
+                        🔄 Start Term {nextTermNumber} Renewal Hub (₹2,140)
+                      </Button>
+                    ) : (
+                      <Button
+                        fullWidth
+                        disabled
+                        variant="outlined"
+                        sx={{
+                          mt: 1,
+                          borderColor: "#cbd5e1",
+                          color: "#94a3b8",
+                          fontWeight: 800,
+                          fontSize: 11,
+                          borderRadius: 2,
+                          textTransform: "none",
+                          "&.Mui-disabled": { borderColor: "#e2e8f0", color: "#94a3b8" },
+                        }}
+                      >
+                        🔒 Complete Current Term (₹1.5L) to Unlock Term {nextTermNumber}
                       </Button>
                     )}
                   </Paper>
@@ -2515,18 +2539,21 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
         </Snackbar>
       )}
 
-      {/* ── Consumer Term 2 Renewal Hub Modal ── */}
+      {/* ── Consumer Term Renewal Hub Modal ── */}
       <ConsumerCycleRenewalDialog
         open={cycleRenewalOpen}
         onClose={() => setCycleRenewalOpen(false)}
         walletMe={walletMe}
-        currentCycle={consumerCycleState.cycle || "Term 1"}
+        currentCycle={consumerCycleState.cycle || `Term ${currentCycleNumber}`}
+        targetTerm={nextTermNumber}
         onRenewSuccess={() => {
           setConsumerCycleState((prev) => ({
             ...prev,
-            cycle: "Term 2",
+            cycle: `Term ${nextTermNumber}`,
             status: "active",
           }));
+          setSelectedViewingTerm(nextTermNumber);
+          window.location.reload();
         }}
       />
 
@@ -2561,19 +2588,20 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             }}
           >
             <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#9A3412", textTransform: "uppercase", letterSpacing: 0.5 }}>
-              Total Term {viewingTermNumber} Missed Income
+              Total Term {viewingTermNumber} Missed Income (7-Day Grace Window)
             </Typography>
             <Typography sx={{ fontSize: 32, fontWeight: 950, color: "#C2410C", my: 0.5 }}>
               ₹{fmt(missingIncome)}
             </Typography>
             <Typography sx={{ fontSize: 11.5, color: "#7C2D12", maxWidth: 440, mx: "auto" }}>
-              Income generated from Matrix & Layer placements after your Term {viewingTermNumber} limit (₹1.5 Lakhs) is reached.
+              Income generated after your Term {viewingTermNumber} limit is reached.
+              <br /><b>⏳ 7-Day Recovery Rule:</b> If you renew or upgrade within 7 days, this amount is <b>100% recovered</b> directly into your Main Wallet (75%) and Self Account (25%)!
             </Typography>
           </Paper>
 
           <Box sx={{ mb: 2 }}>
             <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#1E293B", mb: 1 }}>
-              How Does Earning Cap & Missing Income Work?
+              How Does Earning Cap & 7-Day Recovery Work?
             </Typography>
             <Stack spacing={1.2}>
               <Box sx={{ p: 1.5, bgcolor: "#F8FAFC", borderRadius: "12px", border: "1px solid #E2E8F0" }}>
@@ -2587,19 +2615,20 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
 
               <Box sx={{ p: 1.5, bgcolor: "#F8FAFC", borderRadius: "12px", border: "1px solid #E2E8F0" }}>
                 <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>
-                  2. Direct Sponsor Bonus Is NEVER Capped
+                  2. Direct Sponsor Bonus Bifurcation
                 </Typography>
                 <Typography sx={{ fontSize: 11.5, color: "#64748B", mt: 0.3 }}>
-                  Your direct referral bonuses (SPP ₹1,000, Prime direct, and Rank 1 upgrade direct) always flow 100% as usual without any limits.
+                  <b>Same-Rank Directs:</b> 100% uncapped and exempt from the cycle limit.
+                  <br /><b>Higher-Rank Directs:</b> Counted toward the current term's ₹1,50,000 cap.
                 </Typography>
               </Box>
 
               <Box sx={{ p: 1.5, bgcolor: "#F8FAFC", borderRadius: "12px", border: "1px solid #E2E8F0" }}>
                 <Typography sx={{ fontSize: 12, fontWeight: 800, color: "#0F172A" }}>
-                  3. Unlock Fresh ₹1.5L Headroom via Renewal
+                  3. 7-Day Automatic Recovery on Renewal
                 </Typography>
                 <Typography sx={{ fontSize: 11.5, color: "#64748B", mt: 0.3 }}>
-                  Select Track 1 (₹2k), Track 2 (₹8k), Track 3 (₹40k), or Full Bundle (₹50k) to renew and unlock fresh ₹1.5L headroom for the next term.
+                  Renewing into the next term (₹2,140) within 7 days of reaching your cap automatically recovers all held missing income into your Main Wallet (75%) and Self Account (25%).
                 </Typography>
               </Box>
             </Stack>
@@ -2628,7 +2657,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
               "&:hover": { bgcolor: "#C2410C" },
             }}
           >
-            🚀 Renew Term & Unlock Headroom
+            🚀 Renew & Claim ₹{fmt(missingIncome)}
           </Button>
         </DialogActions>
       </Dialog>

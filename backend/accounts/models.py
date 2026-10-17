@@ -451,10 +451,21 @@ class Wallet(models.Model):
     def get_active_term_headroom(self) -> Decimal:
         """
         Calculates remaining layer commission headroom for user's active academic term.
-        Total combined cycle cap: ₹150,000.00 (Layers + Royalty).
+        Individual layer caps:
+          L1: ₹1,750
+          L2: ₹3,750 (1,750 + 2,000)
+          L3: ₹7,750 (3,750 + 4,000)
+          L4: ₹13,750 (7,750 + 6,000)
+          L5: ₹21,250 (13,750 + 7,500)
+          L6: ₹30,000 (21,250 + 8,750)
+          L7: ₹40,000 (30,000 + 10,000)
+          L8: ₹55,000 (40,000 + 15,000)
+          L9: ₹75,000 (55,000 + 20,000)
+          L10: ₹100,000 (75,000 + 25,000)
+        Plus Royalty pool up to ₹50,000 => Total Combined Cycle Cap: ₹150,000.00.
         """
         try:
-            from django.db.models import Sum, Q
+            from django.db.models import Sum, Q, Max
             user = self.user
             if not user or not getattr(user, "id", None):
                 return Decimal("150000.00")
@@ -465,8 +476,8 @@ class Wallet(models.Model):
             ).order_by("created_at"))
 
             active_term_start = None
+            max_term = 1
             if renewal_txs:
-                max_term = 1
                 for r in renewal_txs:
                     t_val = (r.meta or {}).get("term")
                     if not t_val:
@@ -509,7 +520,9 @@ class Wallet(models.Model):
                     Q(meta__orig_type__icontains="AUTOPOOL") |
                     Q(meta__source__icontains="MATRIX") |
                     Q(meta__trigger__in=["PRIME_150", "PRIME_750", "PRIME_759", "SELF_REBIRTH_250"])
-                ))
+                )) |
+                Q(meta__direct_type="HIGHER_RANK_DIRECT") |
+                Q(meta__is_higher_rank_direct=True)
             )
 
             earned_royalty = WalletTransaction.objects.filter(t_filter).filter(q_royalty).exclude(
@@ -520,12 +533,147 @@ class Wallet(models.Model):
                 Q(type__startswith="SELF_ACCOUNT") | Q(meta__ledger="SELF_ACCOUNT") | Q(type="MISSING_BLOCK_OVERFLOW")
             ).aggregate(t=Sum("amount"))["t"] or Decimal("0.00")
 
-            total_cap = Decimal("150000.00")
-            current_total = Decimal(str(earned_layer)) + Decimal(str(earned_royalty))
-            rem = total_cap - current_total
-            return max(Decimal("0.00"), rem.quantize(Decimal("0.01")))
+            CUMULATIVE_LAYER_CAPS = {
+                1: Decimal("1750.00"),
+                2: Decimal("3750.00"),
+                3: Decimal("7750.00"),
+                4: Decimal("13750.00"),
+                5: Decimal("21250.00"),
+                6: Decimal("30000.00"),
+                7: Decimal("40000.00"),
+                8: Decimal("55000.00"),
+                9: Decimal("75000.00"),
+                10: Decimal("100000.00"),
+            }
+
+            active_level = 1
+            try:
+                from mlm_ranks.models import RankUpgrade
+                u_phone = str(getattr(user, "phone", "") or getattr(user, "username", "") or "").strip()
+                is_apex_root = (u_phone == "9999999999" or getattr(user, "id", None) == 1)
+
+                if is_apex_root and max_term == 1:
+                    active_level = 10
+                elif max_term == 1:
+                    rp = getattr(user, "rank_profile", None)
+                    if rp and rp.current_rank:
+                        active_level = max(1, int(rp.current_rank.level_number))
+                    else:
+                        hi = RankUpgrade.objects.filter(
+                            user=user,
+                            payment_status="SUCCESS"
+                        ).aggregate(m=Max("to_rank__level_number"))["m"]
+                        active_level = max(1, int(hi or 1))
+                else:
+                    # For Term 2+, level starts at 1 and advances with upgrades purchased in this term
+                    q_upg = RankUpgrade.objects.filter(user=user, payment_status="SUCCESS")
+                    if active_term_start:
+                        q_upg = q_upg.filter(created_at__gte=active_term_start)
+                    hi = q_upg.aggregate(m=Max("to_rank__level_number"))["m"]
+                    active_level = max(1, int(hi or 1))
+            except Exception:
+                active_level = 1
+
+            layer_cap = CUMULATIVE_LAYER_CAPS.get(active_level, Decimal("100000.00"))
+            total_cycle_cap = min(Decimal("150000.00"), layer_cap + Decimal("50000.00"))
+
+            layer_headroom = max(Decimal("0.00"), layer_cap - earned_layer)
+            cycle_headroom = max(Decimal("0.00"), total_cycle_cap - (earned_layer + min(Decimal("50000.00"), earned_royalty)))
+            rem = min(layer_headroom, cycle_headroom)
+            return rem.quantize(Decimal("0.01"))
         except Exception:
             return Decimal("150000.00")
+
+    def recover_held_missing_income(self) -> Decimal:
+        """
+        Releases held missing income within the 7-day grace window up to the current headroom.
+        Splits released funds 75% to Main Wallet and 25% to Self Account.
+        """
+        try:
+            headroom = self.get_active_term_headroom()
+            if headroom <= Decimal("0.00"):
+                return Decimal("0.00")
+
+            from django.utils import timezone
+            from datetime import timedelta
+            now_dt = timezone.now()
+            seven_days_ago = now_dt - timedelta(days=7)
+
+            held_txs = list(
+                WalletTransaction.objects.filter(
+                    user=self.user,
+                    type="MISSING_BLOCK_OVERFLOW",
+                    created_at__gte=seven_days_ago
+                ).exclude(meta__status="RECOVERED").order_by("created_at")
+            )
+
+            if not held_txs:
+                return Decimal("0.00")
+
+            total_recoverable = Decimal("0.00")
+            txs_to_recover = []
+            for h in held_txs:
+                amt = Decimal(str(h.amount or 0))
+                if amt <= Decimal("0.00"):
+                    continue
+                if total_recoverable + amt <= headroom:
+                    total_recoverable += amt
+                    txs_to_recover.append((h, amt))
+                else:
+                    partial = headroom - total_recoverable
+                    if partial > Decimal("0.00"):
+                        total_recoverable += partial
+                        txs_to_recover.append((h, partial))
+                    break
+
+            if total_recoverable <= Decimal("0.00"):
+                return Decimal("0.00")
+
+            rec_main = (total_recoverable * Decimal("0.75")).quantize(Decimal("0.01"))
+            rec_self = (total_recoverable - rec_main).quantize(Decimal("0.01"))
+
+            self.main_balance = (self.main_balance or Decimal("0.00")) + rec_main
+            self.self_account_balance = (self.self_account_balance or Decimal("0.00")) + rec_self
+            self.save(update_fields=["main_balance", "self_account_balance", "updated_at"])
+
+            for h, r_amt in txs_to_recover:
+                h_meta = dict(h.meta or {})
+                h_meta["status"] = "RECOVERED"
+                h_meta["recovered_at"] = now_dt.isoformat()
+                h_meta["recovered_amount"] = str(r_amt)
+                h.meta = h_meta
+                h.save(update_fields=["meta"])
+
+            WalletTransaction.objects.create(
+                user=self.user,
+                amount=rec_main,
+                balance_after=self.main_balance,
+                type="COMMISSION_CREDIT",
+                source_type="MISSING_INCOME_RECOVERY",
+                meta={
+                    "ledger": "MAIN",
+                    "recovered_from_missing": True,
+                    "gross_recovered": str(total_recoverable),
+                    "income_75": str(rec_main),
+                    "self_25": str(rec_self),
+                }
+            )
+            if rec_self > Decimal("0.00"):
+                WalletTransaction.objects.create(
+                    user=self.user,
+                    amount=rec_self,
+                    balance_after=self.self_account_balance,
+                    type="SELF_ACCOUNT_CREDIT",
+                    source_type="MISSING_INCOME_RECOVERY",
+                    meta={
+                        "ledger": "SELF_ACCOUNT",
+                        "recovered_from_missing": True,
+                        "gross_recovered": str(total_recoverable),
+                    }
+                )
+            return total_recoverable
+        except Exception:
+            return Decimal("0.00")
 
     @transaction.atomic
     def credit(
@@ -660,7 +808,8 @@ class Wallet(models.Model):
 
         if (is_commission or is_prime_tx) and not no_withhold and amt > 0:
             # Check Academic Term Headroom for Matrix / Layer Incomes (capped at ₹150,000 per term)
-            # Direct sponsor bonuses are exempt and flow unconstrained.
+            # Direct sponsor bonuses are exempt and flow unconstrained EXCEPT for Higher-Rank Directs
+            is_higher_rank_direct = bool(meta.get("is_higher_rank_direct") or meta.get("direct_type") == "HIGHER_RANK_DIRECT")
             is_layer_tx = (
                 tx_upper in {
                     "AUTOPOOL_BONUS_FIVE",
@@ -672,10 +821,16 @@ class Wallet(models.Model):
                 or meta.get("kind") == "RANK_UPGRADE_LEVEL"
                 or "MATRIX" in str(meta.get("source", "")).upper()
                 or "LAYER" in str(meta.get("source", "")).upper()
+                or is_higher_rank_direct
             )
 
             if is_layer_tx:
                 headroom = self.get_active_term_headroom()
+                from django.utils import timezone
+                from datetime import timedelta
+                now_dt = timezone.now()
+                held_deadline = (now_dt + timedelta(days=7)).isoformat()
+
                 if headroom <= D("0.00"):
                     # 100% Capped: Route entire commission to MISSING_BLOCK_OVERFLOW (no credit to spendable wallet)
                     meta_missing = {
@@ -684,6 +839,8 @@ class Wallet(models.Model):
                         "orig_type": str(tx_type),
                         "gross": str(amt),
                         "reason": "ACADEMIC_TERM_CAP_REACHED",
+                        "status": "HELD",
+                        "held_deadline": held_deadline,
                         "headroom": "0.00",
                     }
                     WalletTransaction.objects.create(
@@ -707,6 +864,8 @@ class Wallet(models.Model):
                         "orig_type": str(tx_type),
                         "gross": str(overflow_amt),
                         "reason": "ACADEMIC_TERM_CAP_REACHED_PARTIAL",
+                        "status": "HELD",
+                        "held_deadline": held_deadline,
                         "headroom": "0.00",
                     }
                     WalletTransaction.objects.create(

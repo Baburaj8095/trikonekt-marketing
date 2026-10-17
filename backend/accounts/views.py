@@ -4523,6 +4523,8 @@ def wallet_me_history(request):
 
         "ROYALTY": (Q(type="GLOBAL_ROYALTY") | Q(meta__source="GLOBAL_ROYALTY")) & ~Q(type__startswith="SELF_ACCOUNT"),
         "DIRECT": (Q(type="DIRECT_REF_BONUS") | Q(meta__orig_type="DIRECT_REF_BONUS") | (Q(source_type="RANK_UPGRADE") & (Q(meta__kind="RANK_UPGRADE_DIRECT") | Q(meta__level=0)))) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT"),
+        "SAME_RANK_DIRECT": (Q(type="DIRECT_REF_BONUS") | Q(meta__orig_type="DIRECT_REF_BONUS") | (Q(source_type="RANK_UPGRADE") & (Q(meta__kind="RANK_UPGRADE_DIRECT") | Q(meta__level=0)))) & ~Q(meta__direct_type="HIGHER_RANK_DIRECT") & ~Q(meta__is_higher_rank_direct=True) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT"),
+        "HIGHER_RANK_DIRECT": (Q(type="DIRECT_REF_BONUS") | Q(meta__orig_type="DIRECT_REF_BONUS") | (Q(source_type="RANK_UPGRADE") & (Q(meta__kind="RANK_UPGRADE_DIRECT") | Q(meta__level=0)))) & (Q(meta__direct_type="HIGHER_RANK_DIRECT") | Q(meta__is_higher_rank_direct=True)) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT"),
         "WITHDRAWAL": (Q(type__in=["WITHDRAWAL_DEBIT", "WITHDRAWAL_REQUEST"]) | Q(source_type="WITHDRAWAL")),
         "P2P": (Q(type__in=["P2P_PACKAGE_COUPON_SEND", "P2P_PACKAGE_COUPON_RECEIVE"]) | Q(source_type__icontains="P2P")),
         "MISSING_INCOME": Q(type="MISSING_BLOCK_OVERFLOW") | Q(meta__ledger="MISSING_INCOME"),
@@ -4611,9 +4613,22 @@ def wallet_me_history(request):
         royalty_amt = royalty_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
         spp_amt = spp_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
 
+        # Bifurcate Direct Sponsor Income:
+        # - Higher-Rank Direct (downline term > root term): counts toward the ₹1.5L cycle limit
+        # - Same-Rank Direct (downline term == root term): 100% uncapped, excluded from ₹1.5L limit
+        higher_rank_direct_sub = direct_sub.filter(
+            Q(meta__direct_type="HIGHER_RANK_DIRECT") | Q(meta__is_higher_rank_direct=True)
+        )
+        higher_rank_direct_amt = higher_rank_direct_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
+        same_rank_direct_amt = max(D("0.00"), direct_amt - higher_rank_direct_amt)
+
+        # Held missing income within 7-day grace period
+        missing_held_sub = t_sub.filter(type="MISSING_BLOCK_OVERFLOW", meta__status="HELD")
+        missing_held_amt = missing_held_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
+
         layer_amt = five_amt + three_amt + e_edu_layer_amt + spp_amt
         tot_amt = credited_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
-        cycle_eligible_amt = layer_amt + min(D("50000.00"), royalty_amt)
+        cycle_eligible_amt = layer_amt + higher_rank_direct_amt + min(D("50000.00"), royalty_amt)
         cycle_earned = min(D("150000.00"), cycle_eligible_amt)
 
         term_stats[t_str] = {
@@ -4628,9 +4643,12 @@ def wallet_me_history(request):
             "e_edu_direct_total": str(e_edu_direct_amt),
             "e_edu_total": str(e_edu_layer_amt + e_edu_direct_amt),
             "direct_total": str(direct_amt or e_edu_direct_amt),
+            "same_rank_direct_total": str(same_rank_direct_amt),
+            "higher_rank_direct_total": str(higher_rank_direct_amt),
             "royalty_total": str(royalty_amt),
             "spp_total": str(spp_amt),
             "missing_total": str(missing_amt),
+            "missing_held_total": str(missing_held_amt),
         }
 
     # Server-Side Filter Processing (100% Database SQL Execution)
@@ -4786,8 +4804,12 @@ def wallet_me_history(request):
 def wallet_term_renewal(request):
     """
     Handles user renewal for Term 2+ academic tracks.
-    Deducts amount dynamically (Base + 18% GST + 7% Admin Fee) from Main Wallet or Coupon Pocket,
+    3-Layer Term Guard:
+      - Validates that current term has completed its ₹1,50,000 cycle limit.
+      - Prevents duplicate or skipped term activations.
+    Deducts amount dynamically (Base + 7% Admin Fee) from Main Wallet or Coupon Pocket,
     creates ACADEMIC_TERM_RENEWAL transaction in PostgreSQL, and activates next term.
+    Automatically recovers held missing income within 7-day window into new term.
     """
     user = request.user
     w = Wallet.get_or_create_for_user(user)
@@ -4795,6 +4817,54 @@ def wallet_term_renewal(request):
     term = int(data.get("term") or 2)
     track = str(data.get("track") or "TRACK_1")
     payment_source = str(data.get("paymentSource") or "MAIN_WALLET").upper()
+
+    renewal_txs = list(
+        WalletTransaction.objects.filter(
+            user=user,
+            type__in=["ACADEMIC_TERM_RENEWAL", "TERM_RENEWAL"]
+        ).order_by("created_at")
+    )
+    purchased_terms = [1]
+    for r in renewal_txs:
+        t_val = (r.meta or {}).get("term")
+        if not t_val:
+            try:
+                t_val = int(str(r.source_id).replace("TERM_", ""))
+            except Exception:
+                t_val = len(purchased_terms) + 1
+        try:
+            t_int = int(t_val)
+            if t_int not in purchased_terms:
+                purchased_terms.append(t_int)
+        except Exception:
+            pass
+    purchased_terms.sort()
+
+    current_term = max(purchased_terms) if purchased_terms else 1
+
+    if term in purchased_terms:
+        return Response(
+            {"success": False, "message": f"Term {term} is already active."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if term > current_term + 1:
+        return Response(
+            {"success": False, "message": f"Cannot skip terms. Please activate Term {current_term + 1} first."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # 3-Layer Guard: Current active term must have reached ₹1,50,000 cycle limit
+    headroom = w.get_active_term_headroom()
+    if headroom > D("0.00"):
+        return Response(
+            {
+                "success": False,
+                "message": f"Term {term} cannot be activated yet. You must complete your current Term {current_term} earnings (₹1,50,000 limit) first. Current remaining headroom: ₹{headroom:.2f}."
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
     try:
         base_amt = D(str(data.get("baseAmount") or 2000))
     except Exception:
@@ -4844,27 +4914,16 @@ def wallet_term_renewal(request):
         }
     )
 
-    renewal_txs = list(
-        WalletTransaction.objects.filter(
-            user=user,
-            type__in=["ACADEMIC_TERM_RENEWAL", "TERM_RENEWAL"]
-        ).order_by("created_at")
-    )
-    purchased_terms = [1]
-    for r in renewal_txs:
-        t_val = (r.meta or {}).get("term")
-        if not t_val:
-            try:
-                t_val = int(str(r.source_id).replace("TERM_", ""))
-            except Exception:
-                t_val = len(purchased_terms) + 1
-        try:
-            t_int = int(t_val)
-            if t_int not in purchased_terms:
-                purchased_terms.append(t_int)
-        except Exception:
-            pass
+    if term not in purchased_terms:
+        purchased_terms.append(term)
     purchased_terms.sort()
+
+    # 7-Day Missing Income Recovery upon successful term renewal
+    recovered_amt = D("0.00")
+    try:
+        recovered_amt = w.recover_held_missing_income()
+    except Exception:
+        pass
 
     return Response({
         "success": True,
@@ -4874,7 +4933,8 @@ def wallet_term_renewal(request):
         "transaction_id": tx.id,
         "current_term": term,
         "purchased_terms": purchased_terms,
-        "message": f"Term {term} activated successfully with {track}!"
+        "recovered_missing_amount": str(recovered_amt),
+        "message": f"Term {term} activated successfully with {track}! " + (f"Recovered ₹{recovered_amt:.2f} held missing income into your wallet." if recovered_amt > 0 else "")
     }, status=status.HTTP_200_OK)
 
 

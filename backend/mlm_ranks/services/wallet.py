@@ -50,7 +50,50 @@ class WalletPoster:
 
     @classmethod
     def credit_direct(cls, user, amount: Decimal, *, from_user_id: int, upgrade_id: int) -> WalletPostResult:
-        meta = {"from_user_id": from_user_id, "upgrade_id": upgrade_id, "kind": "RANK_UPGRADE_DIRECT"}
+        # Determine downline term vs sponsor term
+        from_term = 1
+        to_term = 1
+        try:
+            from accounts.models import WalletTransaction
+            for u_id, is_from in [(from_user_id, True), (getattr(user, "id", None), False)]:
+                if not u_id:
+                    continue
+                txs = list(WalletTransaction.objects.filter(
+                    user_id=u_id,
+                    type__in=["ACADEMIC_TERM_RENEWAL", "TERM_RENEWAL"]
+                ))
+                m = 1
+                for r in txs:
+                    t_val = (r.meta or {}).get("term")
+                    if not t_val:
+                        try:
+                            t_val = int(str(r.source_id).replace("TERM_", ""))
+                        except Exception:
+                            t_val = None
+                    if t_val:
+                        try:
+                            m = max(m, int(t_val))
+                        except Exception:
+                            pass
+                if is_from:
+                    from_term = m
+                else:
+                    to_term = m
+        except Exception:
+            pass
+
+        is_higher_rank = (from_term > to_term)
+        direct_type = "HIGHER_RANK_DIRECT" if is_higher_rank else "SAME_RANK_DIRECT"
+
+        meta = {
+            "from_user_id": from_user_id,
+            "upgrade_id": upgrade_id,
+            "kind": "RANK_UPGRADE_DIRECT",
+            "from_term": from_term,
+            "to_term": to_term,
+            "direct_type": direct_type,
+            "is_higher_rank_direct": is_higher_rank,
+        }
         return cls._credit(user, amount, cls.DIRECT_TX, source_type="RANK_UPGRADE", source_id=str(upgrade_id), meta=meta)
 
     @classmethod

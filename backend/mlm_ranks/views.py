@@ -1449,6 +1449,10 @@ class AdminApproveRankUpgradeView(APIView):
                 else:
                     CommissionDistributor.distribute(upg)
                 FiveMatrixService.reevaluate_user_holds(upg.user.id)
+                # Recover any held missing income that is now within the expanded rank headroom
+                from accounts.models import Wallet
+                w = Wallet.get_or_create_for_user(upg.user)
+                w.recover_held_missing_income()
             except Exception:
                 pass
 
