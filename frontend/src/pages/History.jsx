@@ -954,6 +954,23 @@ const HistoryRow = React.memo(function HistoryRow({ tx, onClick }) {
               {typeName}
             </Typography>
 
+            {/* Dedicated Term 2 Badge - Strictly only shown for Term 2 and higher, never for Term 1 */}
+            {Number(tx?.term) >= 2 && (
+              <Chip
+                size="small"
+                label={`Term ${tx.term} ⚡`}
+                sx={{
+                  height: 18,
+                  fontSize: 10,
+                  fontWeight: 900,
+                  borderRadius: 1,
+                  bgcolor: "#EFF6FF",
+                  color: "#2563EB",
+                  border: "1px solid #93C5FD",
+                }}
+              />
+            )}
+
             {/* Dedicated Primary Badge for Wallet Split Type */}
             {isSelfAccount ? (
               <Chip
@@ -1137,6 +1154,27 @@ function TxDetailDrawer({ open, onClose, tx }) {
           <Typography sx={{ fontSize: 12, color: "#0F172A", fontWeight: 700 }}>{dateStr}</Typography>
         </Box>
         <Divider />
+
+        {Number(tx?.term) >= 2 && (
+          <>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <Typography sx={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>Academic Term</Typography>
+              <Chip
+                size="small"
+                label={`Term ${tx.term} (Active Current Term ⚡)`}
+                sx={{
+                  height: 20,
+                  fontSize: 10.5,
+                  fontWeight: 900,
+                  bgcolor: "#EFF6FF",
+                  color: "#2563EB",
+                  border: "1px solid #93C5FD",
+                }}
+              />
+            </Box>
+            <Divider />
+          </>
+        )}
 
         {counterpartyLabel(tx) && (
           <>

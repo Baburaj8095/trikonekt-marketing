@@ -4073,6 +4073,80 @@ def wallet_me_history(request):
     except Exception:
         rp_balance = "0.00"
 
+    # Academic Term Detection & Boundary Filtering (Database-Driven)
+    renewal_txs = list(
+        WalletTransaction.objects.filter(
+            user=user,
+            type__in=["ACADEMIC_TERM_RENEWAL", "TERM_RENEWAL"]
+        ).order_by("created_at")
+    )
+    purchased_terms = [1]
+    for r in renewal_txs:
+        t_val = (r.meta or {}).get("term")
+        if not t_val:
+            try:
+                t_val = int(str(r.source_id).replace("TERM_", ""))
+            except Exception:
+                t_val = len(purchased_terms) + 1
+        try:
+            t_int = int(t_val)
+            if t_int not in purchased_terms:
+                purchased_terms.append(t_int)
+        except Exception:
+            pass
+    purchased_terms.sort()
+    current_term = purchased_terms[-1]
+
+    # Discover purchased tracks per term from database records
+    term_tracks = {}
+    term_tracks["1"] = ["TRACK_1"]
+    for r in renewal_txs:
+        t_val = (r.meta or {}).get("term")
+        if not t_val:
+            try:
+                t_val = int(str(r.source_id).replace("TERM_", ""))
+            except Exception:
+                t_val = None
+        trk = (r.meta or {}).get("track")
+        if t_val:
+            t_key = str(t_val)
+            if t_key not in term_tracks:
+                term_tracks[t_key] = []
+            if trk and trk not in term_tracks[t_key]:
+                term_tracks[t_key].append(trk)
+            elif not trk and "TRACK_1" not in term_tracks[t_key]:
+                term_tracks[t_key].append("TRACK_1")
+
+    cur_key = str(current_term)
+    if cur_key not in term_tracks:
+        term_tracks[cur_key] = ["TRACK_1"]
+    active_term_tracks = term_tracks.get(cur_key, ["TRACK_1"])
+
+    # Map each purchased term to its earliest activation timestamp
+    term_start_dts = {}
+    for r in renewal_txs:
+        t_val = (r.meta or {}).get("term")
+        if not t_val:
+            try:
+                t_val = int(str(r.source_id).replace("TERM_", ""))
+            except Exception:
+                t_val = None
+        if t_val:
+            try:
+                t_int = int(t_val)
+                if t_int not in term_start_dts or r.created_at < term_start_dts[t_int]:
+                    term_start_dts[t_int] = r.created_at
+            except Exception:
+                pass
+
+    def get_tx_term(dt):
+        if not dt or not term_start_dts:
+            return 1
+        for t in sorted(term_start_dts.keys(), reverse=True):
+            if dt >= term_start_dts[t]:
+                return t
+        return 1
+
     def txmap(tx):
         try:
             amt = str(tx.amount)
@@ -4087,6 +4161,7 @@ def wallet_me_history(request):
             "meta": tx.meta or {},
             "source_type": tx.source_type or "",
             "source_id": tx.source_id or "",
+            "term": get_tx_term(getattr(tx, "created_at", None)),
         }
 
     try:
@@ -4493,72 +4568,6 @@ def wallet_me_history(request):
     e_layer_tot = D(layer_edu_earned or "0.00")
     ssv_layer_tot = D(category_stats.get("SSV_LAYER", {}).get("total", "0.00"))
     layer_matrix_earned = str(five_layer_tot + three_layer_tot + e_layer_tot + ssv_layer_tot)
-
-    # Academic Term Detection & Boundary Filtering (Database-Driven)
-    renewal_txs = list(
-        WalletTransaction.objects.filter(
-            user=user,
-            type__in=["ACADEMIC_TERM_RENEWAL", "TERM_RENEWAL"]
-        ).order_by("created_at")
-    )
-    purchased_terms = [1]
-    for r in renewal_txs:
-        t_val = (r.meta or {}).get("term")
-        if not t_val:
-            try:
-                t_val = int(str(r.source_id).replace("TERM_", ""))
-            except Exception:
-                t_val = len(purchased_terms) + 1
-        try:
-            t_int = int(t_val)
-            if t_int not in purchased_terms:
-                purchased_terms.append(t_int)
-        except Exception:
-            pass
-    purchased_terms.sort()
-    current_term = purchased_terms[-1]
-
-    # Discover purchased tracks per term from database records
-    term_tracks = {}
-    term_tracks["1"] = ["TRACK_1"]
-    for r in renewal_txs:
-        t_val = (r.meta or {}).get("term")
-        if not t_val:
-            try:
-                t_val = int(str(r.source_id).replace("TERM_", ""))
-            except Exception:
-                t_val = None
-        trk = (r.meta or {}).get("track")
-        if t_val:
-            t_key = str(t_val)
-            if t_key not in term_tracks:
-                term_tracks[t_key] = []
-            if trk and trk not in term_tracks[t_key]:
-                term_tracks[t_key].append(trk)
-            elif not trk and "TRACK_1" not in term_tracks[t_key]:
-                term_tracks[t_key].append("TRACK_1")
-
-    cur_key = str(current_term)
-    if cur_key not in term_tracks:
-        term_tracks[cur_key] = ["TRACK_1"]
-    active_term_tracks = term_tracks.get(cur_key, ["TRACK_1"])
-
-    # Map each purchased term to its earliest activation timestamp
-    term_start_dts = {}
-    for r in renewal_txs:
-        t_val = (r.meta or {}).get("term")
-        if not t_val:
-            try:
-                t_val = int(str(r.source_id).replace("TERM_", ""))
-            except Exception:
-                t_val = None
-        if t_val:
-            try:
-                t_int = int(t_val)
-                if t_int not in term_start_dts or r.created_at < term_start_dts[t_int]:
-                    term_start_dts[t_int] = r.created_at
-            except Exception:
-                pass
 
     # Precalculate exact database SQL sums for each purchased term
     term_stats = {}
