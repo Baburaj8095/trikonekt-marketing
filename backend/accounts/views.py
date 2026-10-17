@@ -4412,13 +4412,13 @@ def wallet_me_history(request):
         ) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT") & ~Q(meta__source__icontains="FIVE_MATRIX") & ~Q(meta__orig_type="AUTOPOOL_BONUS_FIVE"),
 
         "E_EDU_LAYER": (
-            Q(source_type="RANK_UPGRADE") &
-            (Q(meta__kind="RANK_UPGRADE_LEVEL") | Q(meta__orig_type="LEVEL_BONUS") | Q(type="LEVEL_BONUS"))
+            (Q(source_type="RANK_UPGRADE") | Q(meta__source="E_EDU") | Q(meta__kind__startswith="RANK_UPGRADE") | Q(meta__orig_type__in=["LEVEL_BONUS", "RANK_UPGRADE_LEVEL"]) | Q(type="LEVEL_BONUS")) &
+            (Q(meta__kind="RANK_UPGRADE_LEVEL") | Q(meta__orig_type="LEVEL_BONUS") | Q(type="LEVEL_BONUS") | Q(meta__orig_type="RANK_UPGRADE_LEVEL") | Q(meta__layer_level__gt=0))
         ) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT"),
 
         "E_EDU_DIRECT": (
-            Q(source_type="RANK_UPGRADE") &
-            (Q(meta__kind="RANK_UPGRADE_DIRECT") | Q(meta__orig_type="DIRECT_REF_BONUS") | Q(type="DIRECT_REF_BONUS") | Q(meta__level=0))
+            (Q(source_type="RANK_UPGRADE") | Q(meta__source="E_EDU") | Q(meta__kind__startswith="RANK_UPGRADE") | Q(meta__orig_type__in=["DIRECT_REF_BONUS", "RANK_UPGRADE_DIRECT"]) | Q(type="DIRECT_REF_BONUS")) &
+            (Q(meta__kind="RANK_UPGRADE_DIRECT") | Q(meta__orig_type="DIRECT_REF_BONUS") | Q(type="DIRECT_REF_BONUS") | Q(meta__orig_type="RANK_UPGRADE_DIRECT") | Q(meta__level=0))
         ) & ~Q(type__startswith="SELF_ACCOUNT") & ~Q(meta__ledger="SELF_ACCOUNT"),
 
         "E_EDU": (
@@ -4586,27 +4586,37 @@ def wallet_me_history(request):
             Q(type__startswith="SELF_ACCOUNT") | Q(meta__ledger="SELF_ACCOUNT") | Q(type="MISSING_BLOCK_OVERFLOW")
         )
 
-        layer_sub = credited_sub.filter(
-            Q(type__in=["AUTOPOOL_BONUS_FIVE", "AUTOPOOL_BONUS_THREE", "LEVEL_BONUS"]) |
-            Q(meta__source__icontains="MATRIX") |
-            Q(meta__source__icontains="LAYER") |
-            Q(source_type="RANK_UPGRADE") |
-            (Q(type="INCOME_CREDIT_75") & (Q(meta__source__icontains="MATRIX") | Q(meta__orig_type__in=["AUTOPOOL_BONUS_FIVE", "AUTOPOOL_BONUS_THREE"])))
-        )
+        five_sub = credited_sub.filter(cat_queries["FIVE_LAYER"])
+        three_sub = credited_sub.filter(cat_queries["THREE_LAYER"])
+        e_edu_layer_sub = credited_sub.filter(cat_queries["E_EDU_LAYER"])
+        e_edu_direct_sub = credited_sub.filter(cat_queries["E_EDU_DIRECT"])
+        direct_sub = credited_sub.filter(cat_queries["DIRECT"])
+        royalty_sub = credited_sub.filter(cat_queries["ROYALTY"])
+        spp_sub = credited_sub.filter(cat_queries["SSV_LAYER"])
 
-        royalty_sub = credited_sub.filter(
-            Q(type="GLOBAL_ROYALTY") | Q(meta__source="GLOBAL_ROYALTY")
-        )
-
-        tot_amt = credited_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
-        layer_amt = layer_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
+        five_amt = five_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
+        three_amt = three_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
+        e_edu_layer_amt = e_edu_layer_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
+        e_edu_direct_amt = e_edu_direct_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
+        direct_amt = direct_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
         royalty_amt = royalty_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
+        spp_amt = spp_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
+
+        layer_amt = five_amt + three_amt + e_edu_layer_amt + spp_amt
+        tot_amt = credited_sub.aggregate(s=Sum("amount"))["s"] or D("0.00")
 
         term_stats[t_str] = {
             "count": credited_sub.count(),
             "total": str(tot_amt),
             "layer_total": str(layer_amt),
+            "five_total": str(five_amt),
+            "three_total": str(three_amt),
+            "e_edu_layer_total": str(e_edu_layer_amt),
+            "e_edu_direct_total": str(e_edu_direct_amt),
+            "e_edu_total": str(e_edu_layer_amt + e_edu_direct_amt),
+            "direct_total": str(direct_amt),
             "royalty_total": str(royalty_amt),
+            "spp_total": str(spp_amt),
             "missing_total": str(missing_amt),
         }
 

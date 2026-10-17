@@ -856,6 +856,36 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
       : Math.max(0, earnedRoyalty - Math.max(0, (viewingTermNumber - 1) * maxRoyaltyCap));
   }, [termStat, isViewingArchivedTerm, maxRoyaltyCap, earnedRoyalty, viewingTermNumber]);
 
+  // Pure Layer Income From All Sources (strictly read from DB term_stats aggregates, bifurcated per term)
+  const termLayerBreakdown = useMemo(() => {
+    const stats = walletHistory?.category_stats || {};
+    const five = termStat?.five_total !== undefined ? Number(termStat.five_total) : Number(layerBreakdown.fiveMatrix || 0);
+    const three = termStat?.three_total !== undefined ? Number(termStat.three_total) : Number(layerBreakdown.threeMatrix || 0);
+    const eEdu = termStat?.e_edu_layer_total !== undefined ? Number(termStat.e_edu_layer_total) : (termStat?.e_edu_total !== undefined ? Number(termStat.e_edu_total) : Number(layerBreakdown.eEduSlabs || 0));
+    const spp = termStat?.spp_total !== undefined ? Number(termStat.spp_total) : Number(layerBreakdown.sppLevel || 0);
+
+    return {
+      fiveMatrix: Number(five.toFixed(2)),
+      threeMatrix: Number(three.toFixed(2)),
+      eEduSlabs: Number(eEdu.toFixed(2)),
+      sppLevel: Number(spp.toFixed(2)),
+    };
+  }, [termStat, layerBreakdown]);
+
+  // Total E Edu Income: All E Edu related money (E-Edu Layer Commissions + E-Edu Direct Sponsor/Referral Bonus)
+  // Strictly read from database-computed totals bifurcated per term
+  const termEEduIncome = useMemo(() => {
+    const directTotal = termStat?.e_edu_direct_total !== undefined ? Number(termStat.e_edu_direct_total) : (termStat?.direct_total !== undefined ? Number(termStat.direct_total) : eEduDirectBonus);
+    const layerTotal = termStat?.e_edu_layer_total !== undefined ? Number(termStat.e_edu_layer_total) : eEduLayerIncome;
+    const total = termStat?.e_edu_total !== undefined ? Number(termStat.e_edu_total) : (directTotal + layerTotal);
+
+    return {
+      totalEEduIncome: Number(total.toFixed(2)),
+      eEduLayerIncome: Number(layerTotal.toFixed(2)),
+      eEduDirectBonus: Number(directTotal.toFixed(2)),
+    };
+  }, [termStat, eEduDirectBonus, eEduLayerIncome]);
+
   // Dynamic available limit for layers: up to ₹1,50,000 minus whatever Royalty has taken
   const dynamicLayerCap = Math.max(0, totalCycleCap - Math.min(maxRoyaltyCap, viewingTermEarnedRoyalty));
   const maxLayerCap = dynamicLayerCap;
@@ -1364,6 +1394,191 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
         </>
       )}
 
+      {/* ── Academic Term Income Bifurcation Widget ── */}
+      {purchasedTerms.length > 1 && (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            mb: 2,
+            borderRadius: 3,
+            bgcolor: "#ffffff",
+            border: "1.5px solid #e2e8f0",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.04)",
+          }}
+        >
+          <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1} sx={{ mb: 1.5 }}>
+            <Box>
+              <Typography sx={{ fontSize: 14, fontWeight: 950, color: "#0f172a", display: "flex", alignItems: "center", gap: 1 }}>
+                📊 Academic Term Income Bifurcation
+                <Chip label={`${purchasedTerms.length} Terms Purchased`} size="small" color="primary" sx={{ fontWeight: 800, fontSize: 10, height: 20 }} />
+              </Typography>
+              <Typography sx={{ fontSize: 11, color: "#64748b", mt: 0.25 }}>
+                Clear breakdown of earnings separated by Academic Term. Click any term card below to inspect its detailed layer and community matrix progression.
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1}>
+              {purchasedTerms.map((t) => {
+                const isSelected = viewingTermNumber === t.num;
+                return (
+                  <Chip
+                    key={t.num}
+                    label={t.isCurrent ? `Term ${t.num} (Active ⚡)` : `Term ${t.num} (Archived 🏆)`}
+                    clickable
+                    color={isSelected ? "primary" : "default"}
+                    variant={isSelected ? "filled" : "outlined"}
+                    onClick={() => setSelectedViewingTerm(t.num)}
+                    sx={{
+                      fontWeight: 900,
+                      fontSize: 11,
+                      borderRadius: "8px",
+                      borderColor: isSelected ? "primary.main" : "#cbd5e1",
+                    }}
+                  />
+                );
+              })}
+            </Stack>
+          </Stack>
+
+          <Grid container spacing={2}>
+            {purchasedTerms.map((t) => {
+              const stat = walletHistory?.term_stats?.[String(t.num)] || {};
+              const tTotal = Number(stat.total || 0);
+              const tLayer = Number(stat.layer_total || 0);
+              const tFive = Number(stat.five_total || 0);
+              const tThree = Number(stat.three_total || 0);
+              const tEEduLayer = Number(stat.e_edu_layer_total || 0);
+              const tEEduDirect = Number(stat.e_edu_direct_total || 0);
+              const tEEduTotal = Number(stat.e_edu_total || (tEEduLayer + tEEduDirect));
+              const tRoyalty = Number(stat.royalty_total || 0);
+              const tDirect = Number(stat.direct_total || 0);
+              const tMissing = Number(stat.missing_total || 0);
+
+              const isSelected = viewingTermNumber === t.num;
+              const isCurrent = t.num === currentCycleNumber;
+              const capLimit = 150000;
+              const pct = Math.min(100, Math.max(0, (tTotal / capLimit) * 100));
+
+              return (
+                <Grid item xs={12} md={6} key={t.num}>
+                  <Paper
+                    variant="outlined"
+                    onClick={() => setSelectedViewingTerm(t.num)}
+                    sx={{
+                      p: 2,
+                      borderRadius: 2.5,
+                      cursor: "pointer",
+                      transition: "all 0.2s ease-in-out",
+                      bgcolor: isSelected ? (isCurrent ? "#f0fdf4" : "#f8fafc") : "#ffffff",
+                      borderColor: isSelected ? (isCurrent ? "#16a34a" : "#2563eb") : "#e2e8f0",
+                      borderWidth: isSelected ? 2 : 1.5,
+                      boxShadow: isSelected ? "0 4px 14px rgba(37,99,235,0.12)" : "none",
+                      "&:hover": {
+                        borderColor: isCurrent ? "#16a34a" : "#2563eb",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+                      },
+                    }}
+                  >
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography sx={{ fontSize: 15, fontWeight: 950, color: isCurrent ? "#166534" : "#1e293b" }}>
+                          Term {t.num} {isCurrent ? "(Current Term)" : "(Completed)"}
+                        </Typography>
+                        <Chip
+                          label={isCurrent ? "Active ⚡" : "Archived 🏆"}
+                          size="small"
+                          sx={{
+                            height: 20,
+                            fontSize: 10,
+                            fontWeight: 900,
+                            bgcolor: isCurrent ? "#16a34a" : "#64748b",
+                            color: "#fff",
+                          }}
+                        />
+                      </Stack>
+                      {isSelected ? (
+                        <Chip label="Currently Viewing" color={isCurrent ? "success" : "primary"} size="small" sx={{ fontWeight: 800, fontSize: 10, height: 20 }} />
+                      ) : (
+                        <Typography sx={{ fontSize: 11, color: "#2563eb", fontWeight: 700 }}>
+                          Click to View &gt;
+                        </Typography>
+                      )}
+                    </Stack>
+
+                    <Divider sx={{ my: 1 }} />
+
+                    <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 0.5 }}>
+                      <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>TOTAL TERM EARNINGS</Typography>
+                      <Typography sx={{ fontSize: 18, fontWeight: 950, color: isCurrent ? "#15803d" : "#0f172a" }}>
+                        ₹{fmt(tTotal)} <span style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8" }}>/ ₹{fmt(capLimit)}</span>
+                      </Typography>
+                    </Stack>
+
+                    <LinearProgress
+                      variant="determinate"
+                      value={pct}
+                      sx={{
+                        height: 7,
+                        borderRadius: 3.5,
+                        mb: 1.5,
+                        bgcolor: "#e2e8f0",
+                        "& .MuiLinearProgress-bar": {
+                          bgcolor: isCurrent ? "#16a34a" : "#3b82f6",
+                        },
+                      }}
+                    />
+
+                    {/* Bifurcated Channels Grid */}
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(3, 1fr)",
+                        gap: 1,
+                        bgcolor: isSelected ? "rgba(255,255,255,0.7)" : "#f8fafc",
+                        p: 1.25,
+                        borderRadius: 2,
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <Box>
+                        <Typography sx={{ fontSize: 9.5, color: "#64748b", fontWeight: 800 }}>5-MATRIX</Typography>
+                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#0f172a" }}>₹{fmt(tFive)}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: 9.5, color: "#64748b", fontWeight: 800 }}>3-MATRIX</Typography>
+                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#0f172a" }}>₹{fmt(tThree)}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: 9.5, color: "#7c3aed", fontWeight: 800 }}>E-EDU TOTAL</Typography>
+                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#7c3aed" }}>₹{fmt(tEEduTotal)}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: 9.5, color: "#6d28d9", fontWeight: 700 }}>↳ e-Edu Layer</Typography>
+                        <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: "#6d28d9" }}>₹{fmt(tEEduLayer)}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: 9.5, color: "#6d28d9", fontWeight: 700 }}>↳ e-Edu Direct</Typography>
+                        <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: "#6d28d9" }}>₹{fmt(tEEduDirect)}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: 9.5, color: "#059669", fontWeight: 800 }}>ROYALTY</Typography>
+                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: "#059669" }}>₹{fmt(tRoyalty)}</Typography>
+                      </Box>
+                    </Box>
+
+                    {tMissing > 0 && (
+                      <Typography sx={{ fontSize: 10.5, fontWeight: 800, color: "#c2410c", mt: 1 }}>
+                        ⚠️ Overflow / Missing Blocks: ₹{fmt(tMissing)}
+                      </Typography>
+                    )}
+                  </Paper>
+                </Grid>
+              );
+            })}
+          </Grid>
+        </Paper>
+      )}
+
       {/* ── Multi-Cycle Status & Earning Cap Banner (Layer 1L + Royalty 50k = 1.5L) ── */}
       <Paper
         elevation={0}
@@ -1635,8 +1850,8 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
               <Chip label={`Eligible ₹${fmt(dynamicRoyaltyCap)}`} color="success" size="small" sx={{ fontWeight: 900, fontSize: 11 }} />
             </Stack>
             <Divider sx={{ my: 1 }} />
-            <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700, mb: 0.5 }}>TOTAL ROYALTY EARNED (ALL TIERS)</Typography>
-            <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#0f172a", mb: 0.5 }}>₹{fmt(earnedRoyalty)}</Typography>
+            <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700, mb: 0.5 }}>TOTAL ROYALTY EARNED (TERM {viewingTermNumber})</Typography>
+            <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#0f172a", mb: 0.5 }}>₹{fmt(viewingTermEarnedRoyalty)}</Typography>
             <Box sx={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 0.5, fontSize: 10, color: "#64748b", mb: 0.5 }}>
               <span>District (T1): ₹{fmt(royaltyInfo?.tier1_earned ?? 0)}</span>
               <span>Districtwise (T2): ₹{fmt(royaltyInfo?.tier2_district_earned ?? (Number(royaltyInfo?.tier2_earned || 0) * 0.6))}</span>
@@ -1645,7 +1860,7 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             </Box>
             <LinearProgress
               variant="determinate"
-              value={dynamicRoyaltyCap > 0 ? Math.min(100, (earnedRoyalty / dynamicRoyaltyCap) * 100) : 0}
+              value={dynamicRoyaltyCap > 0 ? Math.min(100, (viewingTermEarnedRoyalty / dynamicRoyaltyCap) * 100) : 0}
               color="success"
               sx={{ height: 6, borderRadius: 3, mb: 1 }}
             />
@@ -1749,10 +1964,10 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
             <Typography sx={{ fontSize: 10, color: "#64748b", fontWeight: 700, mb: 0.5 }}>TOTAL LAYER INCOME (ALL SOURCES)</Typography>
             <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#0f172a", mb: 0.5 }}>₹{fmt(totalEarnings)}</Typography>
             <Box sx={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 0.5, fontSize: 10, color: "#64748b", mb: 0.5 }}>
-              <span>5 Blocks: ₹{fmt(layerBreakdown.fiveMatrix)}</span>
-              <span>3 Blocks: ₹{fmt(layerBreakdown.threeMatrix)}</span>
-              <span>e-Edu: ₹{fmt(layerBreakdown.eEduSlabs)}</span>
-              {layerBreakdown.sppLevel > 0 && <span>SSV: ₹{fmt(layerBreakdown.sppLevel)}</span>}
+              <span>5 Blocks: ₹{fmt(termLayerBreakdown.fiveMatrix)}</span>
+              <span>3 Blocks: ₹{fmt(termLayerBreakdown.threeMatrix)}</span>
+              <span>e-Edu: ₹{fmt(termLayerBreakdown.eEduSlabs)}</span>
+              {termLayerBreakdown.sppLevel > 0 && <span>SSV: ₹{fmt(termLayerBreakdown.sppLevel)}</span>}
             </Box>
             <LinearProgress variant="determinate" value={layerMatrixPercent} sx={{ height: 6, borderRadius: 3, mb: 1 }} />
             <Divider sx={{ my: 1 }} />
@@ -1847,15 +2062,15 @@ export default function RankUpgrade({ defaultToRankId = null, teamSummary: propT
           }}
         >
           <Typography sx={{ fontSize: 10, fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.4, mb: 0.5, whiteSpace: "nowrap" }}>
-            Total E Edu Income
+            Total E Edu Income (Term {viewingTermNumber})
           </Typography>
           <Typography sx={{ fontSize: 18, fontWeight: 900, color: "#7c3aed" }}>
-            ₹{fmt(totalEEduIncome)}
+            ₹{fmt(termEEduIncome.totalEEduIncome)}
           </Typography>
           <Typography sx={{ fontSize: 10, color: "#6d28d9", fontWeight: 700, whiteSpace: "nowrap" }}>
-            {totalEEduIncome > 0
-              ? `Layer: ₹${fmt(eEduLayerIncome)} • Ref: ₹${fmt(eEduDirectBonus)}`
-              : "All E-Edu Sources"}
+            {termEEduIncome.totalEEduIncome > 0
+              ? `Layer: ₹${fmt(termEEduIncome.eEduLayerIncome)} • Ref: ₹${fmt(termEEduIncome.eEduDirectBonus)}`
+              : `No E-Edu Earnings in Term ${viewingTermNumber}`}
           </Typography>
         </Paper>
       </Box>
