@@ -172,7 +172,7 @@ const Login = () => {
   // Redirect legacy /login?mode=register[&role=...] links to the role-scoped register route
   // This avoids any admin-session auto-redirects that can occur on the generic /login page.
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || isGrowthProduction()) return;
     try {
       const params = new URLSearchParams(location.search || "");
       const qMode = String(params.get("mode") || params.get("category") || "").toLowerCase();

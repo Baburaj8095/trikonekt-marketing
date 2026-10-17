@@ -480,11 +480,15 @@ export default function TeamWallet() {
           label = "Source for all transfers";
           actions = [
             { label: "Transfer", onClick: () => setTransferOpen(true) },
-            {
-              label: "Withdraw",
-              onClick: () => (window.location.href = "/user/wallet"),
-              disabled: !kycVerified,
-            },
+            ...(isGrowthProduction()
+              ? []
+              : [
+                  {
+                    label: "Withdraw",
+                    onClick: () => (window.location.href = "/user/wallet"),
+                    disabled: !kycVerified,
+                  },
+                ]),
             {
               label: "Buy Pkg",
               onClick: () => (window.location.href = "/user/promo-packages"),
@@ -495,9 +499,11 @@ export default function TeamWallet() {
           amount = Number(transferWallets?.coupon) || Number(voucherData?.coupon_wallet_balance) || 0;
           icon = <LocalShippingIcon />;
           label = "Create 30-day/7-day vouchers";
-          actions = [
-            { label: "Voucher", onClick: () => setVoucherOpen(true) },
-          ];
+          actions = isGrowthProduction()
+            ? []
+            : [
+                { label: "Voucher", onClick: () => setVoucherOpen(true) },
+              ];
           break;
         case 7:
           amount = Number(transferWallets?.internal || 0);
@@ -508,13 +514,15 @@ export default function TeamWallet() {
           amount = Number(transferWallets?.withdrawal || walletData?.withdrawable_balance || 0);
           icon = <PaymentsIcon />;
           label = `Min Rs. ${limits?.minWithdraw || 500}`;
-          actions = [
-            {
-              label: "Withdraw",
-              onClick: () => (window.location.href = "/user/wallet"),
-              disabled: !kycVerified,
-            },
-          ];
+          actions = isGrowthProduction()
+            ? []
+            : [
+                {
+                  label: "Withdraw",
+                  onClick: () => (window.location.href = "/user/wallet"),
+                  disabled: !kycVerified,
+                },
+              ];
           break;
         case 9:
           amount = addMoneyPocketBalance;
@@ -525,13 +533,15 @@ export default function TeamWallet() {
           amount = Number(transferWallets?.withdrawal || walletData?.withdrawable_balance || 0);
           icon = <PaymentsIcon />;
           label = `Min ₹${limits?.minWithdraw || 500}`;
-          actions = [
-            {
-              label: "Withdraw",
-              onClick: () => (window.location.href = "/user/wallet"),
-              disabled: !kycVerified,
-            },
-          ];
+          actions = isGrowthProduction()
+            ? []
+            : [
+                {
+                  label: "Withdraw",
+                  onClick: () => (window.location.href = "/user/wallet"),
+                  disabled: !kycVerified,
+                },
+              ];
           break;
         case 11:
           amount = Number(transferWallets?.packagePurchaseCoupon) || Number(voucherData?.package_coupon_wallet_balance) || 0;
@@ -578,40 +588,46 @@ export default function TeamWallet() {
   );
 
   const transferPockets = useMemo(
-    () => [
-      {
-        no: 1,
-        transferType: "coupon",
-        title: "Coupon Pocket",
-        wallet: walletByNo[6],
-        onClick: () => (window.location.href = "/user/coupon-pocket"),
-      },
-      {
-        no: 2,
-        title: "Self Package Pocket",
-        wallet: walletByNo[7],
-        disabled: true,
-      },
-      {
-        no: 3,
-        transferType: "withdrawal",
-        title: "Withdrawal To Pocket",
-        wallet: walletByNo[10],
-        onClick: () => (window.location.href = "/user/wallet"),
-      },
-      {
-        no: 4,
-        title: "Add Money (Buy Package)",
-        wallet: walletByNo[9],
-        disabled: true,
-      },
-      {
-        no: 5,
-        title: "Package Purchase Coupon Received (Buy Package)",
-        wallet: walletByNo[11],
-        onClick: () => (window.location.href = "/user/package-coupon-pocket"),
-      },
-    ],
+    () => {
+      const all = [
+        {
+          no: 1,
+          transferType: "coupon",
+          title: "Coupon Pocket",
+          wallet: walletByNo[6],
+          onClick: () => (window.location.href = "/user/coupon-pocket"),
+        },
+        {
+          no: 2,
+          title: "Self Package Pocket",
+          wallet: walletByNo[7],
+          disabled: true,
+        },
+        {
+          no: 3,
+          transferType: "withdrawal",
+          title: "Withdrawal To Pocket",
+          wallet: walletByNo[10],
+          onClick: () => (window.location.href = "/user/wallet"),
+        },
+        {
+          no: 4,
+          title: "Add Money (Buy Package)",
+          wallet: walletByNo[9],
+          disabled: true,
+        },
+        {
+          no: 5,
+          title: "Package Purchase Coupon Received (Buy Package)",
+          wallet: walletByNo[11],
+          onClick: () => (window.location.href = "/user/package-coupon-pocket"),
+        },
+      ];
+      if (isGrowthProduction()) {
+        return all.filter((p) => p.transferType !== "coupon" && p.transferType !== "withdrawal");
+      }
+      return all;
+    },
     [walletByNo]
   );
 
@@ -1150,16 +1166,16 @@ export default function TeamWallet() {
             {/* Card 3: Withdrawable Pocket */}
             <Paper
               elevation={0}
-              onClick={() => openTransferType("withdrawal")}
+              onClick={isGrowthProduction() ? undefined : () => openTransferType("withdrawal")}
               sx={{
                 p: 1.75,
                 borderRadius: "16px",
                 bgcolor: "#ffffff",
                 border: "1px solid #e2e8f0",
                 boxShadow: "0 2px 8px rgba(15, 23, 42, 0.04)",
-                cursor: "pointer",
+                cursor: isGrowthProduction() ? "default" : "pointer",
                 transition: "transform 140ms ease",
-                "&:hover": { transform: "translateY(-2px)" },
+                "&:hover": isGrowthProduction() ? undefined : { transform: "translateY(-2px)" },
               }}
             >
               <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
@@ -1442,10 +1458,10 @@ export default function TeamWallet() {
                 title="Main Wallet"
                 amount={walletByNo[5]?.amount}
                 icon={walletByNo[5]?.icon}
-                caption="Choose a pocket after click"
+                caption={isGrowthProduction() ? "Main Wallet Balance" : "Choose a pocket after click"}
                 highlight
                 tone={5}
-                onClick={() => openTransferType("coupon")}
+                onClick={isGrowthProduction() ? undefined : () => openTransferType("coupon")}
               />
             </Box>
 
